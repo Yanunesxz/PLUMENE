@@ -4,6 +4,11 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
 import { env } from './config/env.js';
+import { authRouter } from './modules/auth/auth.router.js';
+import { catalogRouter } from './modules/catalog/catalog.router.js';
+import { customersRouter } from './modules/customers/customers.router.js';
+import { ordersRouter } from './modules/orders/orders.router.js';
+import { syncRouter } from './modules/sync/sync.router.js';
 
 const server = Fastify({
   logger: {
@@ -29,6 +34,12 @@ server.get('/health', async () => ({
   timestamp: new Date().toISOString(),
   env: env.NODE_ENV,
 }));
+
+await server.register(authRouter);
+await server.register(catalogRouter);
+await server.register(customersRouter);
+await server.register(ordersRouter);
+await server.register(syncRouter);
 
 const start = async (): Promise<void> => {
   try {
