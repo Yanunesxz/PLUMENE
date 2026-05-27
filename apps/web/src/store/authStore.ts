@@ -1,0 +1,45 @@
+import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
+import type { User, UserRole } from '@csb/shared';
+
+interface AuthState {
+  token: string | null;
+  refresh_token: string | null;
+  user: Omit<User, 'created_at'> | null;
+  isAuthenticated: boolean;
+  login: (token: string, refresh_token: string, user: Omit<User, 'created_at'>) => void;
+  logout: () => void;
+  hasRole: (...roles: UserRole[]) => boolean;
+}
+
+export const useAuthStore = create<AuthState>()(
+  persist(
+    (set, get) => ({
+      token: null,
+      refresh_token: null,
+      user: null,
+      isAuthenticated: false,
+
+      login: (token, refresh_token, user) =>
+        set({ token, refresh_token, user, isAuthenticated: true }),
+
+      logout: () =>
+        set({ token: null, refresh_token: null, user: null, isAuthenticated: false }),
+
+      hasRole: (...roles) => {
+        const { user } = get();
+        if (!user) return false;
+        return roles.includes(user.role);
+      },
+    }),
+    {
+      name: 'csb-auth',
+      partialize: (state) => ({
+        token: state.token,
+        refresh_token: state.refresh_token,
+        user: state.user,
+        isAuthenticated: state.isAuthenticated,
+      }),
+    },
+  ),
+);
