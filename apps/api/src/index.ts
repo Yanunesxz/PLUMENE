@@ -9,6 +9,7 @@ import { catalogRouter } from './modules/catalog/catalog.router.js';
 import { customersRouter } from './modules/customers/customers.router.js';
 import { ordersRouter } from './modules/orders/orders.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
+import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
 
 const server = Fastify({
   logger: {
@@ -44,11 +45,20 @@ await server.register(syncRouter);
 const start = async (): Promise<void> => {
   try {
     await server.listen({ port: env.PORT, host: '0.0.0.0' });
+    startErpSyncScheduler();
   } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
 };
+
+const stop = async (): Promise<void> => {
+  stopErpSyncScheduler();
+  await server.close();
+};
+
+process.on('SIGTERM', () => { void stop(); });
+process.on('SIGINT', () => { void stop(); });
 
 await start();
 

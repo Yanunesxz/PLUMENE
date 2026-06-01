@@ -19,10 +19,9 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
-export function requireRole(...roles: UserRole[]) {
+export function requireRole(roles: UserRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    await authenticate(request, reply);
-    if (!roles.includes(request.user.role)) {
+    if (!request.user || !roles.includes(request.user.role)) {
       await reply.status(403).send({
         error: 'Acesso negado para este papel',
         code: 'FORBIDDEN',
