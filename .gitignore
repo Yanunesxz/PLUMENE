@@ -56,3 +56,15 @@ temp/
 
 # Claude Code
 .claude/settings.local.json
+
+# ERP — dados sensíveis NUNCA versionados
+*.FDB
+*.GDB
+*.fdb
+*.gdb
+_tools/erp-sync/.env
+_tools/firebird-reader/schema_*.json
+_tools/firebird-reader/schema_*.txt
+_tools/firebird-reader/relevant_tables.txt
+_tools/firebird-reader/fbembed25/
+_tools/firebird-reader/fbembed25_x64/
