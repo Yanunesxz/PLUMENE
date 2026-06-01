@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { createHash } from 'crypto';
-import type { LoginRequest, AuthPayload } from '@csb/shared';
+import type { LoginRequest, AuthPayload, User } from '@csb/shared';
 import { findUserByEmail, buildAuthPayload, getTokenConfig } from './auth.service.js';
 
 function hashPassword(password: string): string {
@@ -33,7 +33,8 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
   const config = getTokenConfig();
   const token = request.server.jwt.sign(payload, { expiresIn: config.expiresIn });
   const refresh_token = request.server.jwt.sign(
-    { sub: user.id, type: 'refresh' },
+    // refresh tokens use a custom shape that differs from AuthPayload
+    { sub: user.id, type: 'refresh' } as unknown as AuthPayload,
     { expiresIn: config.refreshExpiresIn },
   );
 
@@ -97,7 +98,7 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
       return;
     }
 
-    const payload = buildAuthPayload(userData as AuthPayload & { id: string; company_id: string; name: string; email: string });
+    const payload = buildAuthPayload(userData as User);
     const config = getTokenConfig();
     const token = request.server.jwt.sign(payload, { expiresIn: config.expiresIn });
 

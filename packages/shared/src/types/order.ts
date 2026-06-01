@@ -34,11 +34,11 @@ export interface OrderWithItems extends Order {
 
 export interface CreateOrderRequest {
   customer_id: string;
-  notes?: string;
-  local_id?: string;
+  notes?: string | undefined;
+  local_id?: string | undefined;
   items: Array<{
     product_id: string;
-    variant_id?: string;
+    variant_id?: string | undefined;
     quantity: number;
     unit_price: number;
   }>;

@@ -116,7 +116,7 @@ export async function syncProducts(company_id: string): Promise<SyncResult[]> {
 
     // Deduplica produtos (um produto = vários tamanhos × cores no Firebird)
     const productMap = new Map<string, object>();
-    const variantRows: object[] = [];
+    const variantRows: Record<string, unknown>[] = [];
 
     for (const r of erpRows) {
       const sku = r.PRODUTO.trim();
@@ -169,7 +169,7 @@ export async function syncProducts(company_id: string): Promise<SyncResult[]> {
 
     // 3. Enriquece variantes com product_id e remove campo temporário
     const variants = variantRows
-      .map((v: Record<string, unknown>) => {
+      .map((v) => {
         const pid = productIdMap.get(v['_sku'] as string);
         if (!pid) return null;
         const { _sku: _skip, ...rest } = v;

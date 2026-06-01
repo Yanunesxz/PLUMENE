@@ -8,9 +8,11 @@
  * use o script Python `_tools/erp-sync/sync.py` que usa fbembed.
  */
 import Firebird from 'node-firebird';
+import type { Database } from 'node-firebird';
 import { env } from '../../config/env.js';
 
-export type FirebirdDb = Parameters<Parameters<typeof Firebird.attach>[1]>[1];
+/** Alias for the node-firebird Database handle used in callbacks. */
+export type FirebirdDb = Database;
 
 const fbOptions: Firebird.Options = {
   host: env.ERP_DB_HOST,
@@ -19,7 +21,6 @@ const fbOptions: Firebird.Options = {
   user: env.ERP_DB_USER,
   password: env.ERP_DB_PASSWORD,
   lowercase_keys: false,
-  role: null,
   pageSize: 4096,
 };
 

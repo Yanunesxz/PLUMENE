@@ -1,8 +1,10 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AuthPayload, UserRole } from '@csb/shared';
 
-declare module 'fastify' {
-  interface FastifyRequest {
+// Augmenta @fastify/jwt para tipar request.user como AuthPayload
+declare module '@fastify/jwt' {
+  interface FastifyJWT {
+    payload: AuthPayload;
     user: AuthPayload;
   }
 }

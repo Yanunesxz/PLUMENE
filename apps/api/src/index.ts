@@ -12,13 +12,10 @@ import { syncRouter } from './modules/sync/sync.router.js';
 import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
 
 const server = Fastify({
-  logger: {
-    level: env.NODE_ENV === 'production' ? 'info' : 'debug',
-    transport:
-      env.NODE_ENV !== 'production'
-        ? { target: 'pino-pretty', options: { colorize: true } }
-        : undefined,
-  },
+  logger:
+    env.NODE_ENV !== 'production'
+      ? { level: 'debug', transport: { target: 'pino-pretty', options: { colorize: true } } }
+      : { level: 'info' },
 });
 
 await server.register(helmet, { global: true });
