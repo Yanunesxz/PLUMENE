@@ -4,6 +4,8 @@ export interface OrderItem {
   id: string;
   order_id: string;
   product_id: string;
+  /** Referência à variante (tamanho+cor) escolhida */
+  variant_id: string | null;
   quantity: number;
   unit_price: number;
   total: number;
@@ -36,6 +38,7 @@ export interface CreateOrderRequest {
   local_id?: string;
   items: Array<{
     product_id: string;
+    variant_id?: string;
     quantity: number;
     unit_price: number;
   }>;
