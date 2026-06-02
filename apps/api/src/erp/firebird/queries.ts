@@ -4,39 +4,31 @@
  */
 
 /**
- * Produtos ativos com suas variantes de cor e estoque.
- * Retorna uma linha por (PRODUTO × TAMANHO × COR).
+ * Produtos ativos com estoque agregado por tamanho.
+ * Cores são sortidas: soma o estoque de todas as cores de cada (PRODUTO, TAMANHO).
+ * Retorna uma linha por (PRODUTO × TAMANHO).
  */
 export const QUERY_PRODUCTS_WITH_STOCK = `
   SELECT
     p.PRODUTO,
     p.TAMANHO,
-    TRIM(p.DESCRICAO)              AS DESCRICAO,
-    p.ATIVO,
-    TRIM(p.COLECAO)                AS COLECAO,
-    TRIM(p.CATALOGO)               AS CATALOGO,
-    TRIM(p.MARCA)                  AS MARCA,
-    TRIM(p.GRUPO_PRODUTO)          AS GRUPO_PRODUTO,
-    TRIM(p.GRADE_TAMANHO)          AS GRADE_TAMANHO,
-    TRIM(pc.COR)                   AS COR,
-    TRIM(c.DESCRICAO)              AS COR_DESCRICAO,
-    TRIM(c.COR_HEXADECIMAL)        AS COR_HEXADECIMAL,
-    COALESCE(e.ESTOQUE_PRATELEIRA, 0)    AS ESTOQUE_PRATELEIRA,
-    COALESCE(e.ESTOQUE_PEDIDO, 0)        AS ESTOQUE_PEDIDO,
-    COALESCE(e.ESTOQUE_PRE_PRODUZIDO, 0) AS ESTOQUE_PRE_PRODUZIDO,
-    TRIM(e.CODIGO_BARRAS)          AS CODIGO_BARRAS
+    MAX(TRIM(p.DESCRICAO))        AS DESCRICAO,
+    MAX(p.ATIVO)                  AS ATIVO,
+    MAX(TRIM(p.COLECAO))          AS COLECAO,
+    MAX(TRIM(p.CATALOGO))         AS CATALOGO,
+    MAX(TRIM(p.MARCA))            AS MARCA,
+    MAX(TRIM(p.GRUPO_PRODUTO))    AS GRUPO_PRODUTO,
+    MAX(TRIM(p.GRADE_TAMANHO))    AS GRADE_TAMANHO,
+    COALESCE(SUM(e.ESTOQUE_PRATELEIRA), 0)    AS ESTOQUE_PRATELEIRA,
+    COALESCE(SUM(e.ESTOQUE_PEDIDO), 0)        AS ESTOQUE_PEDIDO,
+    COALESCE(SUM(e.ESTOQUE_PRE_PRODUZIDO), 0) AS ESTOQUE_PRE_PRODUZIDO
   FROM PRODUTO p
-  JOIN PRODUTO_CORES pc
-    ON pc.PRODUTO = p.PRODUTO
-   AND pc.ATIVO   = 'S'
-  LEFT JOIN COR c
-    ON TRIM(c.COR) = TRIM(pc.COR)
   LEFT JOIN ESTOQUE_PRODUTO e
     ON e.PRODUTO  = p.PRODUTO
    AND e.TAMANHO  = p.TAMANHO
-   AND TRIM(e.COR) = TRIM(pc.COR)
   WHERE p.ATIVO = 'S'
-  ORDER BY p.PRODUTO, p.TAMANHO, pc.COR
+  GROUP BY p.PRODUTO, p.TAMANHO
+  ORDER BY p.PRODUTO, p.TAMANHO
 `;
 
 /**
@@ -142,24 +134,24 @@ export const QUERY_REPRESENTATIVES = `
 `;
 
 /**
- * Estoque disponível = prateleira − reservado.
- * Usado para atualização incremental de estoque.
+ * Estoque agregado por (PRODUTO, TAMANHO) — soma todas as cores.
+ * Disponível vendável = ESTOQUE_PRATELEIRA − ESTOQUE_PEDIDO.
+ * Usado para atualização incremental rápida de estoque.
  */
 export const QUERY_STOCK_SNAPSHOT = `
   SELECT
     TRIM(e.PRODUTO)        AS PRODUTO,
     TRIM(e.TAMANHO)        AS TAMANHO,
-    TRIM(e.COR)            AS COR,
-    COALESCE(e.ESTOQUE_PRATELEIRA, 0)    AS ESTOQUE_PRATELEIRA,
-    COALESCE(e.ESTOQUE_PEDIDO, 0)        AS ESTOQUE_PEDIDO,
-    COALESCE(e.ESTOQUE_PRE_PRODUZIDO, 0) AS ESTOQUE_PRE_PRODUZIDO,
-    TRIM(e.CODIGO_BARRAS)  AS CODIGO_BARRAS
+    COALESCE(SUM(e.ESTOQUE_PRATELEIRA), 0)    AS ESTOQUE_PRATELEIRA,
+    COALESCE(SUM(e.ESTOQUE_PEDIDO), 0)        AS ESTOQUE_PEDIDO,
+    COALESCE(SUM(e.ESTOQUE_PRE_PRODUZIDO), 0) AS ESTOQUE_PRE_PRODUZIDO
   FROM ESTOQUE_PRODUTO e
   JOIN PRODUTO p
     ON p.PRODUTO = e.PRODUTO
    AND p.TAMANHO = e.TAMANHO
    AND p.ATIVO   = 'S'
-  ORDER BY e.PRODUTO, e.TAMANHO, e.COR
+  GROUP BY e.PRODUTO, e.TAMANHO
+  ORDER BY e.PRODUTO, e.TAMANHO
 `;
 
 /**

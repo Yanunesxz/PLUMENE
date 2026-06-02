@@ -22,7 +22,6 @@ import {
 } from './queries.js';
 import type {
   ErpPriceTable,
-  ErpProductColor,
   ErpProductPrice,
   ErpCustomer,
   ErpStock,
@@ -100,21 +99,21 @@ export async function syncPriceTables(company_id: string): Promise<SyncResult> {
 export async function syncProducts(company_id: string): Promise<SyncResult[]> {
   const t0 = now();
   try {
-    // Tipo da query combinada produto+cor+estoque
+    // Tipo da query produto + estoque agregado por tamanho (cores somadas)
     type ProductRow = {
       PRODUTO: string; TAMANHO: string; DESCRICAO: string; ATIVO: string;
       COLECAO: string | null; CATALOGO: string | null; MARCA: string | null;
       GRUPO_PRODUTO: string | null; GRADE_TAMANHO: string | null;
-      COR: string; COR_DESCRICAO: string | null; COR_HEXADECIMAL: string | null;
       ESTOQUE_PRATELEIRA: number; ESTOQUE_PEDIDO: number; ESTOQUE_PRE_PRODUZIDO: number;
-      CODIGO_BARRAS: string | null;
     };
 
     const erpRows = await withFirebird((db) =>
       query<ProductRow>(db, QUERY_PRODUCTS_WITH_STOCK),
     );
 
-    // Deduplica produtos (um produto = vários tamanhos × cores no Firebird)
+    // Deduplica produtos (um produto = vários tamanhos no Firebird).
+    // image_url é omitido de propósito: vem dos catálogos PDF e o upsert
+    // preserva o valor existente quando a coluna não está no payload.
     const productMap = new Map<string, object>();
     const variantRows: Record<string, unknown>[] = [];
 
@@ -135,17 +134,13 @@ export async function syncProducts(company_id: string): Promise<SyncResult[]> {
         });
       }
 
-      // Cada (produto × tamanho × cor) = 1 variante
+      // Cada (produto × tamanho) = 1 variante; estoque já somado entre cores
       variantRows.push({
         company_id,
-        erp_sku: `${r.PRODUTO.trim()}|${r.TAMANHO.trim()}|${r.COR.trim()}`,
+        erp_sku: `${r.PRODUTO.trim()}|${r.TAMANHO.trim()}`,
         size: r.TAMANHO.trim(),
-        color: r.COR.trim(),
-        color_description: r.COR_DESCRICAO?.trim() ?? null,
-        color_hex: r.COR_HEXADECIMAL?.trim() ?? null,
         stock_quantity: r.ESTOQUE_PRATELEIRA,
         stock_committed: r.ESTOQUE_PEDIDO,
-        barcode: r.CODIGO_BARRAS?.trim() ?? null,
         active: r.ATIVO === 'S',
         updated_at: new Date().toISOString(),
         // product_id será preenchido abaixo após upsert dos produtos
@@ -319,7 +314,7 @@ export async function syncStock(company_id: string): Promise<SyncResult> {
 
     const updates: object[] = [];
     for (const s of erpStock) {
-      const erp_sku = `${s.PRODUTO.trim()}|${s.TAMANHO.trim()}|${s.COR.trim()}`;
+      const erp_sku = `${s.PRODUTO.trim()}|${s.TAMANHO.trim()}`;
       const variantId = variantMap.get(erp_sku);
       if (!variantId) continue;
 

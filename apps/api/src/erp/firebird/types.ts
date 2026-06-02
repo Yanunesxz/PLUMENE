@@ -31,11 +31,9 @@ export interface ErpColor {
 export interface ErpStock {
   PRODUTO: string;
   TAMANHO: string;
-  COR: string;
-  ESTOQUE_PRATELEIRA: number;   // Estoque disponível
-  ESTOQUE_PEDIDO: number;       // Reservado em pedidos
+  ESTOQUE_PRATELEIRA: number;   // Soma das cores — disponível
+  ESTOQUE_PEDIDO: number;       // Soma das cores — reservado em pedidos
   ESTOQUE_PRE_PRODUZIDO: number;
-  CODIGO_BARRAS: string | null;
 }
 
 export interface ErpCustomer {

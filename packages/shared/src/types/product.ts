@@ -14,33 +14,29 @@ export interface Product {
   brand: string | null;
   /** Grupo de produto (ex: Pijama Adulto, Infantil…) */
   group_name: string | null;
+  /** URL da foto do modelo (vinda dos catálogos PDF). Null até ser vinculada. */
+  image_url: string | null;
   active: boolean;
   updated_at: string;
 }
 
-// ─── Variante = (produto × tamanho × cor) ────────────────────────────────────
+// ─── Variante = (produto × tamanho) ──────────────────────────────────────────
+// Cores são sempre sortidas: o estoque é somado entre todas as cores do tamanho.
 export interface ProductVariant {
   id: string;
   product_id: string;
   company_id: string;
   /**
    * SKU único da variante.
-   * Formato: "{PRODUTO}|{TAMANHO}|{COR}" — espelha a PK do ERP Firebird.
-   * Ex: "PIJ001|M|00001"
+   * Formato: "{PRODUTO}|{TAMANHO}" — cor é sortida, não entra na chave.
+   * Ex: "PIJ001|M"
    */
   erp_sku: string;
   size: string;
-  color: string;
-  /** Descrição legível da cor (COR.DESCRICAO) */
-  color_description: string | null;
-  /** Hex para exibição na UI, ex: "#FF5733" */
-  color_hex: string | null;
-  /** Estoque de prateleira — ESTOQUE_PRODUTO.ESTOQUE_PRATELEIRA */
+  /** Estoque de prateleira somado de todas as cores — SUM(ESTOQUE_PRATELEIRA) */
   stock_quantity: number;
-  /** Estoque reservado em pedidos — ESTOQUE_PRODUTO.ESTOQUE_PEDIDO */
+  /** Reservado em pedidos somado de todas as cores — SUM(ESTOQUE_PEDIDO) */
   stock_committed: number;
-  /** Código de barras — ESTOQUE_PRODUTO.CODIGO_BARRAS */
-  barcode: string | null;
   active: boolean;
   updated_at: string;
 }

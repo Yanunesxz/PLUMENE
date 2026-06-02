@@ -14,24 +14,23 @@ CREATE UNIQUE INDEX IF NOT EXISTS idx_price_tables_erp_code
   WHERE erp_code IS NOT NULL;
 
 -- 2. Atualizar products com campos ERP
+-- image_url: foto do modelo vinda dos catálogos PDF (não vem do ERP)
 ALTER TABLE products
   ADD COLUMN IF NOT EXISTS collection  TEXT,
   ADD COLUMN IF NOT EXISTS brand       TEXT,
-  ADD COLUMN IF NOT EXISTS group_name  TEXT;
+  ADD COLUMN IF NOT EXISTS group_name  TEXT,
+  ADD COLUMN IF NOT EXISTS image_url   TEXT;
 
--- 3. Tabela de variantes de produto (produto × tamanho × cor)
+-- 3. Tabela de variantes de produto (produto × tamanho)
+-- Cores são sortidas: o estoque é a soma de todas as cores do tamanho.
 CREATE TABLE IF NOT EXISTS product_variants (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id       UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
   company_id       UUID NOT NULL REFERENCES companies(id),
-  erp_sku          TEXT NOT NULL,       -- "{PRODUTO}|{TAMANHO}|{COR}"
+  erp_sku          TEXT NOT NULL,       -- "{PRODUTO}|{TAMANHO}"
   size             TEXT NOT NULL,
-  color            TEXT NOT NULL,
-  color_description TEXT,
-  color_hex        TEXT,
   stock_quantity   INTEGER NOT NULL DEFAULT 0,
   stock_committed  INTEGER NOT NULL DEFAULT 0,
-  barcode          TEXT,
   active           BOOLEAN NOT NULL DEFAULT true,
   updated_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(company_id, erp_sku)

@@ -5,12 +5,12 @@ export interface SyncQueueItem {
   id?: number;
   local_id: string;
   customer_id: string;
-  notes?: string;
+  notes?: string | undefined;
   items: Array<{ product_id: string; quantity: number; unit_price: number }>;
   created_at: string;
   updated_at: string;
   attempts: number;
-  last_error?: string;
+  last_error?: string | undefined;
 }
 
 export interface LocalOrder extends Order {

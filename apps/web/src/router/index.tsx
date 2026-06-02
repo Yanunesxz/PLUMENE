@@ -8,7 +8,7 @@ import { NewOrderPage } from '../modules/orders/NewOrderPage.js';
 import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
 
-export const router = createBrowserRouter([
+export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,

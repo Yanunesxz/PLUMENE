@@ -63,8 +63,5 @@ temp/
 *.fdb
 *.gdb
 _tools/erp-sync/.env
-_tools/firebird-reader/schema_*.json
-_tools/firebird-reader/schema_*.txt
-_tools/firebird-reader/relevant_tables.txt
-_tools/firebird-reader/fbembed25/
-_tools/firebird-reader/fbembed25_x64/
+# Leitor local de schema Firebird: DLLs, binários embed e scripts com paths/credenciais da máquina — nunca versionar
+_tools/firebird-reader/
