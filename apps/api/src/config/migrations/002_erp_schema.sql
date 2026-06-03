@@ -7,7 +7,12 @@
 ALTER TABLE price_tables
   ADD COLUMN IF NOT EXISTS erp_code        TEXT,
   ADD COLUMN IF NOT EXISTS price_column    INTEGER NOT NULL DEFAULT 1,
-  ADD COLUMN IF NOT EXISTS col_descriptions JSONB;
+  ADD COLUMN IF NOT EXISTS col_descriptions JSONB,
+  -- Faixa comercial do preço escalonado por valor do pedido:
+  --   1 = Tabela 1 (atacado/melhor preço) · 2 = intermediária · 3 = base/varejo
+  --   NULL = tabela não participa do escalonamento.
+  -- Regra: pedido <500 → tier 3 · 500–1200 → tier 2 · >1200 → tier 1.
+  ADD COLUMN IF NOT EXISTS commercial_tier INTEGER;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_price_tables_erp_code
   ON price_tables(company_id, erp_code)
