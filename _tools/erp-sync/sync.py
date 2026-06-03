@@ -143,24 +143,20 @@ def sync_price_tables(cur) -> int:
 # ─── Sync: Produtos + Variantes ───────────────────────────────────────────────
 def sync_products(cur) -> tuple[int, int]:
     log.info("Sincronizando produtos e variantes...")
+    # Cores sortidas: agrega por (PRODUTO, TAMANHO), somando o estoque de todas as cores.
     cur.execute("""
         SELECT
-            p.PRODUTO, p.TAMANHO, TRIM(p.DESCRICAO), p.ATIVO,
-            TRIM(p.COLECAO), TRIM(p.CATALOGO), TRIM(p.MARCA),
-            TRIM(p.GRUPO_PRODUTO),
-            TRIM(pc.COR),
-            TRIM(c.DESCRICAO),
-            TRIM(c.COR_HEXADECIMAL),
-            COALESCE(e.ESTOQUE_PRATELEIRA, 0),
-            COALESCE(e.ESTOQUE_PEDIDO, 0),
-            TRIM(e.CODIGO_BARRAS)
+            p.PRODUTO, p.TAMANHO, MAX(TRIM(p.DESCRICAO)), MAX(p.ATIVO),
+            MAX(TRIM(p.COLECAO)), MAX(TRIM(p.MARCA)),
+            MAX(TRIM(p.GRUPO_PRODUTO)),
+            COALESCE(SUM(e.ESTOQUE_PRATELEIRA), 0),
+            COALESCE(SUM(e.ESTOQUE_PEDIDO), 0)
         FROM PRODUTO p
-        JOIN PRODUTO_CORES pc ON pc.PRODUTO = p.PRODUTO AND pc.ATIVO = 'S'
-        LEFT JOIN COR c ON TRIM(c.COR) = TRIM(pc.COR)
         LEFT JOIN ESTOQUE_PRODUTO e ON e.PRODUTO = p.PRODUTO
-            AND e.TAMANHO = p.TAMANHO AND TRIM(e.COR) = TRIM(pc.COR)
+            AND e.TAMANHO = p.TAMANHO
         WHERE p.ATIVO = 'S'
-        ORDER BY p.PRODUTO, p.TAMANHO, pc.COR
+        GROUP BY p.PRODUTO, p.TAMANHO
+        ORDER BY p.PRODUTO, p.TAMANHO
     """)
 
     products_seen = {}
@@ -168,13 +164,13 @@ def sync_products(cur) -> tuple[int, int]:
 
     for row in cur.fetchall():
         produto, tamanho, descricao, ativo = row[0], row[1], row[2], row[3]
-        colecao, catalogo, marca, grupo = row[4], row[5], row[6], row[7]
-        cor, cor_desc, cor_hex = trim(row[8]), trim(row[9]), trim(row[10])
-        estoque_prat, estoque_ped = row[11], row[12]
-        cod_barras = trim(row[13])
+        colecao, marca, grupo = row[4], row[5], row[6]
+        estoque_prat, estoque_ped = row[7], row[8]
 
         sku = trim(produto)
         if sku not in products_seen:
+            # image_url é omitido de propósito: vem dos catálogos PDF. O upsert
+            # merge-duplicates preserva o valor existente quando a coluna não vai no payload.
             products_seen[sku] = {
                 "company_id": COMPANY_ID,
                 "erp_id": sku,
@@ -188,17 +184,14 @@ def sync_products(cur) -> tuple[int, int]:
                 "updated_at": now_iso(),
             }
 
-        erp_sku = f"{sku}|{trim(tamanho)}|{trim(cor)}"
+        # Uma variante por (produto, tamanho) — estoque já somado entre as cores.
+        erp_sku = f"{sku}|{trim(tamanho)}"
         variants.append({
             "company_id": COMPANY_ID,
             "erp_sku": erp_sku,
             "size": trim(tamanho),
-            "color": trim(cor) or "",
-            "color_description": cor_desc,
-            "color_hex": cor_hex,
             "stock_quantity": estoque_prat or 0,
             "stock_committed": estoque_ped or 0,
-            "barcode": cod_barras,
             "active": ativo == 'S',
             "updated_at": now_iso(),
         })
@@ -317,12 +310,12 @@ def sync_customers(cur) -> int:
 def sync_stock(cur) -> int:
     log.info("Sincronizando estoque...")
     cur.execute("""
-        SELECT TRIM(e.PRODUTO), TRIM(e.TAMANHO), TRIM(e.COR),
-               COALESCE(e.ESTOQUE_PRATELEIRA, 0),
-               COALESCE(e.ESTOQUE_PEDIDO, 0),
-               TRIM(e.CODIGO_BARRAS)
+        SELECT TRIM(e.PRODUTO), TRIM(e.TAMANHO),
+               COALESCE(SUM(e.ESTOQUE_PRATELEIRA), 0),
+               COALESCE(SUM(e.ESTOQUE_PEDIDO), 0)
         FROM ESTOQUE_PRODUTO e
         JOIN PRODUTO p ON p.PRODUTO = e.PRODUTO AND p.TAMANHO = e.TAMANHO AND p.ATIVO = 'S'
+        GROUP BY e.PRODUTO, e.TAMANHO
     """)
 
     db_variants = supabase_select("product_variants", "id,erp_sku", {"company_id": COMPANY_ID})
@@ -330,14 +323,13 @@ def sync_stock(cur) -> int:
 
     updates = []
     for r in cur.fetchall():
-        erp_sku = f"{r[0]}|{r[1]}|{r[2]}"
+        erp_sku = f"{r[0]}|{r[1]}"
         vid = variant_map.get(erp_sku)
         if vid:
             updates.append({
                 "id": vid,
-                "stock_quantity": r[3],
-                "stock_committed": r[4],
-                "barcode": r[5],
+                "stock_quantity": r[2],
+                "stock_committed": r[3],
                 "updated_at": now_iso(),
             })
 

@@ -15,19 +15,6 @@ export interface ErpProduct {
   GRADE_TAMANHO: string | null;
 }
 
-export interface ErpProductColor {
-  PRODUTO: string;
-  COR: string;           // Código da cor (CHAR 5)
-  ATIVO: string;         // 'S' | 'N'
-}
-
-export interface ErpColor {
-  COR: string;
-  DESCRICAO: string | null;
-  COR_HEXADECIMAL: string | null;
-  CODIGO: string | null;
-}
-
 export interface ErpStock {
   PRODUTO: string;
   TAMANHO: string;
