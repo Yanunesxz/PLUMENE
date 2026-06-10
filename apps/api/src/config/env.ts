@@ -12,7 +12,8 @@ export const env = {
   JWT_REFRESH_EXPIRES_IN: process.env['JWT_REFRESH_EXPIRES_IN'] ?? '7d',
   SUPABASE_URL: requireEnv('SUPABASE_URL'),
   SUPABASE_SERVICE_ROLE_KEY: requireEnv('SUPABASE_SERVICE_ROLE_KEY'),
-  CORS_ORIGIN: process.env['CORS_ORIGIN'] ?? 'http://localhost:5173',
+  CORS_ORIGIN: (process.env['CORS_ORIGIN'] ?? 'http://localhost:5173,http://localhost:5174')
+    .split(',').map(s => s.trim()),
 
   // ── ERP Firebird ────────────────────────────────────────────────────────────
   /** Host do servidor Firebird 2.5 do ERP (ex: 192.168.1.10) */
