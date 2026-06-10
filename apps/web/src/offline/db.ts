@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { Product, Customer, Order, OrderItem } from '@csb/shared';
+import type { ProductWithPrice, Customer, Order, OrderItem } from '@csb/shared';
 
 export interface SyncQueueItem {
   id?: number;
@@ -18,7 +18,8 @@ export interface LocalOrder extends Order {
 }
 
 class AppDatabase extends Dexie {
-  products!: Table<Product, string>;
+  /** Guardamos o payload completo do catálogo (com preço + variantes) para uso offline. */
+  products!: Table<ProductWithPrice, string>;
   customers!: Table<Customer, string>;
   orders!: Table<LocalOrder, string>;
   order_items!: Table<OrderItem, string>;

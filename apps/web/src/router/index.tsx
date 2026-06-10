@@ -7,6 +7,8 @@ import { OrdersPage } from '../modules/orders/OrdersPage.js';
 import { NewOrderPage } from '../modules/orders/NewOrderPage.js';
 import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
+import { UnauthorizedPage } from '../modules/system/UnauthorizedPage.js';
+import { NotFoundPage } from '../modules/system/NotFoundPage.js';
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
@@ -34,13 +36,6 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
       },
     ],
   },
-  {
-    path: '/unauthorized',
-    element: (
-      <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Acesso não autorizado.</p>
-      </div>
-    ),
-  },
-  { path: '*', element: <Navigate to="/" replace /> },
+  { path: '/unauthorized', element: <UnauthorizedPage /> },
+  { path: '*', element: <NotFoundPage /> },
 ]);

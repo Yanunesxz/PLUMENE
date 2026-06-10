@@ -3,13 +3,13 @@ import { useAuthStore } from '../../store/authStore.js';
 import { navItemsForRole } from './navItems.js';
 import { cn } from '../../lib/utils.js';
 
-export function BottomNav() {
+export function SideNav() {
   const { user } = useAuthStore();
   const items = navItemsForRole(user?.role);
 
   return (
-    <nav className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-card/95 backdrop-blur safe-bottom md:hidden">
-      <div className="mx-auto flex max-w-md items-stretch">
+    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 border-r border-border bg-card md:flex md:flex-col">
+      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
         {items.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -17,20 +17,22 @@ export function BottomNav() {
             end={end ?? false}
             className={({ isActive }) =>
               cn(
-                'flex flex-1 flex-col items-center justify-center gap-1 py-2 text-[11px] font-medium transition-colors',
-                isActive ? 'text-brand-600' : 'text-muted-foreground',
+                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-brand-50 text-brand-700'
+                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className="h-5 w-5" strokeWidth={isActive ? 2.5 : 2} />
+                <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.5 : 2} />
                 <span>{label}</span>
               </>
             )}
           </NavLink>
         ))}
-      </div>
-    </nav>
+      </nav>
+    </aside>
   );
 }

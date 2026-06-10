@@ -1,7 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Sparkles } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
+import { Input } from '../../components/ui/Input.js';
+import { Button } from '../../components/ui/Button.js';
+import { Spinner } from '../../components/ui/Spinner.js';
 import type { LoginResponse, ApiResponse } from '@csb/shared';
 
 export function LoginPage() {
@@ -35,58 +39,66 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-brand-700 to-brand-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-8">
-        <div className="text-center mb-8">
-          <h1 className="text-2xl font-bold text-brand-700">Corpo Sensual</h1>
-          <p className="text-gray-500 text-sm mt-1">Plataforma B2B</p>
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-brand-700 via-brand-800 to-brand-900 p-4">
+      <div className="w-full max-w-sm">
+        <div className="mb-6 flex flex-col items-center gap-3 text-center">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur">
+            <Sparkles className="h-7 w-7 text-white" strokeWidth={2} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Corpo Sensual</h1>
+            <p className="mt-0.5 text-sm text-white/70">Plataforma comercial B2B</p>
+          </div>
         </div>
 
-        <form onSubmit={(e) => { void handleSubmit(e); }} className="space-y-4">
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-              E-mail
-            </label>
-            <input
-              id="email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-              autoComplete="email"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="seu@email.com"
-            />
-          </div>
+        <div className="rounded-2xl bg-card p-6 shadow-xl sm:p-8">
+          <form onSubmit={(e) => void handleSubmit(e)} className="space-y-4">
+            <div className="space-y-1.5">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
+                E-mail
+              </label>
+              <Input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+                placeholder="seu@email.com"
+              />
+            </div>
 
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-              Senha
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              autoComplete="current-password"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-              placeholder="••••••••"
-            />
-          </div>
+            <div className="space-y-1.5">
+              <label htmlFor="password" className="text-sm font-medium text-foreground">
+                Senha
+              </label>
+              <Input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                autoComplete="current-password"
+                placeholder="••••••••"
+              />
+            </div>
 
-          {error && (
-            <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</p>
-          )}
+            {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold rounded-lg py-3 text-sm transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Entrando...' : 'Entrar'}
-          </button>
-        </form>
+            <Button type="submit" size="lg" disabled={loading} className="w-full">
+              {loading ? (
+                <>
+                  <Spinner />
+                  Entrando…
+                </>
+              ) : (
+                'Entrar'
+              )}
+            </Button>
+          </form>
+        </div>
+
+        <p className="mt-6 text-center text-xs text-white/50">© 2026 Corpo Sensual</p>
       </div>
     </div>
   );
