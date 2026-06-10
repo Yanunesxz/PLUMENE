@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsup",
     "start": "node dist/index.js",
     "typecheck": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
@@ -18,16 +18,17 @@
     "@fastify/helmet": "^11.1.1",
     "@fastify/jwt": "^8.0.1",
     "@supabase/supabase-js": "^2.43.0",
-    "fastify": "^4.27.0",
     "dotenv": "^16.4.5",
+    "fastify": "^4.27.0",
+    "node-firebird": "^1.1.5",
     "pino": "^9.1.0",
-    "zod": "^3.23.4",
-    "node-firebird": "^1.1.5"
+    "zod": "^3.23.4"
   },
   "devDependencies": {
     "@types/node": "^20.12.7",
     "pino-pretty": "^11.0.0",
     "rimraf": "*",
+    "tsup": "^8.5.1",
     "tsx": "^4.9.3",
     "typescript": "*"
   }
