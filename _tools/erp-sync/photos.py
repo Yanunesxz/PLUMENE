@@ -77,7 +77,7 @@ IMAGE_QUALITY = int(os.environ.get("IMAGE_QUALITY", "82"))
 # Só arquivos cujo nome é EXATAMENTE um código numérico (ex.: 0140.jpg).
 # Ignora alternativas/multi-produto com hífen (0260-1.jpg, 0162-0160.jpg) e a
 # subpasta CONCEITO — essas podem virar galeria depois.
-CODE_FILE_RE = re.compile(r"^(\d+)\.jpe?g$", re.IGNORECASE)
+CODE_FILE_RE = re.compile(r"^(\d+)\.(jpe?g|png)$", re.IGNORECASE)
 
 JSON_HEADERS = {
     "apikey": SUPABASE_KEY,
@@ -185,7 +185,7 @@ def main():
         sys.exit(1)
 
     files = sorted(p for p in folder.iterdir() if p.is_file() and CODE_FILE_RE.match(p.name))
-    skipped = [p.name for p in folder.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg") and not CODE_FILE_RE.match(p.name)]
+    skipped = [p.name for p in folder.iterdir() if p.is_file() and p.suffix.lower() in (".jpg", ".jpeg", ".png") and not CODE_FILE_RE.match(p.name)]
     log.info(f"Pasta: {folder}")
     log.info(f"Fotos código-único: {len(files)} | ignoradas (hífen/alt/multi): {len(skipped)}")
 
