@@ -1,8 +1,9 @@
-import { useState, type FormEvent } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Sparkles } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
+import { saveOfflineCredential, verifyOfflineCredential } from '../../offline/authCache.js';
 import { Input } from '../../components/ui/Input.js';
 import { Button } from '../../components/ui/Button.js';
 import { Spinner } from '../../components/ui/Spinner.js';
@@ -18,10 +19,9 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  if (isAuthenticated) {
-    navigate('/', { replace: true });
-    return null;
-  }
+  useEffect(() => {
+    if (isAuthenticated) navigate('/', { replace: true });
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -30,9 +30,27 @@ export function LoginPage() {
     try {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', { email, password });
       login(res.data.token, res.data.refresh_token, res.data.user);
+      // Guarda esse login para permitir autenticação offline depois.
+      saveOfflineCredential(email, password, res.data);
       navigate('/', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao fazer login');
+      // Falha de rede (offline ou API inacessível): tenta o login salvo localmente.
+      const isNetworkError = !navigator.onLine || err instanceof TypeError;
+      if (isNetworkError) {
+        const offline = verifyOfflineCredential(email, password);
+        if (offline.ok) {
+          login(offline.cred.token, offline.cred.refresh_token, offline.cred.user);
+          navigate('/', { replace: true });
+          return;
+        }
+        setError(
+          offline.reason === 'wrong-password'
+            ? 'Senha incorreta (modo offline).'
+            : 'Você está offline e não há login salvo neste dispositivo para esse e-mail.',
+        );
+      } else {
+        setError(err instanceof Error ? err.message : 'Erro ao fazer login');
+      }
     } finally {
       setLoading(false);
     }
