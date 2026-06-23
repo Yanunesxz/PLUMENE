@@ -56,6 +56,19 @@ export interface CreateRepRequest {
   phone?: string | null;
 }
 
+/** Edição de representante — todos os campos opcionais (envia só o que mudou). */
+export interface UpdateRepRequest {
+  name?: string;
+  email?: string;
+  cpf?: string;
+  price_table_id?: string;
+  legal_name?: string | null;
+  phone?: string | null;
+  active?: boolean;
+  /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
+  password?: string;
+}
+
 export interface LoginRequest {
   email: string;
   password: string;

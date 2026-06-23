@@ -1,6 +1,6 @@
 import { createHash } from 'crypto';
 import { supabase } from '../../config/supabase.js';
-import type { CreateRepRequest, RepListItem, PriceTable } from '@csb/shared';
+import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
 
 function hashPassword(password: string): string {
   return createHash('sha256').update(password).digest('hex');
@@ -103,5 +103,51 @@ export async function createRep(
     .single();
 
   if (error || !data) return { ok: false, reason: 'error' };
+  return { ok: true, rep: toRepListItem(data as unknown as RepRow) };
+}
+
+export type UpdateRepResult =
+  | { ok: true; rep: RepListItem }
+  | { ok: false; reason: 'email_taken' | 'not_found' | 'error' };
+
+export async function updateRep(
+  company_id: string,
+  id: string,
+  body: UpdateRepRequest,
+): Promise<UpdateRepResult> {
+  const update: Record<string, unknown> = {};
+
+  if (body.email !== undefined) {
+    const email = body.email.trim().toLowerCase();
+    const { data: existing } = await supabase
+      .from('users')
+      .select('id')
+      .eq('email', email)
+      .neq('id', id)
+      .maybeSingle();
+    if (existing) return { ok: false, reason: 'email_taken' };
+    update.email = email;
+  }
+  if (body.name !== undefined) update.name = body.name.trim();
+  if (body.cpf !== undefined) update.cpf = body.cpf.trim() || null;
+  if (body.legal_name !== undefined) update.legal_name = body.legal_name?.trim() || null;
+  if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
+  if (body.price_table_id !== undefined) update.price_table_id = body.price_table_id || null;
+  if (body.active !== undefined) update.active = body.active;
+  if (body.password) update.password_hash = hashPassword(body.password);
+
+  if (Object.keys(update).length === 0) return { ok: false, reason: 'error' };
+
+  const { data, error } = await supabase
+    .from('users')
+    .update(update)
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .eq('role', 'rep')
+    .select(REP_SELECT)
+    .maybeSingle();
+
+  if (error) return { ok: false, reason: 'error' };
+  if (!data) return { ok: false, reason: 'not_found' };
   return { ok: true, rep: toRepListItem(data as unknown as RepRow) };
 }

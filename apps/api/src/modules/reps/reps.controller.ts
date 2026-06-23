@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { CreateRepRequest } from '@csb/shared';
-import { listReps, createRep, listPriceTables } from './reps.service.js';
+import type { CreateRepRequest, UpdateRepRequest } from '@csb/shared';
+import { listReps, createRep, updateRep, listPriceTables } from './reps.service.js';
 
 export async function listRepsHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id } = request.user;
@@ -49,4 +49,38 @@ export async function createRepHandler(request: FastifyRequest, reply: FastifyRe
   }
 
   await reply.status(201).send({ data: result.rep });
+}
+
+export async function updateRepHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  const body = request.body as UpdateRepRequest;
+
+  const result = await updateRep(company_id, id, body);
+  if (!result.ok) {
+    if (result.reason === 'email_taken') {
+      await reply.status(409).send({
+        error: 'Já existe um usuário com esse e-mail.',
+        code: 'EMAIL_TAKEN',
+        statusCode: 409,
+      });
+      return;
+    }
+    if (result.reason === 'not_found') {
+      await reply.status(404).send({
+        error: 'Representante não encontrado.',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+      return;
+    }
+    await reply.status(500).send({
+      error: 'Não foi possível atualizar o representante.',
+      code: 'UPDATE_FAILED',
+      statusCode: 500,
+    });
+    return;
+  }
+
+  await reply.send({ data: result.rep });
 }

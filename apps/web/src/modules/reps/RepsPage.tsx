@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag } from 'lucide-react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/ui/Input.js';
@@ -9,22 +9,42 @@ import { Badge } from '../../components/ui/Badge.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { Spinner } from '../../components/ui/Spinner.js';
 import { Toast } from '../../components/ui/Toast.js';
-import type { RepListItem, PriceTable, CreateRepRequest, ApiResponse } from '@csb/shared';
+import type {
+  RepListItem,
+  PriceTable,
+  CreateRepRequest,
+  UpdateRepRequest,
+  ApiResponse,
+} from '@csb/shared';
 
-const EMPTY = { name: '', email: '', cpf: '', legal_name: '', phone: '', price_table_id: '', password: '' };
+const EMPTY = {
+  name: '',
+  email: '',
+  cpf: '',
+  legal_name: '',
+  phone: '',
+  price_table_id: '',
+  password: '',
+  active: true,
+};
 
 export function RepsPage() {
   const { token } = useAuthStore();
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [tables, setTables] = useState<PriceTable[]>([]);
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const set = (k: keyof typeof EMPTY) => (e: { target: { value: string } }) =>
-    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const isEditing = editingId !== null;
+
+  const set =
+    (k: keyof typeof EMPTY) =>
+    (e: { target: { value: string } }) =>
+      setForm((f) => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => {
     if (!token) return;
@@ -32,32 +52,84 @@ export function RepsPage() {
     void api.get<ApiResponse<PriceTable[]>>('/price-tables', token).then((r) => setTables(r.data)).catch(() => {});
   }, [token]);
 
+  const closeForm = () => {
+    setShowForm(false);
+    setEditingId(null);
+    setForm({ ...EMPTY });
+    setError('');
+  };
+
+  const startCreate = () => {
+    setEditingId(null);
+    setForm({ ...EMPTY });
+    setError('');
+    setShowForm(true);
+  };
+
+  const startEdit = (rep: RepListItem) => {
+    setEditingId(rep.id);
+    setForm({
+      name: rep.name,
+      email: rep.email,
+      cpf: rep.cpf ?? '',
+      legal_name: rep.legal_name ?? '',
+      phone: rep.phone ?? '',
+      price_table_id: rep.price_table_id ?? '',
+      password: '',
+      active: rep.active,
+    });
+    setError('');
+    setShowForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    if (!form.name || !form.email || !form.cpf || !form.price_table_id || !form.password) {
-      setError('Preencha nome, e-mail, CPF, tabela e senha.');
+    if (!form.name || !form.email || !form.cpf || !form.price_table_id) {
+      setError('Preencha nome, e-mail, CPF e tabela.');
+      return;
+    }
+    if (!isEditing && !form.password) {
+      setError('Defina uma senha inicial.');
       return;
     }
     if (!token) return;
     setSubmitting(true);
     try {
-      const payload: CreateRepRequest = {
-        name: form.name,
-        email: form.email,
-        cpf: form.cpf,
-        price_table_id: form.price_table_id,
-        password: form.password,
-        legal_name: form.legal_name || null,
-        phone: form.phone || null,
-      };
-      const res = await api.post<ApiResponse<RepListItem>>('/reps', payload, token);
-      setReps((prev) => [res.data, ...(prev ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')));
-      setForm({ ...EMPTY });
-      setShowForm(false);
-      setToast({ message: 'Representante cadastrado!', type: 'success' });
+      if (isEditing) {
+        const payload: UpdateRepRequest = {
+          name: form.name,
+          email: form.email,
+          cpf: form.cpf,
+          price_table_id: form.price_table_id,
+          legal_name: form.legal_name || null,
+          phone: form.phone || null,
+          active: form.active,
+          ...(form.password ? { password: form.password } : {}),
+        };
+        const res = await api.patch<ApiResponse<RepListItem>>(`/reps/${editingId}`, payload, token);
+        setReps((prev) => (prev ?? []).map((r) => (r.id === editingId ? res.data : r)));
+        setToast({ message: 'Representante atualizado!', type: 'success' });
+      } else {
+        const payload: CreateRepRequest = {
+          name: form.name,
+          email: form.email,
+          cpf: form.cpf,
+          price_table_id: form.price_table_id,
+          password: form.password,
+          legal_name: form.legal_name || null,
+          phone: form.phone || null,
+        };
+        const res = await api.post<ApiResponse<RepListItem>>('/reps', payload, token);
+        setReps((prev) =>
+          [res.data, ...(prev ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+        );
+        setToast({ message: 'Representante cadastrado!', type: 'success' });
+      }
+      closeForm();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erro ao cadastrar representante.');
+      setError(err instanceof Error ? err.message : 'Erro ao salvar representante.');
     } finally {
       setSubmitting(false);
     }
@@ -70,7 +142,7 @@ export function RepsPage() {
           <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Representantes</h1>
           {reps && <p className="text-sm text-muted-foreground">{reps.length} cadastrados</p>}
         </div>
-        <Button size="md" onClick={() => setShowForm((s) => !s)}>
+        <Button size="md" onClick={() => (showForm ? closeForm() : startCreate())}>
           {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
           {showForm ? 'Cancelar' : 'Novo representante'}
         </Button>
@@ -81,7 +153,9 @@ export function RepsPage() {
           onSubmit={(e) => void handleSubmit(e)}
           className="mb-6 rounded-xl border border-border bg-card p-4 shadow-sm md:p-5"
         >
-          <h2 className="mb-4 text-sm font-semibold text-foreground">Novo representante</h2>
+          <h2 className="mb-4 text-sm font-semibold text-foreground">
+            {isEditing ? 'Editar representante' : 'Novo representante'}
+          </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Nome" required>
               <Input value={form.name} onChange={set('name')} placeholder="Nome do representante" />
@@ -108,9 +182,28 @@ export function RepsPage() {
                 ))}
               </Select>
             </Field>
-            <Field label="Senha inicial" required>
-              <Input type="password" value={form.password} onChange={set('password')} placeholder="Defina a senha de acesso" autoComplete="new-password" />
+            <Field label={isEditing ? 'Nova senha' : 'Senha inicial'} required={!isEditing}>
+              <Input
+                type="password"
+                value={form.password}
+                onChange={set('password')}
+                placeholder={isEditing ? 'Deixe em branco para manter' : 'Defina a senha de acesso'}
+                autoComplete="new-password"
+              />
             </Field>
+            {isEditing && (
+              <Field label="Status">
+                <label className="flex h-10 items-center gap-2 text-sm text-foreground">
+                  <input
+                    type="checkbox"
+                    checked={form.active}
+                    onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
+                    className="h-4 w-4 rounded border-input text-brand-600 focus:ring-brand-500"
+                  />
+                  Representante ativo
+                </label>
+              </Field>
+            )}
           </div>
 
           {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
@@ -122,6 +215,8 @@ export function RepsPage() {
                   <Spinner />
                   Salvando…
                 </>
+              ) : isEditing ? (
+                'Salvar alterações'
               ) : (
                 'Cadastrar representante'
               )}
@@ -160,7 +255,17 @@ export function RepsPage() {
                     {rep.legal_name && <p className="truncate text-xs text-muted-foreground">{rep.legal_name}</p>}
                   </div>
                 </div>
-                {!rep.active && <Badge variant="gray">Inativo</Badge>}
+                <div className="flex shrink-0 items-center gap-1">
+                  {!rep.active && <Badge variant="gray">Inativo</Badge>}
+                  <button
+                    type="button"
+                    onClick={() => startEdit(rep)}
+                    aria-label={`Editar ${rep.name}`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                </div>
               </div>
 
               <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
