@@ -7,6 +7,7 @@ import { OrdersPage } from '../modules/orders/OrdersPage.js';
 import { NewOrderPage } from '../modules/orders/NewOrderPage.js';
 import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
+import { RepsPage } from '../modules/reps/RepsPage.js';
 import { UnauthorizedPage } from '../modules/system/UnauthorizedPage.js';
 import { NotFoundPage } from '../modules/system/NotFoundPage.js';
 
@@ -31,6 +32,11 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,
             children: [{ index: true, element: <DashboardPage /> }],
+          },
+          {
+            path: 'representantes',
+            element: <PrivateRoute roles={['manager', 'admin']} />,
+            children: [{ index: true, element: <RepsPage /> }],
           },
         ],
       },

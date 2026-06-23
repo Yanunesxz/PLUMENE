@@ -14,6 +14,11 @@ export interface User {
   role: UserRole;
   active: boolean;
   created_at: string;
+  /** Representante: CPF, razão social, telefone e tabela de preço atribuída. */
+  cpf?: string | null;
+  legal_name?: string | null;
+  phone?: string | null;
+  price_table_id?: string | null;
 }
 
 export interface AuthPayload {
@@ -22,6 +27,33 @@ export interface AuthPayload {
   role: UserRole;
   company_id: string;
   name: string;
+  /** Tabela de preço do representante logado (usada para precificar o catálogo). */
+  price_table_id?: string | null;
+}
+
+/** Representante na listagem (gerente/admin), com o nome da tabela resolvido. */
+export interface RepListItem {
+  id: string;
+  name: string;
+  email: string;
+  cpf: string | null;
+  legal_name: string | null;
+  phone: string | null;
+  active: boolean;
+  price_table_id: string | null;
+  price_table_name: string | null;
+  created_at: string;
+}
+
+/** Dados mínimos para o gerente cadastrar um representante. */
+export interface CreateRepRequest {
+  name: string;
+  email: string;
+  password: string;
+  cpf: string;
+  price_table_id: string;
+  legal_name?: string | null;
+  phone?: string | null;
 }
 
 export interface LoginRequest {

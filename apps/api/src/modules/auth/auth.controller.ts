@@ -49,6 +49,7 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
         email: user.email,
         role: user.role,
         active: user.active,
+        price_table_id: user.price_table_id ?? null,
       },
     },
   });

@@ -8,6 +8,7 @@ import { authRouter } from './modules/auth/auth.router.js';
 import { catalogRouter } from './modules/catalog/catalog.router.js';
 import { customersRouter } from './modules/customers/customers.router.js';
 import { ordersRouter } from './modules/orders/orders.router.js';
+import { repsRouter } from './modules/reps/reps.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
 import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
 
@@ -37,6 +38,7 @@ await server.register(authRouter);
 await server.register(catalogRouter);
 await server.register(customersRouter);
 await server.register(ordersRouter);
+await server.register(repsRouter);
 await server.register(syncRouter);
 
 const start = async (): Promise<void> => {

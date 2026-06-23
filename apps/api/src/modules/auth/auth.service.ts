@@ -21,6 +21,7 @@ export function buildAuthPayload(user: User): AuthPayload {
     role: user.role,
     company_id: user.company_id,
     name: user.name,
+    price_table_id: user.price_table_id ?? null,
   };
 }
 
