@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Clock, Wallet, Check, X, Inbox } from 'lucide-react';
+import { Clock, Wallet, Check, X, Inbox, TrendingUp, ShoppingCart, Crown } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -9,30 +9,58 @@ import { Button } from '../../components/ui/Button.js';
 import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
-import type { Order, ApiResponse } from '@csb/shared';
+import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 
 export function DashboardPage() {
   const { token } = useAuthStore();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);
 
-  const pendingOrders = useLiveQuery(
-    () => db.orders.where('status').equals('pending_approval').toArray(),
-    [],
-  );
+  const allOrders = useLiveQuery(() => db.orders.toArray(), []);
+  const customers = useLiveQuery(() => db.customers.toArray(), []);
 
   useEffect(() => {
     if (!token) return;
     api
       .get<ApiResponse<Order[]>>('/orders', token)
       .then((res) => db.orders.bulkPut(res.data))
-      .catch(() => {
-        /* offline: usamos o cache */
-      });
+      .catch(() => {});
+    api
+      .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
+      .then((res) => db.customers.bulkPut(res.data))
+      .catch(() => {});
   }, [token]);
 
-  const pendingCount = pendingOrders?.length ?? 0;
-  const pendingTotal = pendingOrders?.reduce((sum, o) => sum + (o.total ?? 0), 0) ?? 0;
+  const custName = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of customers ?? []) m.set(c.id, c.name);
+    return m;
+  }, [customers]);
+
+  const metrics = useMemo(() => {
+    const orders = allOrders ?? [];
+    const now = new Date();
+    const isThisMonth = (iso: string) => {
+      const d = new Date(iso);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    };
+    const approved = orders.filter((o) => o.status === 'approved');
+    const pending = orders.filter((o) => o.status === 'pending_approval');
+
+    const topMap = new Map<string, number>();
+    for (const o of approved) topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + (o.total ?? 0));
+    const topClientes = [...topMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+    return {
+      vendasMes: approved.filter((o) => isThisMonth(o.created_at)).reduce((s, o) => s + (o.total ?? 0), 0),
+      pedidosMes: orders.filter((o) => isThisMonth(o.created_at)).length,
+      pendingCount: pending.length,
+      pendingTotal: pending.reduce((s, o) => s + (o.total ?? 0), 0),
+      ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
+      pending,
+      topClientes,
+    };
+  }, [allOrders]);
 
   const handleDecision = async (orderId: string, decision: 'approved' | 'rejected') => {
     if (!token) return;
@@ -52,32 +80,51 @@ export function DashboardPage() {
   };
 
   return (
-    <div className="space-y-5 p-4 md:p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Painel</h1>
 
-      <div className="grid grid-cols-2 gap-3 sm:max-w-md">
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-yellow-100 text-yellow-700">
-            <Clock className="h-5 w-5" strokeWidth={2} />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{pendingCount}</p>
-          <p className="text-xs text-muted-foreground">Aguardando aprovação</p>
-        </div>
-        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-          <div className="mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-brand-700">
-            <Wallet className="h-5 w-5" strokeWidth={2} />
-          </div>
-          <p className="text-2xl font-bold text-foreground">{formatBRL(pendingTotal)}</p>
-          <p className="text-xs text-muted-foreground">Valor pendente</p>
-        </div>
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <MetricCard icon={TrendingUp} tint="green" value={formatBRL(metrics.vendasMes)} label="Vendas do mês" />
+        <MetricCard icon={ShoppingCart} tint="brand" value={String(metrics.pedidosMes)} label="Pedidos no mês" />
+        <MetricCard icon={Clock} tint="yellow" value={String(metrics.pendingCount)} label="Aguardando aprovação" />
+        <MetricCard icon={Wallet} tint="brand" value={formatBRL(metrics.ticket)} label="Ticket médio" />
       </div>
+
+      {metrics.topClientes.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Top clientes
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+            <ul className="divide-y divide-border">
+              {metrics.topClientes.map(([customerId, total], i) => (
+                <li key={customerId} className="flex items-center justify-between gap-3 px-4 py-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span
+                      className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                        i === 0 ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700'
+                      }`}
+                    >
+                      {i === 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}
+                    </span>
+                    <span className="truncate text-sm font-medium text-foreground">
+                      {custName.get(customerId) ?? 'Cliente'}
+                    </span>
+                  </div>
+                  <span className="shrink-0 text-sm font-semibold text-foreground">{formatBRL(total)}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      )}
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Pedidos pendentes
+          Pedidos pendentes {metrics.pendingCount > 0 && `· ${formatBRL(metrics.pendingTotal)}`}
         </h2>
 
-        {pendingOrders && pendingOrders.length === 0 ? (
+        {metrics.pending.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <Inbox className="h-7 w-7" strokeWidth={1.5} />
@@ -86,12 +133,14 @@ export function DashboardPage() {
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {pendingOrders?.map((order) => (
+            {metrics.pending.map((order) => (
               <li key={order.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
                 <div className="mb-3 flex items-start justify-between gap-2">
-                  <div>
-                    <span className="font-mono text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
-                    <p className="mt-1 text-lg font-bold text-foreground">{formatBRL(order.total)}</p>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {custName.get(order.customer_id) ?? 'Cliente'}
+                    </p>
+                    <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total ?? 0)}</p>
                     <p className="text-xs text-muted-foreground">
                       {new Date(order.created_at).toLocaleDateString('pt-BR')}
                     </p>
@@ -129,6 +178,33 @@ export function DashboardPage() {
       </section>
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+    </div>
+  );
+}
+
+function MetricCard({
+  icon: Icon,
+  tint,
+  value,
+  label,
+}: {
+  icon: typeof Clock;
+  tint: 'green' | 'yellow' | 'brand';
+  value: string;
+  label: string;
+}) {
+  const tints: Record<string, string> = {
+    green: 'bg-green-100 text-green-700',
+    yellow: 'bg-yellow-100 text-yellow-700',
+    brand: 'bg-brand-100 text-brand-700',
+  };
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+      <div className={`mb-2 flex h-9 w-9 items-center justify-center rounded-full ${tints[tint]}`}>
+        <Icon className="h-5 w-5" strokeWidth={2} />
+      </div>
+      <p className="truncate text-xl font-bold text-foreground">{value}</p>
+      <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
 }

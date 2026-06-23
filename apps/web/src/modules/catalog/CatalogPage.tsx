@@ -28,6 +28,7 @@ export function CatalogPage() {
   const [search, setSearch] = useState('');
   const [brand, setBrand] = useState<string>(ALL);
   const [sort, setSort] = useState<SortKey>('code');
+  const [inStockOnly, setInStockOnly] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
@@ -74,6 +75,7 @@ export function CatalogPage() {
     return (allProducts ?? [])
       .filter((p) => p.active)
       .filter((p) => brand === ALL || p.brand === brand)
+      .filter((p) => !inStockOnly || availableOf(p) > 0)
       .filter(
         (p) =>
           !q ||
@@ -82,7 +84,7 @@ export function CatalogPage() {
           (p.collection?.toLowerCase().includes(q) ?? false),
       )
       .sort(compare);
-  }, [allProducts, search, brand, sort]);
+  }, [allProducts, search, brand, sort, inStockOnly]);
 
   const isInitialLoading = allProducts === undefined || (loading && (allProducts?.length ?? 0) === 0);
 
@@ -125,18 +127,24 @@ export function CatalogPage() {
         </Select>
       </div>
 
-      {brands.length > 0 && (
-        <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
-          <Chip active={brand === ALL} onClick={() => setBrand(ALL)}>
-            Todos
-          </Chip>
-          {brands.map((b) => (
-            <Chip key={b} active={brand === b} onClick={() => setBrand(b)}>
-              {b}
+      <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
+        <Chip active={inStockOnly} onClick={() => setInStockOnly((v) => !v)}>
+          Só com estoque
+        </Chip>
+        {brands.length > 0 && (
+          <>
+            <span className="w-px shrink-0 self-stretch bg-border" aria-hidden />
+            <Chip active={brand === ALL} onClick={() => setBrand(ALL)}>
+              Todos
             </Chip>
-          ))}
-        </div>
-      )}
+            {brands.map((b) => (
+              <Chip key={b} active={brand === b} onClick={() => setBrand(b)}>
+                {b}
+              </Chip>
+            ))}
+          </>
+        )}
+      </div>
 
       {isInitialLoading ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">

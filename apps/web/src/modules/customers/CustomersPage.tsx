@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, ChevronRight, Building2 } from 'lucide-react';
+import { Search, Users, ChevronRight, Building2, MessageCircle } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Input } from '../../components/ui/Input.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
-import { cn } from '../../lib/utils.js';
+import { cn, formatBRL } from '../../lib/utils.js';
 import type { CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 
 export function CustomersPage() {
@@ -77,36 +77,60 @@ export function CustomersPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {customers.map((customer) => (
-            <button
+            <div
               key={customer.id}
-              type="button"
-              onClick={() => handleSelect(customer)}
-              disabled={customer.blocked}
               className={cn(
-                'group flex w-full items-center gap-3 rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all',
-                customer.blocked
-                  ? 'cursor-not-allowed opacity-60'
-                  : 'hover:border-brand-200 hover:shadow-md active:scale-[0.99]',
+                'group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all',
+                customer.blocked ? 'opacity-70' : 'hover:border-brand-200 hover:shadow-md',
               )}
             >
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
-                <Building2 className="h-5 w-5" strokeWidth={2} />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">{customer.name}</p>
-                {customer.cnpj && (
-                  <p className="truncate text-xs text-muted-foreground">CNPJ: {customer.cnpj}</p>
+              <button
+                type="button"
+                onClick={() => handleSelect(customer)}
+                disabled={customer.blocked}
+                className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+              >
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                  <Building2 className="h-5 w-5" strokeWidth={2} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium text-foreground">{customer.name}</p>
+                  {customer.trade_name && customer.trade_name !== customer.name && (
+                    <p className="truncate text-xs text-muted-foreground">{customer.trade_name}</p>
+                  )}
+                  {customer.cnpj && (
+                    <p className="truncate text-xs text-muted-foreground">CNPJ: {customer.cnpj}</p>
+                  )}
+                  {customer.credit_limit != null && (
+                    <p className="truncate text-xs text-muted-foreground">
+                      Limite: {formatBRL(customer.credit_limit)}
+                    </p>
+                  )}
+                  {customer.blocked && customer.block_reason && (
+                    <p className="truncate text-xs text-red-500">{customer.block_reason}</p>
+                  )}
+                </div>
+              </button>
+
+              <div className="flex shrink-0 flex-col items-end gap-1.5">
+                {customer.blocked ? (
+                  <Badge variant="red">Bloqueado</Badge>
+                ) : (
+                  <ChevronRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 )}
-                {customer.blocked && customer.block_reason && (
-                  <p className="truncate text-xs text-red-500">{customer.block_reason}</p>
+                {customer.whatsapp && (
+                  <a
+                    href={`https://wa.me/${customer.whatsapp.replace(/\D/g, '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Abrir WhatsApp"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50"
+                  >
+                    <MessageCircle className="h-[18px] w-[18px]" />
+                  </a>
                 )}
               </div>
-              {customer.blocked ? (
-                <Badge variant="red">Bloqueado</Badge>
-              ) : (
-                <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-              )}
-            </button>
+            </div>
           ))}
         </div>
       )}
