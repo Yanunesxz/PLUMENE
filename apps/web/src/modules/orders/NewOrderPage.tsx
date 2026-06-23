@@ -4,6 +4,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2, Minus, Plus, WifiOff, ShoppingCart } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useCartStore } from '../../store/cartStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { addToSyncQueue } from '../../offline/sync.js';
@@ -14,14 +15,6 @@ import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems } from '@csb/shared';
 
-interface OrderItemDraft {
-  product_id: string;
-  product_name: string;
-  sku: string;
-  quantity: number;
-  unit_price: number;
-}
-
 export function NewOrderPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -30,9 +23,15 @@ export function NewOrderPage() {
 
   const preselectedCustomerId = params.get('customer_id') ?? '';
 
+  const items = useCartStore((s) => s.items);
+  const setQuantity = useCartStore((s) => s.setQuantity);
+  const setUnitPrice = useCartStore((s) => s.setUnitPrice);
+  const removeItem = useCartStore((s) => s.remove);
+  const addToCart = useCartStore((s) => s.add);
+  const clearCart = useCartStore((s) => s.clear);
+
   const [customerId, setCustomerId] = useState(preselectedCustomerId);
   const [notes, setNotes] = useState('');
-  const [items, setItems] = useState<OrderItemDraft[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -51,32 +50,13 @@ export function NewOrderPage() {
     const product = activeProducts.find((p) => p.id === product_id);
     if (!product) return;
     if (items.some((i) => i.product_id === product_id)) return;
-    setItems((prev) => [
-      ...prev,
-      {
-        product_id,
-        product_name: product.name,
-        sku: product.sku,
-        quantity: 1,
-        unit_price: product.price ?? 0,
-      },
-    ]);
-  };
-
-  const setQuantity = (product_id: string, quantity: number) => {
-    setItems((prev) =>
-      prev.map((i) => (i.product_id === product_id ? { ...i, quantity: Math.max(1, quantity || 1) } : i)),
-    );
-  };
-
-  const setUnitPrice = (product_id: string, unit_price: number) => {
-    setItems((prev) =>
-      prev.map((i) => (i.product_id === product_id ? { ...i, unit_price: Math.max(0, unit_price) } : i)),
-    );
-  };
-
-  const removeItem = (product_id: string) => {
-    setItems((prev) => prev.filter((i) => i.product_id !== product_id));
+    addToCart({
+      product_id,
+      product_name: product.name,
+      sku: product.sku,
+      quantity: 1,
+      unit_price: product.price ?? 0,
+    });
   };
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
@@ -110,6 +90,7 @@ export function NewOrderPage() {
         });
         setToast({ message: 'Pedido salvo offline. Será sincronizado ao reconectar.', type: 'info' });
       }
+      clearCart();
       setTimeout(() => void navigate('/orders'), 1500);
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : 'Erro ao criar pedido', type: 'error' });

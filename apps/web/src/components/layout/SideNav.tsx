@@ -1,15 +1,45 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useNavigate } from 'react-router-dom';
+import { Sparkles, LogOut, WifiOff } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { navItemsForRole } from './navItems.js';
+import { USER_ROLE_LABELS } from '@csb/shared';
 import { cn } from '../../lib/utils.js';
 
 export function SideNav() {
-  const { user } = useAuthStore();
+  const { user, logout } = useAuthStore();
+  const navigate = useNavigate();
+  const isOnline = useOnlineStatus();
   const items = navItemsForRole(user?.role);
+  const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login', { replace: true });
+  };
 
   return (
-    <aside className="sticky top-14 hidden h-[calc(100vh-3.5rem)] w-60 shrink-0 border-r border-border bg-card md:flex md:flex-col">
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto p-3">
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
+      {/* Marca */}
+      <div className="flex items-center gap-2.5 px-5 py-5">
+        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-700 text-white">
+          <Sparkles className="h-5 w-5" strokeWidth={2} />
+        </span>
+        <div className="leading-tight">
+          <p className="text-sm font-bold text-foreground">Corpo Sensual</p>
+          <p className="text-[11px] font-medium text-muted-foreground">Plataforma B2B</p>
+        </div>
+      </div>
+
+      {!isOnline && (
+        <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700">
+          <WifiOff className="h-3.5 w-3.5" strokeWidth={2.5} />
+          Modo offline
+        </div>
+      )}
+
+      {/* Navegação */}
+      <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
         {items.map(({ to, label, icon: Icon, end }) => (
           <NavLink
             key={to}
@@ -33,6 +63,29 @@ export function SideNav() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Usuário */}
+      <div className="border-t border-border p-3">
+        <div className="flex items-center gap-2.5">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+            {initials}
+          </span>
+          <div className="min-w-0 flex-1 leading-tight">
+            <p className="truncate text-sm font-medium text-foreground">{user?.name}</p>
+            {user?.role && (
+              <p className="truncate text-[11px] text-muted-foreground">{USER_ROLE_LABELS[user.role]}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            aria-label="Sair"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+          </button>
+        </div>
+      </div>
     </aside>
   );
 }

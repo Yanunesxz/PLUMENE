@@ -1,22 +1,30 @@
 import { useState, useEffect, useMemo, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Search, PackageSearch } from 'lucide-react';
+import { Search, PackageSearch, ShoppingCart } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useCartStore } from '../../store/cartStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/ui/Input.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { ProductCard } from '../../components/commerce/ProductCard.js';
-import { cn } from '../../lib/utils.js';
+import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
 const ALL = '__all__';
 
 export function CatalogPage() {
   const { token } = useAuthStore();
+  const navigate = useNavigate();
+  const cartItems = useCartStore((s) => s.items);
+  const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
   const [brand, setBrand] = useState<string>(ALL);
   const [loading, setLoading] = useState(false);
+
+  const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
+  const cartTotal = cartItems.reduce((t, i) => t + i.quantity * i.unit_price, 0);
 
   // Booleanos não são chaves indexáveis no IndexedDB — lemos tudo e filtramos em memória.
   const allProducts = useLiveQuery(() => db.products.toArray(), []);
@@ -121,9 +129,38 @@ export function CatalogPage() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((product) => (
-            <ProductCard key={product.id} product={product} />
+            <ProductCard
+              key={product.id}
+              product={product}
+              inOrder={cartItems.some((i) => i.product_id === product.id)}
+              onAdd={(p) =>
+                addToCart({
+                  product_id: p.id,
+                  product_name: p.name,
+                  sku: p.sku,
+                  quantity: 1,
+                  unit_price: p.price ?? 0,
+                })
+              }
+            />
           ))}
         </div>
+      )}
+
+      {cartCount > 0 && (
+        <button
+          type="button"
+          onClick={() => void navigate('/orders/new')}
+          className="fixed bottom-24 right-4 z-40 flex items-center gap-3 rounded-full bg-brand-700 py-3 pl-4 pr-5 text-white shadow-lg transition-colors hover:bg-brand-800 md:bottom-6"
+        >
+          <span className="relative flex h-6 w-6 items-center justify-center">
+            <ShoppingCart className="h-5 w-5" strokeWidth={2} />
+            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-brand-700">
+              {cartCount}
+            </span>
+          </span>
+          <span className="text-sm font-semibold">Ver pedido · {formatBRL(cartTotal)}</span>
+        </button>
       )}
     </div>
   );

@@ -1,4 +1,4 @@
-import { ImageIcon, Plus } from 'lucide-react';
+import { ImageIcon, Plus, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
 
@@ -8,16 +8,17 @@ interface ProductCardProps {
   onClick?: (product: ProductWithPrice) => void;
   /** Adiciona rápido ao pedido (mostra o botão +). */
   onAdd?: (product: ProductWithPrice) => void;
+  /** Item já está no pedido em montagem. */
+  inOrder?: boolean;
 }
 
-export function ProductCard({ product, onClick, onAdd }: ProductCardProps) {
+export function ProductCard({ product, onClick, onAdd, inOrder }: ProductCardProps) {
   const available = product.variants?.reduce(
     (sum, v) => sum + Math.max(0, v.stock_quantity - v.stock_committed),
     0,
   );
   const hasStock = available != null && (product.variants?.length ?? 0) > 0;
   const outOfStock = hasStock && available === 0;
-  const label = product.brand ?? product.collection ?? null;
   const clickable = !!onClick;
 
   return (
@@ -29,7 +30,7 @@ export function ProductCard({ product, onClick, onAdd }: ProductCardProps) {
         clickable && 'cursor-pointer',
       )}
     >
-      <div className="relative aspect-[3/4] w-full overflow-hidden bg-muted">
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
         {product.image_url ? (
           <img
             src={product.image_url}
@@ -39,7 +40,7 @@ export function ProductCard({ product, onClick, onAdd }: ProductCardProps) {
           />
         ) : (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-gradient-to-br from-brand-50 to-brand-100 text-brand-300">
-            <ImageIcon className="h-10 w-10" strokeWidth={1.5} />
+            <ImageIcon className="h-9 w-9" strokeWidth={1.5} />
             <span className="text-xs font-semibold text-brand-400">{product.sku}</span>
           </div>
         )}
@@ -55,38 +56,49 @@ export function ProductCard({ product, onClick, onAdd }: ProductCardProps) {
         )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-0.5 p-3">
-        {label && (
-          <p className="truncate text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-            {label}
-          </p>
-        )}
+      <div className="flex flex-1 flex-col gap-1 p-3">
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[11px] font-semibold text-muted-foreground">{product.sku}</span>
+          {hasStock && !outOfStock && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
+              {available} un.
+            </span>
+          )}
+        </div>
+
         <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{product.name}</p>
+        {product.collection && (
+          <p className="truncate text-xs text-muted-foreground">Coleção: {product.collection}</p>
+        )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">
-          <div className="min-w-0">
-            {product.price != null ? (
-              <p className="text-sm font-bold text-foreground">{formatBRL(product.price)}</p>
-            ) : (
-              <p className="text-xs font-medium text-muted-foreground">Sob consulta</p>
-            )}
-            {hasStock && !outOfStock && (
-              <p className="text-[11px] text-muted-foreground">{available} em estoque</p>
-            )}
-          </div>
+          {product.price != null ? (
+            <p className="text-base font-bold tracking-tight text-foreground">{formatBRL(product.price)}</p>
+          ) : (
+            <p className="text-xs font-medium text-muted-foreground">Sob consulta</p>
+          )}
 
           {onAdd && (
             <button
               type="button"
-              aria-label="Adicionar ao pedido"
+              aria-label={inOrder ? 'Adicionado ao pedido' : 'Adicionar ao pedido'}
               disabled={outOfStock}
               onClick={(e) => {
                 e.stopPropagation();
                 onAdd(product);
               }}
-              className="flex shrink-0 items-center justify-center rounded-full bg-brand-600 text-white shadow-sm transition-colors hover:bg-brand-700 disabled:opacity-40"
+              className={cn(
+                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors disabled:opacity-40',
+                inOrder
+                  ? 'border-brand-600 bg-brand-600 text-white'
+                  : 'border-brand-200 bg-brand-50 text-brand-700 hover:border-brand-600 hover:bg-brand-600 hover:text-white',
+              )}
             >
-              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              {inOrder ? (
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+              ) : (
+                <Plus className="h-4 w-4" strokeWidth={2.5} />
+              )}
             </button>
           )}
         </div>
