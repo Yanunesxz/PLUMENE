@@ -5,6 +5,7 @@ import { LoginPage } from '../modules/auth/LoginPage.js';
 import { CatalogPage } from '../modules/catalog/CatalogPage.js';
 import { OrdersPage } from '../modules/orders/OrdersPage.js';
 import { NewOrderPage } from '../modules/orders/NewOrderPage.js';
+import { OrderDetailPage } from '../modules/orders/OrderDetailPage.js';
 import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
 import { RepsPage } from '../modules/reps/RepsPage.js';
@@ -27,6 +28,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { path: 'catalog', element: <CatalogPage /> },
           { path: 'orders', element: <OrdersPage /> },
           { path: 'orders/new', element: <NewOrderPage /> },
+          { path: 'orders/:id', element: <OrderDetailPage /> },
           { path: 'customers', element: <CustomersPage /> },
           {
             path: 'dashboard',

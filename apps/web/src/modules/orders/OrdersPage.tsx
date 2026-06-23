@@ -141,9 +141,10 @@ export function OrdersPage() {
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {filtered.map((order) => (
-            <div
+            <Link
               key={order.id}
-              className="rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:shadow-md"
+              to={`/orders/${order.id}`}
+              className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:border-brand-200 hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-2">
                 <span className="font-mono text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
@@ -160,7 +161,7 @@ export function OrdersPage() {
                   year: 'numeric',
                 })}
               </p>
-            </div>
+            </Link>
           ))}
         </div>
       )}
