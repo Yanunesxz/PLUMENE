@@ -9,7 +9,7 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { addToSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/ui/Button.js';
-import { Select } from '../../components/ui/Select.js';
+import { SearchSelect } from '../../components/ui/SearchSelect.js';
 import { Textarea } from '../../components/ui/Textarea.js';
 import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -117,19 +117,19 @@ export function NewOrderPage() {
           <label htmlFor="customer" className="text-sm font-medium text-foreground">
             Cliente
           </label>
-          <Select
+          <SearchSelect
             id="customer"
             value={customerId}
-            onChange={(e) => setCustomerId(e.target.value)}
-            required
-          >
-            <option value="">Selecione um cliente</option>
-            {customers?.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </Select>
+            onSelect={setCustomerId}
+            placeholder="Selecione um cliente"
+            searchPlaceholder="Buscar cliente por nome ou CNPJ…"
+            emptyText="Nenhum cliente encontrado"
+            options={(customers ?? []).map((c) => ({
+              value: c.id,
+              label: c.name,
+              sublabel: c.cnpj ? `CNPJ ${c.cnpj}` : undefined,
+            }))}
+          />
           {selectedCustomer?.blocked && <p className="text-xs text-red-500">Este cliente está bloqueado.</p>}
         </div>
 
@@ -137,23 +137,23 @@ export function NewOrderPage() {
           <label htmlFor="add-product" className="text-sm font-medium text-foreground">
             Adicionar produto
           </label>
-          <Select
+          <SearchSelect
             id="add-product"
-            value=""
-            onChange={(e) => {
-              if (e.target.value) addItem(e.target.value);
-            }}
+            onSelect={addItem}
+            resetOnSelect
             disabled={availableProducts.length === 0}
-          >
-            <option value="">
-              {availableProducts.length === 0 ? 'Nenhum produto disponível' : 'Selecione um produto'}
-            </option>
-            {availableProducts.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} — {p.sku}
-              </option>
-            ))}
-          </Select>
+            placeholder={availableProducts.length === 0 ? 'Nenhum produto disponível' : 'Buscar produto para adicionar…'}
+            searchPlaceholder="Buscar por nome ou código (SKU)…"
+            emptyText="Nenhum produto encontrado"
+            options={availableProducts.map((p) => ({
+              value: p.id,
+              label: p.name,
+              sublabel: p.sku,
+            }))}
+          />
+          <p className="text-xs text-muted-foreground">
+            Dica: você também pode adicionar itens direto pelo Catálogo.
+          </p>
         </div>
 
         {items.length === 0 ? (
