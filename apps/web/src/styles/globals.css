@@ -12,10 +12,10 @@
     --muted-foreground: 240 3.8% 46.1%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 330 81% 60%;
-    --primary: 333 71% 51%;
+    --ring: 175 70% 38%;
+    --primary: 175 77% 26%;
     --primary-foreground: 0 0% 100%;
-    --radius: 0.75rem;
+    --radius: 0.625rem;
   }
 
   * {
