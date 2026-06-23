@@ -59,6 +59,9 @@ export function NewOrderPage() {
     });
   };
 
+  // Rep não edita preço (segue a tabela do representante); só gerente/admin ajusta.
+  const canEditPrice = user?.role === 'manager' || user?.role === 'admin';
+
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
 
@@ -212,14 +215,20 @@ export function NewOrderPage() {
 
                   <div className="min-w-[6rem] flex-1">
                     <label className="mb-1 block text-xs text-muted-foreground">Preço unit.</label>
-                    <input
-                      type="number"
-                      min={0}
-                      step={0.01}
-                      value={item.unit_price}
-                      onChange={(e) => setUnitPrice(item.product_id, Number(e.target.value))}
-                      className="h-11 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    />
+                    {canEditPrice ? (
+                      <input
+                        type="number"
+                        min={0}
+                        step={0.01}
+                        value={item.unit_price}
+                        onChange={(e) => setUnitPrice(item.product_id, Number(e.target.value))}
+                        className="h-11 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      />
+                    ) : (
+                      <p className="flex h-11 items-center text-sm font-medium text-foreground">
+                        {formatBRL(item.unit_price)}
+                      </p>
+                    )}
                   </div>
 
                   <div className="text-right">
