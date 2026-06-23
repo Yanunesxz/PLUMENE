@@ -7,12 +7,18 @@ import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/ui/Input.js';
+import { Select } from '../../components/ui/Select.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { ProductCard } from '../../components/commerce/ProductCard.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
 const ALL = '__all__';
+
+type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc' | 'stock';
+
+const availableOf = (p: ProductWithPrice) =>
+  (p.variants ?? []).reduce((s, v) => s + Math.max(0, v.stock_quantity - v.stock_committed), 0);
 
 export function CatalogPage() {
   const { token } = useAuthStore();
@@ -21,6 +27,7 @@ export function CatalogPage() {
   const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
   const [brand, setBrand] = useState<string>(ALL);
+  const [sort, setSort] = useState<SortKey>('code');
   const [loading, setLoading] = useState(false);
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
@@ -49,6 +56,21 @@ export function CatalogPage() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
+    const compare = (a: ProductWithPrice, b: ProductWithPrice) => {
+      switch (sort) {
+        case 'name':
+          return a.name.localeCompare(b.name, 'pt-BR');
+        case 'price_desc':
+          return (b.price ?? 0) - (a.price ?? 0);
+        case 'price_asc':
+          return (a.price ?? 0) - (b.price ?? 0);
+        case 'stock':
+          return availableOf(b) - availableOf(a);
+        case 'code':
+        default:
+          return a.sku.localeCompare(b.sku, 'pt-BR', { numeric: true });
+      }
+    };
     return (allProducts ?? [])
       .filter((p) => p.active)
       .filter((p) => brand === ALL || p.brand === brand)
@@ -59,8 +81,8 @@ export function CatalogPage() {
           p.sku.toLowerCase().includes(q) ||
           (p.collection?.toLowerCase().includes(q) ?? false),
       )
-      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
-  }, [allProducts, search, brand]);
+      .sort(compare);
+  }, [allProducts, search, brand, sort]);
 
   const isInitialLoading = allProducts === undefined || (loading && (allProducts?.length ?? 0) === 0);
 
@@ -74,19 +96,33 @@ export function CatalogPage() {
         </p>
       </div>
 
-      <div className="relative mb-3">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-          strokeWidth={2}
-        />
-        <Input
-          type="search"
-          inputMode="search"
-          placeholder="Buscar por nome, SKU ou coleção…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="pl-9"
-        />
+      <div className="mb-3 flex flex-col gap-2 sm:flex-row">
+        <div className="relative flex-1">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+            strokeWidth={2}
+          />
+          <Input
+            type="search"
+            inputMode="search"
+            placeholder="Buscar por nome, SKU ou coleção…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Select
+          aria-label="Ordenar"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          className="sm:w-52"
+        >
+          <option value="code">Ordenar: Código (A–Z)</option>
+          <option value="name">Ordenar: Nome (A–Z)</option>
+          <option value="price_desc">Ordenar: Maior preço</option>
+          <option value="price_asc">Ordenar: Menor preço</option>
+          <option value="stock">Ordenar: Mais estoque</option>
+        </Select>
       </div>
 
       {brands.length > 0 && (
