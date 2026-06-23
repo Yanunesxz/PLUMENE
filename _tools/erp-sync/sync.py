@@ -263,6 +263,49 @@ def sync_prices(cur) -> int:
     log.info(f"  Preços: {result['records']} registros")
     return result["records"]
 
+# ─── Auditoria: Preços (somente leitura) ───────────────────────────────────────
+def audit_prices(cur) -> None:
+    """Classifica por que produtos ativos ficam sem preço. Não escreve nada.
+
+    Hoje o sync_prices só usa PRECO1 (price_column é gravado fixo = 1). Esta
+    auditoria mostra quantos SKUs têm preço APENAS em PRECO2..6 (que o sync
+    ignora) vs quantos não têm preço nenhum no ERP.
+    """
+    log.info("AUDITORIA de preços (somente leitura)...")
+
+    cur.execute("SELECT DISTINCT TRIM(PRODUTO) FROM PRODUTO WHERE ATIVO = 'S'")
+    active = {r[0] for r in cur.fetchall()}
+    log.info(f"  Produtos ativos (códigos distintos): {len(active)}")
+
+    cur.execute("""
+        SELECT TRIM(itp.PRODUTO),
+               itp.PRECO1, itp.PRECO2, itp.PRECO3, itp.PRECO4, itp.PRECO5, itp.PRECO6
+        FROM ITENS_TABELA_PRECO itp
+        JOIN TABELA_PRECO tp ON TRIM(tp.TABELA_PRECO) = TRIM(itp.TABELA_PRECO)
+        WHERE tp.ATIVO = 'S'
+    """)
+    has_item, has_preco1, has_other = set(), set(), set()
+    for r in cur.fetchall():
+        code, precos = r[0], [r[1], r[2], r[3], r[4], r[5], r[6]]
+        has_item.add(code)
+        if precos[0] and precos[0] > 0:
+            has_preco1.add(code)
+        elif any(p and p > 0 for p in precos[1:]):
+            has_other.add(code)
+
+    no_item = active - has_item
+    only_other = (active & has_other) - has_preco1
+    priced_ok = active & has_preco1
+
+    log.info(f"  COM preço em PRECO1 (o sync usa hoje):     {len(priced_ok)}")
+    log.info(f"  COM preço só em PRECO2..6 (sync IGNORA):   {len(only_other)}")
+    log.info(f"  SEM nenhum item de preço no ERP:           {len(no_item)}")
+    if only_other:
+        log.info(f"    -> recuperáveis lendo a coluna certa. Ex.: {sorted(only_other)[:15]}")
+    if no_item:
+        log.info(f"    -> precisam de preço no ERP. Ex.: {sorted(no_item)[:15]}")
+
+
 # ─── Sync: Clientes ───────────────────────────────────────────────────────────
 def sync_customers(cur) -> int:
     log.info("Sincronizando clientes...")
@@ -340,7 +383,7 @@ def sync_stock(cur) -> int:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="ERP Sync — Firebird → Supabase")
-    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices"],
+    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices", "prices-audit"],
                         default="full", help="Modo de sincronização")
     args = parser.parse_args()
 
@@ -368,6 +411,8 @@ def main():
             sync_customers(cur)
         elif args.mode == "prices":
             sync_prices(cur)
+        elif args.mode == "prices-audit":
+            audit_prices(cur)
     finally:
         cur.close()
         con.close()
