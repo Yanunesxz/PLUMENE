@@ -1,16 +1,59 @@
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Receipt, Wallet, Users, ShoppingCart, TrendingUp, Percent, Target } from 'lucide-react';
+import {
+  Receipt,
+  Wallet,
+  Users,
+  ShoppingCart,
+  TrendingUp,
+  Percent,
+  Target,
+  RefreshCw,
+  CheckCircle2,
+  CloudOff,
+} from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
+import { flushSyncQueue } from '../../offline/sync.js';
+import { Button } from '../../components/ui/Button.js';
+import { Spinner } from '../../components/ui/Spinner.js';
+import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 
 export function MyAreaPage() {
   const { token, user } = useAuthStore();
+  const isOnline = useOnlineStatus();
   const orders = useLiveQuery(() => db.orders.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const pendingSync = useLiveQuery(() => db.sync_queue.count(), []) ?? 0;
+  const [syncing, setSyncing] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  const handleSync = async () => {
+    if (!token || syncing) return;
+    setSyncing(true);
+    try {
+      const { synced, failed } = await flushSyncQueue(token);
+      if (synced > 0) {
+        const r = await api.get<ApiResponse<Order[]>>('/orders', token);
+        await db.orders.bulkPut(r.data);
+      }
+      setToast(
+        failed > 0
+          ? { message: `${failed} pedido(s) não sincronizaram. Vamos tentar de novo.`, type: 'error' }
+          : synced > 0
+            ? { message: `${synced} pedido(s) sincronizado(s)!`, type: 'success' }
+            : { message: 'Nada para sincronizar.', type: 'info' },
+      );
+    } catch {
+      setToast({ message: 'Erro ao sincronizar. Verifique a conexão.', type: 'error' });
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (!token) return;
@@ -71,6 +114,50 @@ export function MyAreaPage() {
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Sincronização
+        </h2>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span
+                className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
+                  pendingSync > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                }`}
+              >
+                {pendingSync > 0 ? (
+                  <CloudOff className="h-5 w-5" strokeWidth={2} />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5" strokeWidth={2} />
+                )}
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  {pendingSync > 0
+                    ? `${pendingSync} pedido${pendingSync > 1 ? 's' : ''} aguardando sincronização`
+                    : 'Tudo sincronizado'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {isOnline
+                    ? 'A sincronização é automática ao reconectar.'
+                    : 'Você está offline — sincroniza sozinho ao reconectar.'}
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={syncing || !isOnline}
+              onClick={() => void handleSync()}
+            >
+              {syncing ? <Spinner /> : <RefreshCw className="h-4 w-4" strokeWidth={2.5} />}
+              {syncing ? 'Sincronizando…' : 'Sincronizar'}
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Desempenho
         </h2>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
@@ -81,6 +168,8 @@ export function MyAreaPage() {
           <Row icon={ShoppingCart} label="Total de pedidos" value={String(m.totalPedidos)} last />
         </div>
       </section>
+
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }
