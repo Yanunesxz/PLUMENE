@@ -29,6 +29,8 @@ export function CatalogPage() {
   const [brand, setBrand] = useState<string>(ALL);
   const [sort, setSort] = useState<SortKey>('code');
   const [inStockOnly, setInStockOnly] = useState(false);
+  // Produtos sem foto ficam ocultos por padrão (catálogo mais limpo); reversível.
+  const [showNoPhoto, setShowNoPhoto] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
@@ -55,6 +57,11 @@ export function CatalogPage() {
     return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [allProducts]);
 
+  const noPhotoCount = useMemo(
+    () => (allProducts ?? []).filter((p) => p.active && !p.image_url).length,
+    [allProducts],
+  );
+
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const compare = (a: ProductWithPrice, b: ProductWithPrice) => {
@@ -74,6 +81,7 @@ export function CatalogPage() {
     };
     return (allProducts ?? [])
       .filter((p) => p.active)
+      .filter((p) => showNoPhoto || !!p.image_url)
       .filter((p) => brand === ALL || p.brand === brand)
       .filter((p) => !inStockOnly || availableOf(p) > 0)
       .filter(
@@ -84,7 +92,7 @@ export function CatalogPage() {
           (p.collection?.toLowerCase().includes(q) ?? false),
       )
       .sort(compare);
-  }, [allProducts, search, brand, sort, inStockOnly]);
+  }, [allProducts, search, brand, sort, inStockOnly, showNoPhoto]);
 
   const isInitialLoading = allProducts === undefined || (loading && (allProducts?.length ?? 0) === 0);
 
@@ -131,6 +139,11 @@ export function CatalogPage() {
         <Chip active={inStockOnly} onClick={() => setInStockOnly((v) => !v)}>
           Só com estoque
         </Chip>
+        {noPhotoCount > 0 && (
+          <Chip active={showNoPhoto} onClick={() => setShowNoPhoto((v) => !v)}>
+            {showNoPhoto ? 'Ocultar sem foto' : `Mostrar sem foto (${noPhotoCount})`}
+          </Chip>
+        )}
         {brands.length > 0 && (
           <>
             <span className="w-px shrink-0 self-stretch bg-border" aria-hidden />
