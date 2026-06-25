@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import type { CustomerWithPriceTable } from '@csb/shared';
+import type { CustomerWithPriceTable, CreateCustomerRequest } from '@csb/shared';
 import type { UserRole } from '@csb/shared';
 
 export async function getCustomers(
@@ -30,4 +30,28 @@ export async function getCustomers(
   const { data, error } = await query;
   if (error || !data) return [];
   return data as CustomerWithPriceTable[];
+}
+
+export async function createCustomer(
+  company_id: string,
+  rep_id: string,
+  body: CreateCustomerRequest,
+): Promise<CustomerWithPriceTable | null> {
+  const { data, error } = await supabase
+    .from('customers')
+    .insert({
+      company_id,
+      rep_id,
+      name: body.name.trim(),
+      trade_name: body.trade_name?.trim() || null,
+      cnpj: body.cnpj?.trim() || null,
+      whatsapp: body.whatsapp?.trim() || null,
+      email: body.email?.trim() || null,
+      blocked: false,
+    })
+    .select('*, price_table:price_tables(id, name, company_id)')
+    .single();
+
+  if (error || !data) return null;
+  return data as CustomerWithPriceTable;
 }

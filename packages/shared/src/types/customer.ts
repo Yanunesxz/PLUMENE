@@ -44,3 +44,12 @@ export interface Customer {
 export interface CustomerWithPriceTable extends Customer {
   price_table: PriceTable | null;
 }
+
+/** Dados mínimos para um representante cadastrar um cliente no app. */
+export interface CreateCustomerRequest {
+  name: string;
+  trade_name?: string | null;
+  cnpj?: string | null;
+  whatsapp?: string | null;
+  email?: string | null;
+}

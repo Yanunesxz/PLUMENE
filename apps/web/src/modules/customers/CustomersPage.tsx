@@ -1,20 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, ChevronRight, Building2, MessageCircle } from 'lucide-react';
+import { Search, Users, ChevronRight, Building2, MessageCircle, UserPlus, X } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Badge } from '../../components/ui/Badge.js';
 import { Input } from '../../components/ui/Input.js';
+import { Button } from '../../components/ui/Button.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
+import { Spinner } from '../../components/ui/Spinner.js';
+import { Toast } from '../../components/ui/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import type { CustomerWithPriceTable, ApiResponse } from '@csb/shared';
+import type { CustomerWithPriceTable, CreateCustomerRequest, ApiResponse } from '@csb/shared';
+
+const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '' };
 
 export function CustomersPage() {
   const { token } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({ ...EMPTY_CUST });
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const setF = (k: keyof typeof EMPTY_CUST) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const customers = useLiveQuery(
     () =>
@@ -45,9 +57,90 @@ export function CustomersPage() {
     void navigate(`/orders/new?customer_id=${customer.id}`);
   };
 
+  const handleCreate = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    if (!form.name.trim()) {
+      setError('Informe o nome do cliente.');
+      return;
+    }
+    if (!token) return;
+    setSaving(true);
+    try {
+      const payload: CreateCustomerRequest = {
+        name: form.name,
+        trade_name: form.trade_name || null,
+        cnpj: form.cnpj || null,
+        whatsapp: form.whatsapp || null,
+        email: form.email || null,
+      };
+      const res = await api.post<ApiResponse<CustomerWithPriceTable>>('/customers', payload, token);
+      await db.customers.put(res.data);
+      setForm({ ...EMPTY_CUST });
+      setShowForm(false);
+      setToast({ message: 'Cliente cadastrado!', type: 'success' });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erro ao cadastrar cliente.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   return (
     <div className="p-4 md:p-6">
-      <h1 className="mb-4 text-xl font-bold tracking-tight text-foreground md:text-2xl">Clientes</h1>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Clientes</h1>
+        <Button size="md" onClick={() => setShowForm((s) => !s)}>
+          {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
+          {showForm ? 'Cancelar' : 'Novo cliente'}
+        </Button>
+      </div>
+
+      {showForm && (
+        <form
+          onSubmit={(e) => void handleCreate(e)}
+          className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm md:p-5"
+        >
+          <h2 className="mb-4 text-sm font-semibold text-foreground">Novo cliente</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Nome / Razão social <span className="text-red-500">*</span>
+              </label>
+              <Input value={form.name} onChange={setF('name')} placeholder="Nome do cliente" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Nome fantasia</label>
+              <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Opcional" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">CNPJ / CPF</label>
+              <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="Opcional" inputMode="numeric" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">WhatsApp</label>
+              <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="Opcional" inputMode="tel" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">E-mail</label>
+              <Input type="email" value={form.email} onChange={setF('email')} placeholder="Opcional" autoComplete="off" />
+            </div>
+          </div>
+          {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+          <div className="mt-4 flex justify-end">
+            <Button type="submit" disabled={saving}>
+              {saving ? (
+                <>
+                  <Spinner />
+                  Salvando…
+                </>
+              ) : (
+                'Cadastrar cliente'
+              )}
+            </Button>
+          </div>
+        </form>
+      )}
 
       <div className="relative mb-4">
         <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -134,6 +227,8 @@ export function CustomersPage() {
           ))}
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }
