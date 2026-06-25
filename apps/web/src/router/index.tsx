@@ -9,6 +9,7 @@ import { OrderDetailPage } from '../modules/orders/OrderDetailPage.js';
 import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
 import { RepsPage } from '../modules/reps/RepsPage.js';
+import { CommissionsPage } from '../modules/commissions/CommissionsPage.js';
 import { UnauthorizedPage } from '../modules/system/UnauthorizedPage.js';
 import { NotFoundPage } from '../modules/system/NotFoundPage.js';
 
@@ -39,6 +40,11 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'representantes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
             children: [{ index: true, element: <RepsPage /> }],
+          },
+          {
+            path: 'comissoes',
+            element: <PrivateRoute roles={['manager', 'admin']} />,
+            children: [{ index: true, element: <CommissionsPage /> }],
           },
         ],
       },

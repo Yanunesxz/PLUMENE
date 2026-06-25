@@ -1,6 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
-import { getOrders, getOrderById, createOrder, updateOrderStatus } from './orders.service.js';
+import {
+  getOrders,
+  getOrderById,
+  createOrder,
+  updateOrderStatus,
+  setOrderInvoiced,
+} from './orders.service.js';
 
 export async function listOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role } = request.user;
@@ -38,6 +44,19 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
     }
     throw err;
   }
+}
+
+export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  const { invoiced } = request.body as { invoiced: boolean };
+
+  const order = await setOrderInvoiced(id, company_id, !!invoiced);
+  if (!order) {
+    await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+    return;
+  }
+  await reply.send({ data: order });
 }
 
 export async function updateStatusHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

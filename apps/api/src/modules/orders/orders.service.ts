@@ -85,6 +85,27 @@ export async function createOrder(
   return getOrderById((order as Order).id, company_id);
 }
 
+export async function setOrderInvoiced(
+  id: string,
+  company_id: string,
+  invoiced: boolean,
+): Promise<Order | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .update({
+      invoiced,
+      invoiced_at: invoiced ? new Date().toISOString() : null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .select()
+    .maybeSingle();
+
+  if (error || !data) return null;
+  return data as Order;
+}
+
 export async function updateOrderStatus(
   id: string,
   company_id: string,

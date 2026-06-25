@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { Badge } from '../../components/ui/Badge.js';
+import { Button } from '../../components/ui/Button.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
@@ -24,10 +25,12 @@ const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | '
 export function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
+  const canInvoice = user?.role === 'manager' || user?.role === 'admin';
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
+  const [invoicing, setInvoicing] = useState(false);
 
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -64,6 +67,25 @@ export function OrderDetailPage() {
       cancel = true;
     };
   }, [id, token]);
+
+  const toggleInvoiced = async () => {
+    if (!id || !token || !order) return;
+    setInvoicing(true);
+    try {
+      const res = await api.patch<ApiResponse<OrderWithItems>>(
+        `/orders/${id}/invoice`,
+        { invoiced: !order.invoiced },
+        token,
+      );
+      setOrder((prev) =>
+        prev ? { ...prev, invoiced: !!res.data.invoiced, invoiced_at: res.data.invoiced_at ?? null } : prev,
+      );
+    } catch {
+      /* mantém estado anterior */
+    } finally {
+      setInvoicing(false);
+    }
+  };
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
@@ -102,6 +124,31 @@ export function OrderDetailPage() {
                 year: 'numeric',
               })}
             </p>
+
+            <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+              <span className="flex items-center gap-2">
+                {order.invoiced ? (
+                  <Badge variant="green">Faturado</Badge>
+                ) : (
+                  <Badge variant="gray">Não faturado</Badge>
+                )}
+                {order.invoiced && order.invoiced_at && (
+                  <span className="text-xs text-muted-foreground">
+                    em {new Date(order.invoiced_at).toLocaleDateString('pt-BR')}
+                  </span>
+                )}
+              </span>
+              {canInvoice && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={invoicing}
+                  onClick={() => void toggleInvoiced()}
+                >
+                  {order.invoiced ? 'Desmarcar' : 'Marcar faturado'}
+                </Button>
+              )}
+            </div>
           </div>
 
           <div className="rounded-xl border border-border bg-card shadow-sm">

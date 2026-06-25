@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@csb/shared';
 
@@ -22,6 +22,7 @@ const managerItems: NavItem[] = [
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
   { to: '/representantes', label: 'Representantes', icon: Contact },
+  { to: '/comissoes', label: 'Comissões', icon: Wallet },
 ];
 
 export function navItemsForRole(role: UserRole | undefined): NavItem[] {

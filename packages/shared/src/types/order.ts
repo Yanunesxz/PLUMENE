@@ -19,6 +19,10 @@ export interface Order {
   status: OrderStatus;
   total: number | null;
   notes: string | null;
+  /** Faturado (boleto/NF emitido) — base da comissão. */
+  invoiced?: boolean;
+  /** Mês em que foi faturado (define quando a comissão entra). */
+  invoiced_at?: string | null;
   local_id: string | null;
   synced_at: string | null;
   erp_order_id: string | null;
