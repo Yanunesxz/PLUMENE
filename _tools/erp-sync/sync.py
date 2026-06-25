@@ -106,6 +106,18 @@ def supabase_select(table: str, columns: str = "*", filters: dict | None = None)
     r.raise_for_status()
     return r.json()
 
+def supabase_patch_by_ids(table: str, ids: list, body: dict) -> int:
+    """PATCH em lote dos registros cujo id está na lista (em chunks)."""
+    total = 0
+    for i in range(0, len(ids), CHUNK_SIZE):
+        chunk = ids[i:i+CHUNK_SIZE]
+        url = f"{SUPABASE_URL}/rest/v1/{table}?id=in.({','.join(chunk)})"
+        r = httpx.patch(url, headers={**HEADERS, "Prefer": "return=minimal"}, json=body, timeout=30)
+        if r.status_code not in (200, 204):
+            raise RuntimeError(f"Supabase patch {table} falhou [{r.status_code}]: {r.text[:300]}")
+        total += len(chunk)
+    return total
+
 # ─── Helpers ──────────────────────────────────────────────────────────────────
 def trim(v):
     return v.strip() if isinstance(v, str) else v
@@ -204,6 +216,15 @@ def sync_products(cur) -> tuple[int, int]:
     db_products = supabase_select("products", "id,erp_id", {"company_id": COMPANY_ID})
     pid_map = {p["erp_id"]: p["id"] for p in db_products if p.get("erp_id")}
 
+    # Desativa no app os produtos que não estão mais ATIVO='S' no ERP. O upsert
+    # acima só trouxe os ativos; sem isso, refs desligadas no ERP continuariam
+    # aparecendo no catálogo e na busca de "adicionar produto".
+    active_skus = set(products_seen.keys())
+    stale_ids = [p["id"] for p in db_products if p.get("erp_id") and p["erp_id"] not in active_skus]
+    if stale_ids:
+        n = supabase_patch_by_ids("products", stale_ids, {"active": False, "updated_at": now_iso()})
+        log.info(f"  Desativados (ref desligada no ERP): {n}")
+
     variant_rows = []
     for v in variants:
         sku = v["erp_sku"].split("|")[0]
@@ -262,6 +283,30 @@ def sync_prices(cur) -> int:
     result = supabase_upsert("product_prices", price_rows)
     log.info(f"  Preços: {result['records']} registros")
     return result["records"]
+
+# ─── Reconciliação de produtos ativos ──────────────────────────────────────────
+def reconcile_active(cur) -> None:
+    """Sincroniza só o flag `active` dos produtos com o ERP, sem re-upsertar.
+
+    Desativa no app os produtos que não estão mais ATIVO='S' no ERP (refs
+    desligadas que continuavam aparecendo no catálogo / na busca) e reativa
+    os que voltaram. Leitura no Firebird + PATCH pontual no Supabase.
+    """
+    log.info("Reconciliando produtos ativos com o ERP...")
+    cur.execute("SELECT DISTINCT TRIM(PRODUTO) FROM PRODUTO WHERE ATIVO = 'S'")
+    active = {r[0] for r in cur.fetchall()}
+    log.info(f"  Ativos no ERP: {len(active)}")
+
+    app = supabase_select("products", "id,erp_id,active", {"company_id": COMPANY_ID})
+    to_off = [p["id"] for p in app if p.get("erp_id") and p["erp_id"] not in active and p.get("active")]
+    to_on = [p["id"] for p in app if p.get("erp_id") and p["erp_id"] in active and not p.get("active")]
+
+    if to_off:
+        supabase_patch_by_ids("products", to_off, {"active": False, "updated_at": now_iso()})
+    if to_on:
+        supabase_patch_by_ids("products", to_on, {"active": True, "updated_at": now_iso()})
+    log.info(f"  Desativados (ref desligada): {len(to_off)} | Reativados: {len(to_on)}")
+
 
 # ─── Auditoria: Preços (somente leitura) ───────────────────────────────────────
 def audit_prices(cur) -> None:
@@ -383,7 +428,7 @@ def sync_stock(cur) -> int:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="ERP Sync — Firebird → Supabase")
-    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices", "prices-audit"],
+    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices", "products", "reconcile", "prices-audit"],
                         default="full", help="Modo de sincronização")
     args = parser.parse_args()
 
@@ -411,6 +456,10 @@ def main():
             sync_customers(cur)
         elif args.mode == "prices":
             sync_prices(cur)
+        elif args.mode == "products":
+            sync_products(cur)
+        elif args.mode == "reconcile":
+            reconcile_active(cur)
         elif args.mode == "prices-audit":
             audit_prices(cur)
     finally:

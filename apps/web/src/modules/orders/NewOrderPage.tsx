@@ -102,7 +102,11 @@ export function NewOrderPage() {
     }
   };
 
-  const availableProducts = activeProducts.filter((p) => !items.some((i) => i.product_id === p.id));
+  // Mesma visibilidade do catálogo: sem Plumene (2xxx) e sem produtos sem foto
+  // (refs que foram tiradas do catálogo não devem aparecer na busca de pedido).
+  const availableProducts = activeProducts.filter(
+    (p) => !/^2/.test(p.sku) && !!p.image_url && !items.some((i) => i.product_id === p.id),
+  );
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
