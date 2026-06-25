@@ -20,9 +20,14 @@ type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc' | 'stock';
 const availableOf = (p: ProductWithPrice) =>
   (p.variants ?? []).reduce((s, v) => s + Math.max(0, v.stock_quantity - v.stock_committed), 0);
 
+// Plumene é outra marca (códigos 2xxx/22xxx) — não entra neste catálogo.
+const isPlumene = (sku: string) => /^2/.test(sku);
+
 export function CatalogPage() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const navigate = useNavigate();
+  // Representante não vê o estoque atual da fábrica.
+  const canSeeStock = user?.role === 'manager' || user?.role === 'admin';
   const cartItems = useCartStore((s) => s.items);
   const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
@@ -58,7 +63,7 @@ export function CatalogPage() {
   }, [allProducts]);
 
   const noPhotoCount = useMemo(
-    () => (allProducts ?? []).filter((p) => p.active && !p.image_url).length,
+    () => (allProducts ?? []).filter((p) => p.active && !p.image_url && !isPlumene(p.sku)).length,
     [allProducts],
   );
 
@@ -81,6 +86,7 @@ export function CatalogPage() {
     };
     return (allProducts ?? [])
       .filter((p) => p.active)
+      .filter((p) => !isPlumene(p.sku))
       .filter((p) => showNoPhoto || !!p.image_url)
       .filter((p) => brand === ALL || p.brand === brand)
       .filter((p) => !inStockOnly || availableOf(p) > 0)
@@ -189,6 +195,7 @@ export function CatalogPage() {
             <ProductCard
               key={product.id}
               product={product}
+              showStock={canSeeStock}
               inOrder={cartItems.some((i) => i.product_id === product.id)}
               onAdd={(p) =>
                 addToCart({

@@ -10,9 +10,11 @@ interface ProductCardProps {
   onAdd?: (product: ProductWithPrice) => void;
   /** Item já está no pedido em montagem. */
   inOrder?: boolean;
+  /** Exibe a quantidade em estoque (oculto para representantes). */
+  showStock?: boolean;
 }
 
-export function ProductCard({ product, onClick, onAdd, inOrder }: ProductCardProps) {
+export function ProductCard({ product, onClick, onAdd, inOrder, showStock = true }: ProductCardProps) {
   const available = product.variants?.reduce(
     (sum, v) => sum + Math.max(0, v.stock_quantity - v.stock_committed),
     0,
@@ -59,7 +61,7 @@ export function ProductCard({ product, onClick, onAdd, inOrder }: ProductCardPro
       <div className="flex flex-1 flex-col gap-1 p-3">
         <div className="flex items-center justify-between gap-2">
           <span className="font-mono text-[11px] font-semibold text-muted-foreground">{product.sku}</span>
-          {hasStock && !outOfStock && (
+          {showStock && hasStock && !outOfStock && (
             <span className="inline-flex items-center gap-1 rounded-full bg-brand-50 px-2 py-0.5 text-[10px] font-semibold text-brand-700">
               {available} un.
             </span>
