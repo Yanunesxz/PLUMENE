@@ -10,6 +10,7 @@ import { CustomersPage } from '../modules/customers/CustomersPage.js';
 import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
 import { RepsPage } from '../modules/reps/RepsPage.js';
 import { CommissionsPage } from '../modules/commissions/CommissionsPage.js';
+import { MyAreaPage } from '../modules/me/MyAreaPage.js';
 import { UnauthorizedPage } from '../modules/system/UnauthorizedPage.js';
 import { NotFoundPage } from '../modules/system/NotFoundPage.js';
 
@@ -26,6 +27,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/catalog" replace /> },
+          { path: 'minha-area', element: <MyAreaPage /> },
           { path: 'catalog', element: <CatalogPage /> },
           { path: 'orders', element: <OrdersPage /> },
           { path: 'orders/new', element: <NewOrderPage /> },

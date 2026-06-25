@@ -31,7 +31,11 @@ export interface AuthPayload {
   name: string;
   /** Tabela de preço do representante logado (usada para precificar o catálogo). */
   price_table_id?: string | null;
+  /** Percentual de comissão do representante (ex.: 10 = 10%). */
+  commission_rate?: number | null;
 }
+
+// (commission_rate em User e AuthPayload são usados pela área do representante)
 
 /** Representante na listagem (gerente/admin), com o nome da tabela resolvido. */
 export interface RepListItem {

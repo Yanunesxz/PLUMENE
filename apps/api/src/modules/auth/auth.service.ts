@@ -22,6 +22,7 @@ export function buildAuthPayload(user: User): AuthPayload {
     company_id: user.company_id,
     name: user.name,
     price_table_id: user.price_table_id ?? null,
+    commission_rate: user.commission_rate ?? null,
   };
 }
 

@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@csb/shared';
 
@@ -11,6 +11,7 @@ export interface NavItem {
 }
 
 const repItems: NavItem[] = [
+  { to: '/minha-area', label: 'Minha área', icon: Gauge },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },

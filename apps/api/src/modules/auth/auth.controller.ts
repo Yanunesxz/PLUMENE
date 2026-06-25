@@ -50,6 +50,7 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
         role: user.role,
         active: user.active,
         price_table_id: user.price_table_id ?? null,
+        commission_rate: user.commission_rate ?? null,
       },
     },
   });
