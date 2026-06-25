@@ -23,12 +23,13 @@ interface RepRow {
   phone: string | null;
   active: boolean;
   price_table_id: string | null;
+  commission_rate: number | null;
   created_at: string;
   price_tables: EmbeddedTable;
 }
 
 const REP_SELECT =
-  'id, name, email, cpf, legal_name, phone, active, price_table_id, created_at, price_tables(name)';
+  'id, name, email, cpf, legal_name, phone, active, price_table_id, commission_rate, created_at, price_tables(name)';
 
 function toRepListItem(row: RepRow): RepListItem {
   return {
@@ -41,6 +42,7 @@ function toRepListItem(row: RepRow): RepListItem {
     active: row.active,
     price_table_id: row.price_table_id ?? null,
     price_table_name: tableName(row.price_tables),
+    commission_rate: row.commission_rate ?? 10,
     created_at: row.created_at,
   };
 }
@@ -98,6 +100,7 @@ export async function createRep(
       legal_name: body.legal_name?.trim() || null,
       phone: body.phone?.trim() || null,
       price_table_id: body.price_table_id,
+      commission_rate: body.commission_rate ?? 10,
     })
     .select(REP_SELECT)
     .single();
@@ -133,6 +136,7 @@ export async function updateRep(
   if (body.legal_name !== undefined) update.legal_name = body.legal_name?.trim() || null;
   if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
   if (body.price_table_id !== undefined) update.price_table_id = body.price_table_id || null;
+  if (body.commission_rate !== undefined) update.commission_rate = body.commission_rate;
   if (body.active !== undefined) update.active = body.active;
   if (body.password) update.password_hash = hashPassword(body.password);
 

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil } from 'lucide-react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Percent } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/ui/Input.js';
@@ -25,6 +25,7 @@ const EMPTY = {
   phone: '',
   price_table_id: '',
   password: '',
+  commission_rate: '10',
   active: true,
 };
 
@@ -76,6 +77,7 @@ export function RepsPage() {
       phone: rep.phone ?? '',
       price_table_id: rep.price_table_id ?? '',
       password: '',
+      commission_rate: String(rep.commission_rate ?? 10),
       active: rep.active,
     });
     setError('');
@@ -105,6 +107,7 @@ export function RepsPage() {
           price_table_id: form.price_table_id,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
+          commission_rate: Number(form.commission_rate) || 10,
           active: form.active,
           ...(form.password ? { password: form.password } : {}),
         };
@@ -120,6 +123,7 @@ export function RepsPage() {
           password: form.password,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
+          commission_rate: Number(form.commission_rate) || 10,
         };
         const res = await api.post<ApiResponse<RepListItem>>('/reps', payload, token);
         setReps((prev) =>
@@ -189,6 +193,18 @@ export function RepsPage() {
                 onChange={set('password')}
                 placeholder={isEditing ? 'Deixe em branco para manter' : 'Defina a senha de acesso'}
                 autoComplete="new-password"
+              />
+            </Field>
+            <Field label="Comissão (%)" required>
+              <Input
+                type="number"
+                min={0}
+                max={100}
+                step={0.5}
+                value={form.commission_rate}
+                onChange={set('commission_rate')}
+                placeholder="10"
+                inputMode="decimal"
               />
             </Field>
             {isEditing && (
@@ -284,6 +300,9 @@ export function RepsPage() {
                   ) : (
                     <span className="italic">Sem tabela</span>
                   )}
+                </p>
+                <p className="flex items-center gap-1.5">
+                  <Percent className="h-3.5 w-3.5 shrink-0" /> Comissão: {rep.commission_rate}%
                 </p>
               </div>
             </div>

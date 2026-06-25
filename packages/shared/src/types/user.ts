@@ -19,6 +19,8 @@ export interface User {
   legal_name?: string | null;
   phone?: string | null;
   price_table_id?: string | null;
+  /** Percentual de comissão do representante (ex.: 10 = 10%). */
+  commission_rate?: number | null;
 }
 
 export interface AuthPayload {
@@ -42,6 +44,7 @@ export interface RepListItem {
   active: boolean;
   price_table_id: string | null;
   price_table_name: string | null;
+  commission_rate: number;
   created_at: string;
 }
 
@@ -54,6 +57,8 @@ export interface CreateRepRequest {
   price_table_id: string;
   legal_name?: string | null;
   phone?: string | null;
+  /** Percentual de comissão (ex.: 10 = 10%). Padrão 10 se omitido. */
+  commission_rate?: number;
 }
 
 /** Edição de representante — todos os campos opcionais (envia só o que mudou). */
@@ -65,6 +70,7 @@ export interface UpdateRepRequest {
   legal_name?: string | null;
   phone?: string | null;
   active?: boolean;
+  commission_rate?: number;
   /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
   password?: string;
 }
