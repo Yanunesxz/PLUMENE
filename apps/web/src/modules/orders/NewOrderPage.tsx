@@ -10,10 +10,11 @@ import { api } from '../../services/api.js';
 import { addToSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/ui/Button.js';
 import { SearchSelect } from '../../components/ui/SearchSelect.js';
+import { SizePickerSheet } from '../../components/commerce/SizePickerSheet.js';
 import { Textarea } from '../../components/ui/Textarea.js';
 import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
-import type { CreateOrderRequest, ApiResponse, OrderWithItems } from '@csb/shared';
+import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 
 export function NewOrderPage() {
   const navigate = useNavigate();
@@ -33,6 +34,7 @@ export function NewOrderPage() {
   const [customerId, setCustomerId] = useState(preselectedCustomerId);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [pickerProduct, setPickerProduct] = useState<ProductWithPrice | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
@@ -46,17 +48,10 @@ export function NewOrderPage() {
     if (preselectedCustomerId) setCustomerId(preselectedCustomerId);
   }, [preselectedCustomerId]);
 
+  // Abre o seletor de tamanho para o produto escolhido na busca.
   const addItem = (product_id: string) => {
     const product = activeProducts.find((p) => p.id === product_id);
-    if (!product) return;
-    if (items.some((i) => i.product_id === product_id)) return;
-    addToCart({
-      product_id,
-      product_name: product.name,
-      sku: product.sku,
-      quantity: 1,
-      unit_price: product.price ?? 0,
-    });
+    if (product) setPickerProduct(product);
   };
 
   // Rep não edita preço (segue a tabela do representante); só gerente/admin ajusta.
@@ -75,7 +70,12 @@ export function NewOrderPage() {
       customer_id: customerId,
       notes: notes || undefined,
       local_id,
-      items: items.map(({ product_id, quantity, unit_price }) => ({ product_id, quantity, unit_price })),
+      items: items.map(({ product_id, variant_id, quantity, unit_price }) => ({
+        product_id,
+        variant_id: variant_id ?? undefined,
+        quantity,
+        unit_price,
+      })),
     };
 
     try {
@@ -104,9 +104,7 @@ export function NewOrderPage() {
 
   // Mesma visibilidade do catálogo: sem Plumene (2xxx) e sem produtos sem foto
   // (refs que foram tiradas do catálogo não devem aparecer na busca de pedido).
-  const availableProducts = activeProducts.filter(
-    (p) => !/^2/.test(p.sku) && !!p.image_url && !items.some((i) => i.product_id === p.id),
-  );
+  const availableProducts = activeProducts.filter((p) => !/^2/.test(p.sku) && !!p.image_url);
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
@@ -171,15 +169,18 @@ export function NewOrderPage() {
         ) : (
           <ul className="space-y-2">
             {items.map((item) => (
-              <li key={item.product_id} className="rounded-xl border border-border bg-card p-3 shadow-sm">
+              <li key={`${item.product_id}|${item.size}`} className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">{item.product_name}</p>
-                    <p className="text-xs text-muted-foreground">{item.sku}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {item.sku}
+                      {item.size ? ` · Tam ${item.size}` : ''}
+                    </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeItem(item.product_id)}
+                    onClick={() => removeItem(item.product_id, item.size)}
                     aria-label="Remover item"
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
                   >
@@ -193,7 +194,7 @@ export function NewOrderPage() {
                     <div className="flex items-center">
                       <button
                         type="button"
-                        onClick={() => setQuantity(item.product_id, item.quantity - 1)}
+                        onClick={() => setQuantity(item.product_id, item.size, item.quantity - 1)}
                         aria-label="Diminuir quantidade"
                         className="flex h-11 w-11 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted"
                       >
@@ -203,12 +204,12 @@ export function NewOrderPage() {
                         type="number"
                         min={1}
                         value={item.quantity}
-                        onChange={(e) => setQuantity(item.product_id, Number(e.target.value))}
+                        onChange={(e) => setQuantity(item.product_id, item.size, Number(e.target.value))}
                         className="h-11 w-12 border-y border-input bg-background text-center text-sm text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         type="button"
-                        onClick={() => setQuantity(item.product_id, item.quantity + 1)}
+                        onClick={() => setQuantity(item.product_id, item.size, item.quantity + 1)}
                         aria-label="Aumentar quantidade"
                         className="flex h-11 w-11 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted"
                       >
@@ -225,7 +226,7 @@ export function NewOrderPage() {
                         min={0}
                         step={0.01}
                         value={item.unit_price}
-                        onChange={(e) => setUnitPrice(item.product_id, Number(e.target.value))}
+                        onChange={(e) => setUnitPrice(item.product_id, item.size, Number(e.target.value))}
                         className="h-11 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     ) : (
@@ -277,6 +278,26 @@ export function NewOrderPage() {
           </Button>
         </div>
       </form>
+
+      {pickerProduct && (
+        <SizePickerSheet
+          product={pickerProduct}
+          onClose={() => setPickerProduct(null)}
+          onConfirm={(lines) =>
+            lines.forEach((l) =>
+              addToCart({
+                product_id: pickerProduct.id,
+                variant_id: l.variant_id,
+                size: l.size,
+                product_name: pickerProduct.name,
+                sku: pickerProduct.sku,
+                quantity: l.quantity,
+                unit_price: pickerProduct.price ?? 0,
+              }),
+            )
+          }
+        />
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>

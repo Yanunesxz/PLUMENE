@@ -10,6 +10,7 @@ import { Input } from '../../components/ui/Input.js';
 import { Select } from '../../components/ui/Select.js';
 import { Skeleton } from '../../components/ui/Skeleton.js';
 import { ProductCard } from '../../components/commerce/ProductCard.js';
+import { SizePickerSheet } from '../../components/commerce/SizePickerSheet.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
@@ -37,6 +38,7 @@ export function CatalogPage() {
   // Produtos sem foto ficam ocultos por padrão (catálogo mais limpo); reversível.
   const [showNoPhoto, setShowNoPhoto] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pickerProduct, setPickerProduct] = useState<ProductWithPrice | null>(null);
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
   const cartTotal = cartItems.reduce((t, i) => t + i.quantity * i.unit_price, 0);
@@ -194,15 +196,7 @@ export function CatalogPage() {
               product={product}
               showStock={canSeeStock}
               inOrder={cartItems.some((i) => i.product_id === product.id)}
-              onAdd={(p) =>
-                addToCart({
-                  product_id: p.id,
-                  product_name: p.name,
-                  sku: p.sku,
-                  quantity: 1,
-                  unit_price: p.price ?? 0,
-                })
-              }
+              onAdd={(p) => setPickerProduct(p)}
             />
           ))}
         </div>
@@ -222,6 +216,26 @@ export function CatalogPage() {
           </span>
           <span className="text-sm font-semibold">Ver pedido · {formatBRL(cartTotal)}</span>
         </button>
+      )}
+
+      {pickerProduct && (
+        <SizePickerSheet
+          product={pickerProduct}
+          onClose={() => setPickerProduct(null)}
+          onConfirm={(lines) =>
+            lines.forEach((l) =>
+              addToCart({
+                product_id: pickerProduct.id,
+                variant_id: l.variant_id,
+                size: l.size,
+                product_name: pickerProduct.name,
+                sku: pickerProduct.sku,
+                quantity: l.quantity,
+                unit_price: pickerProduct.price ?? 0,
+              }),
+            )
+          }
+        />
       )}
     </div>
   );

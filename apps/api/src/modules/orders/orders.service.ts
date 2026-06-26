@@ -74,6 +74,7 @@ export async function createOrder(
   const items = body.items.map((item) => ({
     order_id: (order as Order).id,
     product_id: item.product_id,
+    variant_id: item.variant_id ?? null,
     quantity: item.quantity,
     unit_price: item.unit_price,
     total: item.quantity * item.unit_price,

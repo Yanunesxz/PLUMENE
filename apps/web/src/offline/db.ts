@@ -6,7 +6,7 @@ export interface SyncQueueItem {
   local_id: string;
   customer_id: string;
   notes?: string | undefined;
-  items: Array<{ product_id: string; quantity: number; unit_price: number }>;
+  items: Array<{ product_id: string; variant_id?: string | undefined; quantity: number; unit_price: number }>;
   created_at: string;
   updated_at: string;
   attempts: number;
