@@ -15,7 +15,7 @@ import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
 const ALL = '__all__';
 
-type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc' | 'stock';
+type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
 const availableOf = (p: ProductWithPrice) =>
   (p.variants ?? []).reduce((s, v) => s + Math.max(0, v.stock_quantity - v.stock_committed), 0);
@@ -77,8 +77,6 @@ export function CatalogPage() {
           return (b.price ?? 0) - (a.price ?? 0);
         case 'price_asc':
           return (a.price ?? 0) - (b.price ?? 0);
-        case 'stock':
-          return availableOf(b) - availableOf(a);
         case 'code':
         default:
           return a.sku.localeCompare(b.sku, 'pt-BR', { numeric: true });
@@ -133,11 +131,10 @@ export function CatalogPage() {
           onChange={(e) => setSort(e.target.value as SortKey)}
           className="sm:w-52"
         >
-          <option value="code">Ordenar: Código (A–Z)</option>
+          <option value="code">Ordenar: Referência (menor a maior)</option>
           <option value="name">Ordenar: Nome (A–Z)</option>
           <option value="price_desc">Ordenar: Maior preço</option>
           <option value="price_asc">Ordenar: Menor preço</option>
-          <option value="stock">Ordenar: Mais estoque</option>
         </Select>
       </div>
 
