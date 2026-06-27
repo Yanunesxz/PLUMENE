@@ -1,10 +1,6 @@
-import { createHash } from 'crypto';
 import { supabase } from '../../config/supabase.js';
+import { hashPassword } from '../../lib/password.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
-
-function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
-}
 
 // O embed price_tables(name) pode vir como objeto (1:1) ou array, dependendo da
 // inferência do supabase — normalizamos para o nome (ou null).
@@ -93,7 +89,7 @@ export async function createRep(
       company_id,
       name: body.name.trim(),
       email,
-      password_hash: hashPassword(body.password),
+      password_hash: await hashPassword(body.password),
       role: 'rep',
       active: true,
       cpf: body.cpf.trim(),
@@ -138,7 +134,7 @@ export async function updateRep(
   if (body.price_table_id !== undefined) update.price_table_id = body.price_table_id || null;
   if (body.commission_rate !== undefined) update.commission_rate = body.commission_rate;
   if (body.active !== undefined) update.active = body.active;
-  if (body.password) update.password_hash = hashPassword(body.password);
+  if (body.password) update.password_hash = await hashPassword(body.password);
 
   if (Object.keys(update).length === 0) return { ok: false, reason: 'error' };
 

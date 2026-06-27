@@ -1,11 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { createHash } from 'crypto';
 import type { LoginRequest, AuthPayload, User } from '@csb/shared';
-import { findUserByEmail, buildAuthPayload, getTokenConfig } from './auth.service.js';
-
-function hashPassword(password: string): string {
-  return createHash('sha256').update(password).digest('hex');
-}
+import { findUserByEmail, buildAuthPayload, getTokenConfig, upgradePasswordHash } from './auth.service.js';
+import { verifyPassword, hashPassword } from '../../lib/password.js';
 
 export async function login(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { email, password } = request.body as LoginRequest;
@@ -20,13 +16,23 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
   }
 
   const user = await findUserByEmail(email);
-  if (!user || user.password_hash !== hashPassword(password)) {
+  const check = user ? await verifyPassword(password, user.password_hash) : { ok: false, legacy: false };
+  if (!user || !check.ok) {
     await reply.status(401).send({
       error: 'Credenciais inválidas',
       code: 'INVALID_CREDENTIALS',
       statusCode: 401,
     });
     return;
+  }
+
+  // Migração suave: senha legada (SHA-256) vira bcrypt no primeiro login.
+  if (check.legacy) {
+    try {
+      await upgradePasswordHash(user.id, await hashPassword(password));
+    } catch {
+      /* não bloqueia o login se a atualização falhar */
+    }
   }
 
   const payload = buildAuthPayload(user);

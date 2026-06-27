@@ -26,6 +26,10 @@ export function buildAuthPayload(user: User): AuthPayload {
   };
 }
 
+export async function upgradePasswordHash(userId: string, newHash: string): Promise<void> {
+  await supabase.from('users').update({ password_hash: newHash }).eq('id', userId);
+}
+
 export function getTokenConfig() {
   return {
     expiresIn: env.JWT_EXPIRES_IN,

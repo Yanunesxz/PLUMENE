@@ -1,9 +1,9 @@
 import 'dotenv/config';
-import { createHash } from 'crypto';
+import bcrypt from 'bcryptjs';
 import { supabase } from '../config/supabase.js';
 
 function hash(s: string) {
-  return createHash('sha256').update(s).digest('hex');
+  return bcrypt.hashSync(s, 10);
 }
 
 async function seed() {
