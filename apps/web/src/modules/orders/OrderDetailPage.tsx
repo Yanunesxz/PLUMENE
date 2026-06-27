@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
@@ -48,6 +48,11 @@ export function OrderDetailPage() {
   const custName = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of customers ?? []) m.set(c.id, c.name);
+    return m;
+  }, [customers]);
+  const custWhats = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of customers ?? []) if (c.whatsapp) m.set(c.id, c.whatsapp);
     return m;
   }, [customers]);
 
@@ -121,7 +126,22 @@ export function OrderDetailPage() {
               <span className="font-mono text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
               <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
             </div>
-            <p className="mt-2 text-lg font-bold text-foreground">{custName.get(order.customer_id) ?? 'Cliente'}</p>
+            <div className="mt-2 flex items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-lg font-bold text-foreground">
+                {custName.get(order.customer_id) ?? 'Cliente'}
+              </p>
+              {custWhats.get(order.customer_id) && (
+                <a
+                  href={`https://wa.me/${custWhats.get(order.customer_id)!.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label="Falar no WhatsApp"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50"
+                >
+                  <MessageCircle className="h-[18px] w-[18px]" />
+                </a>
+              )}
+            </div>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {new Date(order.created_at).toLocaleDateString('pt-BR', {
                 day: '2-digit',
