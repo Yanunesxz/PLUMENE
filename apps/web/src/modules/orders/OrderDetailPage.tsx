@@ -40,6 +40,11 @@ export function OrderDetailPage() {
     for (const p of products ?? []) m.set(p.id, p);
     return m;
   }, [products]);
+  const variantSize = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products ?? []) for (const v of p.variants ?? []) m.set(v.id, v.size);
+    return m;
+  }, [products]);
   const custName = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of customers ?? []) m.set(c.id, c.name);
@@ -176,6 +181,9 @@ export function OrderDetailPage() {
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {p?.sku ? `${p.sku} · ` : ''}
+                          {item.variant_id && variantSize.get(item.variant_id)
+                            ? `Tam ${variantSize.get(item.variant_id)} · `
+                            : ''}
                           {item.quantity} × {formatBRL(item.unit_price)}
                         </p>
                       </div>
