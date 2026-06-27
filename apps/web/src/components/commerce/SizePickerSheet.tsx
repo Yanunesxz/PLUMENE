@@ -51,7 +51,7 @@ export function SizePickerSheet({ product, onClose, onConfirm }: SizePickerSheet
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true">
       <div className="absolute inset-0 bg-foreground/40" onClick={onClose} aria-hidden />
       <div className="animate-slide-up relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
