@@ -1,5 +1,5 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Percent } from 'lucide-react';
+import { useEffect, useState, useMemo, type FormEvent } from 'react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Percent, Search } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/ui/Input.js';
@@ -39,8 +39,21 @@ export function RepsPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [repSearch, setRepSearch] = useState('');
 
   const isEditing = editingId !== null;
+
+  const filteredReps = useMemo(() => {
+    const q = repSearch.trim().toLowerCase();
+    const list = reps ?? [];
+    if (!q) return list;
+    return list.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        r.email.toLowerCase().includes(q) ||
+        (r.cpf ?? '').includes(q),
+    );
+  }, [reps, repSearch]);
 
   const set =
     (k: keyof typeof EMPTY) =>
@@ -258,9 +271,28 @@ export function RepsPage() {
           </div>
         </div>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {reps.map((rep) => (
-            <div key={rep.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+        <>
+          {reps.length > 3 && (
+            <div className="relative mb-4">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                inputMode="search"
+                placeholder="Buscar representante por nome, e-mail ou CPF…"
+                value={repSearch}
+                onChange={(e) => setRepSearch(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+          )}
+          {filteredReps.length === 0 ? (
+            <p className="py-10 text-center text-sm text-muted-foreground">
+              Nenhum representante encontrado.
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {filteredReps.map((rep) => (
+                <div key={rep.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
@@ -304,10 +336,12 @@ export function RepsPage() {
                 <p className="flex items-center gap-1.5">
                   <Percent className="h-3.5 w-3.5 shrink-0" /> Comissão: {rep.commission_rate}%
                 </p>
+                </div>
               </div>
+            ))}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
