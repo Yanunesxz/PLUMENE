@@ -63,5 +63,8 @@ temp/
 *.fdb
 *.gdb
 _tools/erp-sync/.env
+# Cache de bytecode do Python — gerado, nunca versionar
+__pycache__/
+*.pyc
 # Leitor local de schema Firebird: DLLs, binários embed e scripts com paths/credenciais da máquina — nunca versionar
 _tools/firebird-reader/
