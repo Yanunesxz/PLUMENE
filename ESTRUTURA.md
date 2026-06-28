@@ -114,19 +114,19 @@ apps/web/
     │   ├── index.tsx     → todas as rotas (qual URL → qual página)
     │   └── PrivateRoute.tsx → exige login (e papel, ex.: roles=['manager','admin'])
     │
-    ├── modules/          → UMA PASTA POR TELA (página)
-    │   ├── auth/LoginPage          → login (online + offline)
-    │   ├── catalog/CatalogPage     → catálogo, busca, ordenar, + (abre tamanho)
-    │   ├── orders/
-    │   │   ├── OrdersPage          → lista de pedidos (busca + filtro status)
-    │   │   ├── NewOrderPage        → montar pedido (cliente + itens por tamanho)
-    │   │   └── OrderDetailPage     → detalhe (itens, faturar, WhatsApp)
-    │   ├── customers/CustomersPage → clientes (lista + cadastrar)
-    │   ├── reps/RepsPage           → representantes (CRUD, comissão) [gerente/admin]
-    │   ├── commissions/CommissionsPage → comissões por rep / todos [gerente/admin]
-    │   ├── dashboard/DashboardPage → Painel do gerente [gerente/admin]
-    │   ├── me/MyAreaPage           → "Minha área" do rep (faturado, comissão, sync)
-    │   └── system/                 → NotFoundPage, UnauthorizedPage
+    ├── modules/          → UMA PASTA POR TELA (página). Pastas e arquivos em PT.
+    │   ├── login/PaginaLogin           → login (online + offline)
+    │   ├── catalogo/PaginaCatalogo     → catálogo, busca, ordenar, + (abre tamanho)
+    │   ├── pedidos/
+    │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
+    │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
+    │   │   └── PaginaDetalhePedido     → detalhe (itens, faturar, WhatsApp)
+    │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
+    │   ├── representantes/PaginaRepresentantes → reps (CRUD, comissão) [gerente/admin]
+    │   ├── comissoes/PaginaComissoes   → comissões por rep / todos [gerente/admin]
+    │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
+    │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (faturado, comissão, sync)
+    │   └── sistema/                    → PaginaNaoEncontrada, PaginaSemAcesso
     │
     ├── components/        → REUTILIZÁVEIS (não são telas)
     │   ├── ui/            → design system: Button, Input, Select, SearchSelect,
