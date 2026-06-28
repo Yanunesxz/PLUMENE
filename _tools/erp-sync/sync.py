@@ -85,12 +85,19 @@ HEADERS = {
     "Prefer": "resolution=merge-duplicates",
 }
 
-def supabase_upsert(table: str, rows: list) -> dict:
-    """Upsert em lotes de CHUNK_SIZE."""
+def supabase_upsert(table: str, rows: list, on_conflict: str | None = None) -> dict:
+    """Upsert em lotes de CHUNK_SIZE.
+
+    `on_conflict` = colunas da chave única (ex.: 'company_id,sku'). Sem isso o
+    PostgREST usa a PK; em re-execução isso causa 409 (duplicate key) quando a
+    linha não tem id. Passe a chave natural da tabela para o merge funcionar.
+    """
     total = 0
     for i in range(0, len(rows), CHUNK_SIZE):
         chunk = rows[i:i+CHUNK_SIZE]
         url = f"{SUPABASE_URL}/rest/v1/{table}"
+        if on_conflict:
+            url += f"?on_conflict={on_conflict}"
         r = httpx.post(url, headers={**HEADERS, "Prefer": "resolution=merge-duplicates,return=minimal"}, json=chunk, timeout=30)
         if r.status_code not in (200, 201, 204):
             raise RuntimeError(f"Supabase upsert {table} falhou [{r.status_code}]: {r.text[:300]}")
@@ -148,7 +155,7 @@ def sync_price_tables(cur) -> int:
             "col_descriptions": json.dumps({1: r[2], 2: r[3], 3: r[4], 4: r[5], 5: r[6], 6: r[7]}),
             "updated_at": now_iso(),
         })
-    result = supabase_upsert("price_tables", rows)
+    result = supabase_upsert("price_tables", rows, on_conflict="company_id,erp_code")
     log.info(f"  Tabelas de preço: {result['records']} registros")
     return result["records"]
 
@@ -209,7 +216,7 @@ def sync_products(cur) -> tuple[int, int]:
         })
 
     product_list = list(products_seen.values())
-    r1 = supabase_upsert("products", product_list)
+    r1 = supabase_upsert("products", product_list, on_conflict="company_id,sku")
     log.info(f"  Produtos: {r1['records']} registros")
 
     # Busca IDs dos produtos inseridos para vincular variantes
@@ -232,7 +239,7 @@ def sync_products(cur) -> tuple[int, int]:
         if pid:
             variant_rows.append({**v, "product_id": pid})
 
-    r2 = supabase_upsert("product_variants", variant_rows)
+    r2 = supabase_upsert("product_variants", variant_rows, on_conflict="company_id,erp_sku")
     log.info(f"  Variantes: {r2['records']} registros")
 
     return r1["records"], r2["records"]
@@ -280,7 +287,7 @@ def sync_prices(cur) -> int:
             "updated_at": now_iso(),
         })
 
-    result = supabase_upsert("product_prices", price_rows)
+    result = supabase_upsert("product_prices", price_rows, on_conflict="product_id,price_table_id")
     log.info(f"  Preços: {result['records']} registros")
     return result["records"]
 
@@ -390,7 +397,7 @@ def sync_customers(cur) -> int:
             "updated_at": updated,
         })
 
-    result = supabase_upsert("customers", rows)
+    result = supabase_upsert("customers", rows, on_conflict="company_id,erp_id")
     log.info(f"  Clientes: {result['records']} registros")
     return result["records"]
 
