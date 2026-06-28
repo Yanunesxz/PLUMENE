@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
@@ -31,6 +31,7 @@ export function PaginaDetalhePedido() {
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
   const [invoicing, setInvoicing] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -97,6 +98,20 @@ export function PaginaDetalhePedido() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!id || !token || !order) return;
+    if (!window.confirm('Excluir este pedido? Esta ação não pode ser desfeita.')) return;
+    setDeleting(true);
+    try {
+      await api.del<ApiResponse<{ ok: boolean }>>(`/orders/${id}`, token);
+      await db.orders.delete(id);
+      navigate('/orders');
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : 'Erro ao excluir pedido');
+      setDeleting(false);
+    }
+  };
+
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
       <button
@@ -123,7 +138,7 @@ export function PaginaDetalhePedido() {
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
+              <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
               <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
@@ -225,6 +240,19 @@ export function PaginaDetalhePedido() {
               <h2 className="mb-1 text-sm font-semibold text-foreground">Observações</h2>
               <p className="text-sm text-muted-foreground">{order.notes}</p>
             </div>
+          )}
+
+          {!order.invoiced && (
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full text-red-600 hover:bg-red-50"
+              disabled={deleting}
+              onClick={() => void handleDelete()}
+            >
+              <Trash2 className="h-4 w-4" />
+              {deleting ? 'Excluindo…' : 'Excluir pedido'}
+            </Button>
           )}
         </div>
       )}

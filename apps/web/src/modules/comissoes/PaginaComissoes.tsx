@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { TrendingUp, Wallet, Receipt, Inbox, Crown } from 'lucide-react';
+import { TrendingUp, Wallet, Receipt, Inbox, Crown, Search } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Select } from '../../components/interface/Select.js';
@@ -17,6 +17,7 @@ export function PaginaComissoes() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [repId, setRepId] = useState<string>(ALL);
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (!token) return;
@@ -111,9 +112,27 @@ export function PaginaComissoes() {
                 <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
                   Por representante
                 </h2>
+                {byRep.rows.length > 3 && (
+                  <div className="relative mb-3">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <Input
+                      type="search"
+                      inputMode="search"
+                      placeholder="Buscar representante…"
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                )}
                 <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                   <ul className="divide-y divide-border">
-                    {byRep.rows.map((r, i) => (
+                    {byRep.rows
+                      .map((r, i) => ({ r, i }))
+                      .filter(({ r }) =>
+                        r.name.toLowerCase().includes(search.trim().toLowerCase()),
+                      )
+                      .map(({ r, i }) => (
                       <li key={r.id} className="flex items-center justify-between gap-3 px-4 py-3">
                         <div className="flex min-w-0 items-center gap-3">
                           <span
@@ -166,7 +185,7 @@ export function PaginaComissoes() {
                       {single.monthOrders.map((o) => (
                         <li key={o.id} className="flex items-center justify-between gap-3 px-4 py-3">
                           <div className="min-w-0">
-                            <p className="font-mono text-xs text-muted-foreground">#{o.id.slice(0, 8)}</p>
+                            <p className="font-mono text-xs text-muted-foreground">#{o.order_number ?? o.id.slice(0, 8)}</p>
                             <p className="text-xs text-muted-foreground">
                               faturado em {o.invoiced_at ? new Date(o.invoiced_at).toLocaleDateString('pt-BR') : '—'}
                             </p>

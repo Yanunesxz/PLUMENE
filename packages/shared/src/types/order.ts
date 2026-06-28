@@ -14,6 +14,8 @@ export interface OrderItem {
 export interface Order {
   id: string;
   company_id: string;
+  /** Número sequencial legível do pedido (ex.: 14534). */
+  order_number?: number | null;
   rep_id: string;
   customer_id: string;
   status: OrderStatus;

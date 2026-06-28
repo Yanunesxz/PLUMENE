@@ -86,6 +86,34 @@ export async function createOrder(
   return getOrderById((order as Order).id, company_id);
 }
 
+export type DeleteOrderResult =
+  | { ok: true }
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' };
+
+export async function deleteOrder(
+  id: string,
+  company_id: string,
+  rep_id: string,
+  role: UserRole,
+): Promise<DeleteOrderResult> {
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, rep_id, invoiced')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!order) return { ok: false, reason: 'not_found' };
+  const o = order as { rep_id: string; invoiced: boolean | null };
+  if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
+  if (o.invoiced) return { ok: false, reason: 'invoiced' };
+
+  // order_items tem ON DELETE CASCADE — somem junto.
+  const { error } = await supabase.from('orders').delete().eq('id', id).eq('company_id', company_id);
+  if (error) return { ok: false, reason: 'not_found' };
+  return { ok: true };
+}
+
 export async function setOrderInvoiced(
   id: string,
   company_id: string,

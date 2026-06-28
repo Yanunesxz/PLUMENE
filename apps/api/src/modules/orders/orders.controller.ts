@@ -6,6 +6,7 @@ import {
   createOrder,
   updateOrderStatus,
   setOrderInvoiced,
+  deleteOrder,
 } from './orders.service.js';
 
 export async function listOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -44,6 +45,26 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
     }
     throw err;
   }
+}
+
+export async function deleteOrderHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub: rep_id, role } = request.user;
+  const { id } = request.params as { id: string };
+
+  const result = await deleteOrder(id, company_id, rep_id, role);
+  if (!result.ok) {
+    if (result.reason === 'forbidden') {
+      await reply.status(403).send({ error: 'Você só pode excluir seus próprios pedidos', code: 'FORBIDDEN', statusCode: 403 });
+      return;
+    }
+    if (result.reason === 'invoiced') {
+      await reply.status(409).send({ error: 'Pedido faturado não pode ser excluído', code: 'ORDER_INVOICED', statusCode: 409 });
+      return;
+    }
+    await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+    return;
+  }
+  await reply.send({ data: { ok: true } });
 }
 
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

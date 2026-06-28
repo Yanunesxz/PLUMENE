@@ -147,7 +147,7 @@ export function PaginaPedidos() {
               className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:border-brand-200 hover:shadow-md"
             >
               <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-xs text-muted-foreground">#{order.id.slice(0, 8)}</span>
+                <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
                 <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
               </div>
               <p className="mt-2 truncate text-sm font-medium text-foreground">
