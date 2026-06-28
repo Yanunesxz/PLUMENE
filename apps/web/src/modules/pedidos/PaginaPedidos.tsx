@@ -30,7 +30,7 @@ const STATUS_FILTERS: { value: OrderStatus | 'all'; label: string }[] = [
   { value: 'draft', label: 'Rascunhos' },
 ];
 
-export function OrdersPage() {
+export function PaginaPedidos() {
   const { token } = useAuthStore();
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');

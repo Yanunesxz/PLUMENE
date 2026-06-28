@@ -9,7 +9,7 @@ import { Button } from '../../components/ui/Button.js';
 import { Spinner } from '../../components/ui/Spinner.js';
 import type { LoginResponse, ApiResponse } from '@csb/shared';
 
-export function LoginPage() {
+export function PaginaLogin() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

@@ -11,7 +11,7 @@ import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 
-export function DashboardPage() {
+export function PaginaPainel() {
   const { token } = useAuthStore();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [processing, setProcessing] = useState<string | null>(null);

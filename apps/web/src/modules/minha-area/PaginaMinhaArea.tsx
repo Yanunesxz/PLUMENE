@@ -23,7 +23,7 @@ import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 
-export function MyAreaPage() {
+export function PaginaMinhaArea() {
   const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
   const orders = useLiveQuery(() => db.orders.toArray(), []);

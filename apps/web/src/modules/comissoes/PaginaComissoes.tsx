@@ -11,7 +11,7 @@ import type { RepListItem, Order, ApiResponse } from '@csb/shared';
 const ALL = '__all__';
 const monthKey = (iso: string) => iso.slice(0, 7);
 
-export function CommissionsPage() {
+export function PaginaComissoes() {
   const { token } = useAuthStore();
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);

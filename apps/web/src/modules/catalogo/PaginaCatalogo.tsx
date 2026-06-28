@@ -24,7 +24,7 @@ const availableOf = (p: ProductWithPrice) =>
 // Plumene é outra marca (códigos 2xxx/22xxx) — não entra neste catálogo.
 const isPlumene = (sku: string) => /^2/.test(sku);
 
-export function CatalogPage() {
+export function PaginaCatalogo() {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
   // Representante não vê o estoque atual da fábrica.

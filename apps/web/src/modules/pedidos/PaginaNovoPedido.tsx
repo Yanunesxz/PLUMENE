@@ -16,7 +16,7 @@ import { Toast } from '../../components/ui/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 
-export function NewOrderPage() {
+export function PaginaNovoPedido() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { token, user } = useAuthStore();

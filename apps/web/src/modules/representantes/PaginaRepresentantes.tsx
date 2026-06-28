@@ -29,7 +29,7 @@ const EMPTY = {
   active: true,
 };
 
-export function RepsPage() {
+export function PaginaRepresentantes() {
   const { token } = useAuthStore();
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [tables, setTables] = useState<PriceTable[]>([]);

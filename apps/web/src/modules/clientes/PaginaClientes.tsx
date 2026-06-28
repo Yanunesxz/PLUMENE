@@ -16,7 +16,7 @@ import type { CustomerWithPriceTable, CreateCustomerRequest, ApiResponse } from 
 
 const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '' };
 
-export function CustomersPage() {
+export function PaginaClientes() {
   const { token } = useAuthStore();
   const navigate = useNavigate();
   const [search, setSearch] = useState('');

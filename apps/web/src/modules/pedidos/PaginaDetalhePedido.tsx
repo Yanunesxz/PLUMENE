@@ -22,7 +22,7 @@ const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | '
   error_erp: 'red',
 };
 
-export function OrderDetailPage() {
+export function PaginaDetalhePedido() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { token, user } = useAuthStore();

@@ -1,23 +1,23 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PrivateRoute } from './PrivateRoute.js';
 import { AppLayout } from '../components/layout/AppLayout.js';
-import { LoginPage } from '../modules/auth/LoginPage.js';
-import { CatalogPage } from '../modules/catalog/CatalogPage.js';
-import { OrdersPage } from '../modules/orders/OrdersPage.js';
-import { NewOrderPage } from '../modules/orders/NewOrderPage.js';
-import { OrderDetailPage } from '../modules/orders/OrderDetailPage.js';
-import { CustomersPage } from '../modules/customers/CustomersPage.js';
-import { DashboardPage } from '../modules/dashboard/DashboardPage.js';
-import { RepsPage } from '../modules/reps/RepsPage.js';
-import { CommissionsPage } from '../modules/commissions/CommissionsPage.js';
-import { MyAreaPage } from '../modules/me/MyAreaPage.js';
-import { UnauthorizedPage } from '../modules/system/UnauthorizedPage.js';
-import { NotFoundPage } from '../modules/system/NotFoundPage.js';
+import { PaginaLogin } from '../modules/login/PaginaLogin.js';
+import { PaginaCatalogo } from '../modules/catalogo/PaginaCatalogo.js';
+import { PaginaPedidos } from '../modules/pedidos/PaginaPedidos.js';
+import { PaginaNovoPedido } from '../modules/pedidos/PaginaNovoPedido.js';
+import { PaginaDetalhePedido } from '../modules/pedidos/PaginaDetalhePedido.js';
+import { PaginaClientes } from '../modules/clientes/PaginaClientes.js';
+import { PaginaPainel } from '../modules/painel/PaginaPainel.js';
+import { PaginaRepresentantes } from '../modules/representantes/PaginaRepresentantes.js';
+import { PaginaComissoes } from '../modules/comissoes/PaginaComissoes.js';
+import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
+import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
+import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
     path: '/login',
-    element: <LoginPage />,
+    element: <PaginaLogin />,
   },
   {
     path: '/',
@@ -27,31 +27,31 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/catalog" replace /> },
-          { path: 'minha-area', element: <MyAreaPage /> },
-          { path: 'catalog', element: <CatalogPage /> },
-          { path: 'orders', element: <OrdersPage /> },
-          { path: 'orders/new', element: <NewOrderPage /> },
-          { path: 'orders/:id', element: <OrderDetailPage /> },
-          { path: 'customers', element: <CustomersPage /> },
+          { path: 'minha-area', element: <PaginaMinhaArea /> },
+          { path: 'catalog', element: <PaginaCatalogo /> },
+          { path: 'orders', element: <PaginaPedidos /> },
+          { path: 'orders/new', element: <PaginaNovoPedido /> },
+          { path: 'orders/:id', element: <PaginaDetalhePedido /> },
+          { path: 'customers', element: <PaginaClientes /> },
           {
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <DashboardPage /> }],
+            children: [{ index: true, element: <PaginaPainel /> }],
           },
           {
             path: 'representantes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <RepsPage /> }],
+            children: [{ index: true, element: <PaginaRepresentantes /> }],
           },
           {
             path: 'comissoes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <CommissionsPage /> }],
+            children: [{ index: true, element: <PaginaComissoes /> }],
           },
         ],
       },
     ],
   },
-  { path: '/unauthorized', element: <UnauthorizedPage /> },
-  { path: '*', element: <NotFoundPage /> },
+  { path: '/unauthorized', element: <PaginaSemAcesso /> },
+  { path: '*', element: <PaginaNaoEncontrada /> },
 ]);
