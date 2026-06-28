@@ -129,10 +129,10 @@ apps/web/
     │   └── sistema/                    → PaginaNaoEncontrada, PaginaSemAcesso
     │
     ├── components/        → REUTILIZÁVEIS (não são telas)
-    │   ├── ui/            → design system: Button, Input, Select, SearchSelect,
+    │   ├── interface/     → design system (botões/inputs): Button, Input, Select, SearchSelect,
     │   │                    Badge, Card, Toast, Spinner, Skeleton, Textarea, EmptyState
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
-    │   └── commerce/      → ProductCard, SizePickerSheet (seletor de tamanho)
+    │   └── comercial/     → CartaoProduto, SeletorTamanho (seletor de tamanho)
     │
     ├── store/            → estado global (Zustand)
     │   ├── authStore.ts  → usuário logado + token (persistido)
@@ -172,7 +172,7 @@ _tools/
 | Quero… | Vá em |
 |---|---|
 | Mudar uma **tela** | `apps/web/src/modules/<área>/` |
-| Mudar um **botão/input padrão** | `apps/web/src/components/ui/` |
+| Mudar um **botão/input padrão** | `apps/web/src/components/interface/` |
 | Mudar o **menu** | `apps/web/src/components/layout/navItems.ts` |
 | Mudar **cores/tema** | `apps/web/src/styles/globals.css` + `tailwind.config.ts` |
 | Mudar uma **regra de negócio / endpoint** | `apps/api/src/modules/<área>/*.service.ts` |
