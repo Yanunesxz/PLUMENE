@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { X, Minus, Plus } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
-import { Button } from '../ui/Button.js';
+import { Button } from '../interface/Button.js';
 import { formatBRL } from '@/lib/utils';
 
 export interface PickedSize {
@@ -10,7 +10,7 @@ export interface PickedSize {
   quantity: number;
 }
 
-interface SizePickerSheetProps {
+interface SeletorTamanhoProps {
   product: ProductWithPrice;
   onClose: () => void;
   onConfirm: (lines: PickedSize[]) => void;
@@ -32,7 +32,7 @@ function sizeCompare(a: string, b: string): number {
   return a.localeCompare(b, 'pt-BR', { numeric: true });
 }
 
-export function SizePickerSheet({ product, onClose, onConfirm }: SizePickerSheetProps) {
+export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoProps) {
   const variants = [...(product.variants ?? [])].sort((a, b) => sizeCompare(a.size, b.size));
   const [qty, setQty] = useState<Record<string, number>>({});
 

@@ -2,7 +2,7 @@ import { ImageIcon, Plus, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
 
-interface ProductCardProps {
+interface CartaoProdutoProps {
   product: ProductWithPrice;
   /** Abre o detalhe / seleção de tamanhos. */
   onClick?: (product: ProductWithPrice) => void;
@@ -14,7 +14,7 @@ interface ProductCardProps {
   showStock?: boolean;
 }
 
-export function ProductCard({ product, onClick, onAdd, inOrder, showStock = true }: ProductCardProps) {
+export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = true }: CartaoProdutoProps) {
   const available = product.variants?.reduce(
     (sum, v) => sum + Math.max(0, v.stock_quantity - v.stock_committed),
     0,

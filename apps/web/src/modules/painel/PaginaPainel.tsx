@@ -4,9 +4,9 @@ import { Clock, Wallet, Check, X, Inbox, TrendingUp, ShoppingCart, Crown } from 
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
-import { Badge } from '../../components/ui/Badge.js';
-import { Button } from '../../components/ui/Button.js';
-import { Toast } from '../../components/ui/Toast.js';
+import { Badge } from '../../components/interface/Badge.js';
+import { Button } from '../../components/interface/Button.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';

@@ -1,7 +1,7 @@
 import { Link } from 'react-router-dom';
 import { ShieldAlert } from 'lucide-react';
-import { EmptyState } from '../../components/ui/EmptyState.js';
-import { buttonVariants } from '../../components/ui/Button.js';
+import { EmptyState } from '../../components/interface/EmptyState.js';
+import { buttonVariants } from '../../components/interface/Button.js';
 import { cn } from '../../lib/utils.js';
 
 export function PaginaSemAcesso() {

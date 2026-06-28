@@ -6,11 +6,11 @@ import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
 import { api } from '../../services/api.js';
-import { Input } from '../../components/ui/Input.js';
-import { Select } from '../../components/ui/Select.js';
-import { Skeleton } from '../../components/ui/Skeleton.js';
-import { ProductCard } from '../../components/commerce/ProductCard.js';
-import { SizePickerSheet } from '../../components/commerce/SizePickerSheet.js';
+import { Input } from '../../components/interface/Input.js';
+import { Select } from '../../components/interface/Select.js';
+import { Skeleton } from '../../components/interface/Skeleton.js';
+import { CartaoProduto } from '../../components/comercial/CartaoProduto.js';
+import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
@@ -191,7 +191,7 @@ export function PaginaCatalogo() {
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {filtered.map((product) => (
-            <ProductCard
+            <CartaoProduto
               key={product.id}
               product={product}
               showStock={canSeeStock}
@@ -219,7 +219,7 @@ export function PaginaCatalogo() {
       )}
 
       {pickerProduct && (
-        <SizePickerSheet
+        <SeletorTamanho
           product={pickerProduct}
           onClose={() => setPickerProduct(null)}
           onConfirm={(lines) =>

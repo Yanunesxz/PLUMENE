@@ -17,9 +17,9 @@ import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { flushSyncQueue } from '../../offline/sync.js';
-import { Button } from '../../components/ui/Button.js';
-import { Spinner } from '../../components/ui/Spinner.js';
-import { Toast } from '../../components/ui/Toast.js';
+import { Button } from '../../components/interface/Button.js';
+import { Spinner } from '../../components/interface/Spinner.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
 

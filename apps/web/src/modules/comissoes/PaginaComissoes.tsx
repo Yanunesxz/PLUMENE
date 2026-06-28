@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, Wallet, Receipt, Inbox, Crown } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
-import { Select } from '../../components/ui/Select.js';
-import { Input } from '../../components/ui/Input.js';
-import { Skeleton } from '../../components/ui/Skeleton.js';
+import { Select } from '../../components/interface/Select.js';
+import { Input } from '../../components/interface/Input.js';
+import { Skeleton } from '../../components/interface/Skeleton.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { RepListItem, Order, ApiResponse } from '@csb/shared';
 

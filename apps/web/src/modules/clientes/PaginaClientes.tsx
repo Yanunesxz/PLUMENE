@@ -5,12 +5,12 @@ import { Search, Users, ChevronRight, Building2, MessageCircle, UserPlus, X } fr
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
-import { Badge } from '../../components/ui/Badge.js';
-import { Input } from '../../components/ui/Input.js';
-import { Button } from '../../components/ui/Button.js';
-import { Skeleton } from '../../components/ui/Skeleton.js';
-import { Spinner } from '../../components/ui/Spinner.js';
-import { Toast } from '../../components/ui/Toast.js';
+import { Badge } from '../../components/interface/Badge.js';
+import { Input } from '../../components/interface/Input.js';
+import { Button } from '../../components/interface/Button.js';
+import { Skeleton } from '../../components/interface/Skeleton.js';
+import { Spinner } from '../../components/interface/Spinner.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { CustomerWithPriceTable, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 

@@ -2,13 +2,13 @@ import { useEffect, useState, useMemo, type FormEvent } from 'react';
 import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Percent, Search } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
-import { Input } from '../../components/ui/Input.js';
-import { Select } from '../../components/ui/Select.js';
-import { Button } from '../../components/ui/Button.js';
-import { Badge } from '../../components/ui/Badge.js';
-import { Skeleton } from '../../components/ui/Skeleton.js';
-import { Spinner } from '../../components/ui/Spinner.js';
-import { Toast } from '../../components/ui/Toast.js';
+import { Input } from '../../components/interface/Input.js';
+import { Select } from '../../components/interface/Select.js';
+import { Button } from '../../components/interface/Button.js';
+import { Badge } from '../../components/interface/Badge.js';
+import { Skeleton } from '../../components/interface/Skeleton.js';
+import { Spinner } from '../../components/interface/Spinner.js';
+import { Toast } from '../../components/interface/Toast.js';
 import type {
   RepListItem,
   PriceTable,

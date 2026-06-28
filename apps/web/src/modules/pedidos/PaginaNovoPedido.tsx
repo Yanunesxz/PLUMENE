@@ -8,11 +8,11 @@ import { useCartStore } from '../../store/cartStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { addToSyncQueue } from '../../offline/sync.js';
-import { Button } from '../../components/ui/Button.js';
-import { SearchSelect } from '../../components/ui/SearchSelect.js';
-import { SizePickerSheet } from '../../components/commerce/SizePickerSheet.js';
-import { Textarea } from '../../components/ui/Textarea.js';
-import { Toast } from '../../components/ui/Toast.js';
+import { Button } from '../../components/interface/Button.js';
+import { SearchSelect } from '../../components/interface/SearchSelect.js';
+import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
+import { Textarea } from '../../components/interface/Textarea.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 
@@ -280,7 +280,7 @@ export function PaginaNovoPedido() {
       </form>
 
       {pickerProduct && (
-        <SizePickerSheet
+        <SeletorTamanho
           product={pickerProduct}
           onClose={() => setPickerProduct(null)}
           onConfirm={(lines) =>

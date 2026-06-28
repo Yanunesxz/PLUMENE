@@ -4,9 +4,9 @@ import { Sparkles } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { saveOfflineCredential, verifyOfflineCredential } from '../../offline/authCache.js';
-import { Input } from '../../components/ui/Input.js';
-import { Button } from '../../components/ui/Button.js';
-import { Spinner } from '../../components/ui/Spinner.js';
+import { Input } from '../../components/interface/Input.js';
+import { Button } from '../../components/interface/Button.js';
+import { Spinner } from '../../components/interface/Spinner.js';
 import type { LoginResponse, ApiResponse } from '@csb/shared';
 
 export function PaginaLogin() {

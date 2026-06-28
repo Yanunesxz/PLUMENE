@@ -3,7 +3,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import { Sparkles, LogOut, WifiOff } from 'lucide-react';
 import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
-import { Toast } from '../ui/Toast.js';
+import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
