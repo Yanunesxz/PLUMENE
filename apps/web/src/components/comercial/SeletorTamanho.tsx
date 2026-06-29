@@ -116,7 +116,10 @@ export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoPr
           )}
         </div>
 
-        <div className="border-t border-border p-4 safe-bottom">
+        <div
+          className="border-t border-border p-4"
+          style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
+        >
           <div className="mb-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {totalQty} {totalQty === 1 ? 'peça' : 'peças'}
