@@ -15,8 +15,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png'],
       manifest: {
-        name: 'Corpo Sensual B2B',
-        short_name: 'CSB2B',
+        name: 'Representantes Corpo Sensual',
+        short_name: 'Representantes',
         description: 'Plataforma comercial para representantes',
         theme_color: '#0f766e',
         background_color: '#ffffff',

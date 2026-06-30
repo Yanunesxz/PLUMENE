@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { Sparkles, LogOut, WifiOff } from 'lucide-react';
+import { LogOut, WifiOff } from 'lucide-react';
+import { Logo } from '../interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { navItemsForRole } from './navItems.js';
@@ -22,12 +23,10 @@ export function SideNav() {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
       {/* Marca */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-700 text-white">
-          <Sparkles className="h-5 w-5" strokeWidth={2} />
-        </span>
+        <Logo className="h-9 w-9 shrink-0 text-foreground" />
         <div className="leading-tight">
           <p className="text-sm font-bold text-foreground">Corpo Sensual</p>
-          <p className="text-[11px] font-medium text-muted-foreground">Plataforma B2B</p>
+          <p className="text-[11px] font-medium text-muted-foreground">Representantes</p>
         </div>
       </div>
 

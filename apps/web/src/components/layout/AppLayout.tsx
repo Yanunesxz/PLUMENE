@@ -1,9 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
-import { Sparkles, LogOut, WifiOff } from 'lucide-react';
+import { LogOut, WifiOff } from 'lucide-react';
 import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
 import { ReconnectBanner } from './ReconnectBanner.js';
+import { Logo } from '../interface/Logo.js';
 import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
@@ -58,9 +59,7 @@ export function AppLayout() {
         {/* Topbar (apenas mobile — no desktop a marca fica na sidebar) */}
         <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 safe-top md:hidden">
           <div className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand-700 text-white">
-              <Sparkles className="h-4 w-4" strokeWidth={2} />
-            </span>
+            <Logo className="h-8 w-8 shrink-0 text-foreground" />
             <span className="text-base font-bold tracking-tight text-foreground">Corpo Sensual</span>
             {!isOnline && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">

@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Sparkles } from 'lucide-react';
+import { Logo } from '../../components/interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { saveOfflineCredential, verifyOfflineCredential } from '../../offline/authCache.js';
@@ -60,12 +60,10 @@ export function PaginaLogin() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-700 text-white shadow-sm">
-            <Sparkles className="h-6 w-6" strokeWidth={2} />
-          </div>
+          <Logo className="h-16 w-16 text-foreground" />
           <div>
             <h1 className="text-xl font-bold tracking-tight text-foreground">Corpo Sensual</h1>
-            <p className="mt-0.5 text-sm text-muted-foreground">Plataforma comercial B2B</p>
+            <p className="mt-0.5 text-sm text-muted-foreground">Representantes</p>
           </div>
         </div>
 
