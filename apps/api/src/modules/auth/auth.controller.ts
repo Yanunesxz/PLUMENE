@@ -1,19 +1,14 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { LoginRequest, AuthPayload, User } from '@csb/shared';
+import type { AuthPayload, User } from '@csb/shared';
 import { findUserByEmail, buildAuthPayload, getTokenConfig, upgradePasswordHash } from './auth.service.js';
 import { verifyPassword, hashPassword } from '../../lib/password.js';
+import { parseBody } from '../../lib/validation.js';
+import { loginSchema, refreshTokenSchema } from './auth.schema.js';
 
 export async function login(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { email, password } = request.body as LoginRequest;
-
-  if (!email || !password) {
-    await reply.status(400).send({
-      error: 'Email e senha são obrigatórios',
-      code: 'VALIDATION_ERROR',
-      statusCode: 400,
-    });
-    return;
-  }
+  const body = await parseBody(loginSchema, request.body, reply);
+  if (!body) return;
+  const { email, password } = body;
 
   const user = await findUserByEmail(email);
   const check = user ? await verifyPassword(password, user.password_hash) : { ok: false, legacy: false };
@@ -63,30 +58,13 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
 }
 
 export async function refreshToken(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { refresh_token } = request.body as { refresh_token: string };
-
-  if (!refresh_token) {
-    await reply.status(400).send({
-      error: 'refresh_token é obrigatório',
-      code: 'VALIDATION_ERROR',
-      statusCode: 400,
-    });
-    return;
-  }
+  const body = await parseBody(refreshTokenSchema, request.body, reply);
+  if (!body) return;
+  const { refresh_token } = body;
 
   try {
     const decoded = request.server.jwt.verify<{ sub: string; type: string }>(refresh_token);
     if (decoded.type !== 'refresh') throw new Error('Invalid token type');
-
-    const user = await findUserByEmail('');
-    if (!user) {
-      await reply.status(401).send({
-        error: 'Usuário não encontrado',
-        code: 'USER_NOT_FOUND',
-        statusCode: 401,
-      });
-      return;
-    }
 
     const { data: userData, error } = await (
       await import('../../config/supabase.js')

@@ -1,5 +1,4 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
 import {
   getOrders,
   getOrderById,
@@ -8,6 +7,8 @@ import {
   setOrderInvoiced,
   deleteOrder,
 } from './orders.service.js';
+import { parseBody } from '../../lib/validation.js';
+import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
 
 export async function listOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role } = request.user;
@@ -28,11 +29,12 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
 }
 
 export async function createOrderHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id } = request.user;
-  const body = request.body as CreateOrderRequest;
+  const { company_id, sub: rep_id, price_table_id } = request.user;
+  const body = await parseBody(createOrderSchema, request.body, reply);
+  if (!body) return;
 
   try {
-    const order = await createOrder(company_id, rep_id, body);
+    const order = await createOrder(company_id, rep_id, price_table_id ?? null, body);
     if (!order) {
       await reply.status(422).send({ error: 'Não foi possível criar o pedido', code: 'CREATE_FAILED', statusCode: 422 });
       return;
@@ -41,6 +43,14 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   } catch (err) {
     if (err instanceof Error && err.message === 'CUSTOMER_BLOCKED') {
       await reply.status(403).send({ error: 'Cliente bloqueado', code: 'CUSTOMER_BLOCKED', statusCode: 403 });
+      return;
+    }
+    if (err instanceof Error && err.message === 'PRICE_NOT_FOUND') {
+      await reply.status(422).send({
+        error: 'Há itens sem preço na tabela do representante',
+        code: 'PRICE_NOT_FOUND',
+        statusCode: 422,
+      });
       return;
     }
     throw err;
@@ -70,9 +80,10 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id } = request.user;
   const { id } = request.params as { id: string };
-  const { invoiced } = request.body as { invoiced: boolean };
+  const body = await parseBody(setInvoicedSchema, request.body, reply);
+  if (!body) return;
 
-  const order = await setOrderInvoiced(id, company_id, !!invoiced);
+  const order = await setOrderInvoiced(id, company_id, body.invoiced);
   if (!order) {
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
@@ -83,7 +94,8 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
 export async function updateStatusHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: approverId, role } = request.user;
   const { id } = request.params as { id: string };
-  const body = request.body as UpdateOrderStatusRequest;
+  const body = await parseBody(updateOrderStatusSchema, request.body, reply);
+  if (!body) return;
 
   if ((body.status === 'approved' || body.status === 'rejected') && role === 'rep') {
     await reply.status(403).send({ error: 'Apenas gerentes podem aprovar ou recusar pedidos', code: 'FORBIDDEN', statusCode: 403 });
@@ -91,7 +103,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   }
 
   try {
-    const order = await updateOrderStatus(id, company_id, approverId, body);
+    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' });
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
       return;

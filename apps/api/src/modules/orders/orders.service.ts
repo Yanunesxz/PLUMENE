@@ -35,9 +35,29 @@ export async function getOrderById(id: string, company_id: string): Promise<Orde
   return order as OrderWithItems;
 }
 
+// Preço dos produtos na tabela de preço do representante. É a fonte autoritativa:
+// o unit_price que vem do cliente nunca é usado para gravar/totalizar o pedido.
+async function getPriceMap(
+  price_table_id: string | null,
+  productIds: string[],
+): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  if (!price_table_id || productIds.length === 0) return map;
+
+  const { data } = await supabase
+    .from('product_prices')
+    .select('product_id, price')
+    .eq('price_table_id', price_table_id)
+    .in('product_id', productIds);
+
+  for (const pp of data ?? []) map.set(pp.product_id as string, pp.price as number);
+  return map;
+}
+
 export async function createOrder(
   company_id: string,
   rep_id: string,
+  price_table_id: string | null,
   body: CreateOrderRequest,
 ): Promise<OrderWithItems | null> {
   const { data: customer } = await supabase
@@ -52,7 +72,27 @@ export async function createOrder(
     throw new Error('CUSTOMER_BLOCKED');
   }
 
-  const total = body.items.reduce((sum, item) => sum + item.quantity * item.unit_price, 0);
+  // Recalcula o preço no servidor pela tabela do representante. Se algum item
+  // não tiver preço definido nessa tabela, o pedido é recusado (não confiamos
+  // num preço vindo do cliente).
+  const productIds = [...new Set(body.items.map((item) => item.product_id))];
+  const priceMap = await getPriceMap(price_table_id, productIds);
+
+  const items = body.items.map((item) => {
+    const unit_price = priceMap.get(item.product_id);
+    if (unit_price === undefined) {
+      throw new Error('PRICE_NOT_FOUND');
+    }
+    return {
+      product_id: item.product_id,
+      variant_id: item.variant_id ?? null,
+      quantity: item.quantity,
+      unit_price,
+      total: item.quantity * unit_price,
+    };
+  });
+
+  const total = items.reduce((sum, item) => sum + item.total, 0);
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
@@ -71,19 +111,18 @@ export async function createOrder(
 
   if (orderError || !order) return null;
 
-  const items = body.items.map((item) => ({
-    order_id: (order as Order).id,
-    product_id: item.product_id,
-    variant_id: item.variant_id ?? null,
-    quantity: item.quantity,
-    unit_price: item.unit_price,
-    total: item.quantity * item.unit_price,
-  }));
+  const orderId = (order as Order).id;
+  const itemsToInsert = items.map((item) => ({ order_id: orderId, ...item }));
 
-  const { error: itemsError } = await supabase.from('order_items').insert(items);
-  if (itemsError) return null;
+  const { error: itemsError } = await supabase.from('order_items').insert(itemsToInsert);
+  if (itemsError) {
+    // Rollback compensatório: um pedido sem itens não deve existir. Sem isso,
+    // uma falha aqui deixaria um pedido órfão (sem itens) no banco.
+    await supabase.from('orders').delete().eq('id', orderId);
+    return null;
+  }
 
-  return getOrderById((order as Order).id, company_id);
+  return getOrderById(orderId, company_id);
 }
 
 export type DeleteOrderResult =
@@ -141,10 +180,16 @@ export async function updateOrderStatus(
   approverId: string,
   body: UpdateOrderStatusRequest,
 ): Promise<Order | null> {
-  const current = await getOrderById(id, company_id);
-  if (!current) return null;
+  const { data: current, error: currentError } = await supabase
+    .from('orders')
+    .select('status')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .single();
 
-  const allowed = ORDER_STATUS_FLOW[current.status];
+  if (currentError || !current) return null;
+
+  const allowed = ORDER_STATUS_FLOW[(current as { status: Order['status'] }).status];
   if (!allowed.includes(body.status)) {
     throw new Error('INVALID_STATUS_TRANSITION');
   }

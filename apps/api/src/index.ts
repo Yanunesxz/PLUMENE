@@ -28,6 +28,26 @@ await server.register(jwt, {
   secret: env.JWT_SECRET,
 });
 
+server.setErrorHandler((error, request, reply) => {
+  server.log.error({ err: error, url: request.url }, 'unhandled request error');
+
+  if (error.validation) {
+    void reply.status(400).send({
+      error: 'Dados inválidos',
+      code: 'VALIDATION_ERROR',
+      statusCode: 400,
+    });
+    return;
+  }
+
+  const statusCode = error.statusCode ?? 500;
+  void reply.status(statusCode).send({
+    error: statusCode >= 500 ? 'Erro interno do servidor' : error.message,
+    code: 'INTERNAL_ERROR',
+    statusCode,
+  });
+});
+
 server.get('/health', async () => ({
   status: 'ok',
   timestamp: new Date().toISOString(),

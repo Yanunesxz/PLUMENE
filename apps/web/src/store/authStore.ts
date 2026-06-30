@@ -8,6 +8,7 @@ interface AuthState {
   user: Omit<User, 'created_at'> | null;
   isAuthenticated: boolean;
   login: (token: string, refresh_token: string, user: Omit<User, 'created_at'>) => void;
+  setToken: (token: string) => void;
   logout: () => void;
   hasRole: (...roles: UserRole[]) => boolean;
 }
@@ -22,6 +23,8 @@ export const useAuthStore = create<AuthState>()(
 
       login: (token, refresh_token, user) =>
         set({ token, refresh_token, user, isAuthenticated: true }),
+
+      setToken: (token) => set({ token }),
 
       logout: () =>
         set({ token: null, refresh_token: null, user: null, isAuthenticated: false }),

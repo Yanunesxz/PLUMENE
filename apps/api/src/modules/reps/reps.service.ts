@@ -1,6 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { hashPassword } from '../../lib/password.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
+import { DEFAULT_COMMISSION_RATE } from '@csb/shared';
 
 // O embed price_tables(name) pode vir como objeto (1:1) ou array, dependendo da
 // inferência do supabase — normalizamos para o nome (ou null).
@@ -38,7 +39,7 @@ function toRepListItem(row: RepRow): RepListItem {
     active: row.active,
     price_table_id: row.price_table_id ?? null,
     price_table_name: tableName(row.price_tables),
-    commission_rate: row.commission_rate ?? 10,
+    commission_rate: row.commission_rate ?? DEFAULT_COMMISSION_RATE,
     created_at: row.created_at,
   };
 }
@@ -96,7 +97,7 @@ export async function createRep(
       legal_name: body.legal_name?.trim() || null,
       phone: body.phone?.trim() || null,
       price_table_id: body.price_table_id,
-      commission_rate: body.commission_rate ?? 10,
+      commission_rate: body.commission_rate ?? DEFAULT_COMMISSION_RATE,
     })
     .select(REP_SELECT)
     .single();
