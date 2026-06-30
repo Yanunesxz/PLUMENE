@@ -59,7 +59,7 @@ export function AppLayout() {
         {/* Topbar (apenas mobile — no desktop a marca fica na sidebar) */}
         <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 safe-top md:hidden">
           <div className="flex items-center gap-2">
-            <Logo className="h-8 w-8 shrink-0 text-foreground" />
+            <Logo className="h-10 w-10 shrink-0" />
             <span className="text-base font-bold tracking-tight text-foreground">Corpo Sensual</span>
             {!isOnline && (
               <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">

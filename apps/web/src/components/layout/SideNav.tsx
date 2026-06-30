@@ -23,7 +23,7 @@ export function SideNav() {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
       {/* Marca */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <Logo className="h-9 w-9 shrink-0 text-foreground" />
+        <Logo className="h-11 w-11 shrink-0" />
         <div className="leading-tight">
           <p className="text-sm font-bold text-foreground">Corpo Sensual</p>
           <p className="text-[11px] font-medium text-muted-foreground">Representantes</p>
