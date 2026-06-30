@@ -1,8 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Sparkles, LogOut, WifiOff } from 'lucide-react';
 import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
+import { ReconnectBanner } from './ReconnectBanner.js';
 import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
@@ -13,11 +14,23 @@ export function AppLayout() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+  const [reconnect, setReconnect] = useState<{ title: string; detail?: string } | null>(null);
+  const dismissReconnect = useCallback(() => setReconnect(null), []);
+
+  // Mostra o card de reconexão assim que volta a ficar online (mesmo sem pedidos
+  // pendentes). Se houver pedidos na fila, o detalhe é preenchido pelo onSynced.
+  const wasOffline = useRef(!isOnline);
+  useEffect(() => {
+    if (isOnline && wasOffline.current) {
+      setReconnect((prev) => prev ?? { title: 'Você está online novamente' });
+    }
+    wasOffline.current = !isOnline;
+  }, [isOnline]);
 
   const handleSynced = useCallback((count: number) => {
-    setToast({
-      message: `${count} pedido${count > 1 ? 's' : ''} sincronizado${count > 1 ? 's' : ''}!`,
-      type: 'success',
+    setReconnect({
+      title: 'Você está online novamente',
+      detail: `${count} pedido${count > 1 ? 's' : ''} enviado${count > 1 ? 's' : ''} com sucesso`,
     });
   }, []);
 
@@ -80,6 +93,10 @@ export function AppLayout() {
       </div>
 
       <BottomNav />
+
+      {reconnect && (
+        <ReconnectBanner title={reconnect.title} detail={reconnect.detail} onDone={dismissReconnect} />
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
