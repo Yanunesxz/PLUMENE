@@ -60,8 +60,23 @@ export function PaginaClientes() {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
+    const digitos = (v: string) => v.replace(/\D/g, '');
     if (!form.name.trim()) {
-      setError('Informe o nome do cliente.');
+      setError('Informe o nome / razão social do cliente.');
+      return;
+    }
+    const cnpjLen = digitos(form.cnpj).length;
+    if (cnpjLen === 0) {
+      setError('Informe o CNPJ ou CPF do cliente.');
+      return;
+    }
+    if (cnpjLen !== 11 && cnpjLen !== 14) {
+      setError('CNPJ deve ter 14 dígitos (ou CPF com 11).');
+      return;
+    }
+    const zapLen = digitos(form.whatsapp).length;
+    if (zapLen < 10 || zapLen > 11) {
+      setError('Informe o WhatsApp com DDD (10 ou 11 dígitos).');
       return;
     }
     if (!token) return;
@@ -114,12 +129,16 @@ export function PaginaClientes() {
               <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Opcional" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">CNPJ / CPF</label>
-              <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="Opcional" inputMode="numeric" />
+              <label className="text-sm font-medium text-foreground">
+                CNPJ / CPF <span className="text-red-500">*</span>
+              </label>
+              <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="00.000.000/0000-00" inputMode="numeric" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">WhatsApp</label>
-              <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="Opcional" inputMode="tel" />
+              <label className="text-sm font-medium text-foreground">
+                WhatsApp <span className="text-red-500">*</span>
+              </label>
+              <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="(00) 00000-0000" inputMode="tel" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">E-mail</label>
