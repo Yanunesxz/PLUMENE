@@ -22,16 +22,45 @@ function orderSheetRows(
   );
 }
 
-export function exportOrdersToXlsx(
+export async function exportOrdersToXlsx(
   orders: OrderWithItems[],
   customerName: Map<string, string>,
   productSku: Map<string, string>,
-): void {
+): Promise<void> {
   const rows = orderSheetRows(orders, customerName, productSku);
   const sheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Pedidos');
 
   const filename = `pedidos_${new Date().toISOString().slice(0, 10)}.xlsx`;
-  XLSX.writeFile(workbook, filename);
+  const buffer = XLSX.write(workbook, { type: 'array', bookType: 'xlsx' }) as ArrayBuffer;
+  const blob = new Blob([buffer], {
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  });
+
+  // iOS Safari (e o app instalado como PWA) ignoram o download por <a download>,
+  // então o XLSX.writeFile "não baixa nada" no iPhone. Quando o navegador
+  // suporta compartilhar arquivos (iOS 15+), abrimos a folha nativa — o usuário
+  // salva em Arquivos ou envia no WhatsApp. No desktop/Android cai no download.
+  const file = new File([blob], filename, { type: blob.type });
+  const nav = navigator as Navigator & { canShare?: (data: { files: File[] }) => boolean };
+  if (typeof nav.share === 'function' && nav.canShare?.({ files: [file] })) {
+    try {
+      await nav.share({ files: [file], title: 'Pedidos' });
+      return;
+    } catch (err) {
+      // Usuário fechou a folha de compartilhamento: não é erro.
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      // Outra falha: cai para o download por link abaixo.
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }

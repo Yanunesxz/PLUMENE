@@ -139,7 +139,7 @@ export function PaginaPedidos() {
           api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token).then((res) => res.data),
         ),
       );
-      exportOrdersToXlsx(detailed, customerName, productSku);
+      await exportOrdersToXlsx(detailed, customerName, productSku);
       setSelectMode(false);
       setSelected(new Set());
     } finally {
