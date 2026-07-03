@@ -17,10 +17,10 @@ export async function listOrders(request: FastifyRequest, reply: FastifyReply): 
 }
 
 export async function getOrder(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id } = request.user;
+  const { company_id, sub: rep_id, role } = request.user;
   const { id } = request.params as { id: string };
 
-  const order = await getOrderById(id, company_id);
+  const order = await getOrderById(id, company_id, role, rep_id);
   if (!order) {
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
@@ -103,13 +103,17 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   }
 
   try {
-    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' });
+    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' }, role);
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
       return;
     }
     await reply.send({ data: order });
   } catch (err) {
+    if (err instanceof Error && err.message === 'FORBIDDEN_NOT_OWNER') {
+      await reply.status(403).send({ error: 'Você só pode alterar seus próprios pedidos', code: 'FORBIDDEN', statusCode: 403 });
+      return;
+    }
     if (err instanceof Error && err.message === 'INVALID_STATUS_TRANSITION') {
       await reply.status(422).send({ error: 'Transição de status inválida', code: 'INVALID_STATUS_TRANSITION', statusCode: 422 });
       return;

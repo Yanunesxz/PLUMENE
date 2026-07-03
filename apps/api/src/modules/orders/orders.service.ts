@@ -23,13 +23,24 @@ export async function getOrders(
   return data as Order[];
 }
 
-export async function getOrderById(id: string, company_id: string): Promise<OrderWithItems | null> {
-  const { data: order, error } = await supabase
+export async function getOrderById(
+  id: string,
+  company_id: string,
+  role?: UserRole,
+  rep_id?: string,
+): Promise<OrderWithItems | null> {
+  let query = supabase
     .from('orders')
     .select('*, items:order_items(*)')
     .eq('id', id)
-    .eq('company_id', company_id)
-    .single();
+    .eq('company_id', company_id);
+
+  // Representante só acessa os próprios pedidos (gerente/admin veem todos).
+  if (role === 'rep' && rep_id) {
+    query = query.eq('rep_id', rep_id);
+  }
+
+  const { data: order, error } = await query.single();
 
   if (error || !order) return null;
   return order as OrderWithItems;
@@ -179,17 +190,25 @@ export async function updateOrderStatus(
   company_id: string,
   approverId: string,
   body: UpdateOrderStatusRequest,
+  role?: UserRole,
 ): Promise<Order | null> {
   const { data: current, error: currentError } = await supabase
     .from('orders')
-    .select('status')
+    .select('status, rep_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .single();
 
   if (currentError || !current) return null;
 
-  const allowed = ORDER_STATUS_FLOW[(current as { status: Order['status'] }).status];
+  const row = current as { status: Order['status']; rep_id: string };
+
+  // Representante só mexe no status dos próprios pedidos (ex.: enviar para aprovação).
+  if (role === 'rep' && row.rep_id !== approverId) {
+    throw new Error('FORBIDDEN_NOT_OWNER');
+  }
+
+  const allowed = ORDER_STATUS_FLOW[row.status];
   if (!allowed.includes(body.status)) {
     throw new Error('INVALID_STATUS_TRANSITION');
   }

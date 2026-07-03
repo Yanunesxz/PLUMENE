@@ -3,10 +3,12 @@ import { env } from '../../config/env.js';
 import type { User, AuthPayload } from '@csb/shared';
 
 export async function findUserByEmail(email: string): Promise<(User & { password_hash: string }) | null> {
+  // E-mails são gravados em minúsculas (ver createRep); normaliza para o login
+  // não falhar quando o usuário digita com qualquer letra maiúscula no celular.
   const { data, error } = await supabase
     .from('users')
     .select('*, password_hash')
-    .eq('email', email)
+    .eq('email', email.trim().toLowerCase())
     .eq('active', true)
     .single();
 

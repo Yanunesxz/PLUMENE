@@ -18,6 +18,17 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
       code: 'UNAUTHORIZED',
       statusCode: 401,
     });
+    return;
+  }
+
+  // Refresh tokens (assinados com o mesmo segredo) só valem em /auth/refresh —
+  // nunca como token de acesso a rotas protegidas.
+  if ((request.user as { type?: string }).type === 'refresh') {
+    await reply.status(401).send({
+      error: 'Token inválido ou expirado',
+      code: 'UNAUTHORIZED',
+      statusCode: 401,
+    });
   }
 }
 
