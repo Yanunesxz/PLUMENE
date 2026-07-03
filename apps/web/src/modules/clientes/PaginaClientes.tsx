@@ -14,7 +14,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { CustomerWithPriceTable, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
-const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '' };
+const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
 
 export function PaginaClientes() {
   const { token } = useAuthStore();
@@ -79,6 +79,14 @@ export function PaginaClientes() {
       setError('Informe o WhatsApp com DDD (10 ou 11 dígitos).');
       return;
     }
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) {
+      setError('Informe um e-mail válido.');
+      return;
+    }
+    if (form.address.trim().length < 5) {
+      setError('Informe o endereço do cliente.');
+      return;
+    }
     if (!token) return;
     setSaving(true);
     try {
@@ -88,6 +96,7 @@ export function PaginaClientes() {
         cnpj: form.cnpj || null,
         whatsapp: form.whatsapp || null,
         email: form.email || null,
+        address: form.address || null,
       };
       const res = await api.post<ApiResponse<CustomerWithPriceTable>>('/customers', payload, token);
       await db.customers.put(res.data);
@@ -141,8 +150,16 @@ export function PaginaClientes() {
               <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="(00) 00000-0000" inputMode="tel" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">E-mail</label>
-              <Input type="email" value={form.email} onChange={setF('email')} placeholder="Opcional" autoComplete="off" />
+              <label className="text-sm font-medium text-foreground">
+                E-mail <span className="text-red-500">*</span>
+              </label>
+              <Input type="email" value={form.email} onChange={setF('email')} placeholder="cliente@email.com" autoComplete="off" />
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Endereço <span className="text-red-500">*</span>
+              </label>
+              <Input value={form.address} onChange={setF('address')} placeholder="Rua, número, bairro, cidade - UF" />
             </div>
           </div>
           {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}

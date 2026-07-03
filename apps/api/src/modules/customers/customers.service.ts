@@ -47,6 +47,7 @@ export async function createCustomer(
       cnpj: body.cnpj?.trim() || null,
       whatsapp: body.whatsapp?.trim() || null,
       email: body.email?.trim() || null,
+      address: body.address?.trim() || null,
       blocked: false,
     })
     .select('*, price_table:price_tables(id, name, company_id)')

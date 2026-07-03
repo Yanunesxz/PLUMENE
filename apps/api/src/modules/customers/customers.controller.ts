@@ -31,6 +31,7 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
     cnpj: body.cnpj ?? null,
     whatsapp: body.whatsapp ?? null,
     email: body.email ?? null,
+    address: body.address ?? null,
   });
   if (!customer) {
     await reply.status(500).send({ error: 'Não foi possível criar o cliente', code: 'CREATE_FAILED', statusCode: 500 });

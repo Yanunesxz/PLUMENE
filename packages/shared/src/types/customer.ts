@@ -38,6 +38,8 @@ export interface Customer {
   whatsapp: string | null;
   /** E-mail */
   email: string | null;
+  /** Endereço completo */
+  address: string | null;
   updated_at: string;
 }
 
@@ -52,4 +54,5 @@ export interface CreateCustomerRequest {
   cnpj?: string | null;
   whatsapp?: string | null;
   email?: string | null;
+  address?: string | null;
 }

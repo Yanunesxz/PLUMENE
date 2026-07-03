@@ -19,11 +19,12 @@ export const createCustomerSchema = z.object({
       const n = somenteDigitos(v).length;
       return n >= 10 && n <= 11;
     }, 'Informe o WhatsApp com DDD (10 ou 11 dígitos)'),
-  trade_name: z.string().trim().nullable().default(null),
+  // Contato e endereço são obrigatórios para o cadastro do cliente.
   email: z
     .string()
     .trim()
-    .nullable()
-    .default(null)
-    .refine((v) => !v || /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'E-mail inválido'),
+    .min(1, 'E-mail é obrigatório')
+    .refine((v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'E-mail inválido'),
+  address: z.string().trim().min(5, 'Endereço é obrigatório'),
+  trade_name: z.string().trim().nullable().default(null),
 });
