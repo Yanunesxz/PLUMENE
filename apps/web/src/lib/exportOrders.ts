@@ -2,14 +2,18 @@ import * as XLSX from 'xlsx';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems } from '@csb/shared';
 
-function orderSheetRows(orders: OrderWithItems[], customerName: Map<string, string>) {
+function orderSheetRows(
+  orders: OrderWithItems[],
+  customerName: Map<string, string>,
+  productSku: Map<string, string>,
+) {
   return orders.flatMap((order) =>
     order.items.map((item) => ({
       'Nº Pedido': order.order_number ?? order.id.slice(0, 8),
       Cliente: customerName.get(order.customer_id) ?? order.customer_id,
       Status: ORDER_STATUS_LABELS[order.status],
-      Produto: item.product_id,
-      Variante: item.variant_id ?? '',
+      Produto: productSku.get(item.product_id) ?? item.product_id,
+      Variante: 'Sortido',
       Quantidade: item.quantity,
       'Preço Unit.': item.unit_price,
       Total: item.total,
@@ -18,8 +22,12 @@ function orderSheetRows(orders: OrderWithItems[], customerName: Map<string, stri
   );
 }
 
-export function exportOrdersToXlsx(orders: OrderWithItems[], customerName: Map<string, string>): void {
-  const rows = orderSheetRows(orders, customerName);
+export function exportOrdersToXlsx(
+  orders: OrderWithItems[],
+  customerName: Map<string, string>,
+  productSku: Map<string, string>,
+): void {
+  const rows = orderSheetRows(orders, customerName, productSku);
   const sheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, sheet, 'Pedidos');

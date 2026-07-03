@@ -13,7 +13,15 @@ import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { exportOrdersToXlsx } from '../../lib/exportOrders.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
-import type { Order, CustomerWithPriceTable, ApiResponse, OrderStatus, OrderWithItems, RepListItem } from '@csb/shared';
+import type {
+  Order,
+  CustomerWithPriceTable,
+  ApiResponse,
+  OrderStatus,
+  OrderWithItems,
+  RepListItem,
+  ProductWithPrice,
+} from '@csb/shared';
 
 const ALL_REPS = '__all__';
 
@@ -48,12 +56,19 @@ export function PaginaPedidos() {
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const products = useLiveQuery(() => db.products.toArray(), []);
 
   const customerName = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of customers ?? []) m.set(c.id, c.name);
     return m;
   }, [customers]);
+
+  const productSku = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products ?? []) m.set(p.id, p.sku);
+    return m;
+  }, [products]);
 
   useEffect(() => {
     if (!token) return;
@@ -69,6 +84,11 @@ export function PaginaPedidos() {
     api
       .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
+      .catch(() => {});
+    // garante o SKU dos produtos para a exportação, mesmo sem passar pelo Catálogo
+    api
+      .get<ApiResponse<ProductWithPrice[]>>('/products', token)
+      .then((res) => db.products.bulkPut(res.data))
       .catch(() => {});
   }, [token]);
 
@@ -119,7 +139,7 @@ export function PaginaPedidos() {
           api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token).then((res) => res.data),
         ),
       );
-      exportOrdersToXlsx(detailed, customerName);
+      exportOrdersToXlsx(detailed, customerName, productSku);
       setSelectMode(false);
       setSelected(new Set());
     } finally {
