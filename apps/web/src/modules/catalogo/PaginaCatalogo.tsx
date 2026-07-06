@@ -16,6 +16,11 @@ import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
 const ALL = '__all__';
 
+interface PriceTableOption {
+  id: string;
+  name: string;
+}
+
 type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
 const availableOf = (p: ProductWithPrice) =>
@@ -40,6 +45,18 @@ export function PaginaCatalogo() {
   const [loading, setLoading] = useState(false);
   const [pickerProduct, setPickerProduct] = useState<ProductWithPrice | null>(null);
 
+  // ── Consulta de preços por tabela ───────────────────────────────────────────
+  // O rep pode VER o catálogo em outra tabela de preço. É só consulta: o carrinho
+  // e o pedido continuam na tabela do próprio rep (o servidor precifica por ela).
+  const defaultTableId = user?.price_table_id ?? '';
+  const [tables, setTables] = useState<PriceTableOption[]>([]);
+  const [viewTableId, setViewTableId] = useState<string>(defaultTableId);
+  // Overlay: mapa produto→preço da tabela consultada (null = usar a tabela do rep).
+  const [overlayPrices, setOverlayPrices] = useState<Map<string, number | null> | null>(null);
+  const isConsulting = viewTableId !== '' && viewTableId !== defaultTableId;
+  const viewTableName = tables.find((t) => t.id === viewTableId)?.name ?? null;
+  const defaultTableName = tables.find((t) => t.id === defaultTableId)?.name ?? null;
+
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
   const cartTotal = cartItems.reduce((t, i) => t + i.quantity * i.unit_price, 0);
 
@@ -57,6 +74,45 @@ export function PaginaCatalogo() {
       })
       .finally(() => setLoading(false));
   }, [token]);
+
+  // Carrega as tabelas de preço da empresa para o seletor de consulta.
+  useEffect(() => {
+    if (!token) return;
+    api
+      .get<ApiResponse<PriceTableOption[]>>('/catalog/price-tables', token)
+      .then((res) => setTables(res.data))
+      .catch(() => {
+        /* sem conexão: seguimos só com a tabela do rep */
+      });
+  }, [token]);
+
+  // Ao escolher uma tabela diferente da do rep, busca os preços dela e monta o
+  // overlay. Esses preços NÃO vão para o Dexie nem para o carrinho — são só exibição.
+  useEffect(() => {
+    if (!token || !isConsulting) {
+      setOverlayPrices(null);
+      return;
+    }
+    let cancelled = false;
+    api
+      .get<ApiResponse<ProductWithPrice[]>>(`/products?price_table_id=${viewTableId}`, token)
+      .then((res) => {
+        if (cancelled) return;
+        const map = new Map<string, number | null>();
+        for (const p of res.data) map.set(p.id, p.price ?? null);
+        setOverlayPrices(map);
+      })
+      .catch(() => {
+        if (!cancelled) setOverlayPrices(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [token, viewTableId, isConsulting]);
+
+  // Preço a EXIBIR: da tabela consultada quando há overlay, senão o da tabela do rep.
+  const priceOf = (p: ProductWithPrice): number | null =>
+    overlayPrices ? (overlayPrices.get(p.id) ?? null) : p.price;
 
   const brands = useMemo(() => {
     const set = new Set<string>();
@@ -76,9 +132,9 @@ export function PaginaCatalogo() {
         case 'name':
           return a.name.localeCompare(b.name, 'pt-BR');
         case 'price_desc':
-          return (b.price ?? 0) - (a.price ?? 0);
+          return (priceOf(b) ?? 0) - (priceOf(a) ?? 0);
         case 'price_asc':
-          return (a.price ?? 0) - (b.price ?? 0);
+          return (priceOf(a) ?? 0) - (priceOf(b) ?? 0);
         case 'code':
         default:
           return a.sku.localeCompare(b.sku, 'pt-BR', { numeric: true });
@@ -98,7 +154,8 @@ export function PaginaCatalogo() {
           (p.collection?.toLowerCase().includes(q) ?? false),
       )
       .sort(compare);
-  }, [allProducts, search, brand, sort, inStockOnly, showNoPhoto]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allProducts, search, brand, sort, inStockOnly, showNoPhoto, overlayPrices]);
 
   const isInitialLoading = allProducts === undefined || (loading && (allProducts?.length ?? 0) === 0);
 
@@ -138,7 +195,30 @@ export function PaginaCatalogo() {
           <option value="price_desc">Ordenar: Maior preço</option>
           <option value="price_asc">Ordenar: Menor preço</option>
         </Select>
+        {tables.length > 1 && (
+          <Select
+            aria-label="Ver preços da tabela"
+            value={viewTableId}
+            onChange={(e) => setViewTableId(e.target.value)}
+            className="sm:w-52"
+          >
+            {tables.map((t) => (
+              <option key={t.id} value={t.id}>
+                Preços: {t.name}
+                {t.id === defaultTableId ? ' (sua tabela)' : ''}
+              </option>
+            ))}
+          </Select>
+        )}
       </div>
+
+      {isConsulting && (
+        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+          Consultando preços de <strong>{viewTableName}</strong>. É só referência — seus
+          pedidos são faturados pela{' '}
+          {defaultTableName ? <strong>{defaultTableName}</strong> : 'sua tabela'}.
+        </div>
+      )}
 
       <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
         <Chip active={inStockOnly} onClick={() => setInStockOnly((v) => !v)}>
@@ -190,15 +270,20 @@ export function PaginaCatalogo() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filtered.map((product) => (
-            <CartaoProduto
-              key={product.id}
-              product={product}
-              showStock={canSeeStock}
-              inOrder={cartItems.some((i) => i.product_id === product.id)}
-              onAdd={(p) => setPickerProduct(p)}
-            />
-          ))}
+          {filtered.map((product) => {
+            // Card mostra o preço consultado; o picker recebe o produto ORIGINAL
+            // (preço da tabela do rep) para o carrinho não herdar o preço de consulta.
+            const display = isConsulting ? { ...product, price: priceOf(product) } : product;
+            return (
+              <CartaoProduto
+                key={product.id}
+                product={display}
+                showStock={canSeeStock}
+                inOrder={cartItems.some((i) => i.product_id === product.id)}
+                onAdd={() => setPickerProduct(product)}
+              />
+            );
+          })}
         </div>
       )}
 

@@ -1,6 +1,34 @@
 import { supabase } from '../../config/supabase.js';
 import type { ProductWithPrice } from '@csb/shared';
 
+/** Tabelas de preço da empresa (id + nome) — para o seletor de consulta no catálogo. */
+export async function listCompanyPriceTables(
+  company_id: string,
+): Promise<{ id: string; name: string }[]> {
+  const { data, error } = await supabase
+    .from('price_tables')
+    .select('id, name')
+    .eq('company_id', company_id)
+    .order('name');
+
+  if (error || !data) return [];
+  return data as { id: string; name: string }[];
+}
+
+/** Garante que a tabela de preço pertence à empresa (evita consultar tabela de outra empresa). */
+export async function priceTableBelongsToCompany(
+  price_table_id: string,
+  company_id: string,
+): Promise<boolean> {
+  const { data } = await supabase
+    .from('price_tables')
+    .select('id')
+    .eq('id', price_table_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  return !!data;
+}
+
 export async function getProducts(
   company_id: string,
   price_table_id?: string,
