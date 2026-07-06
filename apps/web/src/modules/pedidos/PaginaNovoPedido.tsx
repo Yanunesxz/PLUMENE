@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Minus, Plus, WifiOff, ShoppingCart } from 'lucide-react';
+import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -59,6 +59,16 @@ export function PaginaNovoPedido() {
 
   const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
+
+  // O que ainda falta para poder enviar o pedido (cliente é o mais esquecido:
+  // a pessoa chega com produtos no carrinho vindo do catálogo e não seleciona cliente).
+  const missingReason = !customerId
+    ? 'Selecione o cliente para enviar o pedido.'
+    : items.length === 0
+      ? 'Adicione ao menos um produto para enviar o pedido.'
+      : selectedCustomer?.blocked
+        ? 'Este cliente está bloqueado. Escolha outro para continuar.'
+        : null;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -120,7 +130,7 @@ export function PaginaNovoPedido() {
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
         <div className="space-y-1.5">
           <label htmlFor="customer" className="text-sm font-medium text-foreground">
-            Cliente
+            Cliente <span className="text-red-500">*</span>
           </label>
           <SearchSelect
             id="customer"
@@ -135,7 +145,13 @@ export function PaginaNovoPedido() {
               sublabel: c.cnpj ? `CNPJ ${c.cnpj}` : undefined,
             }))}
           />
-          {selectedCustomer?.blocked && <p className="text-xs text-red-500">Este cliente está bloqueado.</p>}
+          {selectedCustomer?.blocked ? (
+            <p className="text-xs text-red-500">Este cliente está bloqueado.</p>
+          ) : !customerId ? (
+            <p className="text-xs text-muted-foreground">
+              Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
+            </p>
+          ) : null}
         </div>
 
         <div className="space-y-1.5">
@@ -268,11 +284,17 @@ export function PaginaNovoPedido() {
             </span>
             <span className="text-xl font-bold text-foreground">{formatBRL(total)}</span>
           </div>
+          {missingReason && (
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.5} />
+              <span>{missingReason}</span>
+            </div>
+          )}
           <Button
             type="submit"
             size="lg"
             className="w-full"
-            disabled={submitting || !customerId || items.length === 0}
+            disabled={submitting || missingReason !== null}
           >
             {submitting ? 'Enviando…' : isOnline ? 'Enviar para aprovação' : 'Salvar offline'}
           </Button>
