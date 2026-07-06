@@ -11,6 +11,8 @@ import {
   RefreshCw,
   CheckCircle2,
   CloudOff,
+  KeyRound,
+  MessageCircle,
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
@@ -18,10 +20,19 @@ import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { api } from '../../services/api.js';
 import { flushSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/interface/Button.js';
+import { Input } from '../../components/interface/Input.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
+
+// Suporte por WhatsApp — número (55) 32 9 9849-3177.
+const SUPORTE_WHATSAPP = '5532998493177';
+const SUPORTE_WHATSAPP_LABEL = '(32) 9 9849-3177';
+const suporteWhatsappUrl = (nome: string) =>
+  `https://wa.me/${SUPORTE_WHATSAPP}?text=${encodeURIComponent(
+    `Olá! Sou ${nome || 'representante'} e preciso de ajuda no app Corpo Sensual.`,
+  )}`;
 
 export function PaginaMinhaArea() {
   const { token, user } = useAuthStore();
@@ -31,6 +42,43 @@ export function PaginaMinhaArea() {
   const pendingSync = useLiveQuery(() => db.sync_queue.count(), []) ?? 0;
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // Troca de senha do próprio representante.
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
+  const handleChangePassword = async () => {
+    if (!token || changingPassword) return;
+    if (newPassword.length < 6) {
+      setToast({ message: 'A nova senha deve ter ao menos 6 caracteres.', type: 'error' });
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setToast({ message: 'A confirmação não confere com a nova senha.', type: 'error' });
+      return;
+    }
+    setChangingPassword(true);
+    try {
+      await api.post<ApiResponse<{ ok: boolean }>>(
+        '/auth/change-password',
+        { current_password: currentPassword, new_password: newPassword },
+        token,
+      );
+      setToast({ message: 'Senha alterada com sucesso!', type: 'success' });
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível alterar a senha.',
+        type: 'error',
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
 
   const handleSync = async () => {
     if (!token || syncing) return;
@@ -167,6 +215,115 @@ export function PaginaMinhaArea() {
           <Row icon={Percent} label="Taxa de aprovação" value={`${m.taxaAprovacao}%`} />
           <Row icon={ShoppingCart} label="Total de pedidos" value={String(m.totalPedidos)} last />
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Segurança
+        </h2>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="mb-3 flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+              <KeyRound className="h-5 w-5" strokeWidth={2} />
+            </span>
+            <div>
+              <p className="text-sm font-medium text-foreground">Trocar minha senha</p>
+              <p className="text-xs text-muted-foreground">
+                Use ao menos 6 caracteres. Você continua logado após trocar.
+              </p>
+            </div>
+          </div>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void handleChangePassword();
+            }}
+            className="space-y-3"
+          >
+            <input
+              type="text"
+              name="username"
+              autoComplete="username"
+              value={user?.email ?? ''}
+              readOnly
+              hidden
+            />
+            <div className="space-y-1.5">
+              <label htmlFor="current-password" className="text-xs font-medium text-muted-foreground">
+                Senha atual
+              </label>
+              <Input
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Sua senha de hoje"
+              />
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-1.5">
+                <label htmlFor="new-password" className="text-xs font-medium text-muted-foreground">
+                  Nova senha
+                </label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Mínimo 6 caracteres"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <label htmlFor="confirm-password" className="text-xs font-medium text-muted-foreground">
+                  Confirmar nova senha
+                </label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Repita a nova senha"
+                />
+              </div>
+            </div>
+            <Button
+              type="submit"
+              size="sm"
+              disabled={changingPassword || !currentPassword || !newPassword || !confirmPassword}
+            >
+              {changingPassword ? <Spinner /> : <KeyRound className="h-4 w-4" strokeWidth={2.5} />}
+              {changingPassword ? 'Salvando…' : 'Salvar nova senha'}
+            </Button>
+          </form>
+        </div>
+      </section>
+
+      <section>
+        <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+          Suporte
+        </h2>
+        <a
+          href={suporteWhatsappUrl(user?.name ?? '')}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50"
+        >
+          <span className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+              <MessageCircle className="h-5 w-5" strokeWidth={2} />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-sm font-medium text-foreground">Falar com o suporte</span>
+              <span className="block text-xs text-muted-foreground">
+                WhatsApp {SUPORTE_WHATSAPP_LABEL}
+              </span>
+            </span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-green-700">Abrir</span>
+        </a>
       </section>
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

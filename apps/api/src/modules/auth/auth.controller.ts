@@ -1,9 +1,9 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AuthPayload, User } from '@csb/shared';
-import { findUserByEmail, buildAuthPayload, getTokenConfig, upgradePasswordHash } from './auth.service.js';
+import { findUserByEmail, findUserById, buildAuthPayload, getTokenConfig, upgradePasswordHash } from './auth.service.js';
 import { verifyPassword, hashPassword } from '../../lib/password.js';
 import { parseBody } from '../../lib/validation.js';
-import { loginSchema, refreshTokenSchema } from './auth.schema.js';
+import { loginSchema, refreshTokenSchema, changePasswordSchema } from './auth.schema.js';
 
 export async function login(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const body = await parseBody(loginSchema, request.body, reply);
@@ -55,6 +55,27 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
       },
     },
   });
+}
+
+export async function changePassword(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const body = await parseBody(changePasswordSchema, request.body, reply);
+  if (!body) return;
+
+  const userId = request.user.sub;
+  const user = await findUserById(userId);
+  if (!user) {
+    await reply.status(404).send({ error: 'Usuário não encontrado', code: 'USER_NOT_FOUND', statusCode: 404 });
+    return;
+  }
+
+  const check = await verifyPassword(body.current_password, user.password_hash);
+  if (!check.ok) {
+    await reply.status(400).send({ error: 'Senha atual incorreta', code: 'WRONG_PASSWORD', statusCode: 400 });
+    return;
+  }
+
+  await upgradePasswordHash(userId, await hashPassword(body.new_password));
+  await reply.send({ data: { ok: true } });
 }
 
 export async function refreshToken(request: FastifyRequest, reply: FastifyReply): Promise<void> {

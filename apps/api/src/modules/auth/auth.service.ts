@@ -16,6 +16,18 @@ export async function findUserByEmail(email: string): Promise<(User & { password
   return data as User & { password_hash: string };
 }
 
+export async function findUserById(id: string): Promise<(User & { password_hash: string }) | null> {
+  const { data, error } = await supabase
+    .from('users')
+    .select('*, password_hash')
+    .eq('id', id)
+    .eq('active', true)
+    .single();
+
+  if (error || !data) return null;
+  return data as User & { password_hash: string };
+}
+
 export function buildAuthPayload(user: User): AuthPayload {
   return {
     sub: user.id,
