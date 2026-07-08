@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Percent, Search } from 'lucide-react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Percent, Search } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/interface/Input.js';
@@ -40,6 +40,7 @@ export function PaginaRepresentantes() {
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const [repSearch, setRepSearch] = useState('');
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const isEditing = editingId !== null;
 
@@ -96,6 +97,54 @@ export function PaginaRepresentantes() {
     setError('');
     setShowForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleDelete = async (rep: RepListItem) => {
+    if (!token || deletingId) return;
+    const ok = window.confirm(
+      `Excluir o representante "${rep.name}"?\n\n` +
+        'Esta ação não pode ser desfeita. Clientes da carteira dele ficarão sem representante.',
+    );
+    if (!ok) return;
+
+    setDeletingId(rep.id);
+    try {
+      const res = await api.del<ApiResponse<{ ok: boolean; unassigned_customers: number }>>(
+        `/reps/${rep.id}`,
+        token,
+      );
+      setReps((prev) => (prev ?? []).filter((r) => r.id !== rep.id));
+      if (editingId === rep.id) closeForm();
+      const n = res.data.unassigned_customers;
+      setToast({
+        message:
+          n > 0
+            ? `Representante excluído. ${n} cliente(s) da carteira ficaram sem representante.`
+            : 'Representante excluído.',
+        type: 'success',
+      });
+    } catch (err) {
+      // Rep com pedidos não pode ser apagado (histórico de comissões) — oferece inativar.
+      if ((err as Error & { code?: string }).code === 'HAS_ORDERS') {
+        const inativar = window.confirm(
+          `${err instanceof Error ? err.message : 'Este representante tem pedidos e não pode ser excluído.'}\n\n` +
+            'Deseja INATIVAR o acesso dele agora? (Ele não conseguirá mais entrar no app, mas o histórico é preservado.)',
+        );
+        if (inativar) {
+          try {
+            const res = await api.patch<ApiResponse<RepListItem>>(`/reps/${rep.id}`, { active: false }, token);
+            setReps((prev) => (prev ?? []).map((r) => (r.id === rep.id ? res.data : r)));
+            setToast({ message: 'Representante inativado — o acesso foi bloqueado.', type: 'success' });
+          } catch (e2) {
+            setToast({ message: e2 instanceof Error ? e2.message : 'Erro ao inativar.', type: 'error' });
+          }
+        }
+      } else {
+        setToast({ message: err instanceof Error ? err.message : 'Erro ao excluir representante.', type: 'error' });
+      }
+    } finally {
+      setDeletingId(null);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -312,6 +361,15 @@ export function PaginaRepresentantes() {
                     className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
                   >
                     <Pencil className="h-4 w-4" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(rep)}
+                    disabled={deletingId === rep.id}
+                    aria-label={`Excluir ${rep.name}`}
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                  >
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </div>
               </div>

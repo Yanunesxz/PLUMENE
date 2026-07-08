@@ -1,6 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRepRequest, UpdateRepRequest } from '@csb/shared';
-import { listReps, createRep, updateRep, listPriceTables } from './reps.service.js';
+import { listReps, createRep, updateRep, deleteRep, listPriceTables } from './reps.service.js';
 
 export async function listRepsHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id } = request.user;
@@ -49,6 +49,39 @@ export async function createRepHandler(request: FastifyRequest, reply: FastifyRe
   }
 
   await reply.status(201).send({ data: result.rep });
+}
+
+export async function deleteRepHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+
+  const result = await deleteRep(company_id, id);
+  if (!result.ok) {
+    if (result.reason === 'not_found') {
+      await reply.status(404).send({
+        error: 'Representante não encontrado.',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+      return;
+    }
+    if (result.reason === 'has_orders') {
+      await reply.status(409).send({
+        error: `Este representante tem ${result.orders} pedido(s) e não pode ser excluído — o histórico de vendas e comissões depende dele. Inative o acesso em vez de excluir.`,
+        code: 'HAS_ORDERS',
+        statusCode: 409,
+      });
+      return;
+    }
+    await reply.status(500).send({
+      error: 'Não foi possível excluir o representante.',
+      code: 'DELETE_FAILED',
+      statusCode: 500,
+    });
+    return;
+  }
+
+  await reply.send({ data: { ok: true, unassigned_customers: result.unassigned_customers } });
 }
 
 export async function updateRepHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

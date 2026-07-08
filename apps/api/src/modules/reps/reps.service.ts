@@ -106,6 +106,47 @@ export async function createRep(
   return { ok: true, rep: toRepListItem(data as unknown as RepRow) };
 }
 
+export type DeleteRepResult =
+  | { ok: true; unassigned_customers: number }
+  | { ok: false; reason: 'not_found' | 'has_orders' | 'error'; orders?: number };
+
+/**
+ * Exclui um representante. Só é permitido quando ele NÃO tem pedidos —
+ * pedidos referenciam o rep (histórico/comissões) e o banco bloqueia via FK.
+ * Clientes da carteira dele ficam sem representante (FK ON DELETE SET NULL).
+ */
+export async function deleteRep(company_id: string, id: string): Promise<DeleteRepResult> {
+  const { data: rep } = await supabase
+    .from('users')
+    .select('id')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .eq('role', 'rep')
+    .maybeSingle();
+  if (!rep) return { ok: false, reason: 'not_found' };
+
+  const { count: orders } = await supabase
+    .from('orders')
+    .select('id', { count: 'exact', head: true })
+    .eq('rep_id', id);
+  if ((orders ?? 0) > 0) return { ok: false, reason: 'has_orders', orders: orders ?? 0 };
+
+  const { count: customers } = await supabase
+    .from('customers')
+    .select('id', { count: 'exact', head: true })
+    .eq('rep_id', id);
+
+  const { error } = await supabase
+    .from('users')
+    .delete()
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .eq('role', 'rep');
+  if (error) return { ok: false, reason: 'error' };
+
+  return { ok: true, unassigned_customers: customers ?? 0 };
+}
+
 export type UpdateRepResult =
   | { ok: true; rep: RepListItem }
   | { ok: false; reason: 'email_taken' | 'not_found' | 'error' };
