@@ -5,6 +5,8 @@ import type { UserRole } from '@csb/shared';
 export interface NavItem {
   to: string;
   label: string;
+  /** Rótulo curto para o menu inferior do celular (6 itens em tela estreita). */
+  short?: string;
   icon: LucideIcon;
   /** Casa exata da rota (evita "ativo" em sub-rotas). */
   end?: boolean;
@@ -23,7 +25,7 @@ const managerItems: NavItem[] = [
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
-  { to: '/representantes', label: 'Representantes', icon: Contact },
+  { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
   { to: '/comissoes', label: 'Comissões', icon: Wallet },
 ];
 
