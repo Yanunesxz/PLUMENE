@@ -2,11 +2,11 @@ import 'dotenv/config';
 import bcrypt from 'bcryptjs';
 import { supabase } from '../config/supabase.js';
 
-// Cria 5 representantes para apresentação. Idempotente: e-mail já existente é pulado.
+// Cria 7 representantes para apresentação. Idempotente: e-mail já existente é pulado.
 // Cada rep recebe uma tabela de preço — sem ela não conseguiria criar pedido
 // (o servidor recalcula o preço pela tabela do representante).
 
-const PASSWORD = 'Rep123*';
+const PASSWORD = 'rep123';
 const COMMISSION_RATE = 10; // %
 
 const reps = [
@@ -15,6 +15,8 @@ const reps = [
   { email: 'representante3@csb.com', name: 'Representante 3' },
   { email: 'representante4@csb.com', name: 'Representante 4' },
   { email: 'representante5@csb.com', name: 'Representante 5' },
+  { email: 'representante6@csb.com', name: 'Representante 6' },
+  { email: 'representante7@csb.com', name: 'Representante 7' },
 ];
 
 async function run() {
@@ -32,18 +34,20 @@ async function run() {
     process.exit(1);
   }
 
-  // Uma tabela de preço dessa empresa para atribuir aos reps.
-  const { data: table } = await supabase
+  // Tabela de preço "de venda" (mesma dos reps reais) para atribuir aos reps de
+  // apresentação — assim eles veem os preços normais do catálogo, e não a tabela
+  // de industrialização. Prefere "TABELA 01"; se não achar, cai na primeira.
+  const { data: tables } = await supabase
     .from('price_tables')
     .select('id, name')
     .eq('company_id', company_id)
-    .order('name')
-    .limit(1)
-    .maybeSingle();
+    .order('name');
 
-  const price_table_id = (table as { id: string; name: string } | null)?.id ?? null;
+  const list = (tables ?? []) as { id: string; name: string }[];
+  const table = list.find((t) => /tabela\s*0?1/i.test(t.name)) ?? list[0];
+  const price_table_id = table?.id ?? null;
   console.log(`🏢 Empresa: ${company_id}`);
-  console.log(`💲 Tabela de preço: ${(table as { name?: string } | null)?.name ?? '(nenhuma)'}`);
+  console.log(`💲 Tabela de preço: ${table?.name ?? '(nenhuma)'}`);
 
   const password_hash = bcrypt.hashSync(PASSWORD, 10);
 
@@ -51,12 +55,19 @@ async function run() {
     const email = r.email.trim().toLowerCase();
     const { data: existing } = await supabase
       .from('users')
-      .select('id')
+      .select('id, price_table_id')
       .eq('email', email)
       .maybeSingle();
 
     if (existing) {
-      console.log(`⏭️  ${email} já existe — pulado`);
+      // Garante a tabela de preço correta mesmo em reps já criados.
+      const ex = existing as { id: string; price_table_id: string | null };
+      if (ex.price_table_id !== price_table_id) {
+        await supabase.from('users').update({ price_table_id }).eq('id', ex.id);
+        console.log(`🔄 ${email} já existia — tabela de preço corrigida`);
+      } else {
+        console.log(`⏭️  ${email} já existe — pulado`);
+      }
       continue;
     }
 
