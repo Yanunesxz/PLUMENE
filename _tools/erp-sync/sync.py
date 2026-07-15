@@ -21,6 +21,7 @@ Dependências:
 """
 import os, sys, json, time, logging, argparse
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 
 # ─── setup ───────────────────────────────────────────────────────────────────
@@ -32,7 +33,13 @@ logging.basicConfig(
 log = logging.getLogger("erp-sync")
 
 SCRIPT_DIR = Path(__file__).parent
-FBEMBED_DIR = SCRIPT_DIR.parent / "firebird-reader" / "fbembed25_x64"
+# Procura as DLLs do Firebird: primeiro ao lado do script (pacote instalado
+# na fábrica), depois no repositório (_tools/firebird-reader).
+_fbembed_candidates = [
+    SCRIPT_DIR / "fbembed25_x64",
+    SCRIPT_DIR.parent / "firebird-reader" / "fbembed25_x64",
+]
+FBEMBED_DIR = next((p for p in _fbembed_candidates if p.exists()), _fbembed_candidates[-1])
 
 # Adiciona DLLs ao PATH antes de importar fdb
 os.environ["PATH"] = str(FBEMBED_DIR) + ";" + os.environ.get("PATH", "")
@@ -58,7 +65,23 @@ except ImportError:
 
 # ─── config ───────────────────────────────────────────────────────────────────
 DB_PATH        = os.environ.get("FIREBIRD_DB_PATH", r"C:\Users\Yan\Downloads\DBCORPO-002.FDB")
+# Se FIREBIRD_HOST estiver definido (ex.: localhost), conecta via servidor
+# Firebird (TCP 3050) em vez de abrir o arquivo direto com fbembed.
+# Obrigatório quando o ERP está rodando e mantém o .FDB aberto.
+FB_HOST        = os.environ.get("FIREBIRD_HOST", "").strip()
+FB_PORT        = int(os.environ.get("FIREBIRD_PORT", "3050"))
+FB_USER        = os.environ.get("FIREBIRD_USER", "SYSDBA")
 FB_PASSWORD    = os.environ.get("FIREBIRD_PASSWORD", "masterkey")
+
+# ── Envio de pedidos (Supabase → ERP) ─────────────────────────────────────────
+# Série de numeração dos pedidos vindos do app (prefixo + generator próprio,
+# p/ não misturar com as séries manuais tipo CS/SX). Ajustável com o Fabio.
+ERP_ORDER_PREFIX    = os.environ.get("ERP_ORDER_PREFIX", "WB")
+ERP_ORDER_GENERATOR = os.environ.get("ERP_ORDER_GENERATOR", "GEN_PEDIDO_WB")
+# Situação com que o pedido entra no ERP (LIBERADO = segue fluxo normal)
+ERP_ORDER_SITUACAO  = os.environ.get("ERP_ORDER_SITUACAO", "LIBERADO")
+# Status no Supabase que libera o envio ao ERP
+ERP_PUSH_STATUS     = os.environ.get("ERP_PUSH_STATUS", "approved")
 SUPABASE_URL   = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_KEY   = os.environ.get("SUPABASE_SERVICE_KEY") or os.environ.get("SUPABASE_SERVICE_ROLE_KEY", "")
 COMPANY_ID     = os.environ.get("COMPANY_ID", "")
@@ -70,12 +93,17 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 # ─── Firebird connection ───────────────────────────────────────────────────────
 def get_fb_connection():
-    return fdb.connect(
-        dsn=DB_PATH,
-        user="SYSDBA",
+    kwargs = dict(
+        user=FB_USER,
         password=FB_PASSWORD,
         fb_library_name=str(FBEMBED_DIR / "fbembed.dll"),
     )
+    if FB_HOST:
+        # Via servidor Firebird (TCP) — modo correto na fábrica, onde o ERP
+        # mantém o arquivo aberto. fbembed.dll também funciona como client.
+        return fdb.connect(host=FB_HOST, port=FB_PORT, database=DB_PATH, **kwargs)
+    # Acesso embedded direto ao arquivo — só para cópias offline do banco.
+    return fdb.connect(dsn=DB_PATH, **kwargs)
 
 # ─── Supabase client ──────────────────────────────────────────────────────────
 HEADERS = {
@@ -401,6 +429,179 @@ def sync_customers(cur) -> int:
     log.info(f"  Clientes: {result['records']} registros")
     return result["records"]
 
+# ─── Push: Pedidos (Supabase → ERP) ───────────────────────────────────────────
+# Direção inversa das demais: lê pedidos aprovados no Supabase e INSERE no
+# Firebird (PEDIDO + ITENS_PEDIDO). Única operação de escrita no ERP.
+#
+# Idempotência: grava os 10 primeiros hex do UUID do pedido em
+# PEDIDO.IDPEDIDO_EXTERNO (VARCHAR(10)) e confere antes de inserir — se a
+# confirmação ao Supabase falhar, a próxima rodada reaproveita o nº já gerado
+# em vez de duplicar.
+
+def _external_id(order_uuid: str) -> str:
+    return order_uuid.replace("-", "")[:10]
+
+def _ensure_generator(con) -> None:
+    """Garante que o generator da série de pedidos do app existe."""
+    if not all(c.isalnum() or c == "_" for c in ERP_ORDER_GENERATOR):
+        raise ValueError(f"Nome de generator inválido: {ERP_ORDER_GENERATOR}")
+    cur = con.cursor()
+    cur.execute(
+        "SELECT 1 FROM RDB$GENERATORS WHERE TRIM(RDB$GENERATOR_NAME) = ?",
+        (ERP_ORDER_GENERATOR,),
+    )
+    if cur.fetchone():
+        return
+    log.warning(f"Generator {ERP_ORDER_GENERATOR} não existe — criando (série nova de pedidos do app)")
+    con.execute_immediate(f"CREATE GENERATOR {ERP_ORDER_GENERATOR}")
+    con.commit()
+
+def fetch_pending_orders() -> list:
+    """Pedidos aprovados e ainda sem número do ERP, com cliente e itens embutidos."""
+    url = (
+        f"{SUPABASE_URL}/rest/v1/orders?select="
+        "id,total,notes,created_at,"
+        "customers(erp_id,rep_erp_id,price_table_id),"
+        "order_items(quantity,unit_price,total,"
+        "product_variants(erp_sku,size),products(erp_id,sku))"
+        f"&company_id=eq.{COMPANY_ID}&status=eq.{ERP_PUSH_STATUS}&erp_order_id=is.null"
+        "&order=created_at.asc"
+    )
+    r = httpx.get(url, headers=HEADERS, timeout=30)
+    r.raise_for_status()
+    return r.json()
+
+class OrderMappingError(Exception):
+    """Erro permanente de mapeamento — não adianta re-tentar sem correção."""
+
+def _map_order_items(order: dict) -> list[tuple]:
+    """(PRODUTO, TAMANHO, QUANTIDADE, PRECO_UNITARIO, TOTAL) por item."""
+    items = order.get("order_items") or []
+    if not items:
+        raise OrderMappingError("pedido sem itens")
+    mapped = []
+    for it in items:
+        variant = it.get("product_variants")
+        if variant and variant.get("erp_sku") and "|" in variant["erp_sku"]:
+            produto, tamanho = variant["erp_sku"].split("|", 1)
+        else:
+            product = it.get("products") or {}
+            produto = product.get("erp_id")
+            tamanho = (variant or {}).get("size")
+            if not produto or not tamanho:
+                raise OrderMappingError(f"item sem vínculo com o ERP (variante/produto ausente): {it}")
+        qty = int(it.get("quantity") or 0)
+        if qty <= 0:
+            raise OrderMappingError(f"item com quantidade inválida: {produto} {tamanho}")
+        # Decimal (não float) para o Firebird não truncar centavos (128.70 → 128.69)
+        unit = Decimal(str(it.get("unit_price") or 0)).quantize(Decimal("0.01"))
+        total = Decimal(str(it.get("total") or 0)).quantize(Decimal("0.01")) or unit * qty
+        mapped.append((produto.strip(), tamanho.strip(), qty, unit, total))
+    return mapped
+
+def _insert_order_into_erp(con, order: dict, table_map: dict) -> str:
+    """Insere PEDIDO + ITENS_PEDIDO numa transação. Retorna o nº gerado."""
+    cur = con.cursor()
+    ext_id = _external_id(order["id"])
+
+    # Já entrou numa rodada anterior? (confirmação ao Supabase pode ter falhado)
+    cur.execute("SELECT PEDIDO FROM PEDIDO WHERE IDPEDIDO_EXTERNO = ?", (ext_id,))
+    existing = cur.fetchone()
+    if existing:
+        log.info(f"  Pedido {order['id'][:8]} já estava no ERP como {existing[0]} — só confirmando")
+        return existing[0].strip()
+
+    customer = order.get("customers") or {}
+    cliente = (customer.get("erp_id") or "").strip()
+    representante = (customer.get("rep_erp_id") or "").strip()
+    if not cliente:
+        raise OrderMappingError("cliente sem código do ERP (erp_id)")
+    if not representante:
+        raise OrderMappingError(f"cliente {cliente} sem representante no ERP (rep_erp_id)")
+
+    pt = table_map.get(customer.get("price_table_id"))
+    if not pt or not pt.get("erp_code"):
+        raise OrderMappingError(f"cliente {cliente} sem tabela de preço mapeada no ERP")
+    tabela_preco = pt["erp_code"].strip()
+    coluna = int(pt.get("price_column") or 1)
+
+    items = _map_order_items(order)
+    valor_produtos = sum(t for *_, t in items)
+    total = Decimal(str(order.get("total"))) if order.get("total") else valor_produtos
+    pecas = sum(q for _, _, q, _, _ in items)
+
+    cur.execute(f"SELECT GEN_ID({ERP_ORDER_GENERATOR}, 1) FROM RDB$DATABASE")
+    seq = cur.fetchone()[0]
+    pedido_num = f"{ERP_ORDER_PREFIX}{seq}"
+    if len(pedido_num) > 10:
+        raise OrderMappingError(f"número de pedido excede 10 caracteres: {pedido_num}")
+
+    hoje = datetime.now().date()
+    obs = (order.get("notes") or "Pedido via app de representantes")[:100]
+
+    cur.execute(
+        """
+        INSERT INTO PEDIDO (
+            PEDIDO, CLIENTE, REPRESENTANTE, DATA_INCLUSAO, DATA_EMISSAO,
+            VALOR_PEDIDO, VALOR_PRODUTOS, VALOR_DESCONTO, VALOR_FRETE,
+            STATUS, SITUACAO, ATIVO, BAIXOU_ESTOQUE,
+            TABELA_PRECO, COLUNA_TABELA_PRECO, PECAS,
+            IDPEDIDO_EXTERNO, OBSERVACAO_ANOTACOES
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 0, 0, 'A', ?, 'S', 'N', ?, ?, ?, ?, ?)
+        """,
+        (pedido_num, cliente, representante, hoje, hoje,
+         total, valor_produtos, ERP_ORDER_SITUACAO,
+         tabela_preco, coluna, pecas, ext_id, obs),
+    )
+
+    for i, (produto, tamanho, qty, unit, item_total) in enumerate(items, start=1):
+        cur.execute(
+            """
+            INSERT INTO ITENS_PEDIDO (
+                PEDIDO, INCREMENTO, PRODUTO, TAMANHO, COR,
+                QUANTIDADE, QTDE_PEDIDO, PRECO_UNITARIO, PRETO_TOTAL, BAIXOU_ESTOQUE
+            ) VALUES (?, ?, ?, ?, '00001', ?, ?, ?, ?, 'N')
+            """,
+            (pedido_num, i, produto, tamanho, qty, qty, unit, item_total),
+        )
+
+    con.commit()
+    return pedido_num
+
+def push_orders(con) -> int:
+    """Envia pedidos aprovados do Supabase para o ERP. Retorna qtde enviada."""
+    orders = fetch_pending_orders()
+    if not orders:
+        log.info("Nenhum pedido aprovado aguardando envio ao ERP")
+        return 0
+
+    log.info(f"{len(orders)} pedido(s) para enviar ao ERP")
+    _ensure_generator(con)
+
+    db_tables = supabase_select("price_tables", "id,erp_code,price_column", {"company_id": COMPANY_ID})
+    table_map = {t["id"]: t for t in db_tables}
+
+    sent = 0
+    for order in orders:
+        oid = order["id"]
+        try:
+            pedido_num = _insert_order_into_erp(con, order, table_map)
+            supabase_patch_by_ids("orders", [oid], {
+                "status": "sent_erp",
+                "erp_order_id": pedido_num,
+                "synced_at": now_iso(),
+            })
+            log.info(f"  Pedido {oid[:8]} → ERP {pedido_num} OK")
+            sent += 1
+        except OrderMappingError as e:
+            con.rollback()
+            log.error(f"  Pedido {oid[:8]} com erro de cadastro (não será re-tentado): {e}")
+            supabase_patch_by_ids("orders", [oid], {"status": "error_erp", "synced_at": now_iso()})
+        except Exception as e:
+            con.rollback()
+            log.error(f"  Pedido {oid[:8]} falhou (vai re-tentar na próxima rodada): {e}")
+    return sent
+
 # ─── Sync: Estoque ────────────────────────────────────────────────────────────
 def sync_stock(cur) -> int:
     log.info("Sincronizando estoque...")
@@ -435,7 +636,7 @@ def sync_stock(cur) -> int:
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="ERP Sync — Firebird → Supabase")
-    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices", "products", "reconcile", "prices-audit"],
+    parser.add_argument("--mode", choices=["full", "stock", "customers", "prices", "products", "reconcile", "prices-audit", "test", "push-orders"],
                         default="full", help="Modo de sincronização")
     args = parser.parse_args()
 
@@ -469,6 +670,14 @@ def main():
             reconcile_active(cur)
         elif args.mode == "prices-audit":
             audit_prices(cur)
+        elif args.mode == "push-orders":
+            push_orders(con)
+        elif args.mode == "test":
+            cur.execute("SELECT COUNT(*) FROM PRODUTO WHERE ATIVO = 'S'")
+            n = cur.fetchone()[0]
+            cur.execute("SELECT COUNT(*) FROM CLIENTE WHERE ATIVO = 'S'")
+            c = cur.fetchone()[0]
+            log.info(f"CONEXAO OK — {n} produtos ativos, {c} clientes ativos no ERP")
     finally:
         cur.close()
         con.close()
