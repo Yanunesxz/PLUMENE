@@ -74,10 +74,11 @@ FB_USER        = os.environ.get("FIREBIRD_USER", "SYSDBA")
 FB_PASSWORD    = os.environ.get("FIREBIRD_PASSWORD", "masterkey")
 
 # ── Envio de pedidos (Supabase → ERP) ─────────────────────────────────────────
-# Série de numeração dos pedidos vindos do app (prefixo + generator próprio,
-# p/ não misturar com as séries manuais tipo CS/SX). Ajustável com o Fabio.
-ERP_ORDER_PREFIX    = os.environ.get("ERP_ORDER_PREFIX", "WB")
-ERP_ORDER_GENERATOR = os.environ.get("ERP_ORDER_GENERATOR", "GEN_PEDIDO_WB")
+# Numeração igual à do ERP: prefixo da série (SX = pedidos de representante)
+# + GEN_PEDIDO_UNIVERSAL, a sequência ÚNICA compartilhada por todas as séries
+# (CS/SX/ML... interleiam o mesmo contador; conferido no banco real).
+ERP_ORDER_PREFIX    = os.environ.get("ERP_ORDER_PREFIX", "SX")
+ERP_ORDER_GENERATOR = os.environ.get("ERP_ORDER_GENERATOR", "GEN_PEDIDO_UNIVERSAL")
 # Situação com que o pedido entra no ERP (LIBERADO = segue fluxo normal)
 ERP_ORDER_SITUACAO  = os.environ.get("ERP_ORDER_SITUACAO", "LIBERADO")
 # Status no Supabase que libera o envio ao ERP
