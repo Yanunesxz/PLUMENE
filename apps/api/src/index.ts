@@ -11,6 +11,7 @@ import { ordersRouter } from './modules/orders/orders.router.js';
 import { repsRouter } from './modules/reps/reps.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
 import { assistantRouter } from './modules/assistant/assistant.router.js';
+import { partnerRouter } from './modules/partner/partner.router.js';
 import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
 
 const server = Fastify({
@@ -62,6 +63,7 @@ await server.register(ordersRouter);
 await server.register(repsRouter);
 await server.register(syncRouter);
 await server.register(assistantRouter);
+await server.register(partnerRouter);
 
 const start = async (): Promise<void> => {
   try {
