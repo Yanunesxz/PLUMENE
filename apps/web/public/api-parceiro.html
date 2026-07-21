@@ -1,0 +1,1442 @@
+<meta charset="utf-8">
+<title>API de Parceiro — Integração de Pedidos</title>
+
+<style>
+  :root {
+    --bg:        #f4f7f7;
+    --surface:   #ffffff;
+    --surface-2: #eef3f3;
+    --border:    #d6e0e0;
+    --border-str:#b9c9c9;
+    --text:      #0e1a1c;
+    --muted:     #566a6d;
+    --accent:    #0a6a72;
+    --accent-sf: #e2f0f0;
+    --ok:        #2c6e49;
+    --warn:      #8a5a12;
+    --err:       #973232;
+    --code-bg:   #0b1315;
+    --code-fg:   #dfe9ea;
+    --code-mut:  #7d9295;
+    --code-str:  #8fcfa1;
+    --code-key:  #7fc4cc;
+    --code-num:  #d9b072;
+
+    --mono: "Cascadia Code", "JetBrains Mono", Consolas, "SF Mono", Menlo, ui-monospace, monospace;
+    --sans: "Segoe UI Variable Text", "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, system-ui, sans-serif;
+    --disp: "Segoe UI Variable Display", "Segoe UI Semibold", "Segoe UI", -apple-system, system-ui, sans-serif;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:        #0a1112;
+      --surface:   #111a1c;
+      --surface-2: #162124;
+      --border:    #223032;
+      --border-str:#33484c;
+      --text:      #e4edee;
+      --muted:     #93a8ab;
+      --accent:    #5ab8bf;
+      --accent-sf: #14282b;
+      --ok:        #6fbf8e;
+      --warn:      #d8a76a;
+      --err:       #e08a8a;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:        #0a1112;
+    --surface:   #111a1c;
+    --surface-2: #162124;
+    --border:    #223032;
+    --border-str:#33484c;
+    --text:      #e4edee;
+    --muted:     #93a8ab;
+    --accent:    #5ab8bf;
+    --accent-sf: #14282b;
+    --ok:        #6fbf8e;
+    --warn:      #d8a76a;
+    --err:       #e08a8a;
+  }
+  :root[data-theme="light"] {
+    --bg:        #f4f7f7;
+    --surface:   #ffffff;
+    --surface-2: #eef3f3;
+    --border:    #d6e0e0;
+    --border-str:#b9c9c9;
+    --text:      #0e1a1c;
+    --muted:     #566a6d;
+    --accent:    #0a6a72;
+    --accent-sf: #e2f0f0;
+    --ok:        #2c6e49;
+    --warn:      #8a5a12;
+    --err:       #973232;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  ::selection { background: var(--accent); color: var(--bg); }
+
+  a { color: var(--accent); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
+
+  /* ── Shell ─────────────────────────────────────────── */
+  .masthead {
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+  .masthead-in {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 40px 28px 34px;
+  }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0 0 14px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  .eyebrow .sep { color: var(--border-str); }
+
+  h1 {
+    font-family: var(--disp);
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.08;
+    letter-spacing: -0.025em;
+    font-weight: 650;
+    margin: 0 0 16px;
+    text-wrap: balance;
+  }
+  .lede {
+    max-width: 62ch;
+    font-size: 17.5px;
+    color: var(--muted);
+    margin: 0;
+  }
+
+  .baseurl {
+    margin-top: 28px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    max-width: 100%;
+  }
+  .baseurl .k {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    background: var(--surface-2);
+    padding: 9px 12px;
+    border-right: 1px solid var(--border);
+    white-space: nowrap;
+  }
+  .baseurl .v {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    padding: 9px 14px;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .wrap {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 0 28px 96px;
+    display: grid;
+    grid-template-columns: 216px minmax(0, 1fr);
+    gap: 56px;
+    align-items: start;
+  }
+
+  /* ── Sidebar ───────────────────────────────────────── */
+  .toc {
+    position: sticky;
+    top: 24px;
+    padding-top: 44px;
+    font-size: 14px;
+  }
+  .toc-title {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 14px;
+  }
+  .toc ol {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    border-left: 1px solid var(--border);
+  }
+  .toc a {
+    display: block;
+    padding: 5px 0 5px 14px;
+    margin-left: -1px;
+    border-left: 2px solid transparent;
+    color: var(--muted);
+    text-decoration: none;
+    line-height: 1.4;
+  }
+  .toc a:hover { color: var(--text); border-left-color: var(--border-str); }
+  .toc a.on { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+
+  /* ── Content ───────────────────────────────────────── */
+  main { padding-top: 44px; min-width: 0; }
+
+  section { scroll-margin-top: 20px; }
+  section + section { margin-top: 60px; }
+
+  h2 {
+    font-family: var(--disp);
+    font-size: 25px;
+    letter-spacing: -0.018em;
+    font-weight: 640;
+    margin: 0 0 6px;
+    text-wrap: balance;
+  }
+  h2 .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    color: var(--accent);
+    margin-right: 10px;
+    vertical-align: 3px;
+  }
+  h3 {
+    font-family: var(--disp);
+    font-size: 17px;
+    font-weight: 640;
+    letter-spacing: -0.008em;
+    margin: 34px 0 8px;
+  }
+  .sub {
+    color: var(--muted);
+    margin: 0 0 24px;
+    max-width: 68ch;
+  }
+  p { max-width: 68ch; }
+  main p { margin: 0 0 14px; }
+
+  code:not(pre code) {
+    font-family: var(--mono);
+    font-size: 0.875em;
+    background: var(--accent-sf);
+    color: var(--accent);
+    padding: 1px 5px;
+    border-radius: 3px;
+    word-break: break-word;
+  }
+
+  /* ── Steps ─────────────────────────────────────────── */
+  .steps {
+    list-style: none;
+    counter-reset: s;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 1px;
+    background: var(--border);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .steps li {
+    counter-increment: s;
+    background: var(--surface);
+    padding: 20px 22px 20px 62px;
+    position: relative;
+  }
+  .steps li::before {
+    content: counter(s);
+    position: absolute;
+    left: 22px;
+    top: 20px;
+    font-family: var(--mono);
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-sf);
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+  }
+  .steps b {
+    display: block;
+    font-family: var(--disp);
+    font-weight: 640;
+    font-size: 15.5px;
+    margin-bottom: 3px;
+  }
+  .steps span { color: var(--muted); font-size: 14.5px; }
+  .steps code { font-size: 13px; }
+
+  /* ── Cards / callouts ──────────────────────────────── */
+  .note {
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    border-radius: 0 7px 7px 0;
+    padding: 16px 20px;
+    margin: 24px 0;
+  }
+  .note p { margin: 0; }
+  .note p + p { margin-top: 10px; }
+  .note-t {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.13em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 6px;
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .note.warn .note-t { color: var(--warn); }
+
+  .grid2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 14px;
+    margin: 22px 0;
+  }
+  .card {
+    border: 1px solid var(--border);
+    background: var(--surface);
+    border-radius: 8px;
+    padding: 18px 20px;
+  }
+  .card b {
+    font-family: var(--disp);
+    display: block;
+    font-size: 15px;
+    font-weight: 640;
+    margin-bottom: 5px;
+  }
+  .card span { color: var(--muted); font-size: 14.5px; }
+
+  /* ── Endpoint blocks ───────────────────────────────── */
+  .ep {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--surface);
+    overflow: hidden;
+    margin: 22px 0 0;
+  }
+  .ep-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-2);
+    flex-wrap: wrap;
+  }
+  .verb {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 4px 9px;
+    border-radius: 4px;
+    color: var(--bg);
+    background: var(--accent);
+  }
+  .verb.post { background: var(--warn); }
+  .path {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+  .ep-body { padding: 18px 20px 4px; }
+  .ep-body > p:first-child { margin-top: 0; }
+
+  /* ── Tables ────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 18px 0 24px; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14.5px;
+    font-variant-numeric: tabular-nums;
+    min-width: 480px;
+  }
+  th {
+    text-align: left;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 0 14px 8px 0;
+    border-bottom: 1px solid var(--border-str);
+    white-space: nowrap;
+  }
+  td {
+    padding: 10px 14px 10px 0;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+  td:first-child { white-space: nowrap; }
+  tbody tr:last-child td { border-bottom: none; }
+  td code { white-space: nowrap; }
+  .t-mut { color: var(--muted); }
+  .st { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+  .st.ok  { color: var(--ok); }
+  .st.wr  { color: var(--warn); }
+  .st.er  { color: var(--err); }
+
+  /* ── Code ──────────────────────────────────────────── */
+  .code {
+    position: relative;
+    background: var(--code-bg);
+    border-radius: 8px;
+    margin: 16px 0 24px;
+    border: 1px solid var(--code-bg);
+  }
+  .code-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 10px 8px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+  }
+  .code-lbl {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--code-mut);
+  }
+  .copy {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    color: var(--code-mut);
+    background: transparent;
+    border: 1px solid rgba(255,255,255,0.13);
+    border-radius: 4px;
+    padding: 4px 9px;
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .copy:hover { color: var(--code-fg); border-color: rgba(255,255,255,0.3); }
+  .copy.done { color: var(--code-str); border-color: var(--code-str); }
+
+  pre {
+    margin: 0;
+    padding: 16px;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--code-fg);
+    tab-size: 2;
+  }
+  pre .c { color: var(--code-mut); font-style: italic; }
+  pre .s { color: var(--code-str); }
+  pre .k { color: var(--code-key); }
+  pre .n { color: var(--code-num); }
+
+  /* ── Language tabs ─────────────────────────────────── */
+  .langs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin: 20px 0 0;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--border);
+  }
+  .lang {
+    font-family: var(--mono);
+    font-size: 12.5px;
+    padding: 6px 13px;
+    border-radius: 5px;
+    border: 1px solid var(--border);
+    background: var(--surface);
+    color: var(--muted);
+    cursor: pointer;
+    transition: color 0.15s, border-color 0.15s, background 0.15s;
+  }
+  .lang:hover { color: var(--text); border-color: var(--border-str); }
+  .lang[aria-selected="true"] {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 600;
+  }
+  .panel[hidden] { display: none; }
+
+  /* ── Checklist ─────────────────────────────────────── */
+  .check {
+    list-style: none;
+    margin: 20px 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 68ch;
+  }
+  .check li {
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 10px;
+  }
+  .check li::before {
+    content: "";
+    flex: none;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--border-str);
+    border-radius: 3px;
+    transform: translateY(2px);
+  }
+
+  footer {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: 28px;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  footer .mono { font-family: var(--mono); font-size: 12px; }
+
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: 1fr; gap: 0; padding-bottom: 64px; }
+    .toc { display: none; }
+    .masthead-in { padding: 32px 22px 28px; }
+    .wrap { padding-left: 22px; padding-right: 22px; }
+    footer { padding: 22px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<header class="masthead">
+  <div class="masthead-in">
+    <p class="eyebrow">
+      <span>API de Parceiro</span>
+      <span class="sep">/</span>
+      <span>versão 1</span>
+      <span class="sep">/</span>
+      <span>atualizado 15 jul 2026</span>
+    </p>
+    <h1>Integração de pedidos<br>para o seu ERP</h1>
+    <p class="lede">
+      Os representantes fecham os pedidos no aplicativo. O seu sistema busca esses
+      pedidos por esta API e grava no seu banco, do seu jeito. Nada é escrito no
+      seu ERP por fora — você continua no controle do que entra.
+    </p>
+    <div class="baseurl">
+      <span class="k">URL base</span>
+      <span class="v">https://setorxweb-production.up.railway.app</span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="toc" aria-label="Índice">
+    <p class="toc-title">Nesta página</p>
+    <ol>
+      <li><a href="#fluxo">Como funciona</a></li>
+      <li><a href="#requisitos">O que você precisa</a></li>
+      <li><a href="#auth">Autenticação</a></li>
+      <li><a href="#endpoints">Endpoints</a></li>
+      <li><a href="#campos">Dicionário de campos</a></li>
+      <li><a href="#cores">Tamanhos e cores</a></li>
+      <li><a href="#codigo">Exemplos de código</a></li>
+      <li><a href="#erros">Erros e reenvio</a></li>
+      <li><a href="#implantacao">Implantação</a></li>
+      <li><a href="#suporte">Suporte</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="fluxo">
+      <h2><span class="num">01</span>Como funciona</h2>
+      <p class="sub">
+        Três chamadas, sempre na mesma ordem. O seu programa roda de tempos em
+        tempos — a cada 1 a 5 minutos é o suficiente.
+      </p>
+
+      <ol class="steps">
+        <li>
+          <b>Buscar a fila</b>
+          <span><code>GET /partner/v1/pedidos</code> devolve os pedidos aprovados que
+          ainda não foram importados, já com os códigos do seu ERP.</span>
+        </li>
+        <li>
+          <b>Gravar no seu sistema</b>
+          <span>O seu programa insere o pedido no seu banco, com as suas regras e os
+          seus campos obrigatórios, e gera o número interno (ex.: <code>SX16680</code>).</span>
+        </li>
+        <li>
+          <b>Confirmar a importação</b>
+          <span><code>POST /partner/v1/pedidos/{id}/confirmar</code> informando o número
+          gerado. O pedido sai da fila e nunca mais aparece.</span>
+        </li>
+      </ol>
+
+      <div class="note">
+        <span class="note-t">Por que a fila não duplica</span>
+        <p>
+          Um pedido só sai da fila depois que você confirma. Se a sua rotina falhar,
+          cair a internet ou o programa reiniciar no meio, o pedido continua lá para
+          a próxima tentativa — e confirmar duas vezes com o mesmo número é seguro.
+        </p>
+      </div>
+    </section>
+
+    <section id="requisitos">
+      <h2><span class="num">02</span>O que você precisa</h2>
+      <p class="sub">
+        Nenhuma biblioteca nossa, nenhum instalador, nenhum componente rodando no seu
+        servidor. Se a sua linguagem faz uma chamada HTTP e lê JSON, ela conversa com
+        esta API.
+      </p>
+
+      <div class="grid2">
+        <div class="card">
+          <b>Qualquer linguagem</b>
+          <span>Delphi, C#, Java, Python, PHP, Node, VB, Progress, ABAP — todas têm
+          cliente HTTP. É a mesma tecnologia de um navegador abrindo um site.</span>
+        </div>
+        <div class="card">
+          <b>Qualquer banco</b>
+          <span>Firebird, SQL Server, Oracle, Postgres, MySQL. A API entrega dados;
+          quem escreve no banco é o seu programa.</span>
+        </div>
+        <div class="card">
+          <b>Só saída de internet</b>
+          <span>As chamadas partem do seu servidor para fora, como um navegador.
+          Não precisa abrir porta, liberar entrada nem configurar roteador.</span>
+        </div>
+        <div class="card">
+          <b>Onde rodar</b>
+          <span>Serviço Windows, tarefa agendada, cron, job do próprio ERP ou um
+          botão na tela. Você escolhe a frequência.</span>
+        </div>
+      </div>
+
+      <p>
+        Todo o tráfego é HTTPS, o corpo das respostas é JSON em UTF-8 e as datas
+        seguem o padrão ISO 8601 (<code>2026-07-15T14:30:00Z</code>).
+      </p>
+    </section>
+
+    <section id="auth">
+      <h2><span class="num">03</span>Autenticação</h2>
+      <p class="sub">
+        Toda chamada leva a sua chave no cabeçalho <code>X-API-Key</code>. A chave
+        identifica a sua empresa — você só enxerga os pedidos que são seus.
+      </p>
+
+      <div class="code">
+        <div class="code-bar">
+          <span class="code-lbl">Cabeçalho obrigatório</span>
+          <button class="copy" type="button">copiar</button>
+        </div>
+        <pre><code>X-API-Key: SUA_CHAVE_AQUI</code></pre>
+      </div>
+
+      <p>
+        Confirme que está tudo certo antes de escrever qualquer código, com uma
+        chamada ao endpoint de status:
+      </p>
+
+      <div class="code">
+        <div class="code-bar">
+          <span class="code-lbl">Teste de conexão</span>
+          <button class="copy" type="button">copiar</button>
+        </div>
+        <pre><code><span class="c"># resposta esperada: {"ok":true,"parceiro":"...","servidor_hora":"..."}</span>
+curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
+  https://setorxweb-production.up.railway.app/partner/v1/status</code></pre>
+      </div>
+
+      <div class="note warn">
+        <span class="note-t">Guarde a chave com cuidado</span>
+        <p>
+          A chave dá acesso aos pedidos da sua empresa. Mantenha em arquivo de
+          configuração ou variável de ambiente — nunca no código-fonte enviado a
+          terceiros. Se vazar, avise que geramos outra na hora.
+        </p>
+      </div>
+    </section>
+
+    <section id="endpoints">
+      <h2><span class="num">04</span>Endpoints</h2>
+      <p class="sub">São três. Um para testar, um para buscar, um para confirmar.</p>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/status</span>
+        </div>
+        <div class="ep-body">
+          <p>Verifica a conexão e a validade da chave. Use no diagnóstico.</p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"ok"</span>: <span class="n">true</span>,
+  <span class="k">"parceiro"</span>: <span class="s">"corposensual"</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-07-15T20:13:15.006Z"</span>
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/pedidos</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            A fila de pedidos aprovados aguardando importação, do mais antigo para o
+            mais novo.
+          </p>
+
+          <h3>Parâmetros (opcionais)</h3>
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Parâmetro</th><th>Exemplo</th><th>O que faz</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>desde</code></td>
+                  <td class="t-mut"><code>2026-07-15T00:00:00Z</code></td>
+                  <td>Só pedidos alterados a partir dessa data e hora. Serve como
+                      marcador do "até onde eu já puxei".</td>
+                </tr>
+                <tr>
+                  <td><code>incluir=todos</code></td>
+                  <td class="t-mut">—</td>
+                  <td>Inclui também os já confirmados. Sem ele, vem apenas a fila
+                      pendente. Útil para conferência e reprocessamento.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"total"</span>: <span class="n">1</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-07-15T20:28:57.163Z"</span>,
+  <span class="k">"pedidos"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"d31b5083-5cd4-400c-863d-f969904c287f"</span>,
+      <span class="k">"numero"</span>: <span class="n">14535</span>,
+      <span class="k">"situacao"</span>: <span class="s">"approved"</span>,
+      <span class="k">"criado_em"</span>: <span class="s">"2026-07-15T20:13:48.015Z"</span>,
+      <span class="k">"atualizado_em"</span>: <span class="s">"2026-07-15T20:14:07.049Z"</span>,
+      <span class="k">"valor_total"</span>: <span class="n">238.70</span>,
+      <span class="k">"observacoes"</span>: <span class="s">"Entregar na loja do centro"</span>,
+      <span class="k">"pedido_erp"</span>: <span class="n">null</span>,
+      <span class="k">"cliente"</span>: {
+        <span class="k">"codigo_erp"</span>: <span class="s">"05836"</span>,
+        <span class="k">"cnpj"</span>: <span class="s">"023.209.286-93"</span>,
+        <span class="k">"razao_social"</span>: <span class="s">"VERONICA ANGELICA DIAS FIGUEIREDO"</span>,
+        <span class="k">"nome_fantasia"</span>: <span class="n">null</span>
+      },
+      <span class="k">"representante_erp"</span>: <span class="s">"04518"</span>,
+      <span class="k">"tabela_preco"</span>: { <span class="k">"codigo_erp"</span>: <span class="s">"00016"</span>, <span class="k">"coluna"</span>: <span class="n">1</span> },
+      <span class="k">"itens"</span>: [
+        { <span class="k">"produto"</span>: <span class="s">"0015"</span>, <span class="k">"tamanho"</span>: <span class="s">"EG"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
+          <span class="k">"quantidade"</span>: <span class="n">3</span>, <span class="k">"preco_unitario"</span>: <span class="n">42.90</span>, <span class="k">"valor_total"</span>: <span class="n">128.70</span> },
+        { <span class="k">"produto"</span>: <span class="s">"0015"</span>, <span class="k">"tamanho"</span>: <span class="s">"G"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
+          <span class="k">"quantidade"</span>: <span class="n">2</span>, <span class="k">"preco_unitario"</span>: <span class="n">55.00</span>, <span class="k">"valor_total"</span>: <span class="n">110.00</span> }
+      ],
+      <span class="k">"importavel"</span>: <span class="n">true</span>,
+      <span class="k">"pendencias"</span>: []
+    }
+  ]
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/pedidos/{id}/confirmar</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Avisa que o pedido entrou no seu ERP e informa o número gerado. A partir
+            daí ele sai da fila.
+          </p>
+
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"pedido_erp"</span>: <span class="s">"SX16680"</span> }</code></pre>
+          </div>
+
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Resposta</th><th>Significado</th><th>O que fazer</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="st ok">200</span> <code>ja_confirmado: false</code></td>
+                  <td>Confirmado agora, saiu da fila.</td>
+                  <td class="t-mut">Seguir para o próximo.</td>
+                </tr>
+                <tr>
+                  <td><span class="st ok">200</span> <code>ja_confirmado: true</code></td>
+                  <td>Já estava confirmado com esse mesmo número.</td>
+                  <td class="t-mut">Nada — repetição é segura.</td>
+                </tr>
+                <tr>
+                  <td><span class="st er">404</span></td>
+                  <td>Pedido não encontrado.</td>
+                  <td class="t-mut">Registrar e avisar o suporte.</td>
+                </tr>
+                <tr>
+                  <td><span class="st wr">409</span></td>
+                  <td>Já confirmado com <em>outro</em> número. A resposta traz o
+                      <code>pedido_erp_atual</code>.</td>
+                  <td class="t-mut">Investigar: sinal de importação duplicada
+                      do seu lado.</td>
+                </tr>
+                <tr>
+                  <td><span class="st er">400</span></td>
+                  <td>Faltou o campo <code>pedido_erp</code>.</td>
+                  <td class="t-mut">Corrigir a chamada.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="campos">
+      <h2><span class="num">05</span>Dicionário de campos</h2>
+      <p class="sub">
+        Os campos marcados como código do ERP já vêm no formato do seu sistema —
+        são os mesmos valores que você usa nas suas tabelas.
+      </p>
+
+      <h3>Pedido</h3>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>id</code></td><td class="t-mut">texto</td><td>Identificador único do pedido no aplicativo. É o que você usa na confirmação.</td></tr>
+            <tr><td><code>numero</code></td><td class="t-mut">inteiro</td><td>Número legível do pedido no aplicativo, para conferência humana.</td></tr>
+            <tr><td><code>situacao</code></td><td class="t-mut">texto</td><td><code>approved</code> aguardando importação · <code>sent_erp</code> já confirmado.</td></tr>
+            <tr><td><code>criado_em</code></td><td class="t-mut">data</td><td>Quando o representante fechou o pedido.</td></tr>
+            <tr><td><code>atualizado_em</code></td><td class="t-mut">data</td><td>Última alteração. É o campo usado pelo filtro <code>desde</code>.</td></tr>
+            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do pedido.</td></tr>
+            <tr><td><code>observacoes</code></td><td class="t-mut">texto</td><td>Anotações do representante. Pode vir vazio.</td></tr>
+            <tr><td><code>cliente.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código do cliente no seu ERP.</b></td></tr>
+            <tr><td><code>cliente.cnpj</code></td><td class="t-mut">texto</td><td>CNPJ ou CPF, para dupla conferência.</td></tr>
+            <tr><td><code>representante_erp</code></td><td class="t-mut">texto</td><td><b>Código do representante no seu ERP.</b></td></tr>
+            <tr><td><code>tabela_preco.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código da tabela de preço no seu ERP.</b></td></tr>
+            <tr><td><code>tabela_preco.coluna</code></td><td class="t-mut">inteiro</td><td>Coluna de preço usada, de 1 a 6.</td></tr>
+            <tr><td><code>importavel</code></td><td class="t-mut">booleano</td><td><code>true</code> quando todos os vínculos com o ERP estão presentes.</td></tr>
+            <tr><td><code>pendencias</code></td><td class="t-mut">lista</td><td>O que falta quando <code>importavel</code> é <code>false</code>.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Item do pedido</h3>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Campo</th><th>Tipo</th><th>Descrição</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>produto</code></td><td class="t-mut">texto</td><td><b>Referência do produto no seu ERP.</b></td></tr>
+            <tr><td><code>tamanho</code></td><td class="t-mut">texto</td><td>P, M, G, GG, EG ou numeração (10, 12, 14…).</td></tr>
+            <tr><td><code>cor</code></td><td class="t-mut">texto</td><td>Código da cor no seu ERP.</td></tr>
+            <tr><td><code>quantidade</code></td><td class="t-mut">inteiro</td><td>Quantidade de peças.</td></tr>
+            <tr><td><code>preco_unitario</code></td><td class="t-mut">número</td><td>Preço unitário praticado no pedido.</td></tr>
+            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do item.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note-t">Pedidos com cadastro incompleto</span>
+        <p>
+          Quando falta um vínculo — cliente sem código, representante não informado,
+          produto sem referência — o pedido vem com <code>importavel: false</code> e a
+          lista <code>pendencias</code> explicando o motivo. A recomendação é importar
+          só os <code>true</code> e listar os demais num relatório, para o cadastro ser
+          corrigido na origem.
+        </p>
+      </div>
+    </section>
+
+    <section id="cores">
+      <h2><span class="num">06</span>Tamanhos e cores</h2>
+      <p class="sub">
+        Cada item traz sempre <code>produto</code>, <code>tamanho</code> e
+        <code>cor</code> — a granularidade é a mesma da linha do seu pedido.
+      </p>
+      <p>
+        Na operação de cores sortidas, em que o representante pede por tamanho e a
+        cor é definida na produção, o campo <code>cor</code> vem com o código padrão
+        de sortido (<code>"00001"</code> na Corpo Sensual) e o pedido é uma linha por
+        tamanho.
+      </p>
+      <p>
+        Quando houver venda por cor específica — a referência 0800 em preto, branco e
+        rosa, por exemplo — cada combinação vira uma linha e o campo <code>cor</code>
+        traz o código real de cada uma. <b>O formato da resposta não muda:</b> se o seu
+        programa já lê o campo <code>cor</code> desde o começo, ele funciona nos dois
+        cenários sem alteração.
+      </p>
+    </section>
+
+    <section id="codigo">
+      <h2><span class="num">07</span>Exemplos de código</h2>
+      <p class="sub">
+        O ciclo completo — buscar, gravar e confirmar — na sua linguagem. Substitua a
+        função de gravação pelo seu procedimento de inserção de pedidos.
+      </p>
+
+      <div class="langs" role="tablist" aria-label="Linguagem">
+        <button class="lang" role="tab" aria-selected="true"  data-l="curl">cURL</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="delphi">Delphi</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="csharp">C#</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="python">Python</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="php">PHP</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="java">Java</button>
+        <button class="lang" role="tab" aria-selected="false" data-l="node">Node.js</button>
+      </div>
+
+      <div class="panel" data-p="curl" role="tabpanel">
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">cURL — linha de comando</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="c"># 1. buscar a fila</span>
+curl -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  <span class="s">"https://setorxweb-production.up.railway.app/partner/v1/pedidos"</span>
+
+<span class="c"># 1b. só o que mudou desde uma data</span>
+curl -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  <span class="s">"https://setorxweb-production.up.railway.app/partner/v1/pedidos?desde=2026-07-15T00:00:00Z"</span>
+
+<span class="c"># 3. confirmar depois de gravar no ERP</span>
+curl -X POST \
+  -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"pedido_erp":"SX16680"}'</span> \
+  <span class="s">"https://setorxweb-production.up.railway.app/partner/v1/pedidos/ID_DO_PEDIDO/confirmar"</span></code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="delphi" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">Delphi — System.Net.HttpClient</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="k">uses</span>
+  System.Net.HttpClient, System.Net.URLClient, System.JSON,
+  System.SysUtils, System.Classes;
+
+<span class="k">const</span>
+  BASE_URL = <span class="s">'https://setorxweb-production.up.railway.app'</span>;
+  API_KEY  = <span class="s">'SUA_CHAVE'</span>;
+
+<span class="c">// 1. busca a fila de pedidos</span>
+<span class="k">function</span> BuscarPedidos: TJSONArray;
+<span class="k">var</span>
+  Http: THTTPClient;
+  Resp: IHTTPResponse;
+  Raiz: TJSONObject;
+<span class="k">begin</span>
+  Http := THTTPClient.Create;
+  <span class="k">try</span>
+    Http.CustomHeaders[<span class="s">'X-API-Key'</span>] := API_KEY;
+    Resp := Http.Get(BASE_URL + <span class="s">'/partner/v1/pedidos'</span>);
+
+    <span class="k">if</span> Resp.StatusCode &lt;&gt; <span class="n">200</span> <span class="k">then</span>
+      <span class="k">raise</span> Exception.CreateFmt(<span class="s">'Erro %d: %s'</span>,
+        [Resp.StatusCode, Resp.ContentAsString]);
+
+    Raiz := TJSONObject.ParseJSONValue(
+      Resp.ContentAsString(TEncoding.UTF8)) <span class="k">as</span> TJSONObject;
+    Result := Raiz.GetValue(<span class="s">'pedidos'</span>) <span class="k">as</span> TJSONArray;
+  <span class="k">finally</span>
+    Http.Free;
+  <span class="k">end</span>;
+<span class="k">end</span>;
+
+<span class="c">// 3. confirma a importacao informando o numero gerado no ERP</span>
+<span class="k">procedure</span> ConfirmarPedido(<span class="k">const</span> Id, PedidoErp: <span class="k">string</span>);
+<span class="k">var</span>
+  Http: THTTPClient;
+  Corpo: TStringStream;
+  Resp: IHTTPResponse;
+<span class="k">begin</span>
+  Http  := THTTPClient.Create;
+  Corpo := TStringStream.Create(
+    <span class="s">'{"pedido_erp":"'</span> + PedidoErp + <span class="s">'"}'</span>, TEncoding.UTF8);
+  <span class="k">try</span>
+    Http.CustomHeaders[<span class="s">'X-API-Key'</span>] := API_KEY;
+    Resp := Http.Post(
+      BASE_URL + <span class="s">'/partner/v1/pedidos/'</span> + Id + <span class="s">'/confirmar'</span>,
+      Corpo, <span class="k">nil</span>,
+      [TNameValuePair.Create(<span class="s">'Content-Type'</span>, <span class="s">'application/json'</span>)]);
+
+    <span class="k">if</span> Resp.StatusCode &lt;&gt; <span class="n">200</span> <span class="k">then</span>
+      <span class="k">raise</span> Exception.CreateFmt(<span class="s">'Falha ao confirmar: %d'</span>,
+        [Resp.StatusCode]);
+  <span class="k">finally</span>
+    Corpo.Free;
+    Http.Free;
+  <span class="k">end</span>;
+<span class="k">end</span>;
+
+<span class="c">// ciclo completo</span>
+<span class="k">procedure</span> ImportarPedidos;
+<span class="k">var</span>
+  Pedidos: TJSONArray;
+  Pedido: TJSONObject;
+  I: Integer;
+  NumeroErp: <span class="k">string</span>;
+<span class="k">begin</span>
+  Pedidos := BuscarPedidos;
+  <span class="k">for</span> I := <span class="n">0</span> <span class="k">to</span> Pedidos.Count - <span class="n">1</span> <span class="k">do</span>
+  <span class="k">begin</span>
+    Pedido := Pedidos.Items[I] <span class="k">as</span> TJSONObject;
+
+    <span class="k">if</span> <span class="k">not</span> (Pedido.GetValue(<span class="s">'importavel'</span>) <span class="k">as</span> TJSONBool).AsBoolean <span class="k">then</span>
+      Continue; <span class="c">// cadastro incompleto — reportar</span>
+
+    <span class="c">// 2. o SEU procedimento de gravacao, com as SUAS regras</span>
+    NumeroErp := GravarPedidoNoErp(Pedido);
+
+    ConfirmarPedido(Pedido.GetValue(<span class="s">'id'</span>).Value, NumeroErp);
+  <span class="k">end</span>;
+<span class="k">end</span>;</code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="csharp" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">C# — HttpClient</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="k">using</span> System.Net.Http;
+<span class="k">using</span> System.Net.Http.Json;
+<span class="k">using</span> System.Text.Json;
+
+<span class="k">const string</span> BaseUrl = <span class="s">"https://setorxweb-production.up.railway.app"</span>;
+<span class="k">const string</span> ApiKey  = <span class="s">"SUA_CHAVE"</span>;
+
+<span class="k">var</span> http = <span class="k">new</span> HttpClient { BaseAddress = <span class="k">new</span> Uri(BaseUrl) };
+http.DefaultRequestHeaders.Add(<span class="s">"X-API-Key"</span>, ApiKey);
+
+<span class="c">// 1. buscar a fila</span>
+<span class="k">var</span> fila = <span class="k">await</span> http.GetFromJsonAsync&lt;JsonElement&gt;(<span class="s">"/partner/v1/pedidos"</span>);
+
+<span class="k">foreach</span> (<span class="k">var</span> pedido <span class="k">in</span> fila.GetProperty(<span class="s">"pedidos"</span>).EnumerateArray())
+{
+    <span class="k">if</span> (!pedido.GetProperty(<span class="s">"importavel"</span>).GetBoolean())
+        <span class="k">continue</span>; <span class="c">// cadastro incompleto — reportar</span>
+
+    <span class="k">var</span> id = pedido.GetProperty(<span class="s">"id"</span>).GetString();
+
+    <span class="c">// 2. o SEU metodo de gravacao, com as SUAS regras</span>
+    <span class="k">string</span> numeroErp = GravarPedidoNoErp(pedido);
+
+    <span class="c">// 3. confirmar</span>
+    <span class="k">var</span> resp = <span class="k">await</span> http.PostAsJsonAsync(
+        $<span class="s">"/partner/v1/pedidos/{id}/confirmar"</span>,
+        <span class="k">new</span> { pedido_erp = numeroErp });
+
+    resp.EnsureSuccessStatusCode();
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="python" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">Python — requests</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="k">import</span> requests
+
+BASE = <span class="s">"https://setorxweb-production.up.railway.app"</span>
+HEAD = {<span class="s">"X-API-Key"</span>: <span class="s">"SUA_CHAVE"</span>}
+
+<span class="c"># 1. buscar a fila</span>
+r = requests.get(f<span class="s">"{BASE}/partner/v1/pedidos"</span>, headers=HEAD, timeout=<span class="n">30</span>)
+r.raise_for_status()
+
+<span class="k">for</span> pedido <span class="k">in</span> r.json()[<span class="s">"pedidos"</span>]:
+    <span class="k">if</span> <span class="k">not</span> pedido[<span class="s">"importavel"</span>]:
+        <span class="k">continue</span>  <span class="c"># cadastro incompleto — reportar</span>
+
+    <span class="c"># 2. a SUA funcao de gravacao, com as SUAS regras</span>
+    numero_erp = gravar_pedido_no_erp(pedido)
+
+    <span class="c"># 3. confirmar</span>
+    c = requests.post(
+        f<span class="s">"{BASE}/partner/v1/pedidos/{pedido['id']}/confirmar"</span>,
+        headers=HEAD,
+        json={<span class="s">"pedido_erp"</span>: numero_erp},
+        timeout=<span class="n">30</span>,
+    )
+    c.raise_for_status()</code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="php" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">PHP — cURL</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code>&lt;?php
+$base = <span class="s">'https://setorxweb-production.up.railway.app'</span>;
+$head = [<span class="s">'X-API-Key: SUA_CHAVE'</span>, <span class="s">'Content-Type: application/json'</span>];
+
+<span class="k">function</span> chamar(<span class="k">string</span> $url, <span class="k">array</span> $head, ?<span class="k">array</span> $body = <span class="k">null</span>): <span class="k">array</span> {
+    $ch = curl_init($url);
+    curl_setopt_array($ch, [
+        CURLOPT_RETURNTRANSFER =&gt; <span class="k">true</span>,
+        CURLOPT_HTTPHEADER     =&gt; $head,
+        CURLOPT_TIMEOUT        =&gt; <span class="n">30</span>,
+    ]);
+    <span class="k">if</span> ($body !== <span class="k">null</span>) {
+        curl_setopt($ch, CURLOPT_POST, <span class="k">true</span>);
+        curl_setopt($ch, CURLOPT_POSTFIELDS, json_encode($body));
+    }
+    $resp = curl_exec($ch);
+    $code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+    curl_close($ch);
+
+    <span class="k">if</span> ($code !== <span class="n">200</span>) {
+        <span class="k">throw new</span> RuntimeException(<span class="s">"HTTP $code: $resp"</span>);
+    }
+    <span class="k">return</span> json_decode($resp, <span class="k">true</span>);
+}
+
+<span class="c">// 1. buscar a fila</span>
+$fila = chamar(<span class="s">"$base/partner/v1/pedidos"</span>, $head);
+
+<span class="k">foreach</span> ($fila[<span class="s">'pedidos'</span>] <span class="k">as</span> $pedido) {
+    <span class="k">if</span> (!$pedido[<span class="s">'importavel'</span>]) <span class="k">continue</span>;
+
+    <span class="c">// 2. a SUA funcao de gravacao</span>
+    $numeroErp = gravarPedidoNoErp($pedido);
+
+    <span class="c">// 3. confirmar</span>
+    chamar(<span class="s">"$base/partner/v1/pedidos/{$pedido['id']}/confirmar"</span>, $head,
+           [<span class="s">'pedido_erp'</span> =&gt; $numeroErp]);
+}</code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="java" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">Java 11+ — java.net.http</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="k">import</span> java.net.URI;
+<span class="k">import</span> java.net.http.HttpClient;
+<span class="k">import</span> java.net.http.HttpRequest;
+<span class="k">import</span> java.net.http.HttpResponse;
+
+<span class="k">static final</span> String BASE = <span class="s">"https://setorxweb-production.up.railway.app"</span>;
+<span class="k">static final</span> String KEY  = <span class="s">"SUA_CHAVE"</span>;
+
+HttpClient http = HttpClient.newHttpClient();
+
+<span class="c">// 1. buscar a fila</span>
+HttpRequest busca = HttpRequest.newBuilder()
+    .uri(URI.create(BASE + <span class="s">"/partner/v1/pedidos"</span>))
+    .header(<span class="s">"X-API-Key"</span>, KEY)
+    .GET()
+    .build();
+
+HttpResponse&lt;String&gt; resp =
+    http.send(busca, HttpResponse.BodyHandlers.ofString());
+
+<span class="k">if</span> (resp.statusCode() != <span class="n">200</span>) {
+    <span class="k">throw new</span> RuntimeException(<span class="s">"Erro "</span> + resp.statusCode());
+}
+
+<span class="c">// leia resp.body() com Jackson ou Gson e percorra "pedidos"</span>
+<span class="c">// 2. grave cada pedido no seu ERP e obtenha o numero gerado</span>
+
+<span class="c">// 3. confirmar</span>
+HttpRequest confirma = HttpRequest.newBuilder()
+    .uri(URI.create(BASE + <span class="s">"/partner/v1/pedidos/"</span> + id + <span class="s">"/confirmar"</span>))
+    .header(<span class="s">"X-API-Key"</span>, KEY)
+    .header(<span class="s">"Content-Type"</span>, <span class="s">"application/json"</span>)
+    .POST(HttpRequest.BodyPublishers.ofString(
+        <span class="s">"{\"pedido_erp\":\""</span> + numeroErp + <span class="s">"\"}"</span>))
+    .build();
+
+http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
+        </div>
+      </div>
+
+      <div class="panel" data-p="node" role="tabpanel" hidden>
+        <div class="code">
+          <div class="code-bar">
+            <span class="code-lbl">Node.js — fetch</span>
+            <button class="copy" type="button">copiar</button>
+          </div>
+          <pre><code><span class="k">const</span> BASE = <span class="s">"https://setorxweb-production.up.railway.app"</span>;
+<span class="k">const</span> HEAD = {
+  <span class="s">"X-API-Key"</span>: <span class="s">"SUA_CHAVE"</span>,
+  <span class="s">"Content-Type"</span>: <span class="s">"application/json"</span>,
+};
+
+<span class="c">// 1. buscar a fila</span>
+<span class="k">const</span> r = <span class="k">await</span> fetch(`${BASE}/partner/v1/pedidos`, { headers: HEAD });
+<span class="k">if</span> (!r.ok) <span class="k">throw new</span> Error(`Erro ${r.status}`);
+<span class="k">const</span> fila = <span class="k">await</span> r.json();
+
+<span class="k">for</span> (<span class="k">const</span> pedido <span class="k">of</span> fila.pedidos) {
+  <span class="k">if</span> (!pedido.importavel) <span class="k">continue</span>; <span class="c">// cadastro incompleto</span>
+
+  <span class="c">// 2. a SUA funcao de gravacao</span>
+  <span class="k">const</span> numeroErp = <span class="k">await</span> gravarPedidoNoErp(pedido);
+
+  <span class="c">// 3. confirmar</span>
+  <span class="k">const</span> c = <span class="k">await</span> fetch(
+    `${BASE}/partner/v1/pedidos/${pedido.id}/confirmar`,
+    { method: <span class="s">"POST"</span>, headers: HEAD,
+      body: JSON.stringify({ pedido_erp: numeroErp }) },
+  );
+  <span class="k">if</span> (!c.ok) <span class="k">throw new</span> Error(`Falha ao confirmar: ${c.status}`);
+}</code></pre>
+        </div>
+      </div>
+    </section>
+
+    <section id="erros">
+      <h2><span class="num">08</span>Erros e reenvio</h2>
+      <p class="sub">
+        A regra de ouro: <b>grave no ERP primeiro, confirme depois.</b> Enquanto não
+        houver confirmação, o pedido continua disponível.
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Situação</th><th>O que acontece</th><th>Conduta</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Internet caiu na busca</td>
+              <td>Nenhum pedido foi lido.</td>
+              <td class="t-mut">Nada a fazer — a próxima rodada lê tudo.</td>
+            </tr>
+            <tr>
+              <td>Gravação no ERP falhou</td>
+              <td>Você não confirma.</td>
+              <td class="t-mut">O pedido volta na próxima busca. Registre o erro.</td>
+            </tr>
+            <tr>
+              <td>Gravou mas a confirmação falhou</td>
+              <td>O pedido volta na fila.</td>
+              <td class="t-mut">Antes de gravar, verifique se já importou aquele
+                  <code>id</code>. Se sim, apenas confirme de novo.</td>
+            </tr>
+            <tr>
+              <td><span class="st er">401</span> na chamada</td>
+              <td>Chave ausente ou inválida.</td>
+              <td class="t-mut">Confira o cabeçalho <code>X-API-Key</code>.</td>
+            </tr>
+            <tr>
+              <td><span class="st er">503</span> na chamada</td>
+              <td>Integração ainda não liberada para a sua empresa.</td>
+              <td class="t-mut">Falar com o suporte.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="note">
+        <span class="note-t">Recomendação de robustez</span>
+        <p>
+          Guarde o <code>id</code> do pedido do aplicativo numa coluna do seu pedido
+          (qualquer campo livre serve). Com isso você consegue verificar em uma
+          consulta se aquele pedido já entrou, o que elimina qualquer chance de
+          duplicação mesmo em falhas de rede no pior momento.
+        </p>
+      </div>
+    </section>
+
+    <section id="implantacao">
+      <h2><span class="num">09</span>Implantação</h2>
+      <p class="sub">
+        Roteiro sugerido, do primeiro teste até a rotina rodando sozinha. Costuma
+        levar de meio a um dia de trabalho.
+      </p>
+
+      <ul class="check">
+        <li>Receber a chave de API e guardá-la em arquivo de configuração.</li>
+        <li>Chamar <code>/partner/v1/status</code> e obter <code>ok: true</code>.</li>
+        <li>Chamar <code>/partner/v1/pedidos</code> e inspecionar o JSON de um pedido real.</li>
+        <li>Conferir se os códigos de cliente, representante, tabela e produto batem
+            com os cadastros do seu ERP.</li>
+        <li>Escrever a gravação do pedido no seu banco, com as suas regras e campos
+            obrigatórios — de preferência num ambiente de teste primeiro.</li>
+        <li>Gravar o <code>id</code> do pedido do aplicativo junto ao pedido no seu ERP.</li>
+        <li>Chamar a confirmação e verificar que o pedido saiu da fila.</li>
+        <li>Tratar os <code>importavel: false</code> num relatório de pendências.</li>
+        <li>Agendar a rotina (serviço, tarefa agendada ou cron) a cada 1 a 5 minutos.</li>
+        <li>Registrar log de cada importação: id, número gerado, data e resultado.</li>
+      </ul>
+
+      <div class="note">
+        <span class="note-t">Ambiente</span>
+        <p>
+          Não há ambiente de homologação separado: a fila só contém pedidos reais
+          aprovados. Para um teste controlado, avise o suporte que criamos um pedido
+          de teste identificado nas observações e o removemos em seguida.
+        </p>
+      </div>
+    </section>
+
+    <section id="suporte">
+      <h2><span class="num">10</span>Suporte</h2>
+      <p class="sub">
+        Precisa de um campo que não está na resposta? Fale — a API é nossa e o campo
+        entra sem quebrar o que já foi feito.
+      </p>
+      <p>
+        Campos novos são sempre adicionados, nunca renomeados ou removidos dentro da
+        mesma versão. Uma mudança que exija alteração no seu programa vira uma nova
+        versão (<code>/partner/v2/</code>) e a v1 continua funcionando.
+      </p>
+      <p>
+        Fale com <b>Yan</b>, responsável pelo sistema de pedidos.
+      </p>
+    </section>
+  </main>
+</div>
+
+<footer>
+  <span>API de Parceiro · versão 1 · documento público, sem chaves de acesso</span>
+  <span class="mono">setorxweb-production.up.railway.app</span>
+</footer>
+
+<script>
+  // ── Troca de linguagem nos exemplos ──────────────────
+  const tabs = document.querySelectorAll(".lang");
+  const panels = document.querySelectorAll(".panel");
+
+  tabs.forEach((tab) => {
+    tab.addEventListener("click", () => {
+      tabs.forEach((t) => t.setAttribute("aria-selected", String(t === tab)));
+      const alvo = tab.dataset.l;
+      panels.forEach((p) => { p.hidden = p.dataset.p !== alvo; });
+    });
+  });
+
+  // ── Copiar bloco de código ───────────────────────────
+  document.querySelectorAll(".copy").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const texto = btn.closest(".code").querySelector("code").innerText;
+      try {
+        await navigator.clipboard.writeText(texto);
+      } catch {
+        const ta = document.createElement("textarea");
+        ta.value = texto;
+        ta.style.position = "fixed";
+        ta.style.opacity = "0";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+      }
+      btn.textContent = "copiado";
+      btn.classList.add("done");
+      setTimeout(() => {
+        btn.textContent = "copiar";
+        btn.classList.remove("done");
+      }, 1600);
+    });
+  });
+
+  // ── Marca a seção atual no índice ────────────────────
+  const links = new Map(
+    [...document.querySelectorAll(".toc a")].map((a) => [a.getAttribute("href").slice(1), a]),
+  );
+  const obs = new IntersectionObserver(
+    (entradas) => {
+      entradas.forEach((e) => {
+        if (!e.isIntersecting) return;
+        links.forEach((a) => a.classList.remove("on"));
+        links.get(e.target.id)?.classList.add("on");
+      });
+    },
+    { rootMargin: "-10% 0px -75% 0px" },
+  );
+  document.querySelectorAll("section[id]").forEach((s) => obs.observe(s));
+</script>
