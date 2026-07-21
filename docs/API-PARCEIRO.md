@@ -1,9 +1,16 @@
 # API de Parceiro — Integração de Pedidos (v1)
 
-> **Versão web para enviar ao parceiro:** [`api-parceiro.html`](api-parceiro.html) —
-> mesma especificação em página navegável, com exemplos em Delphi, C#, Python,
-> PHP, Java, Node e cURL. Publicada em:
-> https://claude.ai/code/artifact/1b6dc8b6-c16e-4540-a736-b60be7203651
+> **Link para enviar ao parceiro:**
+> https://setorx-web-web.vercel.app/api-parceiro
+>
+> Mesma especificação em página navegável, com exemplos em Delphi, C#, Python,
+> PHP, Java, Node e cURL.
+>
+> A página é servida pelo próprio site: o arquivo fica em
+> `apps/web/public/api-parceiro.html` e sobe junto com o deploy do front. A URL
+> sem `.html` funciona por um rewrite específico em `apps/web/vercel.json`,
+> declarado **antes** do catch-all do SPA. Não use `cleanUrls` para isso — a
+> opção faz o Vercel devolver 404 em todas as rotas do app.
 
 Integração para o ERP da fábrica **buscar os pedidos** feitos pelos representantes
 no aplicativo e gravá-los no próprio sistema. O aplicativo nunca escreve no banco
