@@ -562,13 +562,17 @@
       <span class="sep">/</span>
       <span>versão 1</span>
       <span class="sep">/</span>
-      <span>atualizado 15 jul 2026</span>
+      <span>atualizado 21 jul 2026</span>
     </p>
     <h1>Integração de pedidos<br>para o seu ERP</h1>
     <p class="lede">
       Os representantes fecham os pedidos no aplicativo. O seu sistema busca esses
       pedidos por esta API e grava no seu banco, do seu jeito. Nada é escrito no
       seu ERP por fora — você continua no controle do que entra.
+    </p>
+    <p class="lede" style="margin-top: 12px">
+      A mesma API atende qualquer fábrica: você recebe uma chave, ela identifica a
+      sua empresa e você enxerga apenas os seus pedidos.
     </p>
     <div class="baseurl">
       <span class="k">URL base</span>
@@ -725,7 +729,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </div>
             <pre><code>{
   <span class="k">"ok"</span>: <span class="n">true</span>,
-  <span class="k">"parceiro"</span>: <span class="s">"corposensual"</span>,
+  <span class="k">"parceiro"</span>: <span class="s">"nome-da-sua-empresa"</span>,
   <span class="k">"servidor_hora"</span>: <span class="s">"2026-07-15T20:13:15.006Z"</span>
 }</code></pre>
           </div>
@@ -936,8 +940,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       <p>
         Na operação de cores sortidas, em que o representante pede por tamanho e a
         cor é definida na produção, o campo <code>cor</code> vem com o código padrão
-        de sortido (<code>"00001"</code> na Corpo Sensual) e o pedido é uma linha por
-        tamanho.
+        de sortido combinado com a sua fábrica (por exemplo <code>"00001"</code>) e o
+        pedido é uma linha por tamanho.
       </p>
       <p>
         Quando houver venda por cor específica — a referência 0800 em preto, branco e
