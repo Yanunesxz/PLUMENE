@@ -7,6 +7,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
+import { UploadFotos } from './UploadFotos.js';
 import type { ApiResponse } from '@csb/shared';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -254,6 +255,8 @@ export function PaginaImportar() {
           </div>
         )}
       </section>
+
+      <UploadFotos />
 
       {summary && (
         <section className="rounded-xl border border-green-200 bg-green-50 p-4">
