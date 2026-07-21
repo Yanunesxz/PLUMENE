@@ -74,6 +74,24 @@ Colunas da planilha (o cabeçalho aceita variações):
 | `estoque` | — | `15` (usado quando `tamanhos` não traz o número) |
 | `foto_url` | — | `https://.../0001.jpg` |
 | `grupo` (ou categoria) | — | `PIJAMAS` |
+| `cor` | — | `Azul` |
+| `base` (ou modelo) | — | `0172` |
+
+**Cores (opcional):** se a fábrica tem o mesmo modelo em cores diferentes, mande
+cada cor como uma **linha própria** (referência própria), com a **mesma `base`**
+e a `cor` preenchida:
+
+```
+referencia   nome                  cor     base
+0172-AZUL    CAMISOLA MODELO 0172  Azul    0172
+0172-CINZA   CAMISOLA MODELO 0172  Cinza   0172
+```
+
+No catálogo elas viram **um card só** com as bolinhas de cor (estilo Mercado
+Livre); o representante escolhe a cor e o tamanho. Cada cor tem sua própria grade
+e estoque. Quem **não** usa cor (como a Corpo Sensual) deixa `cor`/`base` vazios —
+funciona como hoje ("cores sortidas"). A **cor da bolinha** é calculada
+automaticamente a partir da foto no upload.
 
 ### b) Pela API (para carga automatizada)
 
