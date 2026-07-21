@@ -94,6 +94,26 @@ curl -X POST https://setorxweb-production.up.railway.app/products/import \
 
 Resposta traz um resumo (criados/atualizados, tamanhos, preços) e avisos.
 
+### c) Fotos dos produtos (em lote)
+
+Depois de importar os produtos, na mesma tela **Importar produtos** há a seção
+**"Fotos dos produtos (em lote)"**:
+
+1. Escolher **vários arquivos de uma vez**, nomeados pela referência do produto —
+   ex.: `0001.jpg`, `0002.png`, `MB003.jpg`.
+2. O navegador **reduz cada foto** (máx. 1000px, JPEG) e envia; o sistema guarda
+   na **CDN** (nuvem) e já liga a foto ao produto de mesmo código.
+
+- Casa pelo **nome do arquivo = referência** (sem a extensão). `0001.jpg` → produto `0001`.
+- Arquivo sem produto correspondente aparece em "sem produto" (não quebra o resto).
+- Reenviar a mesma referência **substitui** a foto.
+- Limite de **2 MB por foto** (a redução no navegador já deixa bem abaixo disso).
+- Diferente do link (`foto_url`), aqui a imagem passa a ser **do sistema** — não
+  depende de servidor externo e carrega rápido pela CDN.
+
+Pela API (equivalente da tela): `POST /products/fotos` (admin), corpo
+`{ "sku": "0001", "image_base64": "<base64 da imagem>" }`.
+
 ---
 
 ## Regras e limites (leia antes de rodar)
