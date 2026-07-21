@@ -1,69 +1,16 @@
-import 'dotenv/config';
-import Fastify from 'fastify';
-import cors from '@fastify/cors';
-import helmet from '@fastify/helmet';
-import jwt from '@fastify/jwt';
+/**
+ * Servidor local / long-running (desenvolvimento e Docker).
+ *
+ * Na Vercel a entrada é `api/index.ts`, que usa a mesma `buildApp()` sem
+ * `listen()`. O scheduler do ERP vive só aqui: depende de processo ligado o
+ * tempo todo, o que não existe em serverless. Em produção quem sincroniza é o
+ * agente instalado no servidor da fábrica.
+ */
+import { buildApp } from './app.js';
 import { env } from './config/env.js';
-import { authRouter } from './modules/auth/auth.router.js';
-import { catalogRouter } from './modules/catalog/catalog.router.js';
-import { customersRouter } from './modules/customers/customers.router.js';
-import { ordersRouter } from './modules/orders/orders.router.js';
-import { repsRouter } from './modules/reps/reps.router.js';
-import { syncRouter } from './modules/sync/sync.router.js';
-import { assistantRouter } from './modules/assistant/assistant.router.js';
-import { partnerRouter } from './modules/partner/partner.router.js';
 import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
 
-const server = Fastify({
-  logger:
-    env.NODE_ENV !== 'production'
-      ? { level: 'debug', transport: { target: 'pino-pretty', options: { colorize: true } } }
-      : { level: 'info' },
-});
-
-await server.register(helmet, { global: true });
-await server.register(cors, {
-  origin: env.CORS_ORIGIN,
-  credentials: true,
-});
-await server.register(jwt, {
-  secret: env.JWT_SECRET,
-});
-
-server.setErrorHandler((error, request, reply) => {
-  server.log.error({ err: error, url: request.url }, 'unhandled request error');
-
-  if (error.validation) {
-    void reply.status(400).send({
-      error: 'Dados inválidos',
-      code: 'VALIDATION_ERROR',
-      statusCode: 400,
-    });
-    return;
-  }
-
-  const statusCode = error.statusCode ?? 500;
-  void reply.status(statusCode).send({
-    error: statusCode >= 500 ? 'Erro interno do servidor' : error.message,
-    code: 'INTERNAL_ERROR',
-    statusCode,
-  });
-});
-
-server.get('/health', async () => ({
-  status: 'ok',
-  timestamp: new Date().toISOString(),
-  env: env.NODE_ENV,
-}));
-
-await server.register(authRouter);
-await server.register(catalogRouter);
-await server.register(customersRouter);
-await server.register(ordersRouter);
-await server.register(repsRouter);
-await server.register(syncRouter);
-await server.register(assistantRouter);
-await server.register(partnerRouter);
+const server = await buildApp();
 
 const start = async (): Promise<void> => {
   try {
