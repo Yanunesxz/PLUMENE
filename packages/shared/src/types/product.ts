@@ -16,6 +16,16 @@ export interface Product {
   group_name: string | null;
   /** URL da foto do modelo (vinda dos catálogos PDF). Null até ser vinculada. */
   image_url: string | null;
+  /**
+   * Agrupamento de variações de COR: produtos com o mesmo `variant_group`
+   * (na mesma empresa) são o mesmo modelo em cores diferentes — o catálogo
+   * mostra um card único com as bolinhas de cor. NULL = produto isolado.
+   */
+  variant_group: string | null;
+  /** Nome da cor desta variante (ex.: "Azul"). NULL = produto sem cor. */
+  color_name: string | null;
+  /** Cor da bolinha (hex), calculada a partir da foto no upload. NULL = fallback. */
+  color_hex: string | null;
   active: boolean;
   updated_at: string;
 }

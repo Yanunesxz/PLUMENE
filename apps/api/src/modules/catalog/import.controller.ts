@@ -21,6 +21,8 @@ const importSchema = z.object({
           .optional(),
         image_url: z.string().trim().url('URL de foto inválida').max(500).optional(),
         group: z.string().trim().max(100).optional(),
+        color: z.string().trim().max(40).optional(),
+        variant_group: z.string().trim().max(40).optional(),
       }),
     )
     .min(1, 'Nenhum produto na importação')

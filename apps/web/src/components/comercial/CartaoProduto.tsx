@@ -12,9 +12,14 @@ interface CartaoProdutoProps {
   inOrder?: boolean;
   /** Exibe a quantidade em estoque (oculto para representantes). */
   showStock?: boolean;
+  /** Cores disponíveis (hex das bolinhas). Mais de uma → mostra as opções de cor. */
+  swatches?: (string | null)[] | undefined;
 }
 
-export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = true }: CartaoProdutoProps) {
+const FALLBACK_HEX = '#D1D5DB';
+
+export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = true, swatches }: CartaoProdutoProps) {
+  const hasColors = (swatches?.length ?? 0) > 1;
   const available = product.variants?.reduce(
     (sum, v) => sum + Math.max(0, v.stock_quantity - v.stock_committed),
     0,
@@ -71,6 +76,21 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
         <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{product.name}</p>
         {product.collection && (
           <p className="truncate text-xs text-muted-foreground">Coleção: {product.collection}</p>
+        )}
+
+        {hasColors && (
+          <div className="flex items-center gap-1 pt-0.5">
+            {swatches!.slice(0, 5).map((hex, i) => (
+              <span
+                key={i}
+                className="h-3.5 w-3.5 rounded-full border border-black/10"
+                style={{ backgroundColor: hex ?? FALLBACK_HEX }}
+              />
+            ))}
+            {swatches!.length > 5 && (
+              <span className="text-[10px] font-medium text-muted-foreground">+{swatches!.length - 5}</span>
+            )}
+          </div>
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-2">

@@ -15,8 +15,37 @@ import type { ApiResponse } from '@csb/shared';
 const MAX_DIM = 1000;
 const QUALITY = 0.82;
 
-/** Redimensiona no navegador e devolve o JPEG como Blob (binário, sem base64). */
-function resizeToJpegBlob(file: File): Promise<Blob> {
+interface ProcessedImage {
+  blob: Blob;
+  /** Cor predominante da peça (hex, sem "#") para a bolinha; null se não deu. */
+  hex: string | null;
+}
+
+/**
+ * Cor "da peça": média dos pixels COLORIDOS, ignorando fundo branco/preto e
+ * cinzas (baixa saturação) — assim a bolinha reflete a cor do produto, não o
+ * fundo do estúdio. Devolve hex sem "#" ou null se a foto for quase toda neutra.
+ */
+function dominantHex(data: Uint8ClampedArray): string | null {
+  let r = 0, g = 0, b = 0, n = 0;
+  // amostra 1 a cada 4 pixels (passo 16 no array RGBA) — rápido e suficiente.
+  for (let i = 0; i < data.length; i += 16) {
+    const R = data[i] ?? 0, G = data[i + 1] ?? 0, B = data[i + 2] ?? 0, A = data[i + 3] ?? 0;
+    if (A < 200) continue;
+    const max = Math.max(R, G, B), min = Math.min(R, G, B);
+    const sat = max === 0 ? 0 : (max - min) / max;
+    if (max > 240 && sat < 0.12) continue; // quase branco (fundo)
+    if (max < 28) continue; // quase preto (sombra)
+    if (sat < 0.15) continue; // cinza sem cor definida
+    r += R; g += G; b += B; n += 1;
+  }
+  if (n < 20) return null; // peça neutra (branca/preta/cinza) — sem cor confiável
+  const h = (v: number) => Math.round(v / n).toString(16).padStart(2, '0');
+  return `${h(r)}${h(g)}${h(b)}`;
+}
+
+/** Redimensiona no navegador, extrai a cor e devolve o JPEG como Blob (binário). */
+function processImage(file: File): Promise<ProcessedImage> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -31,8 +60,14 @@ function resizeToJpegBlob(file: File): Promise<Blob> {
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject(new Error('canvas indisponível'));
       ctx.drawImage(img, 0, 0, w, h);
+      let hex: string | null = null;
+      try {
+        hex = dominantHex(ctx.getImageData(0, 0, w, h).data);
+      } catch {
+        hex = null; // se getImageData falhar (raro), segue sem cor
+      }
       canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('falha ao gerar a imagem'))),
+        (blob) => (blob ? resolve({ blob, hex }) : reject(new Error('falha ao gerar a imagem'))),
         'image/jpeg',
         QUALITY,
       );
@@ -73,9 +108,10 @@ export function UploadFotos() {
     for (const file of images) {
       const sku = skuFromFilename(file.name);
       try {
-        const blob = await resizeToJpegBlob(file);
+        const { blob, hex } = await processImage(file);
+        const q = hex ? `&hex=${hex}` : '';
         await api.postBlob<ApiResponse<{ url: string }>>(
-          `/products/fotos?sku=${encodeURIComponent(sku)}`,
+          `/products/fotos?sku=${encodeURIComponent(sku)}${q}`,
           blob,
           token,
         );

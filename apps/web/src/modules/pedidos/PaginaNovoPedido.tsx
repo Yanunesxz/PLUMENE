@@ -34,7 +34,7 @@ export function PaginaNovoPedido() {
   const [customerId, setCustomerId] = useState(preselectedCustomerId);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [pickerProduct, setPickerProduct] = useState<ProductWithPrice | null>(null);
+  const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
@@ -51,7 +51,12 @@ export function PaginaNovoPedido() {
   // Abre o seletor de tamanho para o produto escolhido na busca.
   const addItem = (product_id: string) => {
     const product = activeProducts.find((p) => p.id === product_id);
-    if (product) setPickerProduct(product);
+    if (!product) return;
+    // Abre com todas as cores do mesmo modelo (para escolher a cor no seletor).
+    const group = product.variant_group
+      ? activeProducts.filter((p) => p.variant_group === product.variant_group)
+      : [product];
+    setPicker({ product, group });
   };
 
   // Rep não edita preço (segue a tabela do representante); só gerente/admin ajusta.
@@ -301,20 +306,21 @@ export function PaginaNovoPedido() {
         </div>
       </form>
 
-      {pickerProduct && (
+      {picker && (
         <SeletorTamanho
-          product={pickerProduct}
-          onClose={() => setPickerProduct(null)}
-          onConfirm={(lines) =>
+          product={picker.product}
+          colorGroup={picker.group.length > 1 ? picker.group : undefined}
+          onClose={() => setPicker(null)}
+          onConfirm={(chosen, lines) =>
             lines.forEach((l) =>
               addToCart({
-                product_id: pickerProduct.id,
+                product_id: chosen.id,
                 variant_id: l.variant_id,
                 size: l.size,
-                product_name: pickerProduct.name,
-                sku: pickerProduct.sku,
+                product_name: chosen.name,
+                sku: chosen.sku,
                 quantity: l.quantity,
-                unit_price: pickerProduct.price ?? 0,
+                unit_price: chosen.price ?? 0,
               }),
             )
           }

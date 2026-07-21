@@ -19,6 +19,10 @@ export interface ImportProductInput {
   sizes?: ImportSizeInput[] | undefined;
   image_url?: string | undefined;
   group?: string | undefined;
+  /** Cor desta variante (ex.: "Azul"). Vazio = produto sem cor. */
+  color?: string | undefined;
+  /** Agrupador das cores do mesmo modelo (ex.: "0172"). Vazio = produto isolado. */
+  variant_group?: string | undefined;
 }
 
 export interface ImportSummary {
@@ -95,6 +99,8 @@ export async function importProducts(
       name: p.name.trim(),
       image_url: p.image_url?.trim() || null,
       group_name: p.group?.trim() || null,
+      color_name: p.color?.trim() || null,
+      variant_group: p.variant_group?.trim() || null,
       active: true,
       updated_at: new Date().toISOString(),
     }));

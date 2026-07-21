@@ -4,7 +4,7 @@ import { uploadProductPhoto, MAX_IMAGE_BYTES } from './photos.service.js';
 // A foto chega como binário cru no corpo (Content-Type image/* ou octet-stream);
 // a referência do produto vem na query (?sku=0001).
 export async function uploadPhotoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { sku } = request.query as { sku?: string };
+  const { sku, hex } = request.query as { sku?: string; hex?: string };
   if (!sku || !sku.trim()) {
     await reply.status(400).send({ error: 'Informe a referência (?sku=)', code: 'VALIDATION_ERROR', statusCode: 400 });
     return;
@@ -17,7 +17,7 @@ export async function uploadPhotoHandler(request: FastifyRequest, reply: Fastify
   }
 
   const { company_id } = request.user;
-  const result = await uploadProductPhoto(company_id, sku, body);
+  const result = await uploadProductPhoto(company_id, sku, body, hex);
 
   if (!result.ok) {
     if (result.reason === 'not_found') {

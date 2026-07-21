@@ -22,6 +22,8 @@ interface ParsedRow {
   sizes?: { size: string; stock: number }[];
   image_url?: string;
   group?: string;
+  color?: string;
+  variant_group?: string;
   /** Problema de validação da linha (linha inválida não é enviada). */
   error?: string;
 }
@@ -44,6 +46,9 @@ const HEADER_MAP: Record<string, keyof ParsedRow | 'sizes_raw' | 'stock_raw'> = 
   estoque: 'stock_raw', stock: 'stock_raw', quantidade: 'stock_raw',
   foto: 'image_url', imagem: 'image_url', foto_url: 'image_url', image_url: 'image_url',
   grupo: 'group', categoria: 'group', group: 'group', colecao: 'group', 'coleção': 'group',
+  cor: 'color', color: 'color',
+  base: 'variant_group', modelo: 'variant_group', variacao: 'variant_group',
+  'variação': 'variant_group', agrupar: 'variant_group',
 };
 
 /** "P:10, M:20" ou "P,M,G" (+estoque padrão) → lista de tamanhos. */
@@ -94,6 +99,8 @@ function parseWorkbook(buf: ArrayBuffer): ParsedRow[] {
       ...(sizes?.length ? { sizes } : {}),
       ...(mapped.image_url ? { image_url: mapped.image_url } : {}),
       ...(mapped.group ? { group: mapped.group } : {}),
+      ...(mapped.color ? { color: mapped.color } : {}),
+      ...(mapped.variant_group ? { variant_group: mapped.variant_group } : {}),
     };
     if (!out.sku) out.error = 'Sem referência (SKU)';
     else if (!out.name) out.error = 'Sem nome';
@@ -104,8 +111,10 @@ function parseWorkbook(buf: ArrayBuffer): ParsedRow[] {
 
 function downloadTemplate() {
   const rows = [
-    { referencia: '0001', nome: 'PIJAMA EXEMPLO CURTO', preco: 49.9, tamanhos: 'P:10, M:15, G:10', foto_url: '', grupo: 'PIJAMAS' },
-    { referencia: '0002', nome: 'CAMISOLA EXEMPLO', preco: 39.9, tamanhos: 'P, M, G, GG', estoque: 5, foto_url: '', grupo: 'CAMISOLAS' },
+    { referencia: '0001', nome: 'PIJAMA EXEMPLO CURTO', preco: 49.9, tamanhos: 'P:10, M:15, G:10', cor: '', base: '', foto_url: '', grupo: 'PIJAMAS' },
+    // Duas cores do MESMO modelo: mesma "base", cor diferente (viram um card só).
+    { referencia: '0172-AZUL', nome: 'CAMISOLA MODELO 0172', preco: 45.0, tamanhos: 'P:10, M:15, G:8', cor: 'Azul', base: '0172', foto_url: '', grupo: 'CAMISOLAS' },
+    { referencia: '0172-CINZA', nome: 'CAMISOLA MODELO 0172', preco: 45.0, tamanhos: 'P:6, M:9, G:4', cor: 'Cinza', base: '0172', foto_url: '', grupo: 'CAMISOLAS' },
   ];
   const ws = utils.json_to_sheet(rows);
   const wb = utils.book_new();
@@ -172,6 +181,9 @@ export function PaginaImportar() {
         <p className="mb-3 text-xs text-muted-foreground">
           Colunas: <strong>referencia</strong> e <strong>nome</strong> (obrigatórias) · preco · tamanhos
           (ex.: <code className="rounded bg-muted px-1">P:10, M:20</code> ou <code className="rounded bg-muted px-1">P, M, G</code> + coluna estoque) · foto_url · grupo.
+          Para <strong>cores</strong>: preencha <code className="rounded bg-muted px-1">cor</code> (ex.: Azul) e{' '}
+          <code className="rounded bg-muted px-1">base</code> igual nas cores do mesmo modelo (ex.: 0172) —
+          elas viram um card só com as bolinhas de cor.
         </p>
         <Button size="sm" variant="outline" onClick={downloadTemplate}>
           <Download className="h-4 w-4" strokeWidth={2.5} /> Baixar planilha modelo

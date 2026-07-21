@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { X, Minus, Plus } from 'lucide-react';
+import { X, Minus, Plus, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
-import { formatBRL } from '@/lib/utils';
+import { cn, formatBRL } from '@/lib/utils';
 
 export interface PickedSize {
   variant_id: string | null;
@@ -11,9 +11,13 @@ export interface PickedSize {
 }
 
 interface SeletorTamanhoProps {
+  /** Cor inicialmente selecionada (ou o produto isolado, sem cor). */
   product: ProductWithPrice;
+  /** Todas as cores do mesmo modelo (inclui `product`). Se ≤1, não mostra cores. */
+  colorGroup?: ProductWithPrice[] | undefined;
   onClose: () => void;
-  onConfirm: (lines: PickedSize[]) => void;
+  /** Devolve a cor escolhida (produto) + os tamanhos selecionados. */
+  onConfirm: (chosen: ProductWithPrice, lines: PickedSize[]) => void;
 }
 
 const SIZE_RANK: Record<string, number> = { PP: 0, P: 1, M: 2, G: 3, GG: 4, EG: 5, EGG: 6, EGGG: 7 };
@@ -32,21 +36,32 @@ function sizeCompare(a: string, b: string): number {
   return a.localeCompare(b, 'pt-BR', { numeric: true });
 }
 
-export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoProps) {
-  const variants = [...(product.variants ?? [])].sort((a, b) => sizeCompare(a.size, b.size));
-  const [qty, setQty] = useState<Record<string, number>>({});
+const FALLBACK_HEX = '#D1D5DB'; // cinza neutro quando a cor não foi extraída da foto
+
+export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: SeletorTamanhoProps) {
+  const colors = (colorGroup ?? []).filter((c) => (c.variants?.length ?? 0) >= 0);
+  const hasColors = colors.length > 1;
+
+  // Cor ativa (produto). Trocar a cor troca grade, preço e foto. A quantidade é
+  // guardada por (cor × tamanho) para não perder o que já foi marcado ao trocar.
+  const [activeId, setActiveId] = useState(product.id);
+  const active = colors.find((c) => c.id === activeId) ?? product;
+  const [qty, setQty] = useState<Record<string, number>>({}); // chave: "productId|size"
+
+  const variants = [...(active.variants ?? [])].sort((a, b) => sizeCompare(a.size, b.size));
+  const key = (size: string) => `${active.id}|${size}`;
 
   const bump = (size: string, delta: number) =>
-    setQty((q) => ({ ...q, [size]: Math.max(0, (q[size] ?? 0) + delta) }));
+    setQty((q) => ({ ...q, [key(size)]: Math.max(0, (q[key(size)] ?? 0) + delta) }));
 
-  const totalQty = Object.values(qty).reduce((s, n) => s + n, 0);
-  const totalValue = totalQty * (product.price ?? 0);
+  const activeQty = variants.reduce((s, v) => s + (qty[key(v.size)] ?? 0), 0);
+  const totalValue = activeQty * (active.price ?? 0);
 
   const confirm = () => {
     const lines: PickedSize[] = variants
-      .filter((v) => (qty[v.size] ?? 0) > 0)
-      .map((v) => ({ variant_id: v.id, size: v.size, quantity: qty[v.size] ?? 0 }));
-    if (lines.length > 0) onConfirm(lines);
+      .filter((v) => (qty[key(v.size)] ?? 0) > 0)
+      .map((v) => ({ variant_id: v.id, size: v.size, quantity: qty[key(v.size)] ?? 0 }));
+    if (lines.length > 0) onConfirm(active, lines);
     onClose();
   };
 
@@ -55,12 +70,23 @@ export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoPr
       <div className="absolute inset-0 bg-foreground/40" onClick={onClose} aria-hidden />
       <div className="animate-slide-up relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-foreground">{product.name}</p>
-            <p className="text-xs text-muted-foreground">
-              {product.sku}
-              {product.price != null ? ` · ${formatBRL(product.price)}` : ''}
-            </p>
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+              {active.image_url ? (
+                <img src={active.image_url} alt={active.name} className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-brand-300">
+                  <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-semibold text-foreground">{active.name}</p>
+              <p className="text-xs text-muted-foreground">
+                {active.sku}
+                {active.price != null ? ` · ${formatBRL(active.price)}` : ''}
+              </p>
+            </div>
           </div>
           <button
             type="button"
@@ -73,12 +99,44 @@ export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoPr
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
+          {hasColors && (
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Cor: <span className="text-foreground">{active.color_name ?? '—'}</span>
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                {colors.map((c) => {
+                  const selected = c.id === active.id;
+                  return (
+                    <button
+                      key={c.id}
+                      type="button"
+                      title={c.color_name ?? c.sku}
+                      onClick={() => setActiveId(c.id)}
+                      aria-label={`Cor ${c.color_name ?? c.sku}`}
+                      aria-pressed={selected}
+                      className={cn(
+                        'relative flex h-9 w-9 items-center justify-center rounded-full border transition',
+                        selected ? 'border-brand-600 ring-2 ring-brand-200' : 'border-border hover:border-brand-300',
+                      )}
+                      style={{ backgroundColor: c.color_hex ?? FALLBACK_HEX }}
+                    >
+                      {selected && (
+                        <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Escolha os tamanhos
           </p>
           {variants.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
-              Este produto não tem grade de tamanhos cadastrada.
+              Esta cor não tem grade de tamanhos cadastrada.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -94,12 +152,12 @@ export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoPr
                       onClick={() => bump(v.size, -1)}
                       aria-label={`Diminuir ${v.size}`}
                       className="flex h-9 w-9 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                      disabled={(qty[v.size] ?? 0) === 0}
+                      disabled={(qty[key(v.size)] ?? 0) === 0}
                     >
                       <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>
                     <span className="flex h-9 w-10 items-center justify-center border-y border-input bg-background text-sm font-medium text-foreground">
-                      {qty[v.size] ?? 0}
+                      {qty[key(v.size)] ?? 0}
                     </span>
                     <button
                       type="button"
@@ -122,11 +180,12 @@ export function SeletorTamanho({ product, onClose, onConfirm }: SeletorTamanhoPr
         >
           <div className="mb-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
-              {totalQty} {totalQty === 1 ? 'peça' : 'peças'}
+              {activeQty} {activeQty === 1 ? 'peça' : 'peças'}
+              {hasColors && active.color_name ? ` · ${active.color_name}` : ''}
             </span>
-            {product.price != null && <span className="font-semibold text-foreground">{formatBRL(totalValue)}</span>}
+            {active.price != null && <span className="font-semibold text-foreground">{formatBRL(totalValue)}</span>}
           </div>
-          <Button size="lg" className="w-full" disabled={totalQty === 0} onClick={confirm}>
+          <Button size="lg" className="w-full" disabled={activeQty === 0} onClick={confirm}>
             Adicionar ao pedido
           </Button>
         </div>

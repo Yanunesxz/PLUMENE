@@ -15,10 +15,20 @@ export type PhotoResult =
   | { ok: true; url: string }
   | { ok: false; reason: 'not_found' | 'too_large' | 'error'; detail?: string };
 
+/** #RGB ou #RRGGBB → normaliza para "#RRGGBB" maiúsculo; inválido → null. */
+function normalizeHex(hex: string | undefined): string | null {
+  if (!hex) return null;
+  const h = hex.trim().replace(/^#/, '');
+  if (/^[0-9a-fA-F]{6}$/.test(h)) return `#${h.toUpperCase()}`;
+  if (/^[0-9a-fA-F]{3}$/.test(h)) return `#${h.split('').map((c) => c + c).join('').toUpperCase()}`;
+  return null;
+}
+
 export async function uploadProductPhoto(
   company_id: string,
   skuRaw: string,
   buffer: Buffer,
+  colorHexRaw?: string,
 ): Promise<PhotoResult> {
   const sku = skuRaw.trim().toUpperCase();
 
@@ -45,10 +55,12 @@ export async function uploadProductPhoto(
   const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
   const url = pub.publicUrl;
 
-  await supabase
-    .from('products')
-    .update({ image_url: url, updated_at: new Date().toISOString() })
-    .eq('id', (product as { id: string }).id);
+  // Grava a URL da foto e, se veio, a cor da bolinha (extraída da foto no navegador).
+  const update: Record<string, unknown> = { image_url: url, updated_at: new Date().toISOString() };
+  const hex = normalizeHex(colorHexRaw);
+  if (hex) update['color_hex'] = hex;
+
+  await supabase.from('products').update(update).eq('id', (product as { id: string }).id);
 
   return { ok: true, url };
 }

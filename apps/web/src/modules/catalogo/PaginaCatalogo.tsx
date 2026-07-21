@@ -43,7 +43,7 @@ export function PaginaCatalogo() {
   // Produtos sem foto ficam ocultos por padrão (catálogo mais limpo); reversível.
   const [showNoPhoto, setShowNoPhoto] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [pickerProduct, setPickerProduct] = useState<ProductWithPrice | null>(null);
+  const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
 
   // ── Consulta de preços por tabela ───────────────────────────────────────────
   // O rep pode VER o catálogo em outra tabela de preço. É só consulta: o carrinho
@@ -156,6 +156,31 @@ export function PaginaCatalogo() {
       .sort(compare);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allProducts, search, brand, sort, inStockOnly, showNoPhoto, overlayPrices]);
+
+  // Agrupa as variações de COR: produtos com o mesmo `variant_group` viram um
+  // card único (com bolinhas de cor). Preserva a ordem: o grupo aparece na
+  // posição do seu primeiro membro. Produto sem grupo = card individual.
+  const groups = useMemo<ProductWithPrice[][]>(() => {
+    const byGroup = new Map<string, ProductWithPrice[]>();
+    for (const p of filtered) {
+      if (!p.variant_group) continue;
+      const arr = byGroup.get(p.variant_group) ?? [];
+      arr.push(p);
+      byGroup.set(p.variant_group, arr);
+    }
+    const seen = new Set<string>();
+    const out: ProductWithPrice[][] = [];
+    for (const p of filtered) {
+      if (p.variant_group) {
+        if (seen.has(p.variant_group)) continue;
+        seen.add(p.variant_group);
+        out.push(byGroup.get(p.variant_group) ?? [p]);
+      } else {
+        out.push([p]);
+      }
+    }
+    return out;
+  }, [filtered]);
 
   const isInitialLoading = allProducts === undefined || (loading && (allProducts?.length ?? 0) === 0);
 
@@ -270,17 +295,20 @@ export function PaginaCatalogo() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {filtered.map((product) => {
-            // Card mostra o preço consultado; o picker recebe o produto ORIGINAL
+          {groups.map((group) => {
+            const rep = group[0]!; // representante do grupo (primeira cor)
+            // Card mostra o preço consultado; o picker recebe os produtos ORIGINAIS
             // (preço da tabela do rep) para o carrinho não herdar o preço de consulta.
-            const display = isConsulting ? { ...product, price: priceOf(product) } : product;
+            const display = isConsulting ? { ...rep, price: priceOf(rep) } : rep;
+            const swatches = group.length > 1 ? group.map((g) => g.color_hex) : undefined;
             return (
               <CartaoProduto
-                key={product.id}
+                key={rep.variant_group ?? rep.id}
                 product={display}
                 showStock={canSeeStock}
-                inOrder={cartItems.some((i) => i.product_id === product.id)}
-                onAdd={() => setPickerProduct(product)}
+                inOrder={group.some((g) => cartItems.some((i) => i.product_id === g.id))}
+                onAdd={() => setPicker({ product: rep, group })}
+                swatches={swatches}
               />
             );
           })}
@@ -303,20 +331,21 @@ export function PaginaCatalogo() {
         </button>
       )}
 
-      {pickerProduct && (
+      {picker && (
         <SeletorTamanho
-          product={pickerProduct}
-          onClose={() => setPickerProduct(null)}
-          onConfirm={(lines) =>
+          product={picker.product}
+          colorGroup={picker.group.length > 1 ? picker.group : undefined}
+          onClose={() => setPicker(null)}
+          onConfirm={(chosen, lines) =>
             lines.forEach((l) =>
               addToCart({
-                product_id: pickerProduct.id,
+                product_id: chosen.id,
                 variant_id: l.variant_id,
                 size: l.size,
-                product_name: pickerProduct.name,
-                sku: pickerProduct.sku,
+                product_name: chosen.name,
+                sku: chosen.sku,
                 quantity: l.quantity,
-                unit_price: pickerProduct.price ?? 0,
+                unit_price: chosen.price ?? 0,
               }),
             )
           }
