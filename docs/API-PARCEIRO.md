@@ -1,5 +1,10 @@
 # API de Parceiro — Integração de Pedidos (v1)
 
+> **Versão web para enviar ao parceiro:** [`api-parceiro.html`](api-parceiro.html) —
+> mesma especificação em página navegável, com exemplos em Delphi, C#, Python,
+> PHP, Java, Node e cURL. Publicada em:
+> https://claude.ai/code/artifact/1b6dc8b6-c16e-4540-a736-b60be7203651
+
 Integração para o ERP da fábrica **buscar os pedidos** feitos pelos representantes
 no aplicativo e gravá-los no próprio sistema. O aplicativo nunca escreve no banco
 do ERP — quem grava é o programa da fábrica, usando esta API como fonte.
