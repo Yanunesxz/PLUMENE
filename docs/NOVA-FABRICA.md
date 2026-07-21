@@ -111,8 +111,8 @@ Depois de importar os produtos, na mesma tela **Importar produtos** há a seçã
 - Diferente do link (`foto_url`), aqui a imagem passa a ser **do sistema** — não
   depende de servidor externo e carrega rápido pela CDN.
 
-Pela API (equivalente da tela): `POST /products/fotos` (admin), corpo
-`{ "sku": "0001", "image_base64": "<base64 da imagem>" }`.
+Pela API (equivalente da tela): `POST /products/fotos?sku=0001` (admin), com a
+imagem já redimensionada **no corpo como binário** (`Content-Type: image/jpeg`).
 
 ---
 
