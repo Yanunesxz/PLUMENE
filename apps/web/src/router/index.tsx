@@ -12,6 +12,7 @@ import { PaginaRepresentantes } from '../modules/representantes/PaginaRepresenta
 import { PaginaComissoes } from '../modules/comissoes/PaginaComissoes.js';
 import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
 import { PaginaAssistente } from '../modules/assistente/PaginaAssistente.js';
+import { PaginaImportar } from '../modules/importar/PaginaImportar.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
 import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 
@@ -49,6 +50,11 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'comissoes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
             children: [{ index: true, element: <PaginaComissoes /> }],
+          },
+          {
+            path: 'importar',
+            element: <PrivateRoute roles={['admin']} />,
+            children: [{ index: true, element: <PaginaImportar /> }],
           },
         ],
       },

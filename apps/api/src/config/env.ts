@@ -15,6 +15,12 @@ export const env = {
   CORS_ORIGIN: (process.env['CORS_ORIGIN'] ?? 'http://localhost:5173,http://localhost:5174')
     .split(',').map(s => s.trim()),
 
+  /**
+   * Chave da PLATAFORMA (dono do sistema) para criar novas empresas/fábricas.
+   * Sem ela definida, o onboarding fica desligado. Nunca dar essa chave a clientes.
+   */
+  PLATFORM_ONBOARD_KEY: process.env['PLATFORM_ONBOARD_KEY'] ?? '',
+
   // ── ERP Firebird ────────────────────────────────────────────────────────────
   /** Host do servidor Firebird 2.5 do ERP (ex: 192.168.1.10) */
   ERP_DB_HOST: process.env['ERP_DB_HOST'] ?? '127.0.0.1',

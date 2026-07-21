@@ -20,6 +20,7 @@ import { repsRouter } from './modules/reps/reps.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
 import { assistantRouter } from './modules/assistant/assistant.router.js';
 import { partnerRouter } from './modules/partner/partner.router.js';
+import { companyRouter } from './modules/company/company.router.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -70,6 +71,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await server.register(syncRouter);
   await server.register(assistantRouter);
   await server.register(partnerRouter);
+  await server.register(companyRouter);
 
   return server;
 }
