@@ -15,8 +15,8 @@ import type { ApiResponse } from '@csb/shared';
 const MAX_DIM = 1000;
 const QUALITY = 0.82;
 
-/** Redimensiona no navegador e devolve o base64 (sem o prefixo data:). */
-function resizeToJpegBase64(file: File): Promise<string> {
+/** Redimensiona no navegador e devolve o JPEG como Blob (binário, sem base64). */
+function resizeToJpegBlob(file: File): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const url = URL.createObjectURL(file);
     const img = new Image();
@@ -31,7 +31,11 @@ function resizeToJpegBase64(file: File): Promise<string> {
       const ctx = canvas.getContext('2d');
       if (!ctx) return reject(new Error('canvas indisponível'));
       ctx.drawImage(img, 0, 0, w, h);
-      resolve(canvas.toDataURL('image/jpeg', QUALITY).split(',')[1] ?? '');
+      canvas.toBlob(
+        (blob) => (blob ? resolve(blob) : reject(new Error('falha ao gerar a imagem'))),
+        'image/jpeg',
+        QUALITY,
+      );
     };
     img.onerror = () => {
       URL.revokeObjectURL(url);
@@ -69,8 +73,12 @@ export function UploadFotos() {
     for (const file of images) {
       const sku = skuFromFilename(file.name);
       try {
-        const image_base64 = await resizeToJpegBase64(file);
-        await api.post<ApiResponse<{ url: string }>>('/products/fotos', { sku, image_base64 }, token);
+        const blob = await resizeToJpegBlob(file);
+        await api.postBlob<ApiResponse<{ url: string }>>(
+          `/products/fotos?sku=${encodeURIComponent(sku)}`,
+          blob,
+          token,
+        );
         state.sent += 1;
       } catch (err) {
         const code = (err as Error & { code?: string }).code;

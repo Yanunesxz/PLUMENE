@@ -1,24 +1,28 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { z } from 'zod';
-import { parseBody } from '../../lib/validation.js';
 import { uploadProductPhoto, MAX_IMAGE_BYTES } from './photos.service.js';
 
-const schema = z.object({
-  sku: z.string().trim().min(1, 'SKU vazio').max(40),
-  image_base64: z.string().min(1, 'Imagem vazia'),
-});
-
+// A foto chega como binário cru no corpo (Content-Type image/* ou octet-stream);
+// a referência do produto vem na query (?sku=0001).
 export async function uploadPhotoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const body = await parseBody(schema, request.body, reply);
-  if (!body) return;
+  const { sku } = request.query as { sku?: string };
+  if (!sku || !sku.trim()) {
+    await reply.status(400).send({ error: 'Informe a referência (?sku=)', code: 'VALIDATION_ERROR', statusCode: 400 });
+    return;
+  }
+
+  const body = request.body;
+  if (!Buffer.isBuffer(body) || body.length === 0) {
+    await reply.status(400).send({ error: 'Corpo da requisição vazio ou não é uma imagem.', code: 'EMPTY_BODY', statusCode: 400 });
+    return;
+  }
 
   const { company_id } = request.user;
-  const result = await uploadProductPhoto(company_id, body.sku, body.image_base64);
+  const result = await uploadProductPhoto(company_id, sku, body);
 
   if (!result.ok) {
     if (result.reason === 'not_found') {
       await reply.status(404).send({
-        error: `Nenhum produto com a referência "${body.sku}" nesta empresa.`,
+        error: `Nenhum produto com a referência "${sku}" nesta empresa.`,
         code: 'PRODUCT_NOT_FOUND',
         statusCode: 404,
       });

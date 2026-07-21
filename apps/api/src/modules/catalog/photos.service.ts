@@ -1,9 +1,9 @@
 import { supabase } from '../../config/supabase.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Upload de foto de produto (base64) → Supabase Storage (CDN), por empresa.
-// O navegador já redimensiona a imagem antes de enviar; aqui só validamos o
-// tamanho, isolamos por company_id e gravamos products.image_url.
+// Upload de foto de produto → Supabase Storage (CDN), por empresa.
+// Recebe a imagem já redimensionada como BINÁRIO cru (sem base64). Aqui só
+// validamos o tamanho, isolamos por company_id e gravamos products.image_url.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const BUCKET = 'product-images';
@@ -18,13 +18,10 @@ export type PhotoResult =
 export async function uploadProductPhoto(
   company_id: string,
   skuRaw: string,
-  imageBase64: string,
+  buffer: Buffer,
 ): Promise<PhotoResult> {
   const sku = skuRaw.trim().toUpperCase();
 
-  // Aceita tanto "data:image/...;base64,XXXX" quanto só o "XXXX".
-  const b64 = imageBase64.includes(',') ? (imageBase64.split(',').pop() ?? '') : imageBase64;
-  const buffer = Buffer.from(b64, 'base64');
   if (buffer.length === 0) return { ok: false, reason: 'error', detail: 'imagem vazia ou inválida' };
   if (buffer.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'too_large' };
 

@@ -14,11 +14,11 @@ export async function catalogRouter(fastify: FastifyInstance): Promise<void> {
     { preHandler: [authenticate, requireRole(['admin'])] },
     importProductsHandler,
   );
-  // Upload de foto (base64) por produto — só admin. bodyLimit acomoda 2 MB de
-  // imagem + ~4/3 do base64 + overhead do JSON.
+  // Upload de foto por produto (binário cru no corpo, ?sku= na query) — só admin.
+  // O limite real é do content-type parser (3 MB); a validação de 2 MB devolve 413.
   fastify.post(
     '/products/fotos',
-    { preHandler: [authenticate, requireRole(['admin'])], bodyLimit: 4 * 1024 * 1024 },
+    { preHandler: [authenticate, requireRole(['admin'])] },
     uploadPhotoHandler,
   );
 }

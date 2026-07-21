@@ -37,6 +37,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
   await server.register(jwt, { secret: env.JWT_SECRET });
 
+  // Upload de foto vai como binário cru (sem base64): parser dedicado que entrega
+  // o Buffer direto. bodyLimit próprio acomoda a foto (2 MB) + folga; não afeta as
+  // rotas JSON, que seguem no parser padrão.
+  server.addContentTypeParser(
+    ['application/octet-stream', 'image/jpeg', 'image/png', 'image/webp'],
+    { parseAs: 'buffer', bodyLimit: 3 * 1024 * 1024 },
+    (_req, body, done) => done(null, body),
+  );
+
   server.setErrorHandler((error, request, reply) => {
     server.log.error({ err: error, url: request.url }, 'unhandled request error');
 
