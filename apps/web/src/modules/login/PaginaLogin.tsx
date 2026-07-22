@@ -4,6 +4,7 @@ import { Logo } from '../../components/interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { saveOfflineCredential, verifyOfflineCredential } from '../../offline/authCache.js';
+import { resetOfflineIfUserChanged } from '../../offline/db.js';
 import { Input } from '../../components/interface/Input.js';
 import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
@@ -29,6 +30,8 @@ export function PaginaLogin() {
     setLoading(true);
     try {
       const res = await api.post<ApiResponse<LoginResponse>>('/auth/login', { email, password });
+      // Zera o cache offline se for outro usuário/empresa (evita misturar dados).
+      await resetOfflineIfUserChanged(res.data.user.id);
       login(res.data.token, res.data.refresh_token, res.data.user);
       // Guarda esse login para permitir autenticação offline depois.
       saveOfflineCredential(email, password, res.data);
@@ -39,6 +42,7 @@ export function PaginaLogin() {
       if (isNetworkError) {
         const offline = verifyOfflineCredential(email, password);
         if (offline.ok) {
+          await resetOfflineIfUserChanged(offline.cred.user.id);
           login(offline.cred.token, offline.cred.refresh_token, offline.cred.user);
           navigate('/', { replace: true });
           return;

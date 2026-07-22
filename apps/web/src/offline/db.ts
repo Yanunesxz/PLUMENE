@@ -39,3 +39,23 @@ class AppDatabase extends Dexie {
 }
 
 export const db = new AppDatabase();
+
+const CACHE_OWNER_KEY = 'csb_cache_owner';
+
+/**
+ * O cache offline pertence a UM usuário. Ao entrar com outro usuário (ou outra
+ * empresa, no multi-fábrica), zera as tabelas para não misturar catálogo,
+ * clientes e pedidos de contas diferentes. Se for o mesmo usuário, não mexe
+ * (preserva o cache e a fila de sincronização offline).
+ */
+export async function resetOfflineIfUserChanged(userId: string): Promise<void> {
+  if (localStorage.getItem(CACHE_OWNER_KEY) === userId) return;
+  await Promise.all([
+    db.products.clear(),
+    db.customers.clear(),
+    db.orders.clear(),
+    db.order_items.clear(),
+    db.sync_queue.clear(),
+  ]);
+  localStorage.setItem(CACHE_OWNER_KEY, userId);
+}
