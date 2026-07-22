@@ -34,6 +34,9 @@ export function PaginaCatalogo() {
   const navigate = useNavigate();
   // Representante não vê o estoque atual da fábrica.
   const canSeeStock = user?.role === 'manager' || user?.role === 'admin';
+  // Só o gerente/admin escolhe a tabela de preço. O representante usa sempre a
+  // tabela que o gerente atribuiu a ele (não pode trocar).
+  const canChoosePriceTable = user?.role === 'manager' || user?.role === 'admin';
   const cartItems = useCartStore((s) => s.items);
   const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
@@ -75,16 +78,16 @@ export function PaginaCatalogo() {
       .finally(() => setLoading(false));
   }, [token]);
 
-  // Carrega as tabelas de preço da empresa para o seletor de consulta.
+  // Carrega as tabelas de preço só para quem pode escolher (gerente/admin).
   useEffect(() => {
-    if (!token) return;
+    if (!token || !canChoosePriceTable) return;
     api
       .get<ApiResponse<PriceTableOption[]>>('/catalog/price-tables', token)
       .then((res) => setTables(res.data))
       .catch(() => {
         /* sem conexão: seguimos só com a tabela do rep */
       });
-  }, [token]);
+  }, [token, canChoosePriceTable]);
 
   // Ao escolher uma tabela diferente da do rep, busca os preços dela e monta o
   // overlay. Esses preços NÃO vão para o Dexie nem para o carrinho — são só exibição.
@@ -220,7 +223,7 @@ export function PaginaCatalogo() {
           <option value="price_desc">Ordenar: Maior preço</option>
           <option value="price_asc">Ordenar: Menor preço</option>
         </Select>
-        {tables.length > 1 && (
+        {canChoosePriceTable && tables.length > 1 && (
           <Select
             aria-label="Ver preços da tabela"
             value={viewTableId}

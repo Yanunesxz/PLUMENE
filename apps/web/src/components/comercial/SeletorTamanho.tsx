@@ -37,6 +37,9 @@ function sizeCompare(a: string, b: string): number {
 }
 
 const FALLBACK_HEX = '#D1D5DB'; // cinza neutro quando a cor não foi extraída da foto
+// Bolinha "arco-íris" para produtos sem cor específica (cores sortidas).
+const SORTIDO_GRADIENT =
+  'conic-gradient(from 90deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)';
 
 export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: SeletorTamanhoProps) {
   const colors = (colorGroup ?? []).filter((c) => (c.variants?.length ?? 0) >= 0);
@@ -99,11 +102,12 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
-          {hasColors && (
-            <div className="mb-4">
-              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                Cor: <span className="text-foreground">{active.color_name ?? '—'}</span>
-              </p>
+          {/* Cor: sempre visível. Com variações → bolinhas de cor; sem cor → "Sortido". */}
+          <div className="mb-4">
+            <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Cor: <span className="text-foreground">{hasColors ? (active.color_name ?? '—') : 'Sortido'}</span>
+            </p>
+            {hasColors ? (
               <div className="flex flex-wrap gap-2.5">
                 {colors.map((c) => {
                   const selected = c.id === active.id;
@@ -121,15 +125,24 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                       )}
                       style={{ backgroundColor: c.color_hex ?? FALLBACK_HEX }}
                     >
-                      {selected && (
-                        <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
-                      )}
+                      {selected && <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />}
                     </button>
                   );
                 })}
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center gap-2">
+                <span
+                  aria-label="Cores sortidas"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand-600 ring-2 ring-brand-200"
+                  style={{ background: SORTIDO_GRADIENT }}
+                >
+                  <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
+                </span>
+                <span className="text-sm font-medium text-foreground">Sortido</span>
+              </div>
+            )}
+          </div>
 
           <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Escolha os tamanhos
@@ -181,7 +194,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
           <div className="mb-3 flex items-center justify-between text-sm">
             <span className="text-muted-foreground">
               {activeQty} {activeQty === 1 ? 'peça' : 'peças'}
-              {hasColors && active.color_name ? ` · ${active.color_name}` : ''}
+              {hasColors ? (active.color_name ? ` · ${active.color_name}` : '') : ' · Sortido'}
             </span>
             {active.price != null && <span className="font-semibold text-foreground">{formatBRL(totalValue)}</span>}
           </div>
