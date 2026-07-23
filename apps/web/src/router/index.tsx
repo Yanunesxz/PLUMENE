@@ -31,7 +31,12 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { index: true, element: <Navigate to="/catalog" replace /> },
           { path: 'minha-area', element: <PaginaMinhaArea /> },
           { path: 'catalog', element: <PaginaCatalogo /> },
-          { path: 'assistente', element: <PaginaAssistente /> },
+          {
+            // Assistente em desenvolvimento: bloqueado para representante.
+            path: 'assistente',
+            element: <PrivateRoute roles={['manager', 'admin']} />,
+            children: [{ index: true, element: <PaginaAssistente /> }],
+          },
           { path: 'orders', element: <PaginaPedidos /> },
           { path: 'orders/new', element: <PaginaNovoPedido /> },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },

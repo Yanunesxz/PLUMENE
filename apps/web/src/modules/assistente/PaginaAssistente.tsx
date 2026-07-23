@@ -80,12 +80,15 @@ export function PaginaAssistente() {
   return (
     <div className="flex h-[calc(100dvh-8rem)] flex-col md:h-[calc(100dvh-4rem)]">
       <div className="border-b border-border px-4 py-3 md:px-6">
-        <h1 className="flex items-center gap-2 text-lg font-bold tracking-tight text-foreground">
+        <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold tracking-tight text-foreground">
           <Sparkles className="h-5 w-5 text-brand-600" strokeWidth={2.2} />
           Assistente
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+            Em desenvolvimento
+          </span>
         </h1>
         <p className="text-xs text-muted-foreground">
-          Versão de testes · consulta estoque, preço, clientes e seus pedidos
+          Recurso em desenvolvimento · consulta estoque, preço, clientes e seus pedidos
         </p>
       </div>
 
