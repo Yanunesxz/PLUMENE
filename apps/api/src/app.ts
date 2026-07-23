@@ -11,6 +11,7 @@ import type { FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
+import rateLimit from '@fastify/rate-limit';
 import { env } from './config/env.js';
 import { authRouter } from './modules/auth/auth.router.js';
 import { catalogRouter } from './modules/catalog/catalog.router.js';
@@ -24,6 +25,10 @@ import { companyRouter } from './modules/company/company.router.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const server = Fastify({
+    // Railway/Vercel ficam atrás de proxy: sem isso, request.ip é o IP do proxy
+    // e o rate-limit trataria todos os clientes como um só (um atacante travaria
+    // todo mundo). Com trustProxy, o limite é por IP real do cliente.
+    trustProxy: true,
     logger:
       env.NODE_ENV !== 'production'
         ? { level: 'debug', transport: { target: 'pino-pretty', options: { colorize: true } } }
@@ -31,6 +36,15 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await server.register(helmet, { global: true });
+
+  // Proteção contra abuso/força-bruta. Limite global folgado (uso normal nem
+  // encosta); rotas sensíveis como /auth/login apertam via `config.rateLimit`.
+  await server.register(rateLimit, {
+    global: true,
+    max: 300,
+    timeWindow: '1 minute',
+    // Sem allowList: o limite vale para todos os IPs.
+  });
   await server.register(cors, {
     origin: env.CORS_ORIGIN,
     credentials: true,
