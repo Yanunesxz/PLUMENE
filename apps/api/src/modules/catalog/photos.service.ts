@@ -31,6 +31,10 @@ export async function uploadProductPhoto(
   colorHexRaw?: string,
 ): Promise<PhotoResult> {
   const sku = skuRaw.trim().toUpperCase();
+  // Nome de arquivo seguro para o Storage: remove separadores de caminho e
+  // qualquer caractere estranho. Impede path traversal (ex.: sku "../EMPRESA-X/0001"
+  // sobrescrevendo a foto de outra empresa). A busca no banco usa o sku real.
+  const safeSku = sku.replace(/[^A-Za-z0-9._-]/g, '_');
 
   if (buffer.length === 0) return { ok: false, reason: 'error', detail: 'imagem vazia ou inválida' };
   if (buffer.length > MAX_IMAGE_BYTES) return { ok: false, reason: 'too_large' };
@@ -44,7 +48,7 @@ export async function uploadProductPhoto(
     .maybeSingle();
   if (!product) return { ok: false, reason: 'not_found' };
 
-  const path = `${company_id}/${sku}.jpg`;
+  const path = `${company_id}/${safeSku}.jpg`;
   const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, buffer, {
     contentType: 'image/jpeg',
     upsert: true,
