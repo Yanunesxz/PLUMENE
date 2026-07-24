@@ -49,7 +49,7 @@ GET /partner/v1/status
 
 **Resposta 200:**
 ```json
-{ "ok": true, "parceiro": "corposensual", "servidor_hora": "2026-07-15T20:13:15.006Z" }
+{ "ok": true, "parceiro": "suaempresa", "servidor_hora": "2026-07-15T20:13:15.006Z" }
 ```
 
 Sem chave ou com chave errada: `401`.
