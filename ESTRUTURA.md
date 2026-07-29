@@ -11,6 +11,7 @@ SetorxWeb/
 ├── packages/
 │   └── shared/   → Tipos e regras usados por web E api
 ├── _tools/       → Scripts utilitários (rodam local, acesso ao ERP)
+├── tests/        → Testes automatizados (vitest) — cobrem web, api e shared
 └── (raiz)        → Configuração do monorepo e deploy
 ```
 
@@ -25,6 +26,7 @@ SetorxWeb/
 | `tsconfig.base.json` | Config TypeScript compartilhada |
 | `Dockerfile` + `railway.toml` | Build/deploy da **API** no Railway |
 | `.claude/launch.json` | Servidor de preview (porta 5173) |
+| `vitest.config.ts` | Configuração dos testes (`pnpm test`) |
 | `README.md` | Visão geral |
 
 ---
@@ -68,7 +70,11 @@ apps/api/src/
 │       ├── 005_rep_commission.sql     → commission_rate em users
 │       ├── 006_order_invoiced.sql     → invoiced/invoiced_at em orders
 │       ├── 007_customer_owner.sql     → rep_id em customers (dono)
-│       └── 008_sync_unique_keys.sql   → índices únicos p/ re-sync
+│       ├── 008_sync_unique_keys.sql   → índices únicos p/ re-sync
+│       ├── 009_order_number.sql       → nº sequencial (substituída pela 012)
+│       ├── 010_company_cascade.sql    → ON DELETE CASCADE nas FKs de empresa
+│       ├── 011_product_colors.sql     → variações de cor por produto
+│       └── 012_rep_carteira_e_numero.sql → código ERP do rep + nº do pedido
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -130,9 +136,10 @@ apps/web/
     │
     ├── components/        → REUTILIZÁVEIS (não são telas)
     │   ├── interface/     → design system (botões/inputs): Button, Input, Select, SearchSelect,
-    │   │                    Badge, Card, Toast, Spinner, Skeleton, Textarea, EmptyState
+    │   │                    Badge, Card, Toast, Spinner, Skeleton, Textarea, EmptyState,
+    │   │                    BotaoTema (claro/escuro/automático)
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
-    │   └── comercial/     → CartaoProduto, SeletorTamanho (seletor de tamanho)
+    │   └── comercial/     → CartaoProduto, SeletorTamanho, grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)
     │   ├── authStore.ts  → usuário logado + token (persistido)
@@ -146,7 +153,9 @@ apps/web/
     ├── services/api.ts   → cliente HTTP (fetch + Bearer token) — fala com a API
     ├── hooks/            → useOnlineStatus, useSyncOnReconnect
     ├── lib/utils.ts      → cn (classes) + formatBRL (R$)
-    └── styles/globals.css → Tailwind + CSS variables (cores do tema = verde petróleo)
+    └── styles/globals.css → Tailwind + TOKENS de cor (claro e escuro).
+                              Nenhuma tela escreve cor crua: use `primary`,
+                              `positive`, `warn`, `danger`, `subtle`, `sunken`.
 ```
 
 > **Fluxo de um clique:** página (modules) → store/services → `services/api.ts` → API.
@@ -175,6 +184,7 @@ _tools/
 | Mudar um **botão/input padrão** | `apps/web/src/components/interface/` |
 | Mudar o **menu** | `apps/web/src/components/layout/navItems.ts` |
 | Mudar **cores/tema** | `apps/web/src/styles/globals.css` + `tailwind.config.ts` |
+| Escrever um **teste** | `tests/` na raiz — `pnpm test` (ou `pnpm verify` p/ tudo) |
 | Mudar uma **regra de negócio / endpoint** | `apps/api/src/modules/<área>/*.service.ts` |
 | Adicionar **rota na API** | `apps/api/src/modules/<área>/*.router.ts` |
 | Mudar um **tipo de dado** | `packages/shared/src/types/` |
