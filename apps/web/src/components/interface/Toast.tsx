@@ -19,9 +19,9 @@ export function Toast({ message, type = 'info', onDone }: ToastProps) {
 
   const colorClass =
     type === 'success'
-      ? 'bg-green-600'
+      ? 'bg-positive'
       : type === 'error'
-        ? 'bg-red-600'
+        ? 'bg-danger'
         : 'bg-gray-800';
 
   return (

@@ -12,7 +12,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import type { CustomerWithPriceTable, CreateCustomerRequest, ApiResponse } from '@csb/shared';
+import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
 const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
 
@@ -45,7 +45,7 @@ export function PaginaClientes() {
   useEffect(() => {
     if (!token) return;
     api
-      .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
+      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
       .catch(() => {
         /* offline: usamos o cache */
@@ -98,7 +98,7 @@ export function PaginaClientes() {
         email: form.email || null,
         address: form.address || null,
       };
-      const res = await api.post<ApiResponse<CustomerWithPriceTable>>('/customers', payload, token);
+      const res = await api.post<ApiResponse<CustomerListItem>>('/customers', payload, token);
       await db.customers.put(res.data);
       setForm({ ...EMPTY_CUST });
       setShowForm(false);
@@ -129,7 +129,7 @@ export function PaginaClientes() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-sm font-medium text-foreground">
-                Nome / Razão social <span className="text-red-500">*</span>
+                Nome / Razão social <span className="text-danger">*</span>
               </label>
               <Input value={form.name} onChange={setF('name')} placeholder="Nome do cliente" />
             </div>
@@ -139,30 +139,30 @@ export function PaginaClientes() {
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">
-                CNPJ / CPF <span className="text-red-500">*</span>
+                CNPJ / CPF <span className="text-danger">*</span>
               </label>
               <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="00.000.000/0000-00" inputMode="numeric" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">
-                WhatsApp <span className="text-red-500">*</span>
+                WhatsApp <span className="text-danger">*</span>
               </label>
               <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="(00) 00000-0000" inputMode="tel" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">
-                E-mail <span className="text-red-500">*</span>
+                E-mail <span className="text-danger">*</span>
               </label>
               <Input type="email" value={form.email} onChange={setF('email')} placeholder="cliente@email.com" autoComplete="off" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-sm font-medium text-foreground">
-                Endereço <span className="text-red-500">*</span>
+                Endereço <span className="text-danger">*</span>
               </label>
               <Input value={form.address} onChange={setF('address')} placeholder="Rua, número, bairro, cidade - UF" />
             </div>
           </div>
-          {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-soft-foreground">{error}</p>}
           <div className="mt-4 flex justify-end">
             <Button type="submit" disabled={saving}>
               {saving ? (
@@ -210,7 +210,7 @@ export function PaginaClientes() {
               key={customer.id}
               className={cn(
                 'group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all',
-                customer.blocked ? 'opacity-70' : 'hover:border-brand-200 hover:shadow-md',
+                customer.blocked ? 'opacity-70' : 'hover:border-primary/30 hover:shadow-md',
               )}
             >
               <button
@@ -219,7 +219,7 @@ export function PaginaClientes() {
                 disabled={customer.blocked}
                 className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
               >
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-50 text-brand-600">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                   <Building2 className="h-5 w-5" strokeWidth={2} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -236,7 +236,7 @@ export function PaginaClientes() {
                     </p>
                   )}
                   {customer.blocked && customer.block_reason && (
-                    <p className="truncate text-xs text-red-500">{customer.block_reason}</p>
+                    <p className="truncate text-xs text-danger">{customer.block_reason}</p>
                   )}
                 </div>
               </button>
@@ -253,7 +253,7 @@ export function PaginaClientes() {
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Abrir WhatsApp"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-positive-soft-foreground transition-colors hover:bg-positive-soft"
                   >
                     <MessageCircle className="h-[18px] w-[18px]" />
                   </a>

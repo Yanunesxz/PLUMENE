@@ -1,5 +1,5 @@
 import Dexie, { type Table } from 'dexie';
-import type { ProductWithPrice, Customer, Order, OrderItem } from '@csb/shared';
+import type { ProductWithPrice, CustomerListItem, Order, OrderItem } from '@csb/shared';
 
 export interface SyncQueueItem {
   id?: number;
@@ -20,7 +20,7 @@ export interface LocalOrder extends Order {
 class AppDatabase extends Dexie {
   /** Guardamos o payload completo do catálogo (com preço + variantes) para uso offline. */
   products!: Table<ProductWithPrice, string>;
-  customers!: Table<Customer, string>;
+  customers!: Table<CustomerListItem, string>;
   orders!: Table<LocalOrder, string>;
   order_items!: Table<OrderItem, string>;
   sync_queue!: Table<SyncQueueItem, number>;
@@ -35,6 +35,18 @@ class AppDatabase extends Dexie {
       order_items: 'id, order_id, product_id',
       sync_queue: '++id, local_id, created_at, attempts',
     });
+
+    // v2: o catálogo passou a chegar enxuto (sem company_id/updated_at) e com a
+    // grade em `in_stock`/`available` no lugar de stock_quantity/stock_committed.
+    // O cache antigo não tem esses campos: sem `in_stock`, TODO tamanho pareceria
+    // esgotado. Limpamos só os produtos — clientes, pedidos e, principalmente, a
+    // FILA OFFLINE continuam intactos (perder pedido não enviado é inaceitável).
+    this.version(2)
+      .stores({
+        products: 'id, sku, name, active',
+        customers: 'id, name, cnpj, blocked',
+      })
+      .upgrade((tx) => tx.table('products').clear());
   }
 }
 

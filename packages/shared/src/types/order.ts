@@ -42,6 +42,11 @@ export interface CreateOrderRequest {
   customer_id: string;
   notes?: string | undefined;
   local_id?: string | undefined;
+  /**
+   * `true` = o representante fechou o pedido e ele já entra na fila do gerente
+   * (`pending_approval`). `false`/ausente = rascunho, ainda em montagem.
+   */
+  submit?: boolean | undefined;
   items: Array<{
     product_id: string;
     variant_id?: string | undefined;

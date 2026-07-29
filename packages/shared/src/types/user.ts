@@ -21,6 +21,12 @@ export interface User {
   price_table_id?: string | null;
   /** Percentual de comissão do representante (ex.: 10 = 10%). */
   commission_rate?: number | null;
+  /**
+   * Código do representante no ERP (ex.: "00779"). É o que casa com
+   * `customers.rep_erp_id` e define a carteira dele. Sem isto, o rep só vê os
+   * clientes que ele mesmo cadastrou no app.
+   */
+  erp_rep_id?: string | null;
 }
 
 export interface AuthPayload {
@@ -33,6 +39,8 @@ export interface AuthPayload {
   price_table_id?: string | null;
   /** Percentual de comissão do representante (ex.: 10 = 10%). */
   commission_rate?: number | null;
+  /** Código ERP do representante — resolve a carteira de clientes. */
+  erp_rep_id?: string | null;
 }
 
 // (commission_rate em User e AuthPayload são usados pela área do representante)
@@ -49,6 +57,8 @@ export interface RepListItem {
   price_table_id: string | null;
   price_table_name: string | null;
   commission_rate: number;
+  /** Código do rep no ERP — define a carteira de clientes que ele enxerga. */
+  erp_rep_id: string | null;
   created_at: string;
 }
 
@@ -63,6 +73,8 @@ export interface CreateRepRequest {
   phone?: string | null;
   /** Percentual de comissão (ex.: 10 = 10%). Padrão 10 se omitido. */
   commission_rate?: number;
+  /** Código do rep no ERP (ex.: "00779"). Sem ele, o rep não recebe carteira. */
+  erp_rep_id?: string | null;
 }
 
 /** Edição de representante — todos os campos opcionais (envia só o que mudou). */
@@ -75,6 +87,7 @@ export interface UpdateRepRequest {
   phone?: string | null;
   active?: boolean;
   commission_rate?: number;
+  erp_rep_id?: string | null;
   /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
   password?: string;
 }

@@ -4,7 +4,7 @@ import { parseBody } from '../../lib/validation.js';
 import { createCustomerSchema } from './customers.schema.js';
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id, role } = request.user;
+  const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
   const { search, include_blocked } = request.query as {
     search?: string;
     include_blocked?: string;
@@ -16,6 +16,7 @@ export async function listCustomers(request: FastifyRequest, reply: FastifyReply
     rep_id,
     search,
     include_blocked !== 'false',
+    erp_rep_id,
   );
   await reply.send({ data: customers });
 }

@@ -81,9 +81,9 @@ export function PaginaAssistente() {
     <div className="flex h-[calc(100dvh-8rem)] flex-col md:h-[calc(100dvh-4rem)]">
       <div className="border-b border-border px-4 py-3 md:px-6">
         <h1 className="flex flex-wrap items-center gap-2 text-lg font-bold tracking-tight text-foreground">
-          <Sparkles className="h-5 w-5 text-brand-600" strokeWidth={2.2} />
+          <Sparkles className="h-5 w-5 text-primary" strokeWidth={2.2} />
           Assistente
-          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-800">
+          <span className="rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-warn-soft-foreground">
             Em desenvolvimento
           </span>
         </h1>
@@ -95,7 +95,7 @@ export function PaginaAssistente() {
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4 md:p-6">
         {empty ? (
           <div className="flex flex-col items-center gap-4 py-10 text-center">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-100 text-brand-600">
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary-soft text-primary">
               <Sparkles className="h-7 w-7" strokeWidth={1.8} />
             </div>
             <div className="space-y-1">
@@ -108,7 +108,7 @@ export function PaginaAssistente() {
                   key={s}
                   type="button"
                   onClick={() => void send(s)}
-                  className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-brand-300 hover:text-foreground"
+                  className="rounded-full border border-border bg-card px-3.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
                 >
                   {s}
                 </button>
@@ -121,7 +121,7 @@ export function PaginaAssistente() {
               <span
                 className={cn(
                   'flex h-8 w-8 shrink-0 items-center justify-center rounded-full',
-                  m.role === 'user' ? 'bg-brand-600 text-white' : 'bg-brand-100 text-brand-700',
+                  m.role === 'user' ? 'bg-primary text-white' : 'bg-primary-soft text-primary-soft-foreground',
                 )}
               >
                 {m.role === 'user' ? (
@@ -134,7 +134,7 @@ export function PaginaAssistente() {
                 className={cn(
                   'max-w-[80%] whitespace-pre-wrap rounded-2xl px-3.5 py-2 text-sm leading-relaxed',
                   m.role === 'user'
-                    ? 'rounded-tr-sm bg-brand-600 text-white'
+                    ? 'rounded-tr-sm bg-primary text-white'
                     : 'rounded-tl-sm bg-muted text-foreground',
                 )}
               >
@@ -146,7 +146,7 @@ export function PaginaAssistente() {
 
         {sending && (
           <div className="flex gap-2.5">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-foreground">
               <Sparkles className="h-4 w-4" strokeWidth={2.2} />
             </span>
             <div className="flex items-center rounded-2xl rounded-tl-sm bg-muted px-4 py-3">
@@ -168,7 +168,7 @@ export function PaginaAssistente() {
             type="submit"
             disabled={sending || !input.trim()}
             aria-label="Enviar"
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white transition-colors hover:bg-brand-700 disabled:opacity-40"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary text-white transition-colors hover:bg-primary/90 disabled:opacity-40"
           >
             <Send className="h-4 w-4" strokeWidth={2.4} />
           </button>

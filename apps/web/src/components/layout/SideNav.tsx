@@ -1,6 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut, WifiOff } from 'lucide-react';
 import { Logo } from '../interface/Logo.js';
+import { BotaoTema } from '../interface/BotaoTema.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { navItemsForRole } from './navItems.js';
@@ -31,7 +32,7 @@ export function SideNav() {
       </div>
 
       {!isOnline && (
-        <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700">
+        <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-warn-soft px-3 py-1.5 text-[11px] font-medium text-warn-soft-foreground">
           <WifiOff className="h-3.5 w-3.5" strokeWidth={2.5} />
           Modo offline
         </div>
@@ -48,7 +49,7 @@ export function SideNav() {
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-brand-50 text-brand-700'
+                  ? 'bg-primary-soft text-primary-soft-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
             }
@@ -66,7 +67,7 @@ export function SideNav() {
       {/* Usuário */}
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
             {initials}
           </span>
           <div className="min-w-0 flex-1 leading-tight">
@@ -75,6 +76,7 @@ export function SideNav() {
               <p className="truncate text-[11px] text-muted-foreground">{USER_ROLE_LABELS[user.role]}</p>
             )}
           </div>
+          <BotaoTema className="h-9 w-9 shrink-0" />
           <button
             type="button"
             onClick={handleLogout}

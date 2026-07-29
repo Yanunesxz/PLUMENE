@@ -43,9 +43,17 @@ export interface Customer {
   updated_at: string;
 }
 
-export interface CustomerWithPriceTable extends Customer {
-  price_table: PriceTable | null;
-}
+/**
+ * Cliente como a lista do app recebe. Subconjunto deliberado de `Customer`: são
+ * os campos que as telas realmente usam. A lista completa (1.353 clientes em
+ * produção) vai inteira para o cache offline, então cada coluna a mais é peso
+ * no 3G do representante — mandar `Customer` inteiro custava 5× isto.
+ */
+export interface CustomerListItem
+  extends Pick<
+    Customer,
+    'id' | 'name' | 'trade_name' | 'cnpj' | 'blocked' | 'block_reason' | 'credit_limit' | 'whatsapp'
+  > {}
 
 /** Dados mínimos para um representante cadastrar um cliente no app. */
 export interface CreateCustomerRequest {

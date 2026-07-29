@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import type { ProductWithPrice } from '@csb/shared';
+import type { CatalogVariant, ProductWithPrice } from '@csb/shared';
 
 /** Tabelas de preço da empresa (id + nome) — para o seletor de consulta no catálogo. */
 export async function listCompanyPriceTables(
@@ -29,13 +29,35 @@ export async function priceTableBelongsToCompany(
   return !!data;
 }
 
+export interface CatalogOptions {
+  price_table_id?: string | undefined;
+  /**
+   * Envia a quantidade disponível por tamanho. Só gerente/admin: a posição de
+   * estoque da fábrica não é informação do representante.
+   */
+  includeStock?: boolean;
+  /**
+   * Descarta o que não tem preço na tabela consultada. Ligado para o
+   * representante: produto sem preço entrava no carrinho a R$ 0 e o pedido
+   * inteiro era recusado no servidor com PRICE_NOT_FOUND.
+   */
+  onlyPriced?: boolean;
+}
+
+// Colunas que o app realmente usa. `select('*')` arrastava company_id,
+// description e updated_at em 313 produtos — peso morto no 3G do representante.
+const PRODUCT_COLUMNS =
+  'id, erp_id, sku, name, collection, brand, group_name, image_url, variant_group, color_name, color_hex, active';
+
 export async function getProducts(
   company_id: string,
-  price_table_id?: string,
+  options: CatalogOptions = {},
 ): Promise<ProductWithPrice[]> {
+  const { price_table_id, includeStock = false, onlyPriced = false } = options;
+
   const { data: products, error } = await supabase
     .from('products')
-    .select('*')
+    .select(PRODUCT_COLUMNS)
     .eq('company_id', company_id)
     .eq('active', true)
     .order('name');
@@ -48,15 +70,23 @@ export async function getProducts(
   // juvenil/infantil em números). Cores são sortidas, então é só (produto×tamanho).
   const { data: variants } = await supabase
     .from('product_variants')
-    .select('id, product_id, company_id, erp_sku, size, stock_quantity, stock_committed, active, updated_at')
+    .select('id, product_id, size, stock_quantity, stock_committed')
     .in('product_id', productIds)
     .eq('active', true);
 
-  const variantsByProduct = new Map<string, NonNullable<typeof variants>>();
+  const variantsByProduct = new Map<string, CatalogVariant[]>();
   for (const v of variants ?? []) {
     const pid = v.product_id as string;
+    // O ERP às vezes devolve estoque negativo (baixa lançada antes da entrada).
+    // Piso em zero: negativo não é "menos que esgotado", é esgotado.
+    const available = Math.max(0, (v.stock_quantity as number) - (v.stock_committed as number));
     const arr = variantsByProduct.get(pid) ?? [];
-    arr.push(v);
+    arr.push({
+      id: v.id as string,
+      size: v.size as string,
+      in_stock: available > 0,
+      ...(includeStock ? { available } : {}),
+    });
     variantsByProduct.set(pid, arr);
   }
 
@@ -70,9 +100,11 @@ export async function getProducts(
     for (const pp of prices ?? []) priceMap.set(pp.product_id as string, pp.price as number);
   }
 
-  return products.map((p) => ({
+  const withPrice = products.map((p) => ({
     ...p,
     price: priceMap.get(p.id as string) ?? null,
-    variants: (variantsByProduct.get(p.id as string) ?? []) as ProductWithPrice['variants'],
-  }));
+    variants: variantsByProduct.get(p.id as string) ?? [],
+  })) as ProductWithPrice[];
+
+  return onlyPriced ? withPrice.filter((p) => p.price != null) : withPrice;
 }

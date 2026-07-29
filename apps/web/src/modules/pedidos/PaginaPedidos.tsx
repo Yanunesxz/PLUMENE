@@ -15,7 +15,7 @@ import { exportOrdersToXlsx } from '../../lib/exportOrders.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type {
   Order,
-  CustomerWithPriceTable,
+  CustomerListItem,
   ApiResponse,
   OrderStatus,
   OrderWithItems,
@@ -25,12 +25,12 @@ import type {
 
 const ALL_REPS = '__all__';
 
-const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'blue'> = {
+const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
   draft: 'gray',
   pending_approval: 'yellow',
   approved: 'green',
   rejected: 'red',
-  sent_erp: 'blue',
+  sent_erp: 'brand',
   error_erp: 'red',
 };
 
@@ -82,7 +82,7 @@ export function PaginaPedidos() {
       .finally(() => setLoading(false));
     // garante os nomes de cliente para a busca, mesmo sem passar pela aba Clientes
     api
-      .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
+      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
       .catch(() => {});
     // garante o SKU dos produtos para a exportação, mesmo sem passar pelo Catálogo
@@ -176,7 +176,7 @@ export function PaginaPedidos() {
       </div>
 
       {selectMode && (
-        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-brand-200 bg-brand-50 p-3">
+        <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft p-3">
           <p className="text-sm font-medium text-foreground">{selected.size} selecionado(s)</p>
           <Button size="sm" onClick={handleExport} disabled={selected.size === 0 || exporting}>
             <FileSpreadsheet className="h-4 w-4" strokeWidth={2.5} />
@@ -284,13 +284,13 @@ export function PaginaPedidos() {
                   onClick={() => toggleSelected(order.id)}
                   className={cn(
                     'relative block rounded-xl border bg-card p-4 text-left shadow-sm transition-shadow',
-                    isSelected ? 'border-brand-600 ring-2 ring-brand-200' : 'border-border hover:border-brand-200',
+                    isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/30',
                   )}
                 >
                   <span
                     className={cn(
                       'absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded-full border-2',
-                      isSelected ? 'border-brand-600 bg-brand-600' : 'border-border bg-background',
+                      isSelected ? 'border-primary bg-primary' : 'border-border bg-background',
                     )}
                   >
                     {isSelected && <span className="h-2 w-2 rounded-full bg-white" />}
@@ -304,7 +304,7 @@ export function PaginaPedidos() {
               <Link
                 key={order.id}
                 to={`/orders/${order.id}`}
-                className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:border-brand-200 hover:shadow-md"
+                className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:border-primary/30 hover:shadow-md"
               >
                 {card}
               </Link>
@@ -324,8 +324,8 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       className={cn(
         'shrink-0 whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors',
         active
-          ? 'border-brand-600 bg-brand-600 text-white'
-          : 'border-border bg-card text-muted-foreground hover:border-brand-300 hover:text-foreground',
+          ? 'border-primary bg-primary text-white'
+          : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground',
       )}
     >
       {children}

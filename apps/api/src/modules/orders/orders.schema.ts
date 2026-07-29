@@ -4,6 +4,9 @@ export const createOrderSchema = z.object({
   customer_id: z.string().min(1, 'customer_id é obrigatório'),
   notes: z.string().optional(),
   local_id: z.string().optional(),
+  // Pedido fechado pelo representante entra direto na fila de aprovação.
+  // Ausente = rascunho (compatível com clientes antigos que não mandam o campo).
+  submit: z.boolean().optional(),
   items: z
     .array(
       z.object({

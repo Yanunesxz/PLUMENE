@@ -27,7 +27,7 @@ export function ReconnectBanner({ title, detail, onDone }: ReconnectBannerProps)
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center px-4 safe-top">
       <div
-        className={`mt-3 flex max-w-sm items-center gap-3 rounded-xl bg-green-600 px-4 py-3 text-white shadow-lg transition-all duration-300 ${
+        className={`mt-3 flex max-w-sm items-center gap-3 rounded-xl bg-positive px-4 py-3 text-white shadow-lg transition-all duration-300 ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-6 opacity-0'
         }`}
       >

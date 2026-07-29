@@ -13,12 +13,12 @@ import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
-const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'blue'> = {
+const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
   draft: 'gray',
   pending_approval: 'yellow',
   approved: 'green',
   rejected: 'red',
-  sent_erp: 'blue',
+  sent_erp: 'brand',
   error_erp: 'red',
 };
 
@@ -151,7 +151,7 @@ export function PaginaDetalhePedido() {
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Falar no WhatsApp"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-green-600 transition-colors hover:bg-green-50"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-positive-soft-foreground transition-colors hover:bg-positive-soft"
                 >
                   <MessageCircle className="h-[18px] w-[18px]" />
                 </a>
@@ -246,7 +246,7 @@ export function PaginaDetalhePedido() {
             <Button
               variant="outline"
               size="lg"
-              className="w-full text-red-600 hover:bg-red-50"
+              className="w-full text-danger-soft-foreground hover:bg-danger-soft"
               disabled={deleting}
               onClick={() => void handleDelete()}
             >

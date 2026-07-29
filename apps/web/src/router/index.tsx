@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { PrivateRoute } from './PrivateRoute.js';
 import { AppLayout } from '../components/layout/AppLayout.js';
@@ -7,14 +8,23 @@ import { PaginaPedidos } from '../modules/pedidos/PaginaPedidos.js';
 import { PaginaNovoPedido } from '../modules/pedidos/PaginaNovoPedido.js';
 import { PaginaDetalhePedido } from '../modules/pedidos/PaginaDetalhePedido.js';
 import { PaginaClientes } from '../modules/clientes/PaginaClientes.js';
-import { PaginaPainel } from '../modules/painel/PaginaPainel.js';
-import { PaginaRepresentantes } from '../modules/representantes/PaginaRepresentantes.js';
-import { PaginaComissoes } from '../modules/comissoes/PaginaComissoes.js';
 import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
-import { PaginaAssistente } from '../modules/assistente/PaginaAssistente.js';
-import { PaginaImportar } from '../modules/importar/PaginaImportar.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
 import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
+
+// Telas que só gerente/admin abrem. O representante — que é quem usa o app no
+// celular, em campo — não precisa baixar nada disto para ver o catálogo.
+// PaginaImportar sozinha carrega a biblioteca de planilhas.
+const PaginaPainel = lazy(() => import('../modules/painel/PaginaPainel.js').then((m) => ({ default: m.PaginaPainel })));
+const PaginaRepresentantes = lazy(() => import('../modules/representantes/PaginaRepresentantes.js').then((m) => ({ default: m.PaginaRepresentantes })));
+const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
+const PaginaAssistente = lazy(() => import('../modules/assistente/PaginaAssistente.js').then((m) => ({ default: m.PaginaAssistente })));
+const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
+
+/** Enquanto o pedaço da tela baixa. Some rápido demais para merecer esqueleto. */
+function AoCarregar({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Carregando…</div>}>{children}</Suspense>;
+}
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
@@ -35,7 +45,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             // Assistente em desenvolvimento: bloqueado para representante.
             path: 'assistente',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <PaginaAssistente /> }],
+            children: [{ index: true, element: <AoCarregar><PaginaAssistente /></AoCarregar> }],
           },
           { path: 'orders', element: <PaginaPedidos /> },
           { path: 'orders/new', element: <PaginaNovoPedido /> },
@@ -44,22 +54,22 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           {
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <PaginaPainel /> }],
+            children: [{ index: true, element: <AoCarregar><PaginaPainel /></AoCarregar> }],
           },
           {
             path: 'representantes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <PaginaRepresentantes /> }],
+            children: [{ index: true, element: <AoCarregar><PaginaRepresentantes /></AoCarregar> }],
           },
           {
             path: 'comissoes',
             element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <PaginaComissoes /> }],
+            children: [{ index: true, element: <AoCarregar><PaginaComissoes /></AoCarregar> }],
           },
           {
             path: 'importar',
             element: <PrivateRoute roles={['admin']} />,
-            children: [{ index: true, element: <PaginaImportar /> }],
+            children: [{ index: true, element: <AoCarregar><PaginaImportar /></AoCarregar> }],
           },
         ],
       },

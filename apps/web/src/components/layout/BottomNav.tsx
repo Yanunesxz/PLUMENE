@@ -22,7 +22,7 @@ export function BottomNav() {
               cn(
                 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pb-1.5 pt-2 font-medium transition-colors',
                 crowded ? 'text-[10px]' : 'text-[11px]',
-                isActive ? 'text-brand-600' : 'text-muted-foreground',
+                isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }
           >

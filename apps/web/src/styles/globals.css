@@ -2,25 +2,141 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Tokens
+   Nenhuma tela escreve cor crua. Tudo sai daqui, e o tema escuro é só a troca
+   destes valores — por isso o app inteiro vira junto.
+   Neutro levemente QUENTE de propósito: cinza azulado deixa a foto de pijama
+   com cara de radiografia.
+   ──────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 175 70% 38%;
-    --primary: 175 77% 26%;
+    /* superfícies */
+    --background: 30 12% 97%; /* fundo do app */
+    --card: 0 0% 100%; /* cartão / barra */
+    --card-foreground: 24 12% 12%;
+    --sunken: 30 10% 93%; /* poço: campo, thumb de foto */
+
+    /* texto */
+    --foreground: 24 12% 12%;
+    --muted: 30 10% 94%;
+    --muted-foreground: 25 7% 38%;
+    /* Metadado, SKU, legenda. Não desce mais que isto: em 10px, abaixo de
+       ~4.5:1 sobre o card o código do produto some no sol. */
+    --subtle: 25 6% 44%;
+
+    /* traços */
+    --border: 30 8% 87%;
+    --input: 30 8% 84%;
+    --ring: 176 60% 34%;
+
+    /* marca */
+    --primary: 176 68% 26%;
     --primary-foreground: 0 0% 100%;
-    --radius: 0.625rem;
+    --primary-soft: 176 45% 94%;
+    --primary-soft-foreground: 176 70% 22%;
+
+    /* estados */
+    --positive: 152 55% 30%;
+    --positive-soft: 152 45% 93%;
+    --positive-soft-foreground: 152 60% 24%;
+
+    --warn: 32 85% 38%;
+    --warn-soft: 40 85% 93%;
+    --warn-soft-foreground: 28 75% 30%;
+
+    --danger: 0 65% 45%;
+    --danger-soft: 4 75% 95%;
+    --danger-soft-foreground: 0 60% 38%;
+
+    --radius: 0.5rem;
+  }
+
+  /* O tema segue o sistema; o botão no cabeçalho crava data-theme e ganha das
+     duas regras abaixo (por isso ele vem depois e repete os valores). */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      --background: 24 8% 9%;
+      --card: 24 7% 13%;
+      --card-foreground: 30 14% 93%;
+      --sunken: 24 7% 17%;
+
+      --foreground: 30 14% 93%;
+      --muted: 24 6% 19%;
+      --muted-foreground: 28 6% 68%;
+      --subtle: 28 5% 58%;
+
+      --border: 26 6% 24%;
+      --input: 26 6% 30%;
+      --ring: 172 55% 45%;
+
+      --primary: 173 55% 40%;
+      --primary-foreground: 174 60% 8%;
+      --primary-soft: 176 30% 18%;
+      --primary-soft-foreground: 172 55% 68%;
+
+      --positive: 152 45% 42%;
+      --positive-soft: 152 25% 17%;
+      --positive-soft-foreground: 150 50% 66%;
+
+      --warn: 38 70% 52%;
+      --warn-soft: 36 30% 18%;
+      --warn-soft-foreground: 40 70% 66%;
+
+      --danger: 2 60% 55%;
+      --danger-soft: 2 30% 19%;
+      --danger-soft-foreground: 4 70% 72%;
+    }
+  }
+
+  :root[data-theme='dark'] {
+    --background: 24 8% 9%;
+    --card: 24 7% 13%;
+    --card-foreground: 30 14% 93%;
+    --sunken: 24 7% 17%;
+
+    --foreground: 30 14% 93%;
+    --muted: 24 6% 19%;
+    --muted-foreground: 28 6% 68%;
+    --subtle: 28 5% 58%;
+
+    --border: 26 6% 24%;
+    --input: 26 6% 30%;
+    --ring: 172 55% 45%;
+
+    --primary: 173 55% 40%;
+    --primary-foreground: 174 60% 8%;
+    --primary-soft: 176 30% 18%;
+    --primary-soft-foreground: 172 55% 68%;
+
+    --positive: 152 45% 42%;
+    --positive-soft: 152 25% 17%;
+    --positive-soft-foreground: 150 50% 66%;
+
+    --warn: 38 70% 52%;
+    --warn-soft: 36 30% 18%;
+    --warn-soft-foreground: 40 70% 66%;
+
+    --danger: 2 60% 55%;
+    --danger-soft: 2 30% 19%;
+    --danger-soft-foreground: 4 70% 72%;
   }
 
   * {
     -webkit-tap-highlight-color: transparent;
     border-color: hsl(var(--border));
+  }
+
+  html {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme='light']) {
+      color-scheme: dark;
+    }
+  }
+  html[data-theme='dark'] {
+    color-scheme: dark;
   }
 
   body {
@@ -29,11 +145,30 @@
     font-feature-settings: 'cv11', 'ss01';
   }
 
+  /* Dinheiro e quantidade em largura fixa: sem isso a coluna de valores dança
+     quando o dígito muda, e numa lista de pedidos isso salta aos olhos. */
+  .tnum,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
   /* Alvos de toque confortáveis (mobile-first) */
   button,
   a,
   [role='button'] {
     @apply min-h-touch min-w-touch;
+  }
+
+  /* Quem pediu menos movimento, recebe menos movimento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

@@ -5,6 +5,7 @@ import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
 import { ReconnectBanner } from './ReconnectBanner.js';
 import { Logo } from '../interface/Logo.js';
+import { BotaoTema } from '../interface/BotaoTema.js';
 import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
@@ -62,7 +63,7 @@ export function AppLayout() {
             <Logo className="h-10 w-10 shrink-0" />
             <span className="text-base font-bold tracking-tight text-foreground">Corpo Sensual</span>
             {!isOnline && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn-soft-foreground">
                 <WifiOff className="h-3 w-3" strokeWidth={2.5} />
                 Offline
               </span>
@@ -70,9 +71,10 @@ export function AppLayout() {
           </div>
 
           <div className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
               {initials}
             </span>
+            <BotaoTema />
             <button
               type="button"
               onClick={handleLogout}

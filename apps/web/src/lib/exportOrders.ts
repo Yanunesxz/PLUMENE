@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems } from '@csb/shared';
 
@@ -27,6 +26,11 @@ export async function exportOrdersToXlsx(
   customerName: Map<string, string>,
   productSku: Map<string, string>,
 ): Promise<void> {
+  // A xlsx sozinha pesa mais que o resto do app. Carregar só quando alguém
+  // clica em exportar tira ~430 KB da abertura do catálogo — que é o caminho
+  // que o representante faz todo dia, no celular dele.
+  const XLSX = await import('xlsx');
+
   const rows = orderSheetRows(orders, customerName, productSku);
   const sheet = XLSX.utils.json_to_sheet(rows);
   const workbook = XLSX.utils.book_new();

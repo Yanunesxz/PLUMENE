@@ -38,12 +38,17 @@ const norm = (s: string): string =>
 const isPlumene = (sku: string): boolean => /^2/.test(sku);
 
 const availableOf = (p: Awaited<ReturnType<typeof getProducts>>[number]): number =>
-  (p.variants ?? []).reduce((s, v) => s + Math.max(0, v.stock_quantity - v.stock_committed), 0);
+  (p.variants ?? []).reduce((s, v) => s + (v.available ?? 0), 0);
 
 // ─── "Ferramentas" (viram tool use do Claude depois) ─────────────────────────
 
 async function findProducts(ctx: AssistantContext, term: string) {
-  const all = await getProducts(ctx.company_id, ctx.price_table_id ?? undefined);
+  // O assistente é exclusivo de gerente/admin (ver assistant.router), então pode
+  // receber a quantidade em estoque — é justamente uma das perguntas que atende.
+  const all = await getProducts(ctx.company_id, {
+    price_table_id: ctx.price_table_id ?? undefined,
+    includeStock: true,
+  });
   const q = norm(term);
   return all
     .filter((p) => p.active && !isPlumene(p.sku))
@@ -77,7 +82,7 @@ const HELP = (name: string): string =>
 export async function answer(ctx: AssistantContext, message: string): Promise<AssistantReply> {
   const text = message.trim();
   const q = norm(text);
-  const provider = 'mock' as const;
+  const provider: AssistantReply['provider'] = 'mock';
 
   if (!text) return { reply: HELP(ctx.name), provider };
 

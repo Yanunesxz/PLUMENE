@@ -34,7 +34,7 @@ export async function withFirebird<T>(
   return new Promise((resolve, reject) => {
     Firebird.attach(fbOptions, (err, db) => {
       if (err) {
-        reject(new Error(`Firebird connection failed: ${err.message}`));
+        reject(new Error(`Firebird connection failed: ${(err as Error).message}`));
         return;
       }
 
@@ -61,7 +61,7 @@ export function query<T = Record<string, unknown>>(
 ): Promise<T[]> {
   return new Promise((resolve, reject) => {
     db.query(sql, params, (err, result) => {
-      if (err) reject(new Error(`Firebird query failed: ${err.message}`));
+      if (err) reject(new Error(`Firebird query failed: ${(err as Error).message}`));
       else resolve((result ?? []) as T[]);
     });
   });

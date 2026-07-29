@@ -22,7 +22,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
-import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
+import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
 // Gerente comercial (suporte) por WhatsApp — número (55) 32 9 9849-3177.
 // É quem controla senhas e acessos; o rep fala com ele por aqui.
@@ -69,7 +69,7 @@ export function PaginaMinhaArea() {
     if (!token) return;
     api.get<ApiResponse<Order[]>>('/orders', token).then((r) => db.orders.bulkPut(r.data)).catch(() => {});
     api
-      .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
+      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((r) => db.customers.bulkPut(r.data))
       .catch(() => {});
   }, [token]);
@@ -131,7 +131,7 @@ export function PaginaMinhaArea() {
             <div className="flex min-w-0 items-center gap-3">
               <span
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${
-                  pendingSync > 0 ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700'
+                  pendingSync > 0 ? 'bg-warn-soft text-warn-soft-foreground' : 'bg-positive-soft text-positive-soft-foreground'
                 }`}
               >
                 {pendingSync > 0 ? (
@@ -187,10 +187,10 @@ export function PaginaMinhaArea() {
           href={suporteWhatsappUrl(user?.name ?? '')}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-green-300 hover:bg-green-50"
+          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-colors hover:border-positive/40 hover:bg-positive-soft"
         >
           <span className="flex min-w-0 items-center gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-green-100 text-green-700">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-positive-soft text-positive-soft-foreground">
               <MessageCircle className="h-5 w-5" strokeWidth={2} />
             </span>
             <span className="min-w-0">
@@ -200,7 +200,7 @@ export function PaginaMinhaArea() {
               </span>
             </span>
           </span>
-          <span className="shrink-0 text-xs font-semibold text-green-700">Abrir</span>
+          <span className="shrink-0 text-xs font-semibold text-positive-soft-foreground">Abrir</span>
         </a>
       </section>
 
@@ -221,8 +221,8 @@ function MetricCard({
   label: string;
 }) {
   const tints: Record<string, string> = {
-    green: 'bg-green-100 text-green-700',
-    brand: 'bg-brand-100 text-brand-700',
+    green: 'bg-positive-soft text-positive-soft-foreground',
+    brand: 'bg-primary-soft text-primary-soft-foreground',
   };
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -253,7 +253,7 @@ function Row({
       <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
         <Icon className="h-4 w-4 shrink-0" /> {label}
       </span>
-      <span className={`text-sm font-semibold ${highlight ? 'text-brand-700' : 'text-foreground'}`}>{value}</span>
+      <span className={`text-sm font-semibold ${highlight ? 'text-primary-soft-foreground' : 'text-foreground'}`}>{value}</span>
     </div>
   );
 }

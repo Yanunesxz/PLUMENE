@@ -1,15 +1,14 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-type BadgeVariant = 'red' | 'green' | 'yellow' | 'gray' | 'blue' | 'brand';
+type BadgeVariant = 'red' | 'green' | 'yellow' | 'gray' | 'brand';
 
 const variantClasses: Record<BadgeVariant, string> = {
-  red: 'bg-red-100 text-red-700',
-  green: 'bg-green-100 text-green-700',
-  yellow: 'bg-yellow-100 text-yellow-800',
+  red: 'bg-danger-soft text-danger-soft-foreground',
+  green: 'bg-positive-soft text-positive-soft-foreground',
+  yellow: 'bg-warn-soft text-warn-soft-foreground',
   gray: 'bg-muted text-muted-foreground',
-  blue: 'bg-blue-100 text-blue-700',
-  brand: 'bg-brand-100 text-brand-700',
+  brand: 'bg-primary-soft text-primary-soft-foreground',
 };
 
 interface BadgeProps {

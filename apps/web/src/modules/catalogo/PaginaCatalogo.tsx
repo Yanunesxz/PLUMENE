@@ -23,8 +23,9 @@ interface PriceTableOption {
 
 type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
-const availableOf = (p: ProductWithPrice) =>
-  (p.variants ?? []).reduce((s, v) => s + Math.max(0, v.stock_quantity - v.stock_committed), 0);
+// Basta UM tamanho com peça para o produto ser vendável. A quantidade em si só
+// chega para gerente/admin (ver catalog.service), então não dá para somar aqui.
+const temEstoque = (p: ProductWithPrice) => (p.variants ?? []).some((v) => v.in_stock);
 
 // Plumene é outra marca (códigos 2xxx/22xxx) — não entra neste catálogo.
 const isPlumene = (sku: string) => /^2/.test(sku);
@@ -148,7 +149,7 @@ export function PaginaCatalogo() {
       .filter((p) => !isPlumene(p.sku))
       .filter((p) => showNoPhoto || !!p.image_url)
       .filter((p) => brand === ALL || p.brand === brand)
-      .filter((p) => !inStockOnly || availableOf(p) > 0)
+      .filter((p) => !inStockOnly || temEstoque(p))
       .filter(
         (p) =>
           !q ||
@@ -241,7 +242,7 @@ export function PaginaCatalogo() {
       </div>
 
       {isConsulting && (
-        <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+        <div className="mb-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
           Consultando preços de <strong>{viewTableName}</strong>. É só referência — seus
           pedidos são faturados pela{' '}
           {defaultTableName ? <strong>{defaultTableName}</strong> : 'sua tabela'}.
@@ -322,11 +323,11 @@ export function PaginaCatalogo() {
         <button
           type="button"
           onClick={() => void navigate('/orders/new')}
-          className="fixed bottom-24 right-4 z-40 flex items-center gap-3 rounded-full bg-brand-700 py-3 pl-4 pr-5 text-white shadow-lg transition-colors hover:bg-brand-800 md:bottom-6"
+          className="fixed bottom-24 right-4 z-40 flex items-center gap-3 rounded-full bg-primary py-3 pl-4 pr-5 text-white shadow-lg transition-colors hover:bg-primary/90 md:bottom-6"
         >
           <span className="relative flex h-6 w-6 items-center justify-center">
             <ShoppingCart className="h-5 w-5" strokeWidth={2} />
-            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-brand-700">
+            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-primary-soft-foreground">
               {cartCount}
             </span>
           </span>
@@ -374,8 +375,8 @@ function Chip({
       className={cn(
         'shrink-0 whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors',
         active
-          ? 'border-brand-600 bg-brand-600 text-white'
-          : 'border-border bg-card text-muted-foreground hover:border-brand-300 hover:text-foreground',
+          ? 'border-primary bg-primary text-white'
+          : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground',
       )}
     >
       {children}

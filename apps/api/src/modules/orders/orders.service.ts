@@ -105,13 +105,17 @@ export async function createOrder(
 
   const total = items.reduce((sum, item) => sum + item.total, 0);
 
+  // Pedido enviado pelo representante já nasce na fila do gerente. Sem isto ele
+  // ficava em 'draft' para sempre e a tela de aprovação nunca via nada.
+  const status: Order['status'] = body.submit ? 'pending_approval' : 'draft';
+
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       company_id,
       rep_id,
       customer_id: body.customer_id,
-      status: 'draft',
+      status,
       total,
       notes: body.notes ?? null,
       local_id: body.local_id ?? null,
