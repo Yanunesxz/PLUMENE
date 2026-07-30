@@ -277,7 +277,7 @@ export function PaginaCatalogo() {
         <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="aspect-[3/4] w-full rounded-lg" />
+              <Skeleton className="aspect-[3/5] w-full rounded-lg" />
               <Skeleton className="h-3 w-1/2" />
               <Skeleton className="h-4 w-3/4" />
             </div>
@@ -299,7 +299,7 @@ export function PaginaCatalogo() {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-          {groups.map((group) => {
+          {groups.map((group, indice) => {
             const rep = group[0]!; // representante do grupo (primeira cor)
             // Card mostra o preço consultado; o picker recebe os produtos ORIGINAIS
             // (preço da tabela do rep) para o carrinho não herdar o preço de consulta.
@@ -313,6 +313,7 @@ export function PaginaCatalogo() {
                 inOrder={group.some((g) => cartItems.some((i) => i.product_id === g.id))}
                 onAdd={() => setPicker({ product: rep, group })}
                 swatches={swatches}
+                prioritaria={indice < 6}
               />
             );
           })}

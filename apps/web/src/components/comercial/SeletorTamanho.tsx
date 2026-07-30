@@ -59,7 +59,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
       <div className="animate-slide-up relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="h-[72px] w-[54px] shrink-0 overflow-hidden rounded-lg bg-sunken">
+            <div className="h-[90px] w-[54px] shrink-0 overflow-hidden rounded-lg bg-sunken">
               {active.image_url ? (
                 <img src={active.image_url} alt={active.name} className="h-full w-full object-cover" />
               ) : (

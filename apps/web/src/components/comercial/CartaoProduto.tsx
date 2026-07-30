@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ImageIcon, Plus, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
@@ -18,11 +19,26 @@ interface CartaoProdutoProps {
   showStock?: boolean;
   /** Cores disponíveis (hex das bolinhas). Mais de uma → mostra as opções de cor. */
   swatches?: (string | null)[] | undefined;
+  /**
+   * Primeiras peças da lista: carregam de imediato, sem esperar o scroll.
+   * `loading="lazy"` no que já está na dobra só atrasa a primeira pintura.
+   */
+  prioritaria?: boolean;
 }
 
 const FALLBACK_HEX = '#D1D5DB';
 
-export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = true, swatches }: CartaoProdutoProps) {
+export function CartaoProduto({
+  product,
+  onClick,
+  onAdd,
+  inOrder,
+  showStock = true,
+  swatches,
+  prioritaria = false,
+}: CartaoProdutoProps) {
+  const [carregada, setCarregada] = useState(false);
+  const [falhou, setFalhou] = useState(false);
   const hasColors = (swatches?.length ?? 0) > 1;
   const grade = ordenarGrade(product.variants ?? []);
   const temGrade = grade.length > 0;
@@ -40,19 +56,32 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
           existe só para conter o fundo branco de estúdio da foto — sem ele a
           modelo flutuaria no papel. */}
       <div className="relative overflow-hidden rounded-lg bg-sunken">
-        {/* 3:4 é a proporção NATIVA de todas as fotos (750×1000). Qualquer outra
-            corta: em quadrado, sumiam 125px em cima e 125px embaixo — ou seja, a
-            cabeça e os pés da modelo. */}
-        <div className="aspect-[3/4] w-full">
-          {product.image_url ? (
+        {/* Proporção 3:5, não a 3:4 da origem — e isso é deliberado.
+            Medido nas fotos do catálogo: a modelo preenche o quadro de cima a
+            baixo (margem de 0,2%), mas sobram ~29% de branco de cada lado. A
+            peça ocupa só 41% da área.
+            Container mais ESTREITO que a origem corta apenas a largura, nunca a
+            altura — cabeça e pés continuam inteiros. Em 3:5 ficam os 80%
+            centrais; a peça mais larga do catálogo usa 53%, então nenhuma corre
+            risco de ser cortada, e a roupa aparece ~20% maior. */}
+        <div className="aspect-[3/5] w-full">
+          {product.image_url && !falhou ? (
             <img
               src={product.image_url}
               alt={product.name}
-              loading="lazy"
+              loading={prioritaria ? 'eager' : 'lazy'}
+              // Em minúsculas de propósito: o React 18.2 não conhece
+              // `fetchPriority` em camelCase e avisa no console a cada imagem —
+              // com 160 no catálogo, vira ruído. Assim vai direto para o DOM,
+              // que é onde o navegador lê.
+              {...({ fetchpriority: prioritaria ? 'high' : 'auto' } as Record<string, string>)}
               decoding="async"
+              onLoad={() => setCarregada(true)}
+              onError={() => setFalhou(true)}
               className={cn(
-                'h-full w-full object-cover transition-opacity duration-200',
-                outOfStock && 'opacity-45',
+                'h-full w-full object-cover transition-opacity duration-300',
+                carregada ? 'opacity-100' : 'opacity-0',
+                outOfStock && carregada && 'opacity-45',
               )}
             />
           ) : (
