@@ -21,7 +21,7 @@ export function BottomNav() {
             className={({ isActive }) =>
               cn(
                 'flex min-w-0 flex-1 flex-col items-center justify-center gap-1 px-0.5 pb-1.5 pt-2 font-medium transition-colors',
-                crowded ? 'text-[10px]' : 'text-[11px]',
+                crowded ? 'text-[11px]' : 'text-[11px]',
                 isActive ? 'text-primary' : 'text-muted-foreground',
               )
             }

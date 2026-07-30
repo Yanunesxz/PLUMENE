@@ -64,9 +64,9 @@ export function PaginaLogin() {
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <Logo className="h-20 w-20" />
+          <Logo className="h-28 w-28" />
           <div>
-            <h1 className="text-xl font-bold tracking-tight text-foreground">Corpo Sensual</h1>
+            <h1 className="text-2xl font-bold tracking-tight text-foreground">Corpo Sensual</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Representantes</p>
           </div>
         </div>

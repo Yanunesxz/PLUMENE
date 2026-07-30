@@ -327,7 +327,7 @@ export function PaginaCatalogo() {
         >
           <span className="relative flex h-6 w-6 items-center justify-center">
             <ShoppingCart className="h-5 w-5" strokeWidth={2} />
-            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[10px] font-bold text-primary-soft-foreground">
+            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary-soft-foreground">
               {cartCount}
             </span>
           </span>

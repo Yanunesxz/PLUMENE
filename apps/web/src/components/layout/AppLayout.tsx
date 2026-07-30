@@ -5,7 +5,6 @@ import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
 import { ReconnectBanner } from './ReconnectBanner.js';
 import { Logo } from '../interface/Logo.js';
-import { BotaoTema } from '../interface/BotaoTema.js';
 import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
@@ -53,15 +52,15 @@ export function AppLayout() {
   const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
 
   return (
-    <div className="flex min-h-screen bg-muted/30">
+    <div className="flex min-h-screen bg-background">
       <SideNav />
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Topbar (apenas mobile — no desktop a marca fica na sidebar) */}
-        <header className="sticky top-0 z-40 flex h-14 items-center justify-between border-b border-border bg-card px-4 safe-top md:hidden">
+        <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 safe-top md:hidden">
           <div className="flex items-center gap-2">
-            <Logo className="h-10 w-10 shrink-0" />
-            <span className="text-base font-bold tracking-tight text-foreground">Corpo Sensual</span>
+            <Logo className="h-11 w-11 shrink-0" />
+            <span className="text-[17px] font-bold tracking-tight text-foreground">Corpo Sensual</span>
             {!isOnline && (
               <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn-soft-foreground">
                 <WifiOff className="h-3 w-3" strokeWidth={2.5} />
@@ -74,7 +73,6 @@ export function AppLayout() {
             <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
               {initials}
             </span>
-            <BotaoTema />
             <button
               type="button"
               onClick={handleLogout}

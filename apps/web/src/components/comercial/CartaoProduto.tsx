@@ -58,12 +58,12 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
           </div>
         )}
         {!product.active && (
-          <span className="absolute left-2 top-2 rounded bg-foreground/80 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-background">
+          <span className="absolute left-2 top-2 rounded bg-foreground/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-background">
             Inativo
           </span>
         )}
         {outOfStock && (
-          <span className="absolute inset-x-0 bottom-0 bg-foreground/75 py-1 text-center text-[11px] font-semibold uppercase tracking-wide text-background">
+          <span className="absolute inset-x-0 bottom-0 bg-foreground/90 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-background">
             Esgotado
           </span>
         )}
@@ -71,15 +71,15 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
 
       <div className="flex flex-1 flex-col gap-1.5 p-2.5">
         <div className="flex items-center justify-between gap-2">
-          <span className="tnum font-mono text-[11px] font-semibold text-subtle">{product.sku}</span>
+          <span className="tnum font-mono text-xs font-bold text-subtle">{product.sku}</span>
           {showStock && available > 0 && (
-            <span className="tnum inline-flex items-center rounded bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold text-primary-soft-foreground">
+            <span className="tnum inline-flex items-center rounded bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary-soft-foreground">
               {available} un.
             </span>
           )}
         </div>
 
-        <p className="line-clamp-2 text-[13px] font-medium leading-snug text-foreground">{product.name}</p>
+        <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{product.name}</p>
 
         {/* Régua de tamanhos: o esgotado sai riscado. O representante decide se
             vale tocar ANTES de tocar. */}
@@ -89,7 +89,7 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
               <span
                 key={v.id}
                 className={cn(
-                  'tnum rounded px-1 py-px text-[10px] font-semibold leading-tight',
+                  'tnum rounded px-1.5 py-0.5 text-[11px] font-bold leading-tight',
                   v.in_stock
                     ? 'bg-muted text-muted-foreground'
                     : 'text-subtle line-through decoration-subtle/70',
@@ -111,14 +111,14 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
               />
             ))}
             {swatches!.length > 5 && (
-              <span className="tnum text-[10px] font-medium text-subtle">+{swatches!.length - 5}</span>
+              <span className="tnum text-[11px] font-medium text-subtle">+{swatches!.length - 5}</span>
             )}
           </div>
         )}
 
         <div className="mt-auto flex items-end justify-between gap-2 pt-1">
           {product.price != null ? (
-            <p className="tnum text-[15px] font-bold tracking-tight text-foreground">
+            <p className="tnum text-base font-bold tracking-tight text-foreground">
               {formatBRL(product.price)}
             </p>
           ) : (
