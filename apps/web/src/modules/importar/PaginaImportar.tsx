@@ -170,7 +170,7 @@ export function PaginaImportar() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Importar produtos</h1>
+        <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Importar produtos</h1>
         <p className="text-sm text-muted-foreground">
           Suba o catálogo da sua fábrica por planilha — sem depender de integração com ERP.
         </p>

@@ -209,7 +209,7 @@ export function PaginaRepresentantes() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Representantes</h1>
+          <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Representantes</h1>
           {reps && <p className="text-sm text-muted-foreground">{reps.length} cadastrados</p>}
         </div>
         <Button size="md" onClick={() => (showForm ? closeForm() : startCreate())}>

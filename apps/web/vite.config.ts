@@ -31,6 +31,17 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // As fontes vêm fatiadas por alfabeto e o navegador escolhe pelo
+        // unicode-range — em português só o latino é buscado. Sem isto o
+        // precache guardaria cirílico, grego e matemático no celular do
+        // representante, que nunca serão exibidos.
+        globIgnores: [
+          '**/*-cyrillic*-normal-*.woff2',
+          '**/*-greek*-normal-*.woff2',
+          '**/*-vietnamese-normal-*.woff2',
+          '**/*-math-*-normal-*.woff2',
+          '**/*-symbols-*-normal-*.woff2',
+        ],
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,

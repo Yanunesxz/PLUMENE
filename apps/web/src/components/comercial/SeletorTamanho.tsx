@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { X, Minus, Plus, ImageIcon, Check } from 'lucide-react';
+import { X, Minus, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
 import { ordenarGrade } from './grade.js';
@@ -59,7 +59,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
       <div className="animate-slide-up relative flex max-h-[85vh] w-full max-w-md flex-col rounded-t-2xl bg-card shadow-xl sm:rounded-2xl">
         <div className="flex items-start justify-between gap-3 border-b border-border p-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-muted">
+            <div className="h-[72px] w-[54px] shrink-0 overflow-hidden rounded-lg bg-sunken">
               {active.image_url ? (
                 <img src={active.image_url} alt={active.name} className="h-full w-full object-cover" />
               ) : (
@@ -69,10 +69,14 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               )}
             </div>
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-foreground">{active.name}</p>
-              <p className="text-xs text-muted-foreground">
-                {active.sku}
-                {active.price != null ? ` · ${formatBRL(active.price)}` : ''}
+              <p className="line-clamp-2 text-[15px] leading-snug text-foreground">{active.name}</p>
+              <p className="mt-1 flex items-baseline gap-2">
+                <span className="tnum font-mono text-[11px] font-semibold tracking-wide text-subtle">
+                  {active.sku}
+                </span>
+                {active.price != null && (
+                  <span className="tnum text-sm font-semibold text-foreground">{formatBRL(active.price)}</span>
+                )}
               </p>
             </div>
           </div>
@@ -129,69 +133,55 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
             )}
           </div>
 
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            Escolha os tamanhos
-          </p>
+          <p className="mb-2.5 text-xs font-medium text-muted-foreground">Quantidade por tamanho</p>
           {variants.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               Esta cor não tem grade de tamanhos cadastrada.
             </p>
           ) : (
-            <ul className="space-y-2">
-              {variants.map((v) => (
-                <li
-                  key={v.id}
-                  className={cn(
-                    'flex items-center justify-between gap-3 rounded-lg border px-3 py-2',
-                    v.in_stock ? 'border-border' : 'border-border/60 bg-muted/40',
-                  )}
-                >
-                  <span className="flex min-w-0 items-baseline gap-2">
-                    <span
-                      className={cn(
-                        'text-sm font-medium',
-                        v.in_stock ? 'text-foreground' : 'text-subtle line-through',
-                      )}
-                    >
-                      Tam {v.size}
-                    </span>
-                    {/* Esgotado é bloqueio: vender o que não existe vira pedido
-                        cortado no faturamento. `available` só chega para
-                        gerente/admin; o representante vê só o rótulo. */}
-                    {!v.in_stock ? (
-                      <span className="text-[11px] font-semibold uppercase tracking-wide text-subtle">
-                        Esgotado
-                      </span>
-                    ) : v.available != null ? (
-                      <span className="tnum text-[11px] font-medium text-subtle">{v.available} un.</span>
-                    ) : null}
-                  </span>
-                  <div className="flex items-center">
-                    <button
-                      type="button"
-                      onClick={() => bump(v.size, -1)}
-                      aria-label={`Diminuir ${v.size}`}
-                      className="flex h-9 w-9 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                      disabled={!v.in_stock || (qty[key(v.size)] ?? 0) === 0}
-                    >
-                      <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                    </button>
-                    <span className="tnum flex h-9 w-10 items-center justify-center border-y border-input bg-card text-sm font-medium text-foreground">
-                      {qty[key(v.size)] ?? 0}
-                    </span>
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+              {variants.map((v) => {
+                const q = qty[key(v.size)] ?? 0;
+                return (
+                  <div key={v.id} className="flex flex-col items-stretch">
+                    {/* A peça inteira é o alvo: toca e soma 1. É como o
+                        representante anota no papel — "P:2 M:4" — em vez de
+                        caçar um "+" de 9px por linha. */}
                     <button
                       type="button"
                       onClick={() => bump(v.size, 1)}
-                      aria-label={`Aumentar ${v.size}`}
                       disabled={!v.in_stock}
-                      className="flex h-9 w-9 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted disabled:opacity-40"
+                      aria-label={`Adicionar tamanho ${v.size}`}
+                      className={cn(
+                        'flex aspect-square flex-col items-center justify-center rounded-lg border transition-colors',
+                        !v.in_stock
+                          ? 'cursor-not-allowed border-dashed border-border bg-transparent text-subtle'
+                          : q > 0
+                            ? 'border-foreground bg-foreground text-background'
+                            : 'border-input bg-card text-foreground hover:border-foreground',
+                      )}
                     >
-                      <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      <span className={cn('text-sm font-semibold', !v.in_stock && 'line-through')}>{v.size}</span>
+                      {v.in_stock ? (
+                        q > 0 && <span className="tnum text-lg font-bold leading-none">{q}</span>
+                      ) : (
+                        <span className="text-[9px] uppercase tracking-wide">esgot.</span>
+                      )}
                     </button>
+                    {q > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => bump(v.size, -1)}
+                        aria-label={`Remover uma peça do tamanho ${v.size}`}
+                        className="mt-1 flex h-7 items-center justify-center rounded text-xs font-medium text-subtle hover:bg-muted hover:text-foreground"
+                      >
+                        <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
+                      </button>
+                    )}
                   </div>
-                </li>
-              ))}
-            </ul>
+                );
+              })}
+            </div>
           )}
         </div>
 
@@ -200,11 +190,13 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
           style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom))' }}
         >
           <div className="mb-3 flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">
+            <span className="tnum text-muted-foreground">
               {activeQty} {activeQty === 1 ? 'peça' : 'peças'}
               {hasColors ? (active.color_name ? ` · ${active.color_name}` : '') : ' · Sortido'}
             </span>
-            {active.price != null && <span className="font-semibold text-foreground">{formatBRL(totalValue)}</span>}
+            {active.price != null && (
+              <span className="tnum text-base font-semibold text-foreground">{formatBRL(totalValue)}</span>
+            )}
           </div>
           <Button size="lg" className="w-full" disabled={activeQty === 0} onClick={confirm}>
             Adicionar ao pedido

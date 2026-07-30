@@ -191,7 +191,7 @@ export function PaginaCatalogo() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-4 flex flex-col gap-1">
-        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Catálogo</h1>
+        <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Catálogo</h1>
         <p className="text-sm text-muted-foreground">
           {filtered.length} {filtered.length === 1 ? 'produto' : 'produtos'}
           {brand !== ALL && ` · ${brand}`}
@@ -274,10 +274,10 @@ export function PaginaCatalogo() {
       </div>
 
       {isInitialLoading ? (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {Array.from({ length: 10 }).map((_, i) => (
             <div key={i} className="flex flex-col gap-2">
-              <Skeleton className="aspect-[3/4] w-full rounded-xl" />
+              <Skeleton className="aspect-[3/4] w-full rounded-lg" />
               <Skeleton className="h-3 w-1/2" />
               <Skeleton className="h-4 w-3/4" />
             </div>
@@ -298,7 +298,7 @@ export function PaginaCatalogo() {
           </div>
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+        <div className="grid grid-cols-2 gap-x-3 gap-y-6 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {groups.map((group) => {
             const rep = group[0]!; // representante do grupo (primeira cor)
             // Card mostra o preço consultado; o picker recebe os produtos ORIGINAIS

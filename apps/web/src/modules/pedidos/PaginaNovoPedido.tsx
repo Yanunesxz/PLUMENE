@@ -126,7 +126,7 @@ export function PaginaNovoPedido() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
-      <h1 className="mb-4 text-xl font-bold tracking-tight text-foreground md:text-2xl">Novo pedido</h1>
+      <h1 className="mb-4 titulo text-[26px] leading-none text-foreground md:text-[32px]">Novo pedido</h1>
 
       {!isOnline && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">

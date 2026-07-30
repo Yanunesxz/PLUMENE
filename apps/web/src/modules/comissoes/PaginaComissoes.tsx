@@ -72,7 +72,7 @@ export function PaginaComissoes() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Comissões</h1>
+        <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Comissões</h1>
         <p className="text-sm text-muted-foreground">Calculada sobre os pedidos faturados.</p>
       </div>
 

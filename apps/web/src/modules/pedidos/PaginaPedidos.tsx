@@ -151,7 +151,7 @@ export function PaginaPedidos() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Pedidos</h1>
+          <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Pedidos</h1>
           {hasOrders && <p className="text-sm text-muted-foreground">{filtered.length} de {orders?.length}</p>}
         </div>
         <div className="flex items-center gap-2">

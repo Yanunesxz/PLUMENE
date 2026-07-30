@@ -3,64 +3,63 @@
 @tailwind utilities;
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   Identidade visual — uma só, calibrada para leitura sob SOL DIRETO.
+   Identidade — tinta sobre papel. As fotos são a única cor.
    Nenhuma tela escreve cor crua: tudo sai daqui.
 
-   O que muda quando o alvo é o sol (o representante trabalha na calçada, na
-   porta da loja, com o celular no brilho máximo):
+   A decisão que organiza o resto: o app NÃO tem cor de marca. O monograma da
+   Corpo Sensual é preto, e cada tela mostra até 160 peças coloridas — camisola
+   rosa, estampa, pele. Um teal (ou qualquer acento) ao lado disso é ruído
+   disputando atenção com a mercadoria. Então a interface é monocromática e o
+   único croma da tela vem do produto.
 
-   • O reflexo na tela come os MEIOS-TONS. Cinza médio, borda clara e cor
-     saturada clara somem. Por isso aqui não existe cinza de 60%: o texto
-     secundário mais claro está em 34% (~7,5:1) e a borda em 72%, não 87%.
-   • Fundo do app levemente escuro contra cartão BRANCO PURO. O branco puro é o
-     máximo de luz que o painel consegue emitir — é ele que vence o reflexo — e
-     o fundo mais escuro faz o cartão se destacar sem depender de sombra.
-   • Neutro QUENTE de propósito: cinza azulado deixa a foto de pijama com cara
-     de radiografia, e sob luz forte puxa ainda mais para o cinza.
-   • Cores de marca e de estado ficam ESCURAS. Teal claro sobre branco é o
-     primeiro a desaparecer lá fora.
+   Cinza FRIO de propósito: a foto é quente (pele, rosa, estampa). Papel frio
+   afasta; papel quente se mistura com a peça e suja a leitura da cor real do
+   tecido — que é justamente o que o lojista está avaliando.
    ──────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
     /* superfícies */
-    --background: 36 18% 93%; /* fundo do app — separa o cartão sem sombra */
-    --card: 0 0% 100%; /* cartão / barra — branco puro, brilho máximo */
-    --card-foreground: 24 14% 9%;
-    --sunken: 33 14% 89%; /* poço: campo, thumb de foto */
+    --background: 220 14% 97%; /* papel */
+    --card: 0 0% 100%;
+    --card-foreground: 220 9% 12%;
+    /* Poço da foto. As fotos são modelo de corpo inteiro sobre branco de
+       estúdio: sem uma superfície que as contenha, a modelo flutua no vazio. */
+    --sunken: 30 6% 94%;
 
-    /* texto — nenhum tom acima de 40% de luminosidade */
-    --foreground: 24 14% 9%; /* ~18:1 no branco */
-    --muted: 33 14% 90%;
-    --muted-foreground: 25 9% 30%; /* ~9,5:1 — rótulo, legenda */
-    --subtle: 25 8% 34%; /* ~7,5:1 — SKU, metadado, o menor texto da tela */
+    /* tinta */
+    --foreground: 220 9% 12%;
+    --muted: 220 12% 95%;
+    --muted-foreground: 220 6% 38%;
+    /* Não sobe além disto: é a cor da referência e do aviso de grade, em 11px.
+       Um cinza mais claro fica bonito na maquete e ilegível no celular. */
+    --subtle: 220 5% 43%;
 
-    /* traços — precisam sobreviver ao reflexo, por isso escuros */
-    --border: 30 10% 72%;
-    /* 3:1 é o mínimo para CONTORNO de controle (WCAG 1.4.11). Campo com borda
-       clara demais simplesmente não é percebido como campo sob sol. */
-    --input: 30 14% 58%;
-    --ring: 176 80% 26%;
+    /* traços */
+    --border: 220 11% 90%;
+    --input: 220 10% 80%;
+    --ring: 220 9% 12%;
 
-    /* marca — teal profundo: segura o contraste sob glare */
-    --primary: 176 80% 20%; /* ~9:1 no branco */
+    /* ação — a mesma tinta do monograma, não uma cor de marca inventada */
+    --primary: 220 9% 12%;
     --primary-foreground: 0 0% 100%;
-    --primary-soft: 176 40% 91%;
-    --primary-soft-foreground: 176 85% 16%;
+    --primary-soft: 220 12% 94%;
+    --primary-soft-foreground: 220 9% 20%;
 
-    /* estados — escuros pelo mesmo motivo */
-    --positive: 152 65% 22%;
-    --positive-soft: 150 40% 90%;
-    --positive-soft-foreground: 152 70% 17%;
+    /* estados — só onde a cor carrega significado, e dessaturados para não
+       competir com a peça */
+    --positive: 158 42% 28%;
+    --positive-soft: 152 30% 94%;
+    --positive-soft-foreground: 158 45% 22%;
 
-    --warn: 28 90% 30%; /* âmbar médio some no sol; este não */
-    --warn-soft: 40 80% 88%;
-    --warn-soft-foreground: 25 85% 24%;
+    --warn: 32 60% 34%;
+    --warn-soft: 38 55% 94%;
+    --warn-soft-foreground: 28 55% 28%;
 
-    --danger: 0 72% 38%;
-    --danger-soft: 4 70% 92%;
-    --danger-soft-foreground: 0 70% 32%;
+    --danger: 5 58% 42%;
+    --danger-soft: 6 60% 96%;
+    --danger-soft-foreground: 5 55% 36%;
 
-    --radius: 0.5rem;
+    --radius: 0.625rem;
   }
 
   * {
@@ -76,6 +75,15 @@
     @apply bg-background text-foreground antialiased;
     font-family: 'Inter Variable', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     font-feature-settings: 'cv11', 'ss01';
+  }
+
+  /* Título de página. É a letra do próprio monograma — didone de alto
+     contraste — em vez de mais um peso do Inter. Só aqui: no resto da tela ela
+     atrapalharia a leitura rápida. */
+  .titulo {
+    font-family: 'Bodoni Moda Variable', Georgia, 'Times New Roman', serif;
+    font-weight: 500;
+    letter-spacing: -0.01em;
   }
 
   /* Dinheiro e quantidade em largura fixa: sem isso a coluna de valores dança

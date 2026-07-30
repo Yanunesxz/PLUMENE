@@ -81,7 +81,7 @@ export function PaginaPainel() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Painel</h1>
+      <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Painel</h1>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={TrendingUp} tint="green" value={formatBRL(metrics.vendasMes)} label="Vendas do mês" />

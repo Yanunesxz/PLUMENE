@@ -60,7 +60,7 @@ export function AppLayout() {
         <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-border bg-card px-4 safe-top md:hidden">
           <div className="flex items-center gap-2">
             <Logo className="h-11 w-11 shrink-0" />
-            <span className="text-[17px] font-bold tracking-tight text-foreground">Corpo Sensual</span>
+            <span className="titulo text-[20px] leading-none text-foreground">Corpo Sensual</span>
             {!isOnline && (
               <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2 py-0.5 text-[11px] font-medium text-warn-soft-foreground">
                 <WifiOff className="h-3 w-3" strokeWidth={2.5} />

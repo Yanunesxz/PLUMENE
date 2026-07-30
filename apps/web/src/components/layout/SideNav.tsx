@@ -25,7 +25,7 @@ export function SideNav() {
       <div className="flex items-center gap-2.5 px-5 py-5">
         <Logo className="h-14 w-14 shrink-0" />
         <div className="leading-tight">
-          <p className="text-[15px] font-bold leading-tight text-foreground">Corpo Sensual</p>
+          <p className="titulo text-[19px] leading-none text-foreground">Corpo Sensual</p>
           <p className="text-[11px] font-medium text-muted-foreground">Representantes</p>
         </div>
       </div>

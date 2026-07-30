@@ -26,129 +26,120 @@ export function CartaoProduto({ product, onClick, onAdd, inOrder, showStock = tr
   const hasColors = (swatches?.length ?? 0) > 1;
   const grade = ordenarGrade(product.variants ?? []);
   const temGrade = grade.length > 0;
-  const outOfStock = temGrade && grade.every((v) => !v.in_stock);
-  // A soma só existe para quem recebe `available` (gerente/admin).
+  const faltando = grade.filter((v) => !v.in_stock);
+  const outOfStock = temGrade && faltando.length === grade.length;
   const available = grade.reduce((sum, v) => sum + (v.available ?? 0), 0);
-  const clickable = !!onClick;
 
   return (
     <div
-      role={clickable ? 'button' : undefined}
+      role={onClick ? 'button' : undefined}
       onClick={onClick ? () => onClick(product) : undefined}
-      className={cn(
-        'group relative flex flex-col overflow-hidden rounded-lg border border-border bg-card transition-colors hover:border-primary/40',
-        clickable && 'cursor-pointer',
-      )}
+      className={cn('group flex flex-col gap-2', onClick && 'cursor-pointer')}
     >
-      {/* 1:1 em vez de 4:5: cabe mais produto na dobra, que é o que importa
-          quando o representante rola a lista na frente do lojista. */}
-      <div className="relative aspect-square w-full overflow-hidden bg-sunken">
-        {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-primary-soft text-primary/40">
-            <ImageIcon className="h-9 w-9" strokeWidth={1.5} />
-            <span className="text-xs font-semibold text-primary/50">{product.sku}</span>
-          </div>
-        )}
-        {!product.active && (
-          <span className="absolute left-2 top-2 rounded bg-foreground/80 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-background">
-            Inativo
-          </span>
-        )}
+      {/* Sem cartão, sem borda, sem sombra: a peça é a unidade. O poço cinza
+          existe só para conter o fundo branco de estúdio da foto — sem ele a
+          modelo flutuaria no papel. */}
+      <div className="relative overflow-hidden rounded-lg bg-sunken">
+        {/* 3:4 é a proporção NATIVA de todas as fotos (750×1000). Qualquer outra
+            corta: em quadrado, sumiam 125px em cima e 125px embaixo — ou seja, a
+            cabeça e os pés da modelo. */}
+        <div className="aspect-[3/4] w-full">
+          {product.image_url ? (
+            <img
+              src={product.image_url}
+              alt={product.name}
+              loading="lazy"
+              decoding="async"
+              className={cn(
+                'h-full w-full object-cover transition-opacity duration-200',
+                outOfStock && 'opacity-45',
+              )}
+            />
+          ) : (
+            <div className="flex h-full w-full flex-col items-center justify-center gap-1.5 text-subtle">
+              <ImageIcon className="h-7 w-7" strokeWidth={1.25} />
+              <span className="tnum font-mono text-[11px] font-semibold">{product.sku}</span>
+            </div>
+          )}
+        </div>
+
         {outOfStock && (
-          <span className="absolute inset-x-0 bottom-0 bg-foreground/90 py-1 text-center text-[11px] font-bold uppercase tracking-wide text-background">
+          <span className="absolute left-2 top-2 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-background">
             Esgotado
           </span>
         )}
+        {!product.active && !outOfStock && (
+          <span className="absolute left-2 top-2 rounded bg-foreground px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-background">
+            Inativo
+          </span>
+        )}
+
+        {onAdd && (
+          <button
+            type="button"
+            aria-label={inOrder ? 'Adicionado ao pedido' : 'Adicionar ao pedido'}
+            disabled={outOfStock}
+            onClick={(e) => {
+              e.stopPropagation();
+              onAdd(product);
+            }}
+            className={cn(
+              'absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full shadow-sm transition-colors disabled:opacity-0',
+              inOrder
+                ? 'bg-foreground text-background'
+                : 'bg-card text-foreground hover:bg-foreground hover:text-background',
+            )}
+          >
+            {inOrder ? <Check className="h-4 w-4" strokeWidth={2.5} /> : <Plus className="h-4 w-4" strokeWidth={2.5} />}
+          </button>
+        )}
       </div>
 
-      <div className="flex flex-1 flex-col gap-1.5 p-2.5">
-        <div className="flex items-center justify-between gap-2">
-          <span className="tnum font-mono text-xs font-bold text-subtle">{product.sku}</span>
+      <div className="flex flex-col gap-0.5">
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="tnum font-mono text-[11px] font-semibold tracking-wide text-subtle">
+            {product.sku}
+          </span>
           {showStock && available > 0 && (
-            <span className="tnum inline-flex items-center rounded bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary-soft-foreground">
-              {available} un.
-            </span>
+            <span className="tnum text-[11px] font-medium text-subtle">{available} un.</span>
           )}
         </div>
 
-        <p className="line-clamp-2 text-sm font-medium leading-snug text-foreground">{product.name}</p>
+        <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">{product.name}</p>
 
-        {/* Régua de tamanhos: o esgotado sai riscado. O representante decide se
-            vale tocar ANTES de tocar. */}
-        {temGrade && (
-          <div className="flex flex-wrap gap-1">
-            {grade.map((v) => (
-              <span
-                key={v.id}
-                className={cn(
-                  'tnum rounded px-1.5 py-0.5 text-[11px] font-bold leading-tight',
-                  v.in_stock
-                    ? 'bg-muted text-muted-foreground'
-                    : 'text-subtle line-through decoration-subtle/70',
-                )}
-              >
-                {v.size}
-              </span>
-            ))}
-          </div>
-        )}
-
-        {hasColors && (
-          <div className="flex items-center gap-1">
-            {swatches!.slice(0, 5).map((hex, i) => (
-              <span
-                key={i}
-                className="h-3.5 w-3.5 rounded-full border border-foreground/10"
-                style={{ backgroundColor: hex ?? FALLBACK_HEX }}
-              />
-            ))}
-            {swatches!.length > 5 && (
-              <span className="tnum text-[11px] font-medium text-subtle">+{swatches!.length - 5}</span>
-            )}
-          </div>
-        )}
-
-        <div className="mt-auto flex items-end justify-between gap-2 pt-1">
+        <div className="flex items-center justify-between gap-2 pt-0.5">
           {product.price != null ? (
-            <p className="tnum text-base font-bold tracking-tight text-foreground">
+            <p className="tnum text-[15px] font-semibold tracking-tight text-foreground">
               {formatBRL(product.price)}
             </p>
           ) : (
-            <p className="text-xs font-medium text-subtle">Sob consulta</p>
+            <p className="text-xs text-subtle">Sob consulta</p>
           )}
 
-          {onAdd && (
-            <button
-              type="button"
-              aria-label={inOrder ? 'Adicionado ao pedido' : 'Adicionar ao pedido'}
-              disabled={outOfStock}
-              onClick={(e) => {
-                e.stopPropagation();
-                onAdd(product);
-              }}
-              className={cn(
-                'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border transition-colors disabled:opacity-40',
-                inOrder
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-primary/30 bg-primary-soft text-primary-soft-foreground hover:border-primary hover:bg-primary hover:text-primary-foreground',
+          {hasColors && (
+            <div className="flex items-center gap-1">
+              {swatches!.slice(0, 4).map((hex, i) => (
+                <span
+                  key={i}
+                  className="h-3 w-3 rounded-full ring-1 ring-inset ring-foreground/15"
+                  style={{ backgroundColor: hex ?? FALLBACK_HEX }}
+                />
+              ))}
+              {swatches!.length > 4 && (
+                <span className="tnum text-[10px] font-medium text-subtle">+{swatches!.length - 4}</span>
               )}
-            >
-              {inOrder ? (
-                <Check className="h-4 w-4" strokeWidth={2.5} />
-              ) : (
-                <Plus className="h-4 w-4" strokeWidth={2.5} />
-              )}
-            </button>
+            </div>
           )}
         </div>
+
+        {/* A grade só aparece quando tem NOTÍCIA. Grade completa não vira linha:
+            a ausência já diz "tem tudo". Antes eram 6 chips repetidos em cada
+            um dos 160 produtos, dizendo nada na maioria das vezes. */}
+        {temGrade && faltando.length > 0 && !outOfStock && (
+          <p className="text-[11px] leading-tight text-subtle">
+            Sem {faltando.map((v) => v.size).join(', ')}
+          </p>
+        )}
       </div>
     </div>
   );

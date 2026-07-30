@@ -107,7 +107,7 @@ export function PaginaMinhaArea() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div>
-        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">
+        <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">
           Olá, {firstName}
         </h1>
         <p className="text-sm text-muted-foreground">

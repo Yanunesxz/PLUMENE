@@ -113,7 +113,7 @@ export function PaginaClientes() {
   return (
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h1 className="text-xl font-bold tracking-tight text-foreground md:text-2xl">Clientes</h1>
+        <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Clientes</h1>
         <Button size="md" onClick={() => setShowForm((s) => !s)}>
           {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
           {showForm ? 'Cancelar' : 'Novo cliente'}
