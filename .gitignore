@@ -68,3 +68,6 @@ __pycache__/
 *.pyc
 # Leitor local de schema Firebird: DLLs, binários embed e scripts com paths/credenciais da máquina — nunca versionar
 _tools/firebird-reader/
+
+# Backups do banco: contem dados de cliente e hash de senha. Nunca versionar.
+backups/
