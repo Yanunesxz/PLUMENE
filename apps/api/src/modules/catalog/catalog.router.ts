@@ -6,8 +6,13 @@ import { uploadPhotoHandler } from './photos.controller.js';
 
 export async function catalogRouter(fastify: FastifyInstance): Promise<void> {
   fastify.get('/products', { preHandler: authenticate }, listProducts);
-  // Tabelas de preço para o seletor de consulta no catálogo (todos os papéis).
-  fastify.get('/catalog/price-tables', { preHandler: authenticate }, listCatalogPriceTables);
+  // Tabelas de preço para o seletor de consulta no catálogo. Só gerente/admin:
+  // o representante não escolhe tabela, então nem precisa saber quais existem.
+  fastify.get(
+    '/catalog/price-tables',
+    { preHandler: [authenticate, requireRole(['manager', 'admin'])] },
+    listCatalogPriceTables,
+  );
   // Importação de catálogo da própria empresa (multi-fábrica) — só admin.
   fastify.post(
     '/products/import',

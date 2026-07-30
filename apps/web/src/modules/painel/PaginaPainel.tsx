@@ -9,7 +9,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
-import type { Order, CustomerWithPriceTable, ApiResponse } from '@csb/shared';
+import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
 export function PaginaPainel() {
   const { token } = useAuthStore();
@@ -26,7 +26,7 @@ export function PaginaPainel() {
       .then((res) => db.orders.bulkPut(res.data))
       .catch(() => {});
     api
-      .get<ApiResponse<CustomerWithPriceTable[]>>('/customers', token)
+      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
       .catch(() => {});
   }, [token]);
@@ -102,7 +102,7 @@ export function PaginaPainel() {
                   <div className="flex min-w-0 items-center gap-3">
                     <span
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        i === 0 ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700'
+                        i === 0 ? 'bg-primary text-white' : 'bg-primary-soft text-primary-soft-foreground'
                       }`}
                     >
                       {i === 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}
@@ -154,7 +154,7 @@ export function PaginaPainel() {
 
                 <div className="flex gap-2">
                   <Button
-                    className="flex-1 bg-green-600 hover:bg-green-700 active:bg-green-800"
+                    className="flex-1 bg-positive hover:bg-positive/90 active:bg-positive/80"
                     disabled={processing === order.id}
                     onClick={() => void handleDecision(order.id, 'approved')}
                   >
@@ -194,9 +194,9 @@ function MetricCard({
   label: string;
 }) {
   const tints: Record<string, string> = {
-    green: 'bg-green-100 text-green-700',
-    yellow: 'bg-yellow-100 text-yellow-700',
-    brand: 'bg-brand-100 text-brand-700',
+    green: 'bg-positive-soft text-positive-soft-foreground',
+    yellow: 'bg-warn-soft text-warn-soft-foreground',
+    brand: 'bg-primary-soft text-primary-soft-foreground',
   };
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">

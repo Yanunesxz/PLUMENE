@@ -4,7 +4,10 @@
   "parserOptions": {
     "ecmaVersion": 2022,
     "sourceType": "module",
-    "ecmaFeatures": { "jsx": true }
+    "ecmaFeatures": { "jsx": true },
+    // As regras "requiring-type-checking" abaixo precisam do tsconfig do pacote.
+    // Sem isto o `pnpm lint` morria antes de checar a primeira linha.
+    "project": true
   },
   "plugins": ["@typescript-eslint", "react", "react-hooks"],
   "extends": [
@@ -22,6 +25,13 @@
     "@typescript-eslint/no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
     "@typescript-eslint/no-explicit-any": "error",
     "@typescript-eslint/consistent-type-imports": "error",
+    // Contrato do Fastify, não descuido nosso: plugin de rota precisa ser async
+    // mesmo sem await dentro, e preHandler aceita handler async de propósito.
+    "@typescript-eslint/require-await": "off",
+    "@typescript-eslint/no-misused-promises": ["error", { "checksVoidReturn": false }],
+    // supabase-js devolve `data` frouxamente tipado; cada service reafirma o tipo
+    // logo abaixo. Fica como aviso para continuar visível sem travar o build.
+    "@typescript-eslint/no-unsafe-assignment": "warn",
     "react/react-in-jsx-scope": "off",
     "react/prop-types": "off",
     "no-console": ["warn", { "allow": ["warn", "error"] }]

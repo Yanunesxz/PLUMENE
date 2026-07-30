@@ -13,9 +13,13 @@
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
     "typecheck": "pnpm -r typecheck",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "pnpm typecheck && pnpm lint && pnpm test",
     "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
     "clean": "pnpm -r clean && rimraf node_modules",
-    "seed": "pnpm --filter @csb/api seed"
+    "seed": "pnpm --filter @csb/api seed",
+    "backup": "node _tools/backup.mjs"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^7.0.0",
@@ -26,7 +30,8 @@
     "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^3.2.5",
     "rimraf": "^5.0.5",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "vitest": "^2"
   },
   "pnpm": {
     "overrides": {

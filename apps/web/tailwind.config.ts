@@ -1,5 +1,12 @@
 import type { Config } from 'tailwindcss';
 
+/** Cor semântica com par "soft" (fundo suave + texto legível sobre ele). */
+const withSoft = (name: string) => ({
+  DEFAULT: `hsl(var(--${name}) / <alpha-value>)`,
+  soft: `hsl(var(--${name}-soft) / <alpha-value>)`,
+  'soft-foreground': `hsl(var(--${name}-soft-foreground) / <alpha-value>)`,
+});
+
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
@@ -15,6 +22,8 @@ export default {
         ring: 'hsl(var(--ring) / <alpha-value>)',
         background: 'hsl(var(--background) / <alpha-value>)',
         foreground: 'hsl(var(--foreground) / <alpha-value>)',
+        subtle: 'hsl(var(--subtle) / <alpha-value>)',
+        sunken: 'hsl(var(--sunken) / <alpha-value>)',
         card: {
           DEFAULT: 'hsl(var(--card) / <alpha-value>)',
           foreground: 'hsl(var(--card-foreground) / <alpha-value>)',
@@ -24,22 +33,14 @@ export default {
           foreground: 'hsl(var(--muted-foreground) / <alpha-value>)',
         },
         primary: {
-          DEFAULT: 'hsl(var(--primary) / <alpha-value>)',
+          ...withSoft('primary'),
           foreground: 'hsl(var(--primary-foreground) / <alpha-value>)',
         },
-        // Paleta da marca Corpo Sensual — verde petróleo (SaaS premium)
-        brand: {
-          50: '#f0fdfa',
-          100: '#ccfbf1',
-          200: '#99f6e4',
-          300: '#5eead4',
-          400: '#2dd4bf',
-          500: '#14b8a6',
-          600: '#0d9488',
-          700: '#0f766e',
-          800: '#115e59',
-          900: '#134e4a',
-        },
+        // Estados. Use estes em vez de green-/yellow-/red- crus: só assim o tema
+        // escuro acompanha.
+        positive: withSoft('positive'),
+        warn: withSoft('warn'),
+        danger: withSoft('danger'),
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',

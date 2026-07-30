@@ -166,28 +166,28 @@ export function UploadFotos() {
               <span>{pct}%</span>
             </div>
             <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-              <div className="h-full rounded-full bg-brand-600 transition-all" style={{ width: `${pct}%` }} />
+              <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${pct}%` }} />
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs">
-            <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-800">
+            <span className="inline-flex items-center gap-1 rounded-full bg-positive-soft px-2.5 py-0.5 font-medium text-positive-soft-foreground">
               <CheckCircle2 className="h-3.5 w-3.5" /> {progress.sent} enviada(s)
             </span>
             {progress.notFound.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-medium text-amber-800">
+              <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2.5 py-0.5 font-medium text-warn-soft-foreground">
                 <AlertTriangle className="h-3.5 w-3.5" /> {progress.notFound.length} sem produto
               </span>
             )}
             {progress.errors.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 font-medium text-red-800">
+              <span className="inline-flex items-center gap-1 rounded-full bg-danger-soft px-2.5 py-0.5 font-medium text-danger-soft-foreground">
                 <AlertTriangle className="h-3.5 w-3.5" /> {progress.errors.length} com erro
               </span>
             )}
           </div>
 
           {progress.notFound.length > 0 && (
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-warn-soft-foreground">
               Sem produto correspondente (confira o nome do arquivo = referência):{' '}
               {progress.notFound.slice(0, 15).join(', ')}
               {progress.notFound.length > 15 ? '…' : ''}

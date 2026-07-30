@@ -26,6 +26,7 @@ const EMPTY = {
   price_table_id: '',
   password: '',
   commission_rate: '10',
+  erp_rep_id: '',
   active: true,
 };
 
@@ -92,6 +93,7 @@ export function PaginaRepresentantes() {
       price_table_id: rep.price_table_id ?? '',
       password: '',
       commission_rate: String(rep.commission_rate ?? 10),
+      erp_rep_id: rep.erp_rep_id ?? '',
       active: rep.active,
     });
     setError('');
@@ -170,6 +172,7 @@ export function PaginaRepresentantes() {
           legal_name: form.legal_name || null,
           phone: form.phone || null,
           commission_rate: Number(form.commission_rate) || 10,
+          erp_rep_id: form.erp_rep_id || null,
           active: form.active,
           ...(form.password ? { password: form.password } : {}),
         };
@@ -186,6 +189,7 @@ export function PaginaRepresentantes() {
           legal_name: form.legal_name || null,
           phone: form.phone || null,
           commission_rate: Number(form.commission_rate) || 10,
+          erp_rep_id: form.erp_rep_id || null,
         };
         const res = await api.post<ApiResponse<RepListItem>>('/reps', payload, token);
         setReps((prev) =>
@@ -248,6 +252,18 @@ export function PaginaRepresentantes() {
                 ))}
               </Select>
             </Field>
+            <Field label="Código no ERP">
+              <Input
+                value={form.erp_rep_id}
+                onChange={set('erp_rep_id')}
+                placeholder="Ex.: 00779"
+                inputMode="numeric"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                É o código do representante no ERP. Sem ele, o rep só enxerga os clientes que
+                cadastrar aqui — a carteira que veio do ERP fica invisível para ele.
+              </p>
+            </Field>
             <Field label={isEditing ? 'Nova senha' : 'Senha inicial'} required={!isEditing}>
               <Input
                 type="password"
@@ -276,7 +292,7 @@ export function PaginaRepresentantes() {
                     type="checkbox"
                     checked={form.active}
                     onChange={(e) => setForm((f) => ({ ...f, active: e.target.checked }))}
-                    className="h-4 w-4 rounded border-input text-brand-600 focus:ring-brand-500"
+                    className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
                   />
                   Representante ativo
                 </label>
@@ -284,7 +300,7 @@ export function PaginaRepresentantes() {
             )}
           </div>
 
-          {error && <p className="mt-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-soft-foreground">{error}</p>}
 
           <div className="mt-4 flex justify-end">
             <Button type="submit" disabled={submitting}>
@@ -344,7 +360,7 @@ export function PaginaRepresentantes() {
                 <div key={rep.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
                     {rep.name.trim().charAt(0).toUpperCase()}
                   </span>
                   <div className="min-w-0">
@@ -367,7 +383,7 @@ export function PaginaRepresentantes() {
                     onClick={() => void handleDelete(rep)}
                     disabled={deletingId === rep.id}
                     aria-label={`Excluir ${rep.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -412,7 +428,7 @@ function Field({ label, required, children }: { label: string; required?: boolea
     <div className="space-y-1.5">
       <label className="text-sm font-medium text-foreground">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-danger">*</span>}
       </label>
       {children}
     </div>

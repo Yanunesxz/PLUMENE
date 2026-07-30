@@ -19,7 +19,6 @@ import { customersRouter } from './modules/customers/customers.router.js';
 import { ordersRouter } from './modules/orders/orders.router.js';
 import { repsRouter } from './modules/reps/reps.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
-import { assistantRouter } from './modules/assistant/assistant.router.js';
 import { partnerRouter } from './modules/partner/partner.router.js';
 import { companyRouter } from './modules/company/company.router.js';
 
@@ -92,7 +91,6 @@ export async function buildApp(): Promise<FastifyInstance> {
   await server.register(ordersRouter);
   await server.register(repsRouter);
   await server.register(syncRouter);
-  await server.register(assistantRouter);
   await server.register(partnerRouter);
   await server.register(companyRouter);
 

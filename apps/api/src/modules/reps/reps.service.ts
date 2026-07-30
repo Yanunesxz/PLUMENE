@@ -21,12 +21,30 @@ interface RepRow {
   active: boolean;
   price_table_id: string | null;
   commission_rate: number | null;
+  erp_rep_id?: string | null;
   created_at: string;
   price_tables: EmbeddedTable;
 }
 
-const REP_SELECT =
+const REP_BASE =
   'id, name, email, cpf, legal_name, phone, active, price_table_id, commission_rate, created_at, price_tables(name)';
+
+// users.erp_rep_id vem da migração 012, que pode não estar aplicada ainda.
+// Pedir uma coluna inexistente faz o PostgREST recusar a query INTEIRA — a tela
+// de representantes ficaria vazia até alguém rodar o SQL. Detecta uma vez e
+// guarda, para o deploy não depender da ordem. (Mesmo padrão do partner.service.)
+let temErpRepId: boolean | null = null;
+
+async function detectarErpRepId(): Promise<boolean> {
+  if (temErpRepId !== null) return temErpRepId;
+  const { error } = await supabase.from('users').select('erp_rep_id').limit(1);
+  temErpRepId = !error;
+  return temErpRepId;
+}
+
+async function repSelect(): Promise<string> {
+  return (await detectarErpRepId()) ? `${REP_BASE}, erp_rep_id` : REP_BASE;
+}
 
 function toRepListItem(row: RepRow): RepListItem {
   return {
@@ -40,6 +58,7 @@ function toRepListItem(row: RepRow): RepListItem {
     price_table_id: row.price_table_id ?? null,
     price_table_name: tableName(row.price_tables),
     commission_rate: row.commission_rate ?? DEFAULT_COMMISSION_RATE,
+    erp_rep_id: row.erp_rep_id ?? null,
     created_at: row.created_at,
   };
 }
@@ -47,7 +66,7 @@ function toRepListItem(row: RepRow): RepListItem {
 export async function listReps(company_id: string): Promise<RepListItem[]> {
   const { data, error } = await supabase
     .from('users')
-    .select(REP_SELECT)
+    .select(await repSelect())
     .eq('company_id', company_id)
     .eq('role', 'rep')
     .order('name');
@@ -98,8 +117,9 @@ export async function createRep(
       phone: body.phone?.trim() || null,
       price_table_id: body.price_table_id,
       commission_rate: body.commission_rate ?? DEFAULT_COMMISSION_RATE,
+      ...((await detectarErpRepId()) ? { erp_rep_id: body.erp_rep_id?.trim() || null } : {}),
     })
-    .select(REP_SELECT)
+    .select(await repSelect())
     .single();
 
   if (error || !data) return { ok: false, reason: 'error' };
@@ -175,6 +195,9 @@ export async function updateRep(
   if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
   if (body.price_table_id !== undefined) update.price_table_id = body.price_table_id || null;
   if (body.commission_rate !== undefined) update.commission_rate = body.commission_rate;
+  if (body.erp_rep_id !== undefined && (await detectarErpRepId())) {
+    update.erp_rep_id = body.erp_rep_id?.trim() || null;
+  }
   if (body.active !== undefined) update.active = body.active;
   if (body.password) update.password_hash = await hashPassword(body.password);
 
@@ -186,7 +209,7 @@ export async function updateRep(
     .eq('id', id)
     .eq('company_id', company_id)
     .eq('role', 'rep')
-    .select(REP_SELECT)
+    .select(await repSelect())
     .maybeSingle();
 
   if (error) return { ok: false, reason: 'error' };

@@ -137,7 +137,7 @@ export function PaginaComissoes() {
                         <div className="flex min-w-0 items-center gap-3">
                           <span
                             className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                              i === 0 && r.comMes > 0 ? 'bg-brand-600 text-white' : 'bg-brand-50 text-brand-700'
+                              i === 0 && r.comMes > 0 ? 'bg-primary text-white' : 'bg-primary-soft text-primary-soft-foreground'
                             }`}
                           >
                             {i === 0 && r.comMes > 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}
@@ -192,7 +192,7 @@ export function PaginaComissoes() {
                           </div>
                           <div className="text-right">
                             <p className="text-sm font-semibold text-foreground">{formatBRL(o.total ?? 0)}</p>
-                            <p className="text-xs text-brand-700">+{formatBRL((o.total ?? 0) * rate)}</p>
+                            <p className="text-xs text-primary-soft-foreground">+{formatBRL((o.total ?? 0) * rate)}</p>
                           </div>
                         </li>
                       ))}
@@ -224,8 +224,8 @@ function MetricCard({
   label: string;
 }) {
   const tints: Record<string, string> = {
-    green: 'bg-green-100 text-green-700',
-    brand: 'bg-brand-100 text-brand-700',
+    green: 'bg-positive-soft text-positive-soft-foreground',
+    brand: 'bg-primary-soft text-primary-soft-foreground',
   };
   return (
     <div className="rounded-xl border border-border bg-card p-4 shadow-sm">

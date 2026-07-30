@@ -22,7 +22,11 @@ export async function processSyncQueue(
     }
 
     try {
-      await createOrder(company_id, rep_id, price_table_id, validation.data);
+      // Tudo que está na fila offline é pedido FECHADO pelo representante — ele
+      // apertou enviar sem sinal. Entra na fila de aprovação, não como rascunho.
+      // Forçado aqui (e não só no cliente) para valer também para itens que já
+      // estavam na fila antes desta versão.
+      await createOrder(company_id, rep_id, price_table_id, { ...validation.data, submit: true });
       synced++;
     } catch (err) {
       failed.push({

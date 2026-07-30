@@ -2,25 +2,74 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ─────────────────────────────────────────────────────────────────────────────
+   Identidade visual — uma só, calibrada para leitura sob SOL DIRETO.
+   Nenhuma tela escreve cor crua: tudo sai daqui.
+
+   O que muda quando o alvo é o sol (o representante trabalha na calçada, na
+   porta da loja, com o celular no brilho máximo):
+
+   • O reflexo na tela come os MEIOS-TONS. Cinza médio, borda clara e cor
+     saturada clara somem. Por isso aqui não existe cinza de 60%: o texto
+     secundário mais claro está em 34% (~7,5:1) e a borda em 72%, não 87%.
+   • Fundo do app levemente escuro contra cartão BRANCO PURO. O branco puro é o
+     máximo de luz que o painel consegue emitir — é ele que vence o reflexo — e
+     o fundo mais escuro faz o cartão se destacar sem depender de sombra.
+   • Neutro QUENTE de propósito: cinza azulado deixa a foto de pijama com cara
+     de radiografia, e sob luz forte puxa ainda mais para o cinza.
+   • Cores de marca e de estado ficam ESCURAS. Teal claro sobre branco é o
+     primeiro a desaparecer lá fora.
+   ──────────────────────────────────────────────────────────────────────────── */
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 175 70% 38%;
-    --primary: 175 77% 26%;
+    /* superfícies */
+    --background: 36 18% 93%; /* fundo do app — separa o cartão sem sombra */
+    --card: 0 0% 100%; /* cartão / barra — branco puro, brilho máximo */
+    --card-foreground: 24 14% 9%;
+    --sunken: 33 14% 89%; /* poço: campo, thumb de foto */
+
+    /* texto — nenhum tom acima de 40% de luminosidade */
+    --foreground: 24 14% 9%; /* ~18:1 no branco */
+    --muted: 33 14% 90%;
+    --muted-foreground: 25 9% 30%; /* ~9,5:1 — rótulo, legenda */
+    --subtle: 25 8% 34%; /* ~7,5:1 — SKU, metadado, o menor texto da tela */
+
+    /* traços — precisam sobreviver ao reflexo, por isso escuros */
+    --border: 30 10% 72%;
+    /* 3:1 é o mínimo para CONTORNO de controle (WCAG 1.4.11). Campo com borda
+       clara demais simplesmente não é percebido como campo sob sol. */
+    --input: 30 14% 58%;
+    --ring: 176 80% 26%;
+
+    /* marca — teal profundo: segura o contraste sob glare */
+    --primary: 176 80% 20%; /* ~9:1 no branco */
     --primary-foreground: 0 0% 100%;
-    --radius: 0.625rem;
+    --primary-soft: 176 40% 91%;
+    --primary-soft-foreground: 176 85% 16%;
+
+    /* estados — escuros pelo mesmo motivo */
+    --positive: 152 65% 22%;
+    --positive-soft: 150 40% 90%;
+    --positive-soft-foreground: 152 70% 17%;
+
+    --warn: 28 90% 30%; /* âmbar médio some no sol; este não */
+    --warn-soft: 40 80% 88%;
+    --warn-soft-foreground: 25 85% 24%;
+
+    --danger: 0 72% 38%;
+    --danger-soft: 4 70% 92%;
+    --danger-soft-foreground: 0 70% 32%;
+
+    --radius: 0.5rem;
   }
 
   * {
     -webkit-tap-highlight-color: transparent;
     border-color: hsl(var(--border));
+  }
+
+  html {
+    color-scheme: light;
   }
 
   body {
@@ -29,11 +78,30 @@
     font-feature-settings: 'cv11', 'ss01';
   }
 
+  /* Dinheiro e quantidade em largura fixa: sem isso a coluna de valores dança
+     quando o dígito muda, e numa lista de pedidos isso salta aos olhos. */
+  .tnum,
+  input[type='number'] {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: 'tnum';
+  }
+
   /* Alvos de toque confortáveis (mobile-first) */
   button,
   a,
   [role='button'] {
     @apply min-h-touch min-w-touch;
+  }
+
+  /* Quem pediu menos movimento, recebe menos movimento. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
   }
 }
 

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { X, Minus, Plus, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
+import { ordenarGrade } from './grade.js';
 import { cn, formatBRL } from '@/lib/utils';
 
 export interface PickedSize {
@@ -20,22 +21,6 @@ interface SeletorTamanhoProps {
   onConfirm: (chosen: ProductWithPrice, lines: PickedSize[]) => void;
 }
 
-const SIZE_RANK: Record<string, number> = { PP: 0, P: 1, M: 2, G: 3, GG: 4, EG: 5, EGG: 6, EGGG: 7 };
-
-// Ordena a grade: números (juvenil/infantil) em ordem numérica; letras de adulto
-// na ordem PP→EGGG; o resto alfabético.
-function sizeCompare(a: string, b: string): number {
-  const na = Number(a);
-  const nb = Number(b);
-  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
-  const ra = SIZE_RANK[a.toUpperCase()];
-  const rb = SIZE_RANK[b.toUpperCase()];
-  if (ra != null && rb != null) return ra - rb;
-  if (ra != null) return -1;
-  if (rb != null) return 1;
-  return a.localeCompare(b, 'pt-BR', { numeric: true });
-}
-
 const FALLBACK_HEX = '#D1D5DB'; // cinza neutro quando a cor não foi extraída da foto
 // Bolinha "arco-íris" para produtos sem cor específica (cores sortidas).
 const SORTIDO_GRADIENT =
@@ -51,7 +36,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
   const active = colors.find((c) => c.id === activeId) ?? product;
   const [qty, setQty] = useState<Record<string, number>>({}); // chave: "productId|size"
 
-  const variants = [...(active.variants ?? [])].sort((a, b) => sizeCompare(a.size, b.size));
+  const variants = ordenarGrade(active.variants ?? []);
   const key = (size: string) => `${active.id}|${size}`;
 
   const bump = (size: string, delta: number) =>
@@ -78,7 +63,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               {active.image_url ? (
                 <img src={active.image_url} alt={active.name} className="h-full w-full object-cover" />
               ) : (
-                <div className="flex h-full w-full items-center justify-center text-brand-300">
+                <div className="flex h-full w-full items-center justify-center text-primary/40">
                   <ImageIcon className="h-6 w-6" strokeWidth={1.5} />
                 </div>
               )}
@@ -121,7 +106,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                       aria-pressed={selected}
                       className={cn(
                         'relative flex h-9 w-9 items-center justify-center rounded-full border transition',
-                        selected ? 'border-brand-600 ring-2 ring-brand-200' : 'border-border hover:border-brand-300',
+                        selected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50',
                       )}
                       style={{ backgroundColor: c.color_hex ?? FALLBACK_HEX }}
                     >
@@ -134,7 +119,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               <div className="flex items-center gap-2">
                 <span
                   aria-label="Cores sortidas"
-                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-brand-600 ring-2 ring-brand-200"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border-2 border-primary ring-2 ring-primary/30"
                   style={{ background: SORTIDO_GRADIENT }}
                 >
                   <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
@@ -156,27 +141,50 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               {variants.map((v) => (
                 <li
                   key={v.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2"
+                  className={cn(
+                    'flex items-center justify-between gap-3 rounded-lg border px-3 py-2',
+                    v.in_stock ? 'border-border' : 'border-border/60 bg-muted/40',
+                  )}
                 >
-                  <span className="text-sm font-medium text-foreground">Tam {v.size}</span>
+                  <span className="flex min-w-0 items-baseline gap-2">
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        v.in_stock ? 'text-foreground' : 'text-subtle line-through',
+                      )}
+                    >
+                      Tam {v.size}
+                    </span>
+                    {/* Esgotado é bloqueio: vender o que não existe vira pedido
+                        cortado no faturamento. `available` só chega para
+                        gerente/admin; o representante vê só o rótulo. */}
+                    {!v.in_stock ? (
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-subtle">
+                        Esgotado
+                      </span>
+                    ) : v.available != null ? (
+                      <span className="tnum text-[11px] font-medium text-subtle">{v.available} un.</span>
+                    ) : null}
+                  </span>
                   <div className="flex items-center">
                     <button
                       type="button"
                       onClick={() => bump(v.size, -1)}
                       aria-label={`Diminuir ${v.size}`}
                       className="flex h-9 w-9 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted disabled:opacity-40"
-                      disabled={(qty[key(v.size)] ?? 0) === 0}
+                      disabled={!v.in_stock || (qty[key(v.size)] ?? 0) === 0}
                     >
                       <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>
-                    <span className="flex h-9 w-10 items-center justify-center border-y border-input bg-background text-sm font-medium text-foreground">
+                    <span className="tnum flex h-9 w-10 items-center justify-center border-y border-input bg-card text-sm font-medium text-foreground">
                       {qty[key(v.size)] ?? 0}
                     </span>
                     <button
                       type="button"
                       onClick={() => bump(v.size, 1)}
                       aria-label={`Aumentar ${v.size}`}
-                      className="flex h-9 w-9 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted"
+                      disabled={!v.in_stock}
+                      className="flex h-9 w-9 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted disabled:opacity-40"
                     >
                       <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>

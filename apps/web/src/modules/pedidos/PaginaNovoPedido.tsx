@@ -85,6 +85,9 @@ export function PaginaNovoPedido() {
       customer_id: customerId,
       notes: notes || undefined,
       local_id,
+      // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
+      // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
+      submit: true,
       items: items.map(({ product_id, variant_id, quantity, unit_price }) => ({
         product_id,
         variant_id: variant_id ?? undefined,
@@ -126,7 +129,7 @@ export function PaginaNovoPedido() {
       <h1 className="mb-4 text-xl font-bold tracking-tight text-foreground md:text-2xl">Novo pedido</h1>
 
       {!isOnline && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-yellow-200 bg-yellow-50 px-3 py-2 text-xs font-medium text-yellow-800">
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
           <WifiOff className="h-4 w-4 shrink-0" strokeWidth={2.5} />
           Você está offline. O pedido será salvo localmente e sincronizado depois.
         </div>
@@ -135,7 +138,7 @@ export function PaginaNovoPedido() {
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
         <div className="space-y-1.5">
           <label htmlFor="customer" className="text-sm font-medium text-foreground">
-            Cliente <span className="text-red-500">*</span>
+            Cliente <span className="text-danger">*</span>
           </label>
           <SearchSelect
             id="customer"
@@ -151,7 +154,7 @@ export function PaginaNovoPedido() {
             }))}
           />
           {selectedCustomer?.blocked ? (
-            <p className="text-xs text-red-500">Este cliente está bloqueado.</p>
+            <p className="text-xs text-danger">Este cliente está bloqueado.</p>
           ) : !customerId ? (
             <p className="text-xs text-muted-foreground">
               Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
@@ -203,7 +206,7 @@ export function PaginaNovoPedido() {
                     type="button"
                     onClick={() => removeItem(item.product_id, item.size)}
                     aria-label="Remover item"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -290,7 +293,7 @@ export function PaginaNovoPedido() {
             <span className="text-xl font-bold text-foreground">{formatBRL(total)}</span>
           </div>
           {missingReason && (
-            <div className="mb-3 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+            <div className="mb-3 flex items-start gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.5} />
               <span>{missingReason}</span>
             </div>

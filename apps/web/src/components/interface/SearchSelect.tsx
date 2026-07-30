@@ -123,7 +123,7 @@ export function SearchSelect({
                     onClick={() => choose(o.value)}
                     className={cn(
                       'flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm transition-colors hover:bg-muted disabled:opacity-40',
-                      o.value === value && 'bg-brand-50',
+                      o.value === value && 'bg-primary-soft',
                     )}
                   >
                     <span className="min-w-0">
@@ -132,7 +132,7 @@ export function SearchSelect({
                         <span className="block truncate text-xs text-muted-foreground">{o.sublabel}</span>
                       )}
                     </span>
-                    {o.value === value && <Check className="h-4 w-4 shrink-0 text-brand-600" />}
+                    {o.value === value && <Check className="h-4 w-4 shrink-0 text-primary" />}
                   </button>
                 </li>
               ))

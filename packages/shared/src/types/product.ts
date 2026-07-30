@@ -62,21 +62,44 @@ export interface ProductPrice {
   updated_at: string;
 }
 
-// ─── Helpers de exibição ──────────────────────────────────────────────────────
-export interface ProductWithPrice extends Product {
-  price: number | null;
-  variants?: ProductVariant[];
-}
-
-export interface ProductVariantWithPrice extends ProductVariant {
-  price: number | null;
-}
-
+// ─── Variante como o catálogo entrega ────────────────────────────────────────
 /**
- * Payload de catálogo enviado ao frontend.
- * Um produto com todas as suas variantes e respectivos preços
- * filtrados pela tabela de preço do cliente.
+ * Grade que o app recebe. NÃO é a linha do banco: o quanto a fábrica tem em
+ * estoque é informação de gerente. O representante recebe só `in_stock` — o
+ * bastante para saber se pode vender o tamanho, sem ver a posição da fábrica.
  */
-export interface CatalogProduct extends Product {
-  variants: ProductVariantWithPrice[];
+export interface CatalogVariant {
+  id: string;
+  size: string;
+  /** Há peça disponível neste tamanho. Chega para todos os papéis. */
+  in_stock: boolean;
+  /** Disponível = estoque − comprometido. Só gerente/admin recebem. */
+  available?: number;
+}
+
+// ─── O que o catálogo entrega ao app ─────────────────────────────────────────
+/**
+ * Produto como o app recebe e guarda no cache offline. É um subconjunto
+ * deliberado de `Product`: `company_id`, `description` e `updated_at` ficam de
+ * fora porque ninguém os usa na tela e multiplicam por 313 no payload.
+ */
+export interface ProductWithPrice
+  extends Pick<
+    Product,
+    | 'id'
+    | 'erp_id'
+    | 'sku'
+    | 'name'
+    | 'collection'
+    | 'brand'
+    | 'group_name'
+    | 'image_url'
+    | 'variant_group'
+    | 'color_name'
+    | 'color_hex'
+    | 'active'
+  > {
+  /** Preço na tabela consultada. `null` = sem preço nessa tabela. */
+  price: number | null;
+  variants?: CatalogVariant[];
 }

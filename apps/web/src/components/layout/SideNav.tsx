@@ -23,15 +23,15 @@ export function SideNav() {
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-border bg-card md:flex">
       {/* Marca */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <Logo className="h-11 w-11 shrink-0" />
+        <Logo className="h-14 w-14 shrink-0" />
         <div className="leading-tight">
-          <p className="text-sm font-bold text-foreground">Corpo Sensual</p>
+          <p className="text-[15px] font-bold leading-tight text-foreground">Corpo Sensual</p>
           <p className="text-[11px] font-medium text-muted-foreground">Representantes</p>
         </div>
       </div>
 
       {!isOnline && (
-        <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5 text-[11px] font-medium text-amber-700">
+        <div className="mx-3 mb-1 flex items-center gap-1.5 rounded-lg bg-warn-soft px-3 py-1.5 text-[11px] font-medium text-warn-soft-foreground">
           <WifiOff className="h-3.5 w-3.5" strokeWidth={2.5} />
           Modo offline
         </div>
@@ -48,7 +48,7 @@ export function SideNav() {
               cn(
                 'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
                 isActive
-                  ? 'bg-brand-50 text-brand-700'
+                  ? 'bg-primary-soft text-primary-soft-foreground'
                   : 'text-muted-foreground hover:bg-muted hover:text-foreground',
               )
             }
@@ -66,7 +66,7 @@ export function SideNav() {
       {/* Usuário */}
       <div className="border-t border-border p-3">
         <div className="flex items-center gap-2.5">
-          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-100 text-sm font-semibold text-brand-700">
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
             {initials}
           </span>
           <div className="min-w-0 flex-1 leading-tight">

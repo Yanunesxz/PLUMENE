@@ -206,9 +206,9 @@ export function PaginaImportar() {
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
-          className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border py-8 text-center transition-colors hover:border-brand-400 hover:bg-brand-50/40"
+          className="flex w-full flex-col items-center gap-2 rounded-xl border-2 border-dashed border-border py-8 text-center transition-colors hover:border-primary/50 hover:bg-primary-soft/40"
         >
-          <UploadCloud className="h-8 w-8 text-brand-600" strokeWidth={1.8} />
+          <UploadCloud className="h-8 w-8 text-primary" strokeWidth={1.8} />
           <span className="text-sm font-medium text-foreground">
             {fileName ? fileName : 'Toque para escolher o arquivo (.xlsx ou .csv)'}
           </span>
@@ -218,11 +218,11 @@ export function PaginaImportar() {
         {rows.length > 0 && (
           <div className="mt-4 space-y-3">
             <div className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2.5 py-0.5 font-medium text-green-800">
+              <span className="inline-flex items-center gap-1 rounded-full bg-positive-soft px-2.5 py-0.5 font-medium text-positive-soft-foreground">
                 <CheckCircle2 className="h-3.5 w-3.5" /> {valid.length} válidos
               </span>
               {invalid.length > 0 && (
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 font-medium text-amber-800">
+                <span className="inline-flex items-center gap-1 rounded-full bg-warn-soft px-2.5 py-0.5 font-medium text-warn-soft-foreground">
                   <AlertTriangle className="h-3.5 w-3.5" /> {invalid.length} com problema (não serão enviados)
                 </span>
               )}
@@ -241,13 +241,13 @@ export function PaginaImportar() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {rows.slice(0, 8).map((r, i) => (
-                    <tr key={i} className={r.error ? 'bg-amber-50/60' : ''}>
+                    <tr key={i} className={r.error ? 'bg-warn-soft/60' : ''}>
                       <td className="px-3 py-2 font-mono">{r.sku || '—'}</td>
                       <td className="max-w-[220px] truncate px-3 py-2">{r.name || '—'}</td>
                       <td className="px-3 py-2">{r.price != null ? formatBRL(r.price) : 'sob consulta'}</td>
                       <td className="px-3 py-2">{r.sizes?.map((s) => s.size).join(', ') ?? 'U'}</td>
                       <td className="px-3 py-2">
-                        {r.error ? <span className="text-amber-700">{r.error}</span> : <span className="text-green-700">ok</span>}
+                        {r.error ? <span className="text-warn-soft-foreground">{r.error}</span> : <span className="text-positive-soft-foreground">ok</span>}
                       </td>
                     </tr>
                   ))}
@@ -271,17 +271,17 @@ export function PaginaImportar() {
       <UploadFotos />
 
       {summary && (
-        <section className="rounded-xl border border-green-200 bg-green-50 p-4">
-          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-green-900">
+        <section className="rounded-xl border border-positive/30 bg-positive-soft p-4">
+          <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold text-positive-soft-foreground">
             <CheckCircle2 className="h-4 w-4" /> Importação concluída
           </h2>
-          <ul className="space-y-1 text-sm text-green-900">
+          <ul className="space-y-1 text-sm text-positive-soft-foreground">
             <li>• {summary.products_created} produto(s) criado(s), {summary.products_updated} atualizado(s)</li>
             <li>• {summary.variants_upserted} tamanho(s) gravado(s)</li>
             <li>• {summary.prices_set} preço(s) definidos na tabela “{summary.price_table}”</li>
           </ul>
           {summary.warnings.length > 0 && (
-            <div className="mt-3 rounded-lg bg-amber-100/70 p-3 text-xs text-amber-900">
+            <div className="mt-3 rounded-lg bg-warn-soft/70 p-3 text-xs text-warn-soft-foreground">
               <p className="mb-1 font-semibold">Avisos:</p>
               {summary.warnings.map((w, i) => (
                 <p key={i}>• {w}</p>
