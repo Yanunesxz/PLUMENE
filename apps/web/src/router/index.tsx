@@ -18,7 +18,6 @@ import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 const PaginaPainel = lazy(() => import('../modules/painel/PaginaPainel.js').then((m) => ({ default: m.PaginaPainel })));
 const PaginaRepresentantes = lazy(() => import('../modules/representantes/PaginaRepresentantes.js').then((m) => ({ default: m.PaginaRepresentantes })));
 const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
-const PaginaAssistente = lazy(() => import('../modules/assistente/PaginaAssistente.js').then((m) => ({ default: m.PaginaAssistente })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
 
 /** Enquanto o pedaço da tela baixa. Some rápido demais para merecer esqueleto. */
@@ -41,12 +40,6 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { index: true, element: <Navigate to="/catalog" replace /> },
           { path: 'minha-area', element: <PaginaMinhaArea /> },
           { path: 'catalog', element: <PaginaCatalogo /> },
-          {
-            // Assistente em desenvolvimento: bloqueado para representante.
-            path: 'assistente',
-            element: <PrivateRoute roles={['manager', 'admin']} />,
-            children: [{ index: true, element: <AoCarregar><PaginaAssistente /></AoCarregar> }],
-          },
           { path: 'orders', element: <PaginaPedidos /> },
           { path: 'orders/new', element: <PaginaNovoPedido /> },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },

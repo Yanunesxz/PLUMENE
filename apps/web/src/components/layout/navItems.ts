@@ -12,7 +12,6 @@ export interface NavItem {
   end?: boolean;
 }
 
-// Assistente de IA está EM DESENVOLVIMENTO: fora do menu do representante por ora.
 const repItems: NavItem[] = [
   { to: '/minha-area', label: 'Minha área', icon: Gauge },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },

@@ -105,10 +105,6 @@ describe('papéis', () => {
   ])('%s acessa /catalog/price-tables', async (_papel, token) => {
     expect((await chamar('/catalog/price-tables', token)).statusCode).toBe(200);
   });
-
-  it('representante não acessa o assistente', async () => {
-    expect((await chamar('/assistant', TOKEN.rep, 'POST')).statusCode).toBe(403);
-  });
 });
 
 describe('catálogo', () => {
