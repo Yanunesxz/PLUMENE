@@ -84,7 +84,21 @@ export async function criarVitrineHandler(request: FastifyRequest, reply: Fastif
   const body = await parseBody(criarVitrineSchema, request.body, reply);
   if (!body) return;
 
-  const vitrine = await criarVitrine(company_id, sub, price_table_id ?? null, body.hours);
+  let vitrine;
+  try {
+    vitrine = await criarVitrine(company_id, sub, price_table_id ?? null, body.hours);
+  } catch (err) {
+    if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
+      request.log.error('Vitrine indisponível: migração 014 não aplicada');
+      await reply.status(503).send({
+        error: 'Os links de acesso ainda não foram liberados no sistema.',
+        code: 'UNAVAILABLE',
+        statusCode: 503,
+      });
+      return;
+    }
+    throw err;
+  }
   if (!vitrine) {
     await reply.status(500).send({ error: 'Não foi possível criar o link', code: 'CREATE_FAILED', statusCode: 500 });
     return;
@@ -247,6 +261,59 @@ export async function abrirVitrineHandler(request: FastifyRequest, reply: Fastif
       token: request.server.jwt.sign(payload, { expiresIn: segundos }),
       expires_at: link.expires_at,
       rep_name: (rep as { name: string } | null)?.name ?? '',
+    },
+  });
+}
+
+// ─── Conta da loja ───────────────────────────────────────────────────────────
+
+/**
+ * O que a loja vê de si mesma. Só leitura: CNPJ, tabela e limite saem do ERP, e
+ * deixar a loja editar criaria divergência com o que o faturamento enxerga.
+ */
+export async function minhaContaHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { customer_id, rep_id } = request.user;
+  if (!customer_id) {
+    await reply.status(403).send({ error: 'Acesso sem loja vinculada', code: 'FORBIDDEN', statusCode: 403 });
+    return;
+  }
+
+  const { data: cliente } = await supabase
+    .from('customers')
+    .select('name, trade_name, cnpj, whatsapp, price_table_id')
+    .eq('id', customer_id)
+    .maybeSingle();
+
+  if (!cliente) {
+    await reply.status(404).send({ error: 'Cadastro não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+    return;
+  }
+
+  const c = cliente as {
+    name: string;
+    trade_name: string | null;
+    cnpj: string | null;
+    whatsapp: string | null;
+    price_table_id: string | null;
+  };
+
+  const [tabela, rep] = await Promise.all([
+    c.price_table_id
+      ? supabase.from('price_tables').select('name').eq('id', c.price_table_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    rep_id
+      ? supabase.from('users').select('name').eq('id', rep_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  await reply.send({
+    data: {
+      name: c.name,
+      trade_name: c.trade_name,
+      cnpj: c.cnpj,
+      whatsapp: c.whatsapp,
+      price_table_name: (tabela.data as { name: string } | null)?.name ?? null,
+      rep_name: (rep.data as { name: string } | null)?.name ?? null,
     },
   });
 }

@@ -10,6 +10,7 @@ import {
   abrirConviteHandler,
   aceitarConviteHandler,
   abrirVitrineHandler,
+  minhaContaHandler,
 } from './access.controller.js';
 
 export async function accessRouter(fastify: FastifyInstance): Promise<void> {
@@ -24,6 +25,13 @@ export async function accessRouter(fastify: FastifyInstance): Promise<void> {
   fastify.post('/showcase-links', guard, criarVitrineHandler);
   fastify.get('/showcase-links', guard, listarVitrinesHandler);
   fastify.delete('/showcase-links/:id', guard, revogarVitrineHandler);
+
+  // A loja consulta o próprio cadastro. Ninguém mais precisa desta rota.
+  fastify.get(
+    '/minha-conta',
+    { preHandler: [authenticate, requireRole(['store'])] },
+    minhaContaHandler,
+  );
 
   // ─── Públicas ──────────────────────────────────────────────────────────────
   // As únicas rotas do sistema sem autenticação além do login. Rate-limit

@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge, UploadCloud } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge, UploadCloud, KeyRound, Store } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { UserRole } from '@csb/shared';
 
@@ -17,6 +17,14 @@ const repItems: NavItem[] = [
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
+  { to: '/acessos', label: 'Acessos', icon: KeyRound },
+];
+
+// A loja compra e acompanha. Nada de carteira, comissão ou aprovação.
+const storeItems: NavItem[] = [
+  { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
+  { to: '/orders', label: 'Meus pedidos', short: 'Pedidos', icon: ClipboardList },
+  { to: '/minha-conta', label: 'Minha conta', short: 'Conta', icon: Store },
 ];
 
 const managerItems: NavItem[] = [
@@ -26,6 +34,7 @@ const managerItems: NavItem[] = [
   { to: '/customers', label: 'Clientes', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
   { to: '/comissoes', label: 'Comissões', icon: Wallet },
+  { to: '/acessos', label: 'Acessos', icon: KeyRound },
 ];
 
 const adminItems: NavItem[] = [
@@ -36,5 +45,6 @@ const adminItems: NavItem[] = [
 export function navItemsForRole(role: UserRole | undefined): NavItem[] {
   if (role === 'admin') return adminItems;
   if (role === 'manager') return managerItems;
+  if (role === 'store') return storeItems;
   return repItems;
 }

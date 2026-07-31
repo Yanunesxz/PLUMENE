@@ -1,9 +1,9 @@
 import { Navigate, Outlet } from 'react-router-dom';
 import { useAuthStore } from '../store/authStore.js';
-import type { UserRole } from '@csb/shared';
+import type { AuthRole } from '@csb/shared';
 
 interface PrivateRouteProps {
-  roles?: UserRole[];
+  roles?: AuthRole[];
 }
 
 export function PrivateRoute({ roles }: PrivateRouteProps) {

@@ -9,6 +9,7 @@ import { PaginaNovoPedido } from '../modules/pedidos/PaginaNovoPedido.js';
 import { PaginaDetalhePedido } from '../modules/pedidos/PaginaDetalhePedido.js';
 import { PaginaClientes } from '../modules/clientes/PaginaClientes.js';
 import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
+import { PaginaConvite } from '../modules/publico/PaginaConvite.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
 import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 
@@ -19,6 +20,11 @@ const PaginaPainel = lazy(() => import('../modules/painel/PaginaPainel.js').then
 const PaginaRepresentantes = lazy(() => import('../modules/representantes/PaginaRepresentantes.js').then((m) => ({ default: m.PaginaRepresentantes })));
 const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
+const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
+const PaginaMinhaConta = lazy(() => import('../modules/loja/PaginaMinhaConta.js').then((m) => ({ default: m.PaginaMinhaConta })));
+// A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
+// quando alguém abre o link.
+const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
 
 /** Enquanto o pedaço da tela baixa. Some rápido demais para merecer esqueleto. */
 function AoCarregar({ children }: { children: ReactNode }) {
@@ -29,6 +35,17 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   {
     path: '/login',
     element: <PaginaLogin />,
+  },
+  // Públicas: fora do PrivateRoute de propósito — quem abre estes links ainda
+  // não tem (ou nunca terá) conta.
+  { path: '/convite/:token', element: <PaginaConvite /> },
+  {
+    path: '/vitrine/:token',
+    element: (
+      <AoCarregar>
+        <PaginaVitrine />
+      </AoCarregar>
+    ),
   },
   {
     path: '/',
@@ -44,6 +61,16 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { path: 'orders/new', element: <PaginaNovoPedido /> },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },
           { path: 'customers', element: <PaginaClientes /> },
+          {
+            path: 'acessos',
+            element: <PrivateRoute roles={['rep', 'manager', 'admin']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaAcessos /></AoCarregar> }],
+          },
+          {
+            path: 'minha-conta',
+            element: <PrivateRoute roles={['store']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaMinhaConta /></AoCarregar> }],
+          },
           {
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,

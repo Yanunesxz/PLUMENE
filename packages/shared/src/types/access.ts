@@ -73,3 +73,13 @@ export interface SessaoVitrine {
   expires_at: string;
   rep_name: string;
 }
+
+/** O que a loja vê da própria conta. Tudo em leitura — cadastro é da fábrica. */
+export interface MinhaContaLoja {
+  name: string;
+  trade_name: string | null;
+  cnpj: string | null;
+  whatsapp: string | null;
+  price_table_name: string | null;
+  rep_name: string | null;
+}

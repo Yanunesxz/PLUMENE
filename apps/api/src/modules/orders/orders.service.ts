@@ -68,6 +68,22 @@ async function getPriceMap(
   return map;
 }
 
+/**
+ * `orders.source`, `guest_name` e `guest_whatsapp` vêm da migração 014, que pode
+ * não estar aplicada. Mandar coluna inexistente no INSERT faz o PostgREST
+ * recusar o pedido INTEIRO — o representante deixaria de conseguir vender até
+ * alguém rodar o SQL. Detecta uma vez e guarda, para o deploy não depender da
+ * ordem. (Mesmo padrão de `reps.service.ts` e `partner.service.ts`.)
+ */
+let temColunasDeOrigem: boolean | null = null;
+
+async function detectarColunasDeOrigem(): Promise<boolean> {
+  if (temColunasDeOrigem !== null) return temColunasDeOrigem;
+  const { error } = await supabase.from('orders').select('source').limit(1);
+  temColunasDeOrigem = !error;
+  return temColunasDeOrigem;
+}
+
 export interface OrigemPedido {
   /** Quem montou. `showcase` é o único que pode ficar sem cliente. */
   source: OrderSource;
@@ -90,6 +106,13 @@ export async function createOrder(
   origem: OrigemPedido = { source: 'rep' },
 ): Promise<OrderWithItems | null> {
   const daVitrine = origem.source === 'showcase';
+
+  // Sem a 014, `orders.customer_id` ainda é NOT NULL e não há onde guardar o
+  // contato do visitante: o pedido de vitrine simplesmente não cabe no banco.
+  // Falha aqui, com motivo, em vez de estourar um 500 sem explicação.
+  if (daVitrine && !(await detectarColunasDeOrigem())) {
+    throw new Error('ACESSO_INDISPONIVEL');
+  }
 
   // Pedido de vitrine não tem cliente: quem pediu é um visitante identificado
   // só por nome e WhatsApp. Nos outros caminhos, o cliente é obrigatório e
@@ -149,9 +172,13 @@ export async function createOrder(
       notes: body.notes ?? null,
       local_id: body.local_id ?? null,
       created_by: origem.created_by ?? rep_id,
-      source: origem.source,
-      guest_name: origem.guest_name ?? null,
-      guest_whatsapp: origem.guest_whatsapp ?? null,
+      ...((await detectarColunasDeOrigem())
+        ? {
+            source: origem.source,
+            guest_name: origem.guest_name ?? null,
+            guest_whatsapp: origem.guest_whatsapp ?? null,
+          }
+        : {}),
     })
     .select()
     .single();

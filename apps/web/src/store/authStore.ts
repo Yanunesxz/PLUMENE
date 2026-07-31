@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { User, UserRole } from '@csb/shared';
+import type { AuthRole, User } from '@csb/shared';
 
 interface AuthState {
   token: string | null;
@@ -10,7 +10,7 @@ interface AuthState {
   login: (token: string, refresh_token: string, user: Omit<User, 'created_at'>) => void;
   setToken: (token: string) => void;
   logout: () => void;
-  hasRole: (...roles: UserRole[]) => boolean;
+  hasRole: (...roles: AuthRole[]) => boolean;
 }
 
 export const useAuthStore = create<AuthState>()(

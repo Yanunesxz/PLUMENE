@@ -46,6 +46,13 @@ export interface VitrineCriada {
   expires_at: string;
 }
 
+/** Migração 014 pendente: a tabela do link ainda não existe. */
+export class RecursoIndisponivel extends Error {
+  constructor() {
+    super('ACESSO_INDISPONIVEL');
+  }
+}
+
 /**
  * Cria a vitrine e devolve o token EM CLARO — é a única vez que ele existe
  * fora do link. A tabela de preço fica congelada aqui: se a do representante
@@ -72,6 +79,9 @@ export async function criarVitrine(
     .select('id, expires_at')
     .single();
 
+  // PGRST205 = tabela ausente. Sem a 014 o recurso inteiro não existe, e um
+  // "não foi possível criar" genérico só geraria ligação para o suporte.
+  if (error?.code === 'PGRST205') throw new RecursoIndisponivel();
   if (error || !data) return null;
   return { id: (data as { id: string }).id, token, expires_at };
 }

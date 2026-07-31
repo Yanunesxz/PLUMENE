@@ -87,6 +87,16 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
     }
     await reply.status(201).send({ data: order });
   } catch (err) {
+    if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
+      // Migração 014 pendente. O visitante não tem o que fazer com esse detalhe.
+      request.log.error('Pedido de vitrine recusado: migração 014 não aplicada');
+      await reply.status(503).send({
+        error: 'Este recurso ainda não está disponível. Fale com o representante.',
+        code: 'UNAVAILABLE',
+        statusCode: 503,
+      });
+      return;
+    }
     if (err instanceof Error && err.message === 'CUSTOMER_BLOCKED') {
       await reply.status(403).send({ error: 'Cliente bloqueado', code: 'CUSTOMER_BLOCKED', statusCode: 403 });
       return;
