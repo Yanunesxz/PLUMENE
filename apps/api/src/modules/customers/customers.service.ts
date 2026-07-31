@@ -1,6 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import type { CustomerListItem, CreateCustomerRequest } from '@csb/shared';
-import type { UserRole } from '@csb/shared';
+import type { AuthRole } from '@csb/shared';
 
 // O PostgREST devolve no máximo 1000 linhas por requisição. Gerente/admin podem
 // ter milhares de clientes, então paginamos em blocos até pegar todos.
@@ -12,7 +12,7 @@ const CUSTOMER_COLUMNS = 'id, name, trade_name, cnpj, blocked, block_reason, cre
 
 export async function getCustomers(
   company_id: string,
-  role: UserRole,
+  role: AuthRole,
   rep_id: string,
   search?: string,
   include_blocked = true,

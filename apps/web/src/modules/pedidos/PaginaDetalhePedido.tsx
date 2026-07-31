@@ -10,6 +10,7 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { formatBRL } from '../../lib/utils.js';
+import { nomeDoComprador, origemParaExibir } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -56,6 +57,12 @@ export function PaginaDetalhePedido() {
     for (const c of customers ?? []) if (c.whatsapp) m.set(c.id, c.whatsapp);
     return m;
   }, [customers]);
+
+  // Pedido de vitrine não tem cadastro: o contato é o que o visitante digitou
+  // no fechamento. É por ele que o representante vai retornar.
+  const zapDoComprador = order?.customer_id
+    ? (custWhats.get(order.customer_id) ?? null)
+    : (order?.guest_whatsapp ?? null);
 
   useEffect(() => {
     if (!id) return;
@@ -138,16 +145,23 @@ export function PaginaDetalhePedido() {
         <div className="space-y-4">
           <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
-              <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
+              <span className="flex min-w-0 items-center gap-1.5">
+                <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
+                {origemParaExibir(order) && (
+                  <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                    {origemParaExibir(order)}
+                  </span>
+                )}
+              </span>
               <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="min-w-0 truncate text-lg font-bold text-foreground">
-                {custName.get(order.customer_id) ?? 'Cliente'}
+                {nomeDoComprador(order, custName)}
               </p>
-              {custWhats.get(order.customer_id) && (
+              {zapDoComprador && (
                 <a
-                  href={`https://wa.me/${custWhats.get(order.customer_id)!.replace(/\D/g, '')}`}
+                  href={`https://wa.me/${zapDoComprador.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Falar no WhatsApp"

@@ -1,12 +1,18 @@
 import { z } from 'zod';
 
 export const createOrderSchema = z.object({
-  customer_id: z.string().min(1, 'customer_id é obrigatório'),
+  // Opcional no schema porque o controller decide quem é o cliente: o
+  // representante manda; a loja tem o dela no token; a vitrine não tem nenhum.
+  // Quem exige a presença é o `createOrder`, conforme a origem.
+  customer_id: z.string().min(1).optional(),
   notes: z.string().optional(),
   local_id: z.string().optional(),
   // Pedido fechado pelo representante entra direto na fila de aprovação.
   // Ausente = rascunho (compatível com clientes antigos que não mandam o campo).
   submit: z.boolean().optional(),
+  // Vitrine: quem está pedindo, já que não há cadastro por trás.
+  guest_name: z.string().max(160).optional(),
+  guest_whatsapp: z.string().max(30).optional(),
   items: z
     .array(
       z.object({

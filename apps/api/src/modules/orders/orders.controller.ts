@@ -7,20 +7,22 @@ import {
   setOrderInvoiced,
   deleteOrder,
 } from './orders.service.js';
+import type { OrigemPedido } from './orders.service.js';
+import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { parseBody } from '../../lib/validation.js';
 import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
 
 export async function listOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id, role } = request.user;
-  const orders = await getOrders(company_id, role, rep_id);
+  const { company_id, sub: rep_id, role, customer_id } = request.user;
+  const orders = await getOrders(company_id, role, rep_id, customer_id);
   await reply.send({ data: orders });
 }
 
 export async function getOrder(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id, role } = request.user;
+  const { company_id, sub: rep_id, role, customer_id } = request.user;
   const { id } = request.params as { id: string };
 
-  const order = await getOrderById(id, company_id, role, rep_id);
+  const order = await getOrderById(id, company_id, role, rep_id, customer_id);
   if (!order) {
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
@@ -29,12 +31,56 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
 }
 
 export async function createOrderHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id, price_table_id } = request.user;
+  const { company_id, sub, role, price_table_id, customer_id, rep_id: dono } = request.user;
   const body = await parseBody(createOrderSchema, request.body, reply);
   if (!body) return;
 
+  // Quem RECEBE o pedido. Loja e visitante têm o representante dono no token;
+  // o representante recebe o próprio.
+  const destinatario = role === 'store' || role === 'guest' ? (dono ?? sub) : sub;
+
+  let origem: OrigemPedido = { source: 'rep', created_by: sub };
+  let tabela = price_table_id ?? null;
+  let corpo = body;
+
+  if (role === 'store') {
+    if (!customer_id) {
+      await reply.status(403).send({ error: 'Acesso sem loja vinculada', code: 'FORBIDDEN', statusCode: 403 });
+      return;
+    }
+    // A loja não escolhe para quem compra: é sempre o cliente dela.
+    corpo = { ...body, customer_id };
+    origem = { source: 'store', created_by: sub };
+    tabela = (await tabelaDaLoja(customer_id, dono ?? null)) ?? null;
+  }
+
+  if (role === 'guest') {
+    const nome = body.guest_name?.trim();
+    const zap = body.guest_whatsapp?.replace(/\D/g, '') ?? '';
+    if (!nome || nome.length < 2) {
+      await reply.status(400).send({ error: 'Informe o nome da loja', code: 'VALIDATION_ERROR', statusCode: 400 });
+      return;
+    }
+    if (zap.length < 10 || zap.length > 11) {
+      await reply.status(400).send({ error: 'Informe o WhatsApp com DDD', code: 'VALIDATION_ERROR', statusCode: 400 });
+      return;
+    }
+    // Vitrine não tem cliente: mesmo que venha um customer_id no corpo, ele é
+    // descartado — quem abriu o link não escolhe para quem está comprando.
+    const semCliente = { ...body };
+    delete semCliente.customer_id;
+    corpo = semCliente;
+    origem = {
+      source: 'showcase',
+      guest_name: nome,
+      guest_whatsapp: body.guest_whatsapp ?? null,
+      // Não há usuário do outro lado: fica o representante dono do link.
+      created_by: dono ?? sub,
+    };
+  }
+
   try {
-    const order = await createOrder(company_id, rep_id, price_table_id ?? null, body);
+    const order = await createOrder(company_id, destinatario, tabela, corpo, origem);
     if (!order) {
       await reply.status(422).send({ error: 'Não foi possível criar o pedido', code: 'CREATE_FAILED', statusCode: 422 });
       return;

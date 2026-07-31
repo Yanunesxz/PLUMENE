@@ -1,4 +1,4 @@
-import type { UserRole } from '../constants/userRole.js';
+import type { AuthRole, UserRole } from '../constants/userRole.js';
 
 export interface Company {
   id: string;
@@ -30,9 +30,10 @@ export interface User {
 }
 
 export interface AuthPayload {
+  /** Usuário logado. Na vitrine, o id do próprio link — não há usuário. */
   sub: string;
   email: string;
-  role: UserRole;
+  role: AuthRole;
   company_id: string;
   name: string;
   /** Tabela de preço do representante logado (usada para precificar o catálogo). */
@@ -41,6 +42,13 @@ export interface AuthPayload {
   commission_rate?: number | null;
   /** Código ERP do representante — resolve a carteira de clientes. */
   erp_rep_id?: string | null;
+  /** Loja: o cliente que este login representa. */
+  customer_id?: string | null;
+  /**
+   * Loja e vitrine: o representante dono, que recebe o pedido para aprovar.
+   * Para admin/manager/rep é nulo — o dono é o próprio `sub`.
+   */
+  rep_id?: string | null;
 }
 
 // (commission_rate em User e AuthPayload são usados pela área do representante)

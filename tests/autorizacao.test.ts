@@ -34,6 +34,25 @@ const TOKEN = {
   expirado: assinar({ ...base, sub: 'rep-1', role: 'rep' }, SEGREDO, -60),
   outroSegredo: assinar({ ...base, sub: 'adm-1', role: 'admin' }, 'segredo-errado'),
   refresh: assinar({ sub: 'rep-1', type: 'refresh' }),
+  // Loja: compra para o cliente dela, recebe pelo representante dono.
+  loja: assinar({
+    ...base,
+    sub: 'loja-1',
+    role: 'store',
+    price_table_id: null,
+    customer_id: 'cliente-1',
+    rep_id: 'rep-1',
+  }),
+  // Vitrine: não é usuário. `sub` é o próprio link.
+  visitante: assinar({
+    ...base,
+    sub: 'link-1',
+    role: 'guest',
+    name: 'Visitante',
+    price_table_id: 'tabela-do-rep',
+    customer_id: null,
+    rep_id: 'rep-1',
+  }),
 };
 
 let app: FastifyInstance;
@@ -44,7 +63,8 @@ beforeAll(async () => {
     product_variants: { data: [{ id: 'v1', product_id: 'p1', size: 'P', stock_quantity: 7, stock_committed: 1 }], error: null },
     product_prices: { data: [{ product_id: 'p1', price: 30 }], error: null },
     price_tables: { data: [{ id: 'tabela-2', name: 'TABELA 02', company_id: EMPRESA }], error: null },
-    customers: { data: [], error: null },
+    // `tabelaDaLoja` consulta o cliente para achar a tabela de preço dela.
+    customers: { data: { price_table_id: 'tabela-2' }, error: null },
     orders: { data: [], error: null },
     users: { data: [], error: null },
   });
@@ -104,6 +124,117 @@ describe('papéis', () => {
     ['admin', TOKEN.admin],
   ])('%s acessa /catalog/price-tables', async (_papel, token) => {
     expect((await chamar('/catalog/price-tables', token)).statusCode).toBe(200);
+  });
+});
+
+describe('loja', () => {
+  it.each([
+    ['/customers'],
+    ['/reps'],
+    ['/price-tables'],
+    ['/catalog/price-tables'],
+    ['/invites'],
+    ['/showcase-links'],
+  ])('não acessa %s', async (url) => {
+    expect((await chamar(url, TOKEN.loja)).statusCode).toBe(403);
+  });
+
+  it('vê o catálogo', async () => {
+    expect((await chamar('/products', TOKEN.loja)).statusCode).toBe(200);
+  });
+
+  it('consulta os próprios pedidos', async () => {
+    expect((await chamar('/orders', TOKEN.loja)).statusCode).toBe(200);
+  });
+
+  it('não aprova pedido — nem o próprio', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/00000000-0000-0000-0000-000000000000/status',
+      headers: { authorization: `Bearer ${TOKEN.loja}` },
+      payload: { status: 'approved' },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('não fatura', async () => {
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/00000000-0000-0000-0000-000000000000/invoice',
+      headers: { authorization: `Bearer ${TOKEN.loja}` },
+      payload: { invoiced: true },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('não apaga pedido', async () => {
+    const res = await app.inject({
+      method: 'DELETE',
+      url: '/orders/00000000-0000-0000-0000-000000000000',
+      headers: { authorization: `Bearer ${TOKEN.loja}` },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('não recebe quantidade em estoque', async () => {
+    const res = await chamar('/products', TOKEN.loja);
+    const { data } = res.json() as { data: Array<{ variants: Array<Record<string, unknown>> }> };
+    expect(JSON.stringify(data)).not.toContain('stock_quantity');
+    expect(data[0]!.variants[0]).not.toHaveProperty('available');
+  });
+
+  it('não consulta outra tabela de preço pela query string', async () => {
+    expect((await chamar('/products?price_table_id=tabela-2', TOKEN.loja)).statusCode).toBe(403);
+  });
+});
+
+describe('vitrine (visitante)', () => {
+  it('vê o catálogo — é para isso que o link existe', async () => {
+    expect((await chamar('/products', TOKEN.visitante)).statusCode).toBe(200);
+  });
+
+  it.each([
+    ['/orders'],
+    ['/customers'],
+    ['/reps'],
+    ['/price-tables'],
+    ['/catalog/price-tables'],
+    ['/invites'],
+    ['/showcase-links'],
+  ])('não acessa %s', async (url) => {
+    expect((await chamar(url, TOKEN.visitante)).statusCode).toBe(403);
+  });
+
+  it('não gera link para si mesmo', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/showcase-links',
+      headers: { authorization: `Bearer ${TOKEN.visitante}` },
+      payload: { hours: 24 },
+    });
+    expect(res.statusCode).toBe(403);
+  });
+
+  it('não recebe quantidade em estoque', async () => {
+    const res = await chamar('/products', TOKEN.visitante);
+    const { data } = res.json() as { data: Array<{ variants: Array<Record<string, unknown>> }> };
+    expect(data[0]!.variants[0]).not.toHaveProperty('available');
+  });
+
+  it('não consulta outra tabela de preço pela query string', async () => {
+    expect((await chamar('/products?price_table_id=tabela-2', TOKEN.visitante)).statusCode).toBe(403);
+  });
+});
+
+describe('rotas públicas', () => {
+  it('link de vitrine inexistente responde 410, não 500', async () => {
+    const res = await app.inject({ method: 'POST', url: '/public/showcase/inventado' });
+    expect(res.statusCode).toBe(410);
+  });
+
+  it('convite inexistente responde 410', async () => {
+    const res = await app.inject({ method: 'GET', url: '/public/invite/inventado' });
+    expect(res.statusCode).toBe(410);
   });
 });
 

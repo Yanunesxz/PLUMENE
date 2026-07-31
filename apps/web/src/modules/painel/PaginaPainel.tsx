@@ -8,6 +8,7 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
+import { nomeDoComprador } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
@@ -47,8 +48,12 @@ export function PaginaPainel() {
     const approved = orders.filter((o) => o.status === 'approved');
     const pending = orders.filter((o) => o.status === 'pending_approval');
 
+    // Pedido de vitrine não entra no ranking: não há cliente por trás dele.
     const topMap = new Map<string, number>();
-    for (const o of approved) topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + (o.total ?? 0));
+    for (const o of approved) {
+      if (!o.customer_id) continue;
+      topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + (o.total ?? 0));
+    }
     const topClientes = [...topMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     return {
@@ -138,7 +143,7 @@ export function PaginaPainel() {
                 <div className="mb-3 flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-medium text-foreground">
-                      {custName.get(order.customer_id) ?? 'Cliente'}
+                      {nomeDoComprador(order, custName)}
                     </p>
                     <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total ?? 0)}</p>
                     <p className="text-xs text-muted-foreground">

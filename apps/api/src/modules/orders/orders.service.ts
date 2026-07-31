@@ -1,12 +1,13 @@
 import { supabase } from '../../config/supabase.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
 import { ORDER_STATUS_FLOW } from '@csb/shared';
-import type { UserRole } from '@csb/shared';
+import type { AuthRole, OrderSource } from '@csb/shared';
 
 export async function getOrders(
   company_id: string,
-  role: UserRole,
+  role: AuthRole,
   rep_id: string,
+  customer_id?: string | null,
 ): Promise<Order[]> {
   let query = supabase
     .from('orders')
@@ -14,9 +15,10 @@ export async function getOrders(
     .eq('company_id', company_id)
     .order('created_at', { ascending: false });
 
-  if (role === 'rep') {
-    query = query.eq('rep_id', rep_id);
-  }
+  if (role === 'rep') query = query.eq('rep_id', rep_id);
+  // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
+  // tenha quem tiver montado (ela mesma ou o representante).
+  if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
 
   const { data, error } = await query;
   if (error || !data) return [];
@@ -26,8 +28,9 @@ export async function getOrders(
 export async function getOrderById(
   id: string,
   company_id: string,
-  role?: UserRole,
+  role?: AuthRole,
   rep_id?: string,
+  customer_id?: string | null,
 ): Promise<OrderWithItems | null> {
   let query = supabase
     .from('orders')
@@ -36,9 +39,9 @@ export async function getOrderById(
     .eq('company_id', company_id);
 
   // Representante só acessa os próprios pedidos (gerente/admin veem todos).
-  if (role === 'rep' && rep_id) {
-    query = query.eq('rep_id', rep_id);
-  }
+  if (role === 'rep' && rep_id) query = query.eq('rep_id', rep_id);
+  // Loja só acessa os pedidos do cliente que ela representa.
+  if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
 
   const { data: order, error } = await query.single();
 
@@ -65,22 +68,45 @@ async function getPriceMap(
   return map;
 }
 
+export interface OrigemPedido {
+  /** Quem montou. `showcase` é o único que pode ficar sem cliente. */
+  source: OrderSource;
+  /** Vitrine: contato informado no fechamento, já que não há cadastro. */
+  guest_name?: string | null;
+  guest_whatsapp?: string | null;
+  /**
+   * Quem apertou enviar. Para a loja é o usuário dela; para a vitrine não há
+   * usuário, então fica o representante dono do link. `rep_id` continua sendo
+   * quem RECEBE o pedido — os dois só coincidem no caminho do representante.
+   */
+  created_by?: string;
+}
+
 export async function createOrder(
   company_id: string,
   rep_id: string,
   price_table_id: string | null,
   body: CreateOrderRequest,
+  origem: OrigemPedido = { source: 'rep' },
 ): Promise<OrderWithItems | null> {
-  const { data: customer } = await supabase
-    .from('customers')
-    .select('id, blocked')
-    .eq('id', body.customer_id)
-    .eq('company_id', company_id)
-    .single();
+  const daVitrine = origem.source === 'showcase';
 
-  if (!customer) return null;
-  if ((customer as { blocked: boolean }).blocked) {
-    throw new Error('CUSTOMER_BLOCKED');
+  // Pedido de vitrine não tem cliente: quem pediu é um visitante identificado
+  // só por nome e WhatsApp. Nos outros caminhos, o cliente é obrigatório e
+  // precisa estar liberado.
+  if (!daVitrine) {
+    if (!body.customer_id) return null;
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id, blocked')
+      .eq('id', body.customer_id)
+      .eq('company_id', company_id)
+      .single();
+
+    if (!customer) return null;
+    if ((customer as { blocked: boolean }).blocked) {
+      throw new Error('CUSTOMER_BLOCKED');
+    }
   }
 
   // Recalcula o preço no servidor pela tabela do representante. Se algum item
@@ -107,19 +133,25 @@ export async function createOrder(
 
   // Pedido enviado pelo representante já nasce na fila do gerente. Sem isto ele
   // ficava em 'draft' para sempre e a tela de aprovação nunca via nada.
-  const status: Order['status'] = body.submit ? 'pending_approval' : 'draft';
+  // Loja e vitrine não têm rascunho: quem compra não guarda pedido pela metade
+  // no servidor, e ninguém deve poder pedir sem passar por aprovação.
+  const status: Order['status'] =
+    origem.source === 'rep' ? (body.submit ? 'pending_approval' : 'draft') : 'pending_approval';
 
   const { data: order, error: orderError } = await supabase
     .from('orders')
     .insert({
       company_id,
       rep_id,
-      customer_id: body.customer_id,
+      customer_id: daVitrine ? null : body.customer_id,
       status,
       total,
       notes: body.notes ?? null,
       local_id: body.local_id ?? null,
-      created_by: rep_id,
+      created_by: origem.created_by ?? rep_id,
+      source: origem.source,
+      guest_name: origem.guest_name ?? null,
+      guest_whatsapp: origem.guest_whatsapp ?? null,
     })
     .select()
     .single();
@@ -148,7 +180,7 @@ export async function deleteOrder(
   id: string,
   company_id: string,
   rep_id: string,
-  role: UserRole,
+  role: AuthRole,
 ): Promise<DeleteOrderResult> {
   const { data: order } = await supabase
     .from('orders')
@@ -194,7 +226,7 @@ export async function updateOrderStatus(
   company_id: string,
   approverId: string,
   body: UpdateOrderStatusRequest,
-  role?: UserRole,
+  role?: AuthRole,
 ): Promise<Order | null> {
   const { data: current, error: currentError } = await supabase
     .from('orders')

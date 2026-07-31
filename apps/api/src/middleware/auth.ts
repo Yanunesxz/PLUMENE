@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { AuthPayload, UserRole } from '@csb/shared';
+import type { AuthPayload, AuthRole } from '@csb/shared';
 
 // Augmenta @fastify/jwt para tipar request.user como AuthPayload
 declare module '@fastify/jwt' {
@@ -32,7 +32,7 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
-export function requireRole(roles: UserRole[]) {
+export function requireRole(roles: AuthRole[]) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     if (!request.user || !roles.includes(request.user.role)) {
       await reply.status(403).send({

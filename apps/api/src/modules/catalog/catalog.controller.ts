@@ -1,15 +1,45 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
+import { supabase } from '../../config/supabase.js';
 import { getProducts, listCompanyPriceTables, priceTableBelongsToCompany } from './catalog.service.js';
 
+/**
+ * Resolve a tabela de preço da loja.
+ *
+ * Primeiro a do próprio cliente; se ele não tiver, a do representante dono.
+ * A queda não é detalhe: 809 dos 1.353 clientes estão sem tabela — sem ela, a
+ * maioria das lojas abriria o catálogo vazio.
+ */
+export async function tabelaDaLoja(
+  customer_id: string,
+  rep_id: string | null | undefined,
+): Promise<string | undefined> {
+  const { data: cliente } = await supabase
+    .from('customers')
+    .select('price_table_id')
+    .eq('id', customer_id)
+    .maybeSingle();
+
+  const daLoja = (cliente as { price_table_id: string | null } | null)?.price_table_id;
+  if (daLoja) return daLoja;
+
+  if (!rep_id) return undefined;
+  const { data: rep } = await supabase
+    .from('users')
+    .select('price_table_id')
+    .eq('id', rep_id)
+    .maybeSingle();
+
+  return (rep as { price_table_id: string | null } | null)?.price_table_id ?? undefined;
+}
+
 export async function listProducts(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, role, price_table_id: repPriceTableId } = request.user;
+  const { company_id, role, price_table_id: doToken, customer_id, rep_id } = request.user;
   const { price_table_id } = request.query as { price_table_id?: string };
 
   // Consultar o catálogo em OUTRA tabela é atribuição de gerente/admin. O
-  // representante fica preso à tabela que o gerente atribuiu a ele — a tela já
-  // esconde o seletor, mas sem esta trava bastava chamar a API com o query param
-  // para ver o catálogo inteiro em qualquer tabela da empresa (INDUSTRIALIZAÇÃO,
-  // 50%, …).
+  // representante fica preso à tabela que o gerente atribuiu a ele; a loja e o
+  // visitante, à que o link/cadastro define. Sem esta trava bastava chamar a API
+  // com o query param para ver o catálogo inteiro em qualquer tabela da empresa.
   const canChooseTable = role === 'manager' || role === 'admin';
   if (price_table_id && !canChooseTable) {
     await reply.status(403).send({
@@ -20,17 +50,21 @@ export async function listProducts(request: FastifyRequest, reply: FastifyReply)
     return;
   }
 
-  let tableId = repPriceTableId ?? undefined;
+  let tableId = doToken ?? undefined;
+  if (role === 'store' && customer_id) {
+    tableId = await tabelaDaLoja(customer_id, rep_id);
+  }
   if (price_table_id && (await priceTableBelongsToCompany(price_table_id, company_id))) {
     tableId = price_table_id;
   }
 
   const products = await getProducts(company_id, {
     price_table_id: tableId,
-    // Estoque da fábrica é informação de gerente.
+    // Estoque da fábrica é informação de gerente. Representante, loja e
+    // visitante recebem só "tem" ou "não tem" por tamanho.
     includeStock: canChooseTable,
-    // Para o representante, produto sem preço na tabela dele não é catálogo —
-    // é um beco sem saída (entra no carrinho a R$ 0 e derruba o pedido inteiro).
+    // Para quem compra, produto sem preço na tabela dele não é catálogo — é um
+    // beco sem saída (entra no carrinho a R$ 0 e derruba o pedido inteiro).
     onlyPriced: !canChooseTable,
   });
 

@@ -12,6 +12,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { exportOrdersToXlsx } from '../../lib/exportOrders.js';
+import { nomeDoComprador, origemParaExibir } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type {
   Order,
@@ -108,7 +109,7 @@ export function PaginaPedidos() {
       .filter((o) => repId === ALL_REPS || o.rep_id === repId)
       .filter((o) => {
         if (!q) return true;
-        const name = customerName.get(o.customer_id)?.toLowerCase() ?? '';
+        const name = nomeDoComprador(o, customerName).toLowerCase();
         return name.includes(q) || o.id.toLowerCase().includes(q);
       });
   }, [orders, status, repId, search, customerName]);
@@ -259,11 +260,20 @@ export function PaginaPedidos() {
             const card = (
               <>
                 <div className="flex items-start justify-between gap-2">
-                  <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
+                  <span className="flex min-w-0 items-center gap-1.5">
+                    <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
+                    {/* Só aparece quando NÃO foi o representante que montou —
+                        é a informação de que o pedido chegou sozinho. */}
+                    {origemParaExibir(order) && (
+                      <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                        {origemParaExibir(order)}
+                      </span>
+                    )}
+                  </span>
                   <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
                 </div>
                 <p className="mt-2 truncate text-sm font-medium text-foreground">
-                  {customerName.get(order.customer_id) ?? 'Cliente'}
+                  {nomeDoComprador(order, customerName)}
                 </p>
                 <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total)}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">

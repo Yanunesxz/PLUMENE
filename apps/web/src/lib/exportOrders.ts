@@ -1,4 +1,5 @@
 import { ORDER_STATUS_LABELS } from '@csb/shared';
+import { nomeDoComprador, ORIGEM_LABEL } from './pedido.js';
 import type { OrderWithItems } from '@csb/shared';
 
 function orderSheetRows(
@@ -9,7 +10,8 @@ function orderSheetRows(
   return orders.flatMap((order) =>
     order.items.map((item) => ({
       'Nº Pedido': order.order_number ?? order.id.slice(0, 8),
-      Cliente: customerName.get(order.customer_id) ?? order.customer_id,
+      Cliente: nomeDoComprador(order, customerName),
+      Origem: ORIGEM_LABEL[order.source ?? 'rep'],
       Status: ORDER_STATUS_LABELS[order.status],
       Produto: productSku.get(item.product_id) ?? item.product_id,
       Variante: 'Sortido',

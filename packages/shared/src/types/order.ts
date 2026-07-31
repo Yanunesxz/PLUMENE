@@ -1,4 +1,5 @@
 import type { OrderStatus } from '../constants/orderStatus.js';
+import type { OrderSource } from './access.js';
 
 export interface OrderItem {
   id: string;
@@ -17,8 +18,14 @@ export interface Order {
   /** Número sequencial legível do pedido (ex.: 14534). */
   order_number?: number | null;
   rep_id: string;
-  customer_id: string;
+  /** Nulo em pedido de vitrine: não há cliente cadastrado por trás. */
+  customer_id: string | null;
   status: OrderStatus;
+  /** Quem montou: representante, loja logada ou vitrine. */
+  source?: OrderSource;
+  /** Vitrine: contato informado no fechamento, já que não há cadastro. */
+  guest_name?: string | null;
+  guest_whatsapp?: string | null;
   total: number | null;
   notes: string | null;
   /** Faturado (boleto/NF emitido) — base da comissão. */
@@ -39,7 +46,8 @@ export interface OrderWithItems extends Order {
 }
 
 export interface CreateOrderRequest {
-  customer_id: string;
+  /** Ignorado para loja (usa o cliente dela) e ausente na vitrine. */
+  customer_id?: string | undefined;
   notes?: string | undefined;
   local_id?: string | undefined;
   /**
@@ -47,6 +55,9 @@ export interface CreateOrderRequest {
    * (`pending_approval`). `false`/ausente = rascunho, ainda em montagem.
    */
   submit?: boolean | undefined;
+  /** Vitrine: quem está pedindo. Obrigatórios nesse caminho, ignorados nos outros. */
+  guest_name?: string | undefined;
+  guest_whatsapp?: string | undefined;
   items: Array<{
     product_id: string;
     variant_id?: string | undefined;

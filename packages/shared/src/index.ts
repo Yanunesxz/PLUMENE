@@ -1,3 +1,4 @@
+export * from './types/access.js';
 export * from './types/api.js';
 export * from './types/customer.js';
 export * from './types/order.js';
