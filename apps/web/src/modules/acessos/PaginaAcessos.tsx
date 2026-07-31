@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link2, Check, Ban, Clock, Store } from 'lucide-react';
+import { Link2, Ban, Clock, Store, Eye } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -8,6 +8,7 @@ import { Button } from '../../components/interface/Button.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
+import { LinkGerado } from './LinkGerado.js';
 import { cn } from '../../lib/utils.js';
 import { SHOWCASE_DURATIONS } from '@csb/shared';
 import type {
@@ -21,12 +22,21 @@ import type {
 type Aba = 'convites' | 'vitrine';
 
 const ROTULO_STATUS: Record<string, string> = {
-  pendente: 'Aguardando',
+  pendente: 'Aguardando a loja abrir',
   usado: 'Em uso',
   expirado: 'Expirado',
   revogado: 'Cancelado',
   ativo: 'Ativo',
 };
+
+interface Gerado {
+  url: string;
+  expiraEm: string;
+  tipo: 'convite' | 'vitrine';
+  cliente?: string | undefined;
+  whatsapp?: string | undefined;
+  horas?: number | undefined;
+}
 
 /** Quanto falta, em texto curto. Vazio quando já passou. */
 function faltam(ate: string): string {
@@ -46,7 +56,7 @@ export function PaginaAcessos() {
   const [vitrines, setVitrines] = useState<ShowcaseLink[] | null>(null);
   const [clienteId, setClienteId] = useState('');
   const [ocupado, setOcupado] = useState(false);
-  const [copiado, setCopiado] = useState<string | null>(null);
+  const [gerado, setGerado] = useState<Gerado | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const clientes = useLiveQuery(() => db.customers.orderBy('name').toArray(), []);
@@ -65,28 +75,20 @@ export function PaginaAcessos() {
     void recarregar();
   }, [recarregar]);
 
-  /**
-   * O link só existe UMA vez: a API devolve a URL na criação e nunca mais.
-   * Por isso ele vai direto para a área de transferência aqui — se o
-   * representante perder, tem que gerar outro.
-   */
-  const copiar = async (url: string, id: string) => {
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiado(id);
-      setTimeout(() => setCopiado(null), 2500);
-      setToast({ message: 'Link copiado. Cole no WhatsApp da loja.', type: 'success' });
-    } catch {
-      setToast({ message: `Copie o link: ${url}`, type: 'success' });
-    }
-  };
-
   const gerarConvite = async () => {
     if (!token || !clienteId) return;
     setOcupado(true);
     try {
       const res = await api.post<ApiResponse<LinkCriado>>('/invites', { customer_id: clienteId }, token);
-      await copiar(res.data.url, res.data.id);
+      const cliente = clientes?.find((c) => c.id === clienteId);
+      setGerado({
+        url: res.data.url,
+        expiraEm: res.data.expires_at,
+        tipo: 'convite',
+        // Nome fantasia primeiro: a razão social do ERP vem com o CNPJ na frente.
+        cliente: cliente?.trade_name?.trim() || cliente?.name,
+        whatsapp: cliente?.whatsapp ?? undefined,
+      });
       setClienteId('');
       await recarregar();
     } catch (e) {
@@ -96,12 +98,12 @@ export function PaginaAcessos() {
     }
   };
 
-  const gerarVitrine = async (hours: ShowcaseDuration) => {
+  const gerarVitrine = async (horas: ShowcaseDuration) => {
     if (!token) return;
     setOcupado(true);
     try {
-      const res = await api.post<ApiResponse<LinkCriado>>('/showcase-links', { hours }, token);
-      await copiar(res.data.url, res.data.id);
+      const res = await api.post<ApiResponse<LinkCriado>>('/showcase-links', { hours: horas }, token);
+      setGerado({ url: res.data.url, expiraEm: res.data.expires_at, tipo: 'vitrine', horas });
       await recarregar();
     } catch (e) {
       setToast({ message: e instanceof Error ? e.message : 'Não foi possível gerar o link', type: 'error' });
@@ -112,9 +114,8 @@ export function PaginaAcessos() {
 
   const revogar = async (tipo: Aba, id: string) => {
     if (!token) return;
-    const rota = tipo === 'convites' ? `/invites/${id}` : `/showcase-links/${id}`;
     try {
-      await api.del(rota, token);
+      await api.del(tipo === 'convites' ? `/invites/${id}` : `/showcase-links/${id}`, token);
       await recarregar();
       setToast({ message: 'Acesso cancelado.', type: 'success' });
     } catch (e) {
@@ -122,36 +123,60 @@ export function PaginaAcessos() {
     }
   };
 
+  const trocarAba = (a: Aba) => {
+    setAba(a);
+    setGerado(null);
+  };
+
   return (
     <div className="p-4 md:p-6">
       <h1 className="titulo mb-1 text-[26px] leading-none text-foreground md:text-[32px]">Acessos</h1>
-      <p className="mb-4 text-sm text-muted-foreground">
-        Dê acesso ao catálogo sem depender de você estar disponível.
+      <p className="mb-5 text-sm text-muted-foreground">
+        Deixe a loja montar o pedido sozinha. Você continua aprovando tudo.
       </p>
 
-      <div className="mb-5 flex gap-2">
-        {(['convites', 'vitrine'] as const).map((a) => (
+      <div className="mb-5 flex gap-1 rounded-lg bg-muted p-1">
+        {(
+          [
+            ['convites', 'Conta de loja'],
+            ['vitrine', 'Link temporário'],
+          ] as const
+        ).map(([valor, rotulo]) => (
           <button
-            key={a}
+            key={valor}
             type="button"
-            onClick={() => setAba(a)}
+            onClick={() => trocarAba(valor)}
             className={cn(
-              'rounded-lg px-3.5 py-2 text-sm font-medium transition-colors',
-              aba === a ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:text-foreground',
+              'flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors',
+              aba === valor
+                ? 'bg-card text-foreground shadow-sm'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
-            {a === 'convites' ? 'Conta de loja' : 'Link temporário'}
+            {rotulo}
           </button>
         ))}
       </div>
 
+      {gerado && (
+        <LinkGerado
+          url={gerado.url}
+          expiraEm={gerado.expiraEm}
+          tipo={gerado.tipo}
+          cliente={gerado.cliente}
+          whatsapp={gerado.whatsapp}
+          horas={gerado.horas}
+          onFechar={() => setGerado(null)}
+        />
+      )}
+
       {aba === 'convites' ? (
         <>
           <div className="mb-5 rounded-xl border border-border bg-card p-4">
-            <p className="mb-1 text-sm font-medium text-foreground">Criar conta para uma loja</p>
-            <p className="mb-3 text-xs text-muted-foreground">
-              A loja recebe o link, cria a própria senha e passa a comprar quando quiser. Os pedidos
-              continuam caindo aqui para você aprovar.
+            <p className="text-sm font-medium text-foreground">Criar conta para uma loja</p>
+            <p className="mb-3 mt-1 text-xs leading-relaxed text-muted-foreground">
+              A loja cria a própria senha e passa a comprar quando quiser, com os preços da tabela
+              dela. Serve para cliente de confiança — o link vale uma vez só.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row">
               <div className="flex-1">
@@ -176,26 +201,29 @@ export function PaginaAcessos() {
           </div>
 
           {convites === null ? (
-            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           ) : convites.length === 0 ? (
             <Vazio icone={Store} texto="Nenhuma loja com acesso ainda." />
           ) : (
-            <ul className="space-y-2">
+            <ul className="overflow-hidden rounded-xl border border-border bg-card">
               {convites.map((c) => (
-                <li key={c.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <li
+                  key={c.id}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium text-foreground">{c.customer_name}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="text-xs text-subtle">
                       {ROTULO_STATUS[c.status]}
-                      {c.status === 'pendente' && faltam(c.expires_at) && ` · expira em ${faltam(c.expires_at)}`}
+                      {c.status === 'pendente' && faltam(c.expires_at) && ` · ${faltam(c.expires_at)}`}
                     </p>
                   </div>
                   {c.status === 'pendente' && (
                     <button
                       type="button"
                       onClick={() => void revogar('convites', c.id)}
-                      aria-label="Cancelar convite"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-danger-soft hover:text-danger-soft-foreground"
+                      aria-label={`Cancelar convite de ${c.customer_name}`}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle transition-colors hover:bg-danger-soft hover:text-danger-soft-foreground"
                     >
                       <Ban className="h-4 w-4" />
                     </button>
@@ -208,20 +236,14 @@ export function PaginaAcessos() {
       ) : (
         <>
           <div className="mb-5 rounded-xl border border-border bg-card p-4">
-            <p className="mb-1 text-sm font-medium text-foreground">Mostrar o catálogo por um tempo</p>
-            <p className="mb-3 text-xs text-muted-foreground">
-              Para quem só quer dar uma olhada. Sem conta, sem senha: o link mostra o catálogo com os
-              seus preços e para de funcionar sozinho.
+            <p className="text-sm font-medium text-foreground">Mostrar o catálogo por um tempo</p>
+            <p className="mb-3 mt-1 text-xs leading-relaxed text-muted-foreground">
+              Para quem só quer dar uma olhada. Sem conta e sem senha: mostra os seus preços e para
+              de funcionar sozinho. Se a pessoa fechar pedido, ele cai aqui com o contato dela.
             </p>
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-4 gap-2">
               {SHOWCASE_DURATIONS.map((h) => (
-                <Button
-                  key={h}
-                  variant="outline"
-                  disabled={ocupado}
-                  onClick={() => void gerarVitrine(h)}
-                >
-                  <Clock className="h-4 w-4" strokeWidth={2.5} />
+                <Button key={h} variant="outline" disabled={ocupado} onClick={() => void gerarVitrine(h)}>
                   {h}h
                 </Button>
               ))}
@@ -229,30 +251,34 @@ export function PaginaAcessos() {
           </div>
 
           {vitrines === null ? (
-            <Skeleton className="h-24 w-full rounded-xl" />
+            <Skeleton className="h-20 w-full rounded-xl" />
           ) : vitrines.length === 0 ? (
             <Vazio icone={Clock} texto="Nenhum link gerado ainda." />
           ) : (
-            <ul className="space-y-2">
+            <ul className="overflow-hidden rounded-xl border border-border bg-card">
               {vitrines.map((v) => (
-                <li key={v.id} className="flex items-center gap-3 rounded-xl border border-border bg-card p-3">
+                <li
+                  key={v.id}
+                  className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0"
+                >
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-medium text-foreground">
                       {ROTULO_STATUS[v.status]}
-                      {v.status === 'ativo' && faltam(v.expires_at) && ` · ${faltam(v.expires_at)} restantes`}
+                      {v.status === 'ativo' && faltam(v.expires_at) && ` · ${faltam(v.expires_at)}`}
                     </p>
-                    <p className="tnum text-xs text-muted-foreground">
+                    <p className="tnum flex items-center gap-1 text-xs text-subtle">
+                      <Eye className="h-3 w-3" strokeWidth={2} />
                       {v.opened_count === 0
-                        ? 'Ainda não foi aberto'
-                        : `Aberto ${v.opened_count} ${v.opened_count === 1 ? 'vez' : 'vezes'}`}
+                        ? 'ainda não foi aberto'
+                        : `${v.opened_count} ${v.opened_count === 1 ? 'abertura' : 'aberturas'}`}
                     </p>
                   </div>
                   {v.status === 'ativo' && (
                     <button
                       type="button"
                       onClick={() => void revogar('vitrine', v.id)}
-                      aria-label="Encerrar link"
-                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-muted-foreground hover:bg-danger-soft hover:text-danger-soft-foreground"
+                      aria-label="Encerrar link agora"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-subtle transition-colors hover:bg-danger-soft hover:text-danger-soft-foreground"
                     >
                       <Ban className="h-4 w-4" />
                     </button>
@@ -262,13 +288,6 @@ export function PaginaAcessos() {
             </ul>
           )}
         </>
-      )}
-
-      {copiado && (
-        <p className="mt-4 flex items-center gap-1.5 text-xs text-positive-soft-foreground">
-          <Check className="h-3.5 w-3.5" strokeWidth={2.5} />
-          Link copiado — ele não aparece de novo, cole agora.
-        </p>
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
