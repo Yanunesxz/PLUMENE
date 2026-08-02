@@ -74,7 +74,10 @@ apps/api/src/
 │       ├── 009_order_number.sql       → nº sequencial (substituída pela 012)
 │       ├── 010_company_cascade.sql    → ON DELETE CASCADE nas FKs de empresa
 │       ├── 011_product_colors.sql     → variações de cor por produto
-│       └── 012_rep_carteira_e_numero.sql → código ERP do rep + nº do pedido
+│       ├── 012_rep_carteira_e_numero.sql → código ERP do rep + nº do pedido
+│       ├── 013_protecoes.sql          → travas contra dado impossível + auditoria
+│       ├── 014_acesso_loja.sql        → papel 'store', convites e vitrine
+│       └── 015_triagem_do_representante.sql → status 'pending_rep' + users.rep_id
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -83,6 +86,8 @@ apps/api/src/
 │   └── password.ts       → hashPassword (bcrypt) + verifyPassword (aceita sha256 legado)
 │
 ├── modules/              → FEATURES — cada uma tem o trio router → controller → service
+│   ├── access/           → convite da loja, vitrine temporária e a área da loja
+│   │                       (invites, showcase, loja.service = GET /minha-area)
 │   ├── auth/             → login, refresh (auth.service tem findUserByEmail, buildAuthPayload)
 │   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep)
 │   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
@@ -126,12 +131,15 @@ apps/web/
     │   ├── pedidos/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
     │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
-    │   │   └── PaginaDetalhePedido     → detalhe (itens, faturar, WhatsApp)
+    │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
     │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, comissão) [gerente/admin]
     │   ├── comissoes/PaginaComissoes   → comissões por rep / todos [gerente/admin]
     │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
-    │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (faturado, comissão, sync)
+    │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (triagem, faturado, sync)
+    │   ├── loja/PaginaMinhaAreaLoja    → "Minha área" da loja (histórico, repetir) [store]
+    │   ├── acessos/PaginaAcessos       → gerar convite e vitrine [rep/gerente/admin]
+    │   ├── publico/                    → PaginaConvite e PaginaVitrine (sem login)
     │   └── sistema/                    → PaginaNaoEncontrada, PaginaSemAcesso
     │
     ├── components/        → REUTILIZÁVEIS (não são telas)
@@ -139,7 +147,8 @@ apps/web/
     │   │                    Badge, Card, Toast, Spinner, Skeleton, Textarea, EmptyState,
     │   │                    BotaoTema (claro/escuro/automático)
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
-    │   └── comercial/     → CartaoProduto, SeletorTamanho, grade.ts (ordem dos tamanhos)
+    │   └── comercial/     → CartaoProduto, SeletorTamanho, CartaoDecisao (aprovar/recusar),
+    │                        grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)
     │   ├── authStore.ts  → usuário logado + token (persistido)
@@ -151,8 +160,11 @@ apps/web/
     │   └── authCache.ts  → login offline (hash da senha guardado local)
     │
     ├── services/api.ts   → cliente HTTP (fetch + Bearer token) — fala com a API
-    ├── hooks/            → useOnlineStatus, useSyncOnReconnect
-    ├── lib/utils.ts      → cn (classes) + formatBRL (R$)
+    ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido
+    ├── lib/
+    │   ├── utils.ts      → cn (classes) + formatBRL (R$)
+    │   └── pedido.ts     → nome do comprador, origem, cor do status e
+    │                       `decisaoDoPedido` (que decisão cada papel pode tomar)
     └── styles/globals.css → Tailwind + TOKENS de cor (claro e escuro).
                               Nenhuma tela escreve cor crua: use `primary`,
                               `positive`, `warn`, `danger`, `subtle`, `sunken`.

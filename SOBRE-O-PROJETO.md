@@ -20,9 +20,14 @@ com **preços calculados automaticamente** pela tabela de cada representante, e 
 
 ## Quem usa (perfis)
 
-- **Representante** — consulta o catálogo, cadastra clientes e monta/acompanha pedidos.
+- **Representante** — consulta o catálogo, cadastra clientes, monta/acompanha pedidos
+  e **decide quais pedidos das lojas seguem para a fábrica**.
 - **Gerente** — acompanha todos os pedidos, aprova ou recusa, e visualiza as comissões.
 - **Administrador** — cadastra e gerencia os representantes e as configurações.
+- **Loja** — o cliente comprando por conta própria: vê o catálogo com a tabela de
+  preço dela, monta o pedido e acompanha o próprio histórico. Não aprova nada.
+- **Visitante da vitrine** — quem abriu um link temporário (1h a 24h). Vê só o
+  catálogo e pode fechar um pedido deixando nome e WhatsApp. Não tem conta.
 
 ## Principais funcionalidades
 
@@ -31,7 +36,12 @@ com **preços calculados automaticamente** pela tabela de cada representante, e 
 - **Catálogo** de produtos com busca, filtros e preço conforme a tabela do representante.
 - **Pedido por grade** — o representante escolhe as quantidades por tamanho (P, M, G…).
 - **Cadastro de clientes** com dados obrigatórios (nome, CNPJ/CPF e WhatsApp).
-- **Fluxo do pedido** — do rascunho ao envio para aprovação do gerente.
+- **Acesso da loja** — o representante gera um convite de uso único e a loja passa a
+  ter login próprio, com catálogo, pedidos e histórico dela.
+- **Link temporário (vitrine)** — catálogo que expira em 1h, 6h, 12h ou 24h, para
+  mostrar preço a quem ainda não é cliente sem abrir conta.
+- **Fluxo do pedido** — do rascunho ao envio. O que a loja monta passa antes pelo
+  representante, que decide se vai para a fábrica; o gerente dá a palavra final.
 - **Comissões** por representante e por mês, sobre o valor faturado.
 - **Funciona offline** — o pedido é salvo no aparelho e **sincroniza sozinho** quando
   a internet volta (essencial para o vendedor em campo).
