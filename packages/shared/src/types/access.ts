@@ -82,4 +82,66 @@ export interface MinhaContaLoja {
   whatsapp: string | null;
   price_table_name: string | null;
   rep_name: string | null;
+  /** Para a loja falar com quem responde por ela sem procurar contato. */
+  rep_whatsapp: string | null;
+}
+
+/** Números da loja, todos calculados sobre pedidos que não foram recusados. */
+export interface ResumoLoja {
+  total_pedidos: number;
+  /** Somatório das quantidades — "peças", que é como a loja conta. */
+  total_pecas: number;
+  total_gasto: number;
+  ticket_medio: number;
+  /** Data do último pedido e há quantos dias ele foi. Nulo em quem nunca pediu. */
+  ultimo_pedido_em: string | null;
+  dias_desde_ultimo: number | null;
+  /** Quantos ainda esperam decisão (do representante ou do gerente). */
+  aguardando: number;
+}
+
+/** Uma peça no histórico da loja, do que mais compra para o que menos compra. */
+export interface PecaComprada {
+  product_id: string;
+  name: string;
+  sku: string;
+  image_url: string | null;
+  /** Soma das quantidades em todos os pedidos. */
+  quantidade: number;
+  /** Quantas vezes ela entrou num pedido — recorrência, não volume. */
+  vezes: number;
+  ultima_compra: string;
+}
+
+/** Um pedido no histórico da loja, já resumido para caber na lista. */
+export interface PedidoResumido {
+  id: string;
+  order_number: number | null;
+  status: string;
+  total: number;
+  /** Peças no pedido — a loja pergunta "quantas peças", não "quantos itens". */
+  pecas: number;
+  created_at: string;
+}
+
+/**
+ * Tudo o que a tela "Minha área" da loja mostra, em UMA resposta.
+ *
+ * O agrupamento é feito no servidor de propósito: o histórico de peças exige
+ * juntar `order_items` de todos os pedidos, e fazer isso no celular custaria uma
+ * requisição por pedido.
+ */
+export interface MinhaAreaLoja {
+  conta: MinhaContaLoja;
+  resumo: ResumoLoja;
+  /** As mais compradas primeiro. No máximo 12. */
+  pecas: PecaComprada[];
+  /** Os mais recentes primeiro. No máximo 10. */
+  pedidos: PedidoResumido[];
+  /** Itens do último pedido, prontos para repetir a compra num toque. */
+  repetir: Array<{
+    product_id: string;
+    variant_id: string | null;
+    quantity: number;
+  }>;
 }

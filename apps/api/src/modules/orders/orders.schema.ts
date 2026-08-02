@@ -26,6 +26,8 @@ export const createOrderSchema = z.object({
 });
 
 export const updateOrderStatusSchema = z.object({
+  // `pending_rep` não entra: ninguém EMPURRA um pedido para a triagem por fora.
+  // Ele só nasce assim, quando a loja ou a vitrine monta o pedido.
   status: z.enum(['draft', 'pending_approval', 'approved', 'rejected', 'sent_erp', 'error_erp']),
   notes: z.string().default(''),
 });

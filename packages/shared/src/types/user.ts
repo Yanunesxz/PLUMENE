@@ -27,6 +27,10 @@ export interface User {
    * clientes que ele mesmo cadastrou no app.
    */
   erp_rep_id?: string | null;
+  /** Loja: o cliente que este login representa. Nulo nos demais papéis. */
+  customer_id?: string | null;
+  /** Loja: o representante que convidou e que recebe os pedidos dela. */
+  rep_id?: string | null;
 }
 
 export interface AuthPayload {

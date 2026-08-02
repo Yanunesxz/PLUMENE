@@ -84,6 +84,20 @@ async function detectarColunasDeOrigem(): Promise<boolean> {
   return temColunasDeOrigem;
 }
 
+/**
+ * `pending_rep` (triagem do representante) vem da migração 015, que altera o
+ * CHECK de `orders.status`. CHECK não dá para detectar com um SELECT como se faz
+ * com coluna: descobrimos tentando gravar. Se o banco recusar, o pedido de loja
+ * e de vitrine volta a cair direto na fila do gerente — que é o comportamento da
+ * 014 — em vez de a compra simplesmente falhar para quem está do outro lado.
+ */
+let temTriagem = true;
+
+function recusouOStatus(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === '23514' && /status/i.test(error.message ?? '');
+}
+
 export interface OrigemPedido {
   /** Quem montou. `showcase` é o único que pode ficar sem cliente. */
   source: OrderSource;
@@ -156,32 +170,51 @@ export async function createOrder(
 
   // Pedido enviado pelo representante já nasce na fila do gerente. Sem isto ele
   // ficava em 'draft' para sempre e a tela de aprovação nunca via nada.
-  // Loja e vitrine não têm rascunho: quem compra não guarda pedido pela metade
-  // no servidor, e ninguém deve poder pedir sem passar por aprovação.
-  const status: Order['status'] =
-    origem.source === 'rep' ? (body.submit ? 'pending_approval' : 'draft') : 'pending_approval';
+  //
+  // Loja e vitrine não têm rascunho nem falam direto com a fábrica: param no
+  // REPRESENTANTE (`pending_rep`), que decide se aquilo vira pedido. Quem monta
+  // o pedido nunca escolhe o próprio status.
+  const statusInicial: Order['status'] =
+    origem.source === 'rep'
+      ? body.submit
+        ? 'pending_approval'
+        : 'draft'
+      : temTriagem
+        ? 'pending_rep'
+        : 'pending_approval';
 
-  const { data: order, error: orderError } = await supabase
-    .from('orders')
-    .insert({
-      company_id,
-      rep_id,
-      customer_id: daVitrine ? null : body.customer_id,
-      status,
-      total,
-      notes: body.notes ?? null,
-      local_id: body.local_id ?? null,
-      created_by: origem.created_by ?? rep_id,
-      ...((await detectarColunasDeOrigem())
-        ? {
-            source: origem.source,
-            guest_name: origem.guest_name ?? null,
-            guest_whatsapp: origem.guest_whatsapp ?? null,
-          }
-        : {}),
-    })
-    .select()
-    .single();
+  const camposDeOrigem = (await detectarColunasDeOrigem())
+    ? {
+        source: origem.source,
+        guest_name: origem.guest_name ?? null,
+        guest_whatsapp: origem.guest_whatsapp ?? null,
+      }
+    : {};
+
+  const gravar = (status: Order['status']) =>
+    supabase
+      .from('orders')
+      .insert({
+        company_id,
+        rep_id,
+        customer_id: daVitrine ? null : body.customer_id,
+        status,
+        total,
+        notes: body.notes ?? null,
+        local_id: body.local_id ?? null,
+        created_by: origem.created_by ?? rep_id,
+        ...camposDeOrigem,
+      })
+      .select()
+      .single();
+
+  let { data: order, error: orderError } = await gravar(statusInicial);
+
+  // Banco ainda sem a 015: cai para a fila do gerente e não tenta de novo.
+  if (recusouOStatus(orderError) && statusInicial === 'pending_rep') {
+    temTriagem = false;
+    ({ data: order, error: orderError } = await gravar('pending_approval'));
+  }
 
   if (orderError || !order) return null;
 
@@ -269,6 +302,19 @@ export async function updateOrderStatus(
   // Representante só mexe no status dos próprios pedidos (ex.: enviar para aprovação).
   if (role === 'rep' && row.rep_id !== approverId) {
     throw new Error('FORBIDDEN_NOT_OWNER');
+  }
+
+  // O que o representante pode decidir é a TRIAGEM, e só ela: o pedido que
+  // chegou da loja ou da vitrine ele manda para a fábrica ou recusa ali mesmo.
+  // A palavra final sobre vender continua sendo do gerente — por isso `approved`
+  // nunca sai da mão dele, e recusar fora da triagem seria o representante
+  // derrubando um pedido que o gerente já tem na mesa.
+  if (role === 'rep') {
+    const forcandoAprovacao = body.status === 'approved';
+    const recusandoForaDaTriagem = body.status === 'rejected' && row.status !== 'pending_rep';
+    if (forcandoAprovacao || recusandoForaDaTriagem) {
+      throw new Error('FORBIDDEN_ROLE');
+    }
   }
 
   const allowed = ORDER_STATUS_FLOW[row.status];

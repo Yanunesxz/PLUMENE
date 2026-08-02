@@ -153,11 +153,6 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   const body = await parseBody(updateOrderStatusSchema, request.body, reply);
   if (!body) return;
 
-  if ((body.status === 'approved' || body.status === 'rejected') && role === 'rep') {
-    await reply.status(403).send({ error: 'Apenas gerentes podem aprovar ou recusar pedidos', code: 'FORBIDDEN', statusCode: 403 });
-    return;
-  }
-
   try {
     const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' }, role);
     if (!order) {
@@ -168,6 +163,14 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   } catch (err) {
     if (err instanceof Error && err.message === 'FORBIDDEN_NOT_OWNER') {
       await reply.status(403).send({ error: 'Você só pode alterar seus próprios pedidos', code: 'FORBIDDEN', statusCode: 403 });
+      return;
+    }
+    if (err instanceof Error && err.message === 'FORBIDDEN_ROLE') {
+      await reply.status(403).send({
+        error: 'Apenas gerentes podem aprovar ou recusar pedidos',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
       return;
     }
     if (err instanceof Error && err.message === 'INVALID_STATUS_TRANSITION') {

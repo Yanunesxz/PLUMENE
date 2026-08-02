@@ -135,6 +135,21 @@ export type UsoConvite =
   | { ok: false; motivo: 'invalido' | 'expirado' | 'usado' | 'revogado' | 'email_em_uso' | 'erro' };
 
 /**
+ * `users.rep_id` vem da migração 015. Mandar coluna inexistente no INSERT faz o
+ * PostgREST recusar a criação INTEIRA — a loja não conseguiria aceitar o
+ * convite até alguém rodar o SQL. Detecta uma vez e guarda. (Mesmo padrão de
+ * `orders.service.ts` e `reps.service.ts`.)
+ */
+let temColunaDono: boolean | null = null;
+
+async function detectarColunaDono(): Promise<boolean> {
+  if (temColunaDono !== null) return temColunaDono;
+  const { error } = await supabase.from('users').select('rep_id').limit(1);
+  temColunaDono = !error;
+  return temColunaDono;
+}
+
+/**
  * Consome o convite e cria a conta.
  *
  * O `used_at` é gravado com a condição `is('used_at', null)`, então duas
@@ -178,6 +193,9 @@ export async function usarConvite(
       password_hash: await hashPassword(senha),
       role: 'store',
       active: true,
+      // Quem convidou é quem responde por esta loja: recebe os pedidos dela e
+      // empresta a própria tabela de preço quando o cliente não tem uma.
+      ...((await detectarColunaDono()) ? { rep_id: convite.rep_id } : {}),
     })
     .select('id')
     .single();

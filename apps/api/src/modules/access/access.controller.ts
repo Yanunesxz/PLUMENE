@@ -17,6 +17,7 @@ import {
   listarVitrines,
   revogarVitrine,
 } from './showcase.service.js';
+import { montarMinhaArea } from './loja.service.js';
 import { buildAuthPayload, getTokenConfig } from '../auth/auth.service.js';
 import type { User } from '@csb/shared';
 
@@ -211,6 +212,8 @@ export async function aceitarConviteHandler(request: FastifyRequest, reply: Fast
         active: true,
         price_table_id: payload.price_table_id ?? null,
         commission_rate: null,
+        customer_id: payload.customer_id ?? null,
+        rep_id: payload.rep_id ?? null,
       },
     },
   });
@@ -302,9 +305,11 @@ export async function minhaContaHandler(request: FastifyRequest, reply: FastifyR
       ? supabase.from('price_tables').select('name').eq('id', c.price_table_id).maybeSingle()
       : Promise.resolve({ data: null }),
     rep_id
-      ? supabase.from('users').select('name').eq('id', rep_id).maybeSingle()
+      ? supabase.from('users').select('name, phone').eq('id', rep_id).maybeSingle()
       : Promise.resolve({ data: null }),
   ]);
+
+  const repDados = rep.data as { name: string; phone: string | null } | null;
 
   await reply.send({
     data: {
@@ -313,7 +318,30 @@ export async function minhaContaHandler(request: FastifyRequest, reply: FastifyR
       cnpj: c.cnpj,
       whatsapp: c.whatsapp,
       price_table_name: (tabela.data as { name: string } | null)?.name ?? null,
-      rep_name: (rep.data as { name: string } | null)?.name ?? null,
+      rep_name: repDados?.name ?? null,
+      rep_whatsapp: repDados?.phone ?? null,
     },
   });
+}
+
+/**
+ * O painel da loja: conta + histórico + o que ela mais compra.
+ *
+ * Uma resposta só. A tela abre em campo, muitas vezes com sinal ruim, e cada
+ * requisição a mais é uma chance de a tela ficar pela metade.
+ */
+export async function minhaAreaHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, customer_id, rep_id } = request.user;
+  if (!customer_id) {
+    await reply.status(403).send({ error: 'Acesso sem loja vinculada', code: 'FORBIDDEN', statusCode: 403 });
+    return;
+  }
+
+  const area = await montarMinhaArea(company_id, customer_id, rep_id);
+  if (!area) {
+    await reply.status(404).send({ error: 'Cadastro não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+    return;
+  }
+
+  await reply.send({ data: area });
 }
