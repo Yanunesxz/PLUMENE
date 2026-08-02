@@ -22,9 +22,9 @@ const repItems: NavItem[] = [
 
 // A loja compra e acompanha. Nada de carteira, comissão ou aprovação.
 const storeItems: NavItem[] = [
+  { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Store },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Meus pedidos', short: 'Pedidos', icon: ClipboardList },
-  { to: '/minha-conta', label: 'Minha conta', short: 'Conta', icon: Store },
 ];
 
 const managerItems: NavItem[] = [

@@ -31,6 +31,11 @@ export function PaginaNovoPedido() {
   const addToCart = useCartStore((s) => s.add);
   const clearCart = useCartStore((s) => s.clear);
 
+  // A loja compra para ela mesma: não escolhe cliente, não tem carteira para
+  // escolher (a rota `/customers` é negada para ela) e o servidor carimba o
+  // cliente pelo token. Sem este caminho, a tela travava em "selecione o
+  // cliente" com uma lista que nunca ia carregar.
+  const ehLoja = user?.role === 'store';
   const [customerId, setCustomerId] = useState(preselectedCustomerId);
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -67,7 +72,7 @@ export function PaginaNovoPedido() {
 
   // O que ainda falta para poder enviar o pedido (cliente é o mais esquecido:
   // a pessoa chega com produtos no carrinho vindo do catálogo e não seleciona cliente).
-  const missingReason = !customerId
+  const missingReason = !customerId && !ehLoja
     ? 'Selecione o cliente para enviar o pedido.'
     : items.length === 0
       ? 'Adicione ao menos um produto para enviar o pedido.'
@@ -77,16 +82,21 @@ export function PaginaNovoPedido() {
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    if (!customerId || items.length === 0 || !user) return;
+    if ((!customerId && !ehLoja) || items.length === 0 || !user) return;
     setSubmitting(true);
+
+    // Offline a loja não tem quem carimbe o cliente por ela: vai o customer_id
+    // que veio no login.
+    const clienteDoPedido = ehLoja ? (user.customer_id ?? '') : customerId;
 
     const local_id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const payload: CreateOrderRequest = {
-      customer_id: customerId,
+      ...(ehLoja ? {} : { customer_id: customerId }),
       notes: notes || undefined,
       local_id,
       // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
       // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
+      // (Para a loja o servidor ignora: pedido dela nunca é rascunho.)
       submit: true,
       items: items.map(({ product_id, variant_id, quantity, unit_price }) => ({
         product_id,
@@ -99,11 +109,14 @@ export function PaginaNovoPedido() {
     try {
       if (isOnline && token) {
         await api.post<ApiResponse<OrderWithItems>>('/orders', payload, token);
-        setToast({ message: 'Pedido criado com sucesso!', type: 'success' });
+        setToast({
+          message: ehLoja ? 'Pedido enviado ao seu representante!' : 'Pedido criado com sucesso!',
+          type: 'success',
+        });
       } else {
         await addToSyncQueue({
           local_id,
-          customer_id: customerId,
+          customer_id: clienteDoPedido,
           notes: notes || undefined,
           items: payload.items,
           created_at: new Date().toISOString(),
@@ -126,7 +139,12 @@ export function PaginaNovoPedido() {
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">
-      <h1 className="mb-4 titulo text-[26px] leading-none text-foreground md:text-[32px]">Novo pedido</h1>
+      <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Novo pedido</h1>
+      <p className="mb-4 mt-1 text-sm text-muted-foreground">
+        {ehLoja
+          ? 'Monte o pedido e envie. Seu representante confere antes de ir para a fábrica.'
+          : 'Escolha o cliente e as peças. O pedido vai para a aprovação da fábrica.'}
+      </p>
 
       {!isOnline && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
@@ -136,31 +154,33 @@ export function PaginaNovoPedido() {
       )}
 
       <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
-        <div className="space-y-1.5">
-          <label htmlFor="customer" className="text-sm font-medium text-foreground">
-            Cliente <span className="text-danger">*</span>
-          </label>
-          <SearchSelect
-            id="customer"
-            value={customerId}
-            onSelect={setCustomerId}
-            placeholder="Selecione um cliente"
-            searchPlaceholder="Buscar cliente por nome ou CNPJ…"
-            emptyText="Nenhum cliente encontrado"
-            options={(customers ?? []).map((c) => ({
-              value: c.id,
-              label: c.name,
-              sublabel: c.cnpj ? `CNPJ ${c.cnpj}` : undefined,
-            }))}
-          />
-          {selectedCustomer?.blocked ? (
-            <p className="text-xs text-danger">Este cliente está bloqueado.</p>
-          ) : !customerId ? (
-            <p className="text-xs text-muted-foreground">
-              Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
-            </p>
-          ) : null}
-        </div>
+        {!ehLoja && (
+          <div className="space-y-1.5">
+            <label htmlFor="customer" className="text-sm font-medium text-foreground">
+              Cliente <span className="text-danger">*</span>
+            </label>
+            <SearchSelect
+              id="customer"
+              value={customerId}
+              onSelect={setCustomerId}
+              placeholder="Selecione um cliente"
+              searchPlaceholder="Buscar cliente por nome ou CNPJ…"
+              emptyText="Nenhum cliente encontrado"
+              options={(customers ?? []).map((c) => ({
+                value: c.id,
+                label: c.name,
+                sublabel: c.cnpj ? `CNPJ ${c.cnpj}` : undefined,
+              }))}
+            />
+            {selectedCustomer?.blocked ? (
+              <p className="text-xs text-danger">Este cliente está bloqueado.</p>
+            ) : !customerId ? (
+              <p className="text-xs text-muted-foreground">
+                Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
+              </p>
+            ) : null}
+          </div>
+        )}
 
         <div className="space-y-1.5">
           <label htmlFor="add-product" className="text-sm font-medium text-foreground">
@@ -304,7 +324,13 @@ export function PaginaNovoPedido() {
             className="w-full"
             disabled={submitting || missingReason !== null}
           >
-            {submitting ? 'Enviando…' : isOnline ? 'Enviar para aprovação' : 'Salvar offline'}
+            {submitting
+              ? 'Enviando…'
+              : !isOnline
+                ? 'Salvar offline'
+                : ehLoja
+                  ? 'Enviar ao meu representante'
+                  : 'Enviar para aprovação'}
           </Button>
         </div>
       </form>

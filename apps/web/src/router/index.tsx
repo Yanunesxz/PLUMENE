@@ -1,5 +1,6 @@
 import { lazy, Suspense, type ReactNode } from 'react';
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { useAuthStore } from '../store/authStore.js';
 import { PrivateRoute } from './PrivateRoute.js';
 import { AppLayout } from '../components/layout/AppLayout.js';
 import { PaginaLogin } from '../modules/login/PaginaLogin.js';
@@ -21,7 +22,7 @@ const PaginaRepresentantes = lazy(() => import('../modules/representantes/Pagina
 const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
 const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
-const PaginaMinhaConta = lazy(() => import('../modules/loja/PaginaMinhaConta.js').then((m) => ({ default: m.PaginaMinhaConta })));
+const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLoja.js').then((m) => ({ default: m.PaginaMinhaAreaLoja })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
 const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
@@ -29,6 +30,25 @@ const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').t
 /** Enquanto o pedaço da tela baixa. Some rápido demais para merecer esqueleto. */
 function AoCarregar({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="p-6 text-sm text-muted-foreground">Carregando…</div>}>{children}</Suspense>;
+}
+
+/**
+ * "Minha área" é o mesmo endereço para papéis diferentes.
+ *
+ * Quem vende vê desempenho e a fila de pedidos que chegaram; quem compra vê o
+ * próprio histórico. Um endereço só porque é assim que as duas pessoas falam
+ * disso — "a minha área" — e porque o menu de cada papel já leva ao lugar certo.
+ */
+function MinhaArea() {
+  const papel = useAuthStore((s) => s.user?.role);
+  if (papel === 'store') {
+    return (
+      <AoCarregar>
+        <PaginaMinhaAreaLoja />
+      </AoCarregar>
+    );
+  }
+  return <PaginaMinhaArea />;
 }
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
@@ -55,7 +75,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
         element: <AppLayout />,
         children: [
           { index: true, element: <Navigate to="/catalog" replace /> },
-          { path: 'minha-area', element: <PaginaMinhaArea /> },
+          { path: 'minha-area', element: <MinhaArea /> },
           { path: 'catalog', element: <PaginaCatalogo /> },
           { path: 'orders', element: <PaginaPedidos /> },
           { path: 'orders/new', element: <PaginaNovoPedido /> },
@@ -66,11 +86,9 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             element: <PrivateRoute roles={['rep', 'manager', 'admin']} />,
             children: [{ index: true, element: <AoCarregar><PaginaAcessos /></AoCarregar> }],
           },
-          {
-            path: 'minha-conta',
-            element: <PrivateRoute roles={['store']} />,
-            children: [{ index: true, element: <AoCarregar><PaginaMinhaConta /></AoCarregar> }],
-          },
+          // Endereço antigo da loja: quem tem o app instalado tem este link
+          // salvo. Leva para o novo lugar em vez de dar "página não encontrada".
+          { path: 'minha-conta', element: <Navigate to="/minha-area" replace /> },
           {
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,

@@ -1,5 +1,5 @@
 import type { OfflineSyncOrder, SyncResult } from '@csb/shared';
-import { createOrder } from '../orders/orders.service.js';
+import { createOrder, type OrigemPedido } from '../orders/orders.service.js';
 import { createOrderSchema } from '../orders/orders.schema.js';
 
 export async function processSyncQueue(
@@ -7,6 +7,7 @@ export async function processSyncQueue(
   rep_id: string,
   price_table_id: string | null,
   orders: OfflineSyncOrder[],
+  origem: OrigemPedido = { source: 'rep' },
 ): Promise<SyncResult> {
   let synced = 0;
   const failed: Array<{ local_id: string; error: string }> = [];
@@ -22,11 +23,18 @@ export async function processSyncQueue(
     }
 
     try {
-      // Tudo que está na fila offline é pedido FECHADO pelo representante — ele
-      // apertou enviar sem sinal. Entra na fila de aprovação, não como rascunho.
+      // Tudo que está na fila offline é pedido FECHADO por quem montou — ele
+      // apertou enviar sem sinal. Entra na fila (do gerente, se veio do
+      // representante; da triagem, se veio da loja), nunca como rascunho.
       // Forçado aqui (e não só no cliente) para valer também para itens que já
       // estavam na fila antes desta versão.
-      await createOrder(company_id, rep_id, price_table_id, { ...validation.data, submit: true });
+      await createOrder(
+        company_id,
+        rep_id,
+        price_table_id,
+        { ...validation.data, submit: true },
+        origem,
+      );
       synced++;
     } catch (err) {
       failed.push({

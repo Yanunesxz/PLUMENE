@@ -1,27 +1,20 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2 } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { useDecidirPedido } from '../../hooks/useDecidirPedido.js';
 import { api } from '../../services/api.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
-import { nomeDoComprador, origemParaExibir } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
-
-const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
-  draft: 'gray',
-  pending_approval: 'yellow',
-  approved: 'green',
-  rejected: 'red',
-  sent_erp: 'brand',
-  error_erp: 'red',
-};
 
 export function PaginaDetalhePedido() {
   const { id } = useParams<{ id: string }>();
@@ -29,10 +22,27 @@ export function PaginaDetalhePedido() {
   const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
   const canInvoice = user?.role === 'manager' || user?.role === 'admin';
+  // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
+  // dois), então os botões não aparecem em vez de responder 403 no toque.
+  const ehLoja = user?.role === 'store';
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
   const [invoicing, setInvoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) =>
+    setToast({ message: mensagem, type: erro ? 'error' : 'success' }),
+  );
+
+  // Quem abre um pedido parado quer decidir ali mesmo — obrigar a voltar para
+  // uma lista para apertar o botão é o tipo de caminho que ninguém descobre.
+  const decisao = order ? decisaoDoPedido(user?.role, order.status) : null;
+
+  const handleDecisao = async (status: OrderStatus) => {
+    if (!id || !order) return;
+    if (await decidir(id, status)) setOrder({ ...order, status });
+  };
 
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -153,11 +163,11 @@ export function PaginaDetalhePedido() {
                   </span>
                 )}
               </span>
-              <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+              <Badge variant={STATUS_VARIANTE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="min-w-0 truncate text-lg font-bold text-foreground">
-                {nomeDoComprador(order, custName)}
+                {ehLoja ? (user?.name ?? 'Meu pedido') : nomeDoComprador(order, custName)}
               </p>
               {zapDoComprador && (
                 <a
@@ -179,7 +189,7 @@ export function PaginaDetalhePedido() {
               })}
             </p>
 
-            <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-3">
+            <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>
               <span className="flex items-center gap-2">
                 {order.invoiced ? (
                   <Badge variant="green">Faturado</Badge>
@@ -204,6 +214,32 @@ export function PaginaDetalhePedido() {
               )}
             </div>
           </div>
+
+          {decisao && (
+            <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+              <p className="mb-3 text-sm text-foreground">{decisao.explicacao}</p>
+              <div className="flex gap-2">
+                <Button
+                  size="lg"
+                  className="flex-1 bg-positive hover:bg-positive/90 active:bg-positive/80"
+                  disabled={decidindo !== null}
+                  onClick={() => void handleDecisao(decisao.aceitar)}
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  {decisao.rotuloAceitar}
+                </Button>
+                <Button
+                  size="lg"
+                  variant="destructive"
+                  disabled={decidindo !== null}
+                  onClick={() => void handleDecisao('rejected')}
+                >
+                  <X className="h-4 w-4" strokeWidth={2.5} />
+                  {decisao.rotuloRecusar}
+                </Button>
+              </div>
+            </div>
+          )}
 
           <div className="rounded-xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
@@ -256,7 +292,7 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
-          {!order.invoiced && (
+          {!order.invoiced && !ehLoja && (
             <Button
               variant="outline"
               size="lg"
@@ -270,6 +306,8 @@ export function PaginaDetalhePedido() {
           )}
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

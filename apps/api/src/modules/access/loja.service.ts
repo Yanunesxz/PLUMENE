@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import type { MinhaAreaLoja, PecaComprada, PedidoResumido } from '@csb/shared';
+import type { MinhaAreaLoja, OrderStatus, PecaComprada, PedidoResumido } from '@csb/shared';
 
 /**
  * "Minha área" da loja.
@@ -18,7 +18,7 @@ const MAX_PEDIDOS_LISTADOS = 10;
 interface LinhaPedido {
   id: string;
   order_number: number | null;
-  status: string;
+  status: OrderStatus;
   total: number | null;
   created_at: string;
 }

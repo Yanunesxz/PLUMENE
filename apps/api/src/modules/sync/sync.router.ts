@@ -8,8 +8,14 @@ import {
 } from './erp-sync.controller.js';
 
 export async function syncRouter(fastify: FastifyInstance): Promise<void> {
-  // Sync offline → Supabase (pedidos criados offline pelo app)
-  fastify.post('/sync', { preHandler: authenticate }, syncHandler);
+  // Sync offline → Supabase (pedidos criados offline pelo app).
+  // O visitante da vitrine fica de fora: ele não tem app instalado nem fila, e
+  // por aqui ele criaria pedido sem o nome e o WhatsApp que o fechamento exige.
+  fastify.post(
+    '/sync',
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'store'])] },
+    syncHandler,
+  );
 
   // ERP → Supabase (admin/manager apenas)
   fastify.post(

@@ -1,21 +1,19 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Clock, Wallet, Check, X, Inbox, TrendingUp, ShoppingCart, Crown } from 'lucide-react';
+import { Clock, Wallet, Inbox, TrendingUp, ShoppingCart, Crown, Hourglass } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useDecidirPedido } from '../../hooks/useDecidirPedido.js';
 import { api } from '../../services/api.js';
-import { Badge } from '../../components/interface/Badge.js';
-import { Button } from '../../components/interface/Button.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
+import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
-import { nomeDoComprador } from '../../lib/pedido.js';
-import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
 export function PaginaPainel() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [processing, setProcessing] = useState<string | null>(null);
 
   const allOrders = useLiveQuery(() => db.orders.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -47,6 +45,10 @@ export function PaginaPainel() {
     };
     const approved = orders.filter((o) => o.status === 'approved');
     const pending = orders.filter((o) => o.status === 'pending_approval');
+    // Pedido que a loja montou e que ainda espera o representante triar. Não é
+    // fila do gerente, mas fica visível: sem isso, um representante ausente
+    // seguraria pedidos sem ninguém na fábrica perceber.
+    const comOsReps = orders.filter((o) => o.status === 'pending_rep');
 
     // Pedido de vitrine não entra no ranking: não há cliente por trás dele.
     const topMap = new Map<string, number>();
@@ -63,26 +65,14 @@ export function PaginaPainel() {
       pendingTotal: pending.reduce((s, o) => s + (o.total ?? 0), 0),
       ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
       pending,
+      comOsReps,
       topClientes,
     };
   }, [allOrders]);
 
-  const handleDecision = async (orderId: string, decision: 'approved' | 'rejected') => {
-    if (!token) return;
-    setProcessing(orderId);
-    try {
-      await api.patch<ApiResponse<Order>>(`/orders/${orderId}/status`, { status: decision }, token);
-      await db.orders.update(orderId, { status: decision });
-      setToast({
-        message: decision === 'approved' ? 'Pedido aprovado!' : 'Pedido recusado.',
-        type: decision === 'approved' ? 'success' : 'error',
-      });
-    } catch (err) {
-      setToast({ message: err instanceof Error ? err.message : 'Erro ao processar pedido', type: 'error' });
-    } finally {
-      setProcessing(null);
-    }
-  };
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) =>
+    setToast({ message: mensagem, type: erro ? 'error' : 'success' }),
+  );
 
   return (
     <div className="space-y-6 p-4 md:p-6">
@@ -138,49 +128,45 @@ export function PaginaPainel() {
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-            {metrics.pending.map((order) => (
-              <li key={order.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
-                <div className="mb-3 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {nomeDoComprador(order, custName)}
-                    </p>
-                    <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total ?? 0)}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(order.created_at).toLocaleDateString('pt-BR')}
-                    </p>
-                  </div>
-                  <Badge variant="yellow">{ORDER_STATUS_LABELS[order.status]}</Badge>
-                </div>
-
-                {order.notes && (
-                  <p className="mb-3 rounded-lg bg-muted p-2 text-xs text-muted-foreground">{order.notes}</p>
-                )}
-
-                <div className="flex gap-2">
-                  <Button
-                    className="flex-1 bg-positive hover:bg-positive/90 active:bg-positive/80"
-                    disabled={processing === order.id}
-                    onClick={() => void handleDecision(order.id, 'approved')}
-                  >
-                    <Check className="h-4 w-4" strokeWidth={2.5} />
-                    Aprovar
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    className="flex-1"
-                    disabled={processing === order.id}
-                    onClick={() => void handleDecision(order.id, 'rejected')}
-                  >
-                    <X className="h-4 w-4" strokeWidth={2.5} />
-                    Recusar
-                  </Button>
-                </div>
-              </li>
-            ))}
+            {metrics.pending.map((order) => {
+              const decisao = decisaoDoPedido(user?.role, order.status);
+              if (!decisao) return null;
+              return (
+                <CartaoDecisao
+                  key={order.id}
+                  order={order}
+                  decisao={decisao}
+                  nomePorCliente={custName}
+                  ocupado={decidindo === order.id}
+                  onDecidir={(status) => void decidir(order.id, status)}
+                />
+              );
+            })}
           </ul>
         )}
       </section>
+
+      {metrics.comOsReps.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            Ainda com os representantes
+          </h2>
+          <div className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-foreground">
+              <Hourglass className="h-5 w-5" strokeWidth={2} />
+            </span>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                {metrics.comOsReps.length} pedido{metrics.comOsReps.length > 1 ? 's' : ''} de loja ·{' '}
+                {formatBRL(metrics.comOsReps.reduce((s, o) => s + (o.total ?? 0), 0))}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Montados pelas lojas. Chegam aqui depois que o representante mandar para a fábrica.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>

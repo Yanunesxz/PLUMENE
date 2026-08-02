@@ -1,3 +1,5 @@
+import type { OrderStatus } from '../constants/orderStatus.js';
+
 // ─── Acesso da loja e vitrine temporária ──────────────────────────────────────
 // Dois caminhos para quem NÃO é da fábrica chegar ao catálogo. Nenhum dos dois
 // aprova, fatura ou vê estoque: o pedido sempre cai para o representante.
@@ -117,7 +119,7 @@ export interface PecaComprada {
 export interface PedidoResumido {
   id: string;
   order_number: number | null;
-  status: string;
+  status: OrderStatus;
   total: number;
   /** Peças no pedido — a loja pergunta "quantas peças", não "quantos itens". */
   pecas: number;

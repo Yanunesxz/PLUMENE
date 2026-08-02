@@ -12,7 +12,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { exportOrdersToXlsx } from '../../lib/exportOrders.js';
-import { nomeDoComprador, origemParaExibir } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type {
   Order,
@@ -26,26 +26,36 @@ import type {
 
 const ALL_REPS = '__all__';
 
-const statusVariant: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
-  draft: 'gray',
-  pending_approval: 'yellow',
-  approved: 'green',
-  rejected: 'red',
-  sent_erp: 'brand',
-  error_erp: 'red',
-};
-
-const STATUS_FILTERS: { value: OrderStatus | 'all'; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'pending_approval', label: 'Pendentes' },
-  { value: 'approved', label: 'Aprovados' },
-  { value: 'rejected', label: 'Recusados' },
-  { value: 'draft', label: 'Rascunhos' },
-];
+/**
+ * Filtros por papel: cada um só vê estado que existe no mundo dele.
+ *
+ * A loja não tem rascunho e não aprova nada — mostrar "Pendentes" e "Rascunhos"
+ * para ela seria oferecer duas gavetas que nunca enchem.
+ */
+function filtrosDeStatus(ehLoja: boolean): { value: OrderStatus | 'all'; label: string }[] {
+  if (ehLoja) {
+    return [
+      { value: 'all', label: 'Todos' },
+      { value: 'pending_rep', label: 'Com o representante' },
+      { value: 'approved', label: 'Aprovados' },
+      { value: 'rejected', label: 'Recusados' },
+    ];
+  }
+  return [
+    { value: 'all', label: 'Todos' },
+    { value: 'pending_rep', label: 'Para revisar' },
+    { value: 'pending_approval', label: 'Pendentes' },
+    { value: 'approved', label: 'Aprovados' },
+    { value: 'rejected', label: 'Recusados' },
+    { value: 'draft', label: 'Rascunhos' },
+  ];
+}
 
 export function PaginaPedidos() {
   const { token, hasRole } = useAuthStore();
   const isManager = hasRole('manager', 'admin');
+  const ehLoja = hasRole('store');
+  const STATUS_FILTERS = useMemo(() => filtrosDeStatus(ehLoja), [ehLoja]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
@@ -81,17 +91,20 @@ export function PaginaPedidos() {
         /* offline: usamos o cache */
       })
       .finally(() => setLoading(false));
-    // garante os nomes de cliente para a busca, mesmo sem passar pela aba Clientes
-    api
-      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
-      .then((res) => db.customers.bulkPut(res.data))
-      .catch(() => {});
+    // garante os nomes de cliente para a busca, mesmo sem passar pela aba Clientes.
+    // A loja não pede: ela não tem carteira, e a rota responde 403 para ela.
+    if (!ehLoja) {
+      api
+        .get<ApiResponse<CustomerListItem[]>>('/customers', token)
+        .then((res) => db.customers.bulkPut(res.data))
+        .catch(() => {});
+    }
     // garante o SKU dos produtos para a exportação, mesmo sem passar pelo Catálogo
     api
       .get<ApiResponse<ProductWithPrice[]>>('/products', token)
       .then((res) => db.products.bulkPut(res.data))
       .catch(() => {});
-  }, [token]);
+  }, [token, ehLoja]);
 
   // Lista de representantes para o filtro do gerente (rep comum só vê os seus).
   useEffect(() => {
@@ -270,11 +283,15 @@ export function PaginaPedidos() {
                       </span>
                     )}
                   </span>
-                  <Badge variant={statusVariant[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+                  <Badge variant={STATUS_VARIANTE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
                 </div>
-                <p className="mt-2 truncate text-sm font-medium text-foreground">
-                  {nomeDoComprador(order, customerName)}
-                </p>
+                {/* Na loja, o comprador é sempre ela mesma — repetir o próprio
+                    nome em todo cartão só ocupa espaço. */}
+                {!ehLoja && (
+                  <p className="mt-2 truncate text-sm font-medium text-foreground">
+                    {nomeDoComprador(order, customerName)}
+                  </p>
+                )}
                 <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total)}</p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {new Date(order.created_at).toLocaleDateString('pt-BR', {

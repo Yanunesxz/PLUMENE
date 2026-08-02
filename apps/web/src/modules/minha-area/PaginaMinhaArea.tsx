@@ -16,11 +16,14 @@ import {
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { useDecidirPedido } from '../../hooks/useDecidirPedido.js';
 import { api } from '../../services/api.js';
 import { flushSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
+import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
@@ -104,6 +107,21 @@ export function PaginaMinhaArea() {
   const clientes = customers?.length ?? 0;
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
 
+  // Pedidos que a loja (ou um link de vitrine) montou e que estão parados
+  // esperando ele. É a única coisa da tela com prazo, então vem antes de tudo.
+  const triagem = useMemo(
+    () => (orders ?? []).filter((o) => o.status === 'pending_rep'),
+    [orders],
+  );
+  const nomePorCliente = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const c of customers ?? []) m.set(c.id, c.name);
+    return m;
+  }, [customers]);
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) =>
+    setToast({ message: mensagem, type: erro ? 'error' : 'success' }),
+  );
+
   return (
     <div className="space-y-6 p-4 md:p-6">
       <div>
@@ -114,6 +132,40 @@ export function PaginaMinhaArea() {
           Seu desempenho · comissão de {user?.commission_rate ?? 0}%
         </p>
       </div>
+
+      {triagem.length > 0 && (
+        <section>
+          <div className="mb-3 flex items-baseline justify-between gap-3">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+              Chegaram para você
+            </h2>
+            <span className="text-xs font-semibold text-primary-soft-foreground">
+              {formatBRL(triagem.reduce((s, o) => s + (o.total ?? 0), 0))}
+            </span>
+          </div>
+          <p className="mb-3 text-sm text-muted-foreground">
+            {triagem.length === 1
+              ? 'Uma loja montou um pedido pelo catálogo. Você decide se ele vai para a fábrica.'
+              : `${triagem.length} lojas montaram pedidos pelo catálogo. Você decide quais vão para a fábrica.`}
+          </p>
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {triagem.map((order) => {
+              const decisao = decisaoDoPedido(user?.role, order.status);
+              if (!decisao) return null;
+              return (
+                <CartaoDecisao
+                  key={order.id}
+                  order={order}
+                  decisao={decisao}
+                  nomePorCliente={nomePorCliente}
+                  ocupado={decidindo === order.id}
+                  onDecidir={(status) => void decidir(order.id, status)}
+                />
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={Receipt} tint="brand" value={formatBRL(m.faturadoMes)} label="Faturado no mês" />
