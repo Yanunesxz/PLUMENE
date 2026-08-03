@@ -95,13 +95,13 @@ export function PaginaPedidos() {
     // A loja não pede: ela não tem carteira, e a rota responde 403 para ela.
     if (!ehLoja) {
       api
-        .get<ApiResponse<CustomerListItem[]>>('/customers', token)
+        .getLista<ApiResponse<CustomerListItem[]>>('/customers', token)
         .then((res) => db.customers.bulkPut(res.data))
         .catch(() => {});
     }
     // garante o SKU dos produtos para a exportação, mesmo sem passar pelo Catálogo
     api
-      .get<ApiResponse<ProductWithPrice[]>>('/products', token)
+      .getLista<ApiResponse<ProductWithPrice[]>>('/products', token)
       .then((res) => db.products.bulkPut(res.data))
       .catch(() => {});
   }, [token, ehLoja]);

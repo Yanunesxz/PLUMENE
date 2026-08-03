@@ -26,7 +26,7 @@ export function PaginaPainel() {
       .then((res) => db.orders.bulkPut(res.data))
       .catch(() => {});
     api
-      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
+      .getLista<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
       .catch(() => {});
   }, [token]);

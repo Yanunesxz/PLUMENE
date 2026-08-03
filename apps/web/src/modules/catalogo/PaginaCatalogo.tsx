@@ -71,7 +71,7 @@ export function PaginaCatalogo() {
     if (!token) return;
     setLoading(true);
     api
-      .get<ApiResponse<ProductWithPrice[]>>('/products', token)
+      .getLista<ApiResponse<ProductWithPrice[]>>('/products', token)
       .then((res) => db.products.bulkPut(res.data))
       .catch(() => {
         /* offline: seguimos com o cache do Dexie */

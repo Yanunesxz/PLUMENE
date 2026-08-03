@@ -80,19 +80,18 @@ export interface CatalogVariant {
 // ─── O que o catálogo entrega ao app ─────────────────────────────────────────
 /**
  * Produto como o app recebe e guarda no cache offline. É um subconjunto
- * deliberado de `Product`: `company_id`, `description` e `updated_at` ficam de
- * fora porque ninguém os usa na tela e multiplicam por 313 no payload.
+ * deliberado de `Product`: `company_id`, `description`, `updated_at`, `erp_id` e
+ * `group_name` ficam de fora porque ninguém os usa na tela e multiplicam por 313
+ * no payload.
  */
 export interface ProductWithPrice
   extends Pick<
     Product,
     | 'id'
-    | 'erp_id'
     | 'sku'
     | 'name'
     | 'collection'
     | 'brand'
-    | 'group_name'
     | 'image_url'
     | 'variant_group'
     | 'color_name'

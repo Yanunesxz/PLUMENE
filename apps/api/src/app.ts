@@ -8,6 +8,7 @@
 import 'dotenv/config';
 import Fastify from 'fastify';
 import type { FastifyInstance } from 'fastify';
+import compress from '@fastify/compress';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import jwt from '@fastify/jwt';
@@ -36,6 +37,21 @@ export async function buildApp(): Promise<FastifyInstance> {
   });
 
   await server.register(helmet, { global: true });
+
+  // As respostas iam CRUAS pela rede. O catálogo (313 produtos com a grade
+  // inteira) e a carteira (1.353 clientes) são JSON repetitivo — o tipo de
+  // conteúdo que o gzip reduz a uma fração. Sem isto, o primeiro acesso do
+  // representante baixava centenas de KB antes de a tela existir, e no 3G da
+  // rua isso é a diferença entre segundos e minutos.
+  //
+  // `global: true` vale para todas as rotas; abaixo do limiar não compensa
+  // gastar CPU comprimindo, então respostas curtas seguem cruas.
+  await server.register(compress, {
+    global: true,
+    // brotli comprime mais, mas custa CPU; o navegador escolhe o que aceita.
+    encodings: ['br', 'gzip', 'deflate'],
+    threshold: 1024,
+  });
 
   // Proteção contra abuso/força-bruta. Limite global folgado (uso normal nem
   // encosta); rotas sensíveis como /auth/login apertam via `config.rateLimit`.

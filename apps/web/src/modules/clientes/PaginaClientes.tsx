@@ -45,7 +45,7 @@ export function PaginaClientes() {
   useEffect(() => {
     if (!token) return;
     api
-      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
+      .getLista<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((res) => db.customers.bulkPut(res.data))
       .catch(() => {
         /* offline: usamos o cache */

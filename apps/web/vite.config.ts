@@ -44,6 +44,29 @@ export default defineConfig({
         ],
         runtimeCaching: [
           {
+            // FOTO DE PRODUTO — a maior parte dos bytes do catálogo.
+            //
+            // Estava em NetworkFirst com 50 entradas, e as duas coisas doíam: a
+            // foto já baixada ia à REDE de novo antes de aparecer (no 3G da
+            // loja, a tela ficava cinza esperando), e 50 entradas não cobrem 313
+            // produtos — o começo do catálogo era despejado ao rolar até o fim.
+            //
+            // CacheFirst porque a URL da foto é fixa por produto: baixada uma
+            // vez, ela é a resposta certa. Trocar a foto de um produto é uma
+            // operação manual e rara; quando acontece, a nova aparece no fim da
+            // validade. Foto velha por alguns dias custa menos do que catálogo
+            // que não abre.
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*\.(?:png|jpe?g|webp|avif)$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'fotos-produtos',
+              expiration: { maxEntries: 500, maxAgeSeconds: 60 * 60 * 24 * 30 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
+            // Resto do Supabase (o que não é foto): dado pode mudar, então a
+            // rede continua vindo primeiro, com o cache como rede de segurança.
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
             handler: 'NetworkFirst',
             options: {

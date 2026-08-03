@@ -73,7 +73,7 @@ export function PaginaMinhaArea() {
     if (!token) return;
     api.get<ApiResponse<Order[]>>('/orders', token).then((r) => db.orders.bulkPut(r.data)).catch(() => {});
     api
-      .get<ApiResponse<CustomerListItem[]>>('/customers', token)
+      .getLista<ApiResponse<CustomerListItem[]>>('/customers', token)
       .then((r) => db.customers.bulkPut(r.data))
       .catch(() => {});
   }, [token]);

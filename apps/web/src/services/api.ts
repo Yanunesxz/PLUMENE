@@ -68,8 +68,66 @@ async function request<T>(
   return res.json() as Promise<T>;
 }
 
+/**
+ * Listas grandes que várias telas pedem: catálogo e carteira.
+ *
+ * Painel, Pedidos e Clientes buscavam `/customers` cada uma na montagem — ir de
+ * uma para a outra baixava os 1.353 clientes três vezes. Aqui a mesma chamada é
+ * compartilhada: quem chega enquanto a primeira está no ar espera a mesma
+ * resposta, e quem chega logo depois recebe a que já veio.
+ *
+ * Sem invalidação por enquanto porque cliente e produto mudam pelo ERP, não pelo
+ * app — a janela cobre a navegação, não o dia.
+ */
+const JANELA_MS = 5 * 60_000;
+const emVoo = new Map<string, Promise<unknown>>();
+const recentes = new Map<string, { quando: number; valor: unknown }>();
+
+function chave(path: string, token: string | undefined): string {
+  // O token entra na chave para nunca servir dado de uma conta a outra: ao
+  // trocar de usuário, a chave muda junto.
+  return `${path}|${token ?? ''}`;
+}
+
+function getCompartilhado<T>(path: string, token?: string): Promise<T> {
+  const k = chave(path, token);
+
+  const recente = recentes.get(k);
+  if (recente && Date.now() - recente.quando < JANELA_MS) {
+    return Promise.resolve(recente.valor as T);
+  }
+
+  const jaPedido = emVoo.get(k);
+  if (jaPedido) return jaPedido as Promise<T>;
+
+  const promessa = request<T>(path, { method: 'GET', token })
+    .then((valor) => {
+      recentes.set(k, { quando: Date.now(), valor });
+      return valor;
+    })
+    .finally(() => {
+      emVoo.delete(k);
+    });
+
+  emVoo.set(k, promessa);
+  return promessa;
+}
+
+/** Descarta o que está guardado — usar depois de uma escrita que muda a lista. */
+export function esquecerCache(path?: string): void {
+  if (!path) {
+    recentes.clear();
+    return;
+  }
+  for (const k of recentes.keys()) {
+    if (k.startsWith(`${path}|`)) recentes.delete(k);
+  }
+}
+
 export const api = {
   get: <T>(path: string, token?: string) => request<T>(path, { method: 'GET', token }),
+  /** GET de lista grande, compartilhado entre telas. Ver `getCompartilhado`. */
+  getLista: getCompartilhado,
   post: <T>(path: string, body: unknown, token?: string) =>
     request<T>(path, { method: 'POST', body: JSON.stringify(body), token }),
   patch: <T>(path: string, body: unknown, token?: string) =>

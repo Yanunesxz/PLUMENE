@@ -46,8 +46,11 @@ export interface CatalogOptions {
 
 // Colunas que o app realmente usa. `select('*')` arrastava company_id,
 // description e updated_at em 313 produtos — peso morto no 3G do representante.
+//
+// `erp_id` e `group_name` saíram na mesma linha de raciocínio: nenhuma tela lê
+// os dois. Iam junto em todo produto, em toda abertura do catálogo, para nada.
 const PRODUCT_COLUMNS =
-  'id, erp_id, sku, name, collection, brand, group_name, image_url, variant_group, color_name, color_hex, active';
+  'id, sku, name, collection, brand, image_url, variant_group, color_name, color_hex, active';
 
 export async function getProducts(
   company_id: string,
