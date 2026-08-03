@@ -3,7 +3,24 @@ import type { SyncRequest } from '@csb/shared';
 
 const API_BASE = import.meta.env['VITE_API_URL'] as string ?? 'http://localhost:3001';
 
-export async function flushSyncQueue(token: string): Promise<{ synced: number; failed: number }> {
+/**
+ * Uma descarga por vez.
+ *
+ * A sincronização automática ao reconectar e o botão "Sincronizar" podem
+ * disparar juntos — e as duas leriam a MESMA fila e enviariam os mesmos pedidos.
+ * O servidor tem a trava definitiva (`local_id` único), mas segurar aqui evita
+ * o trabalho dobrado e a contagem enganosa no aviso da tela.
+ */
+let descarregando: Promise<{ synced: number; failed: number }> | null = null;
+
+export function flushSyncQueue(token: string): Promise<{ synced: number; failed: number }> {
+  descarregando ??= descarregar(token).finally(() => {
+    descarregando = null;
+  });
+  return descarregando;
+}
+
+async function descarregar(token: string): Promise<{ synced: number; failed: number }> {
   const pending = await db.sync_queue.toArray();
   if (pending.length === 0) return { synced: 0, failed: 0 };
 

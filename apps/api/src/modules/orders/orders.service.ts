@@ -103,6 +103,25 @@ function recusouOStatus(error: { code?: string; message?: string } | null): bool
   return error.code === '23514' && /status/i.test(error.message ?? '');
 }
 
+/** Postgres: violação de índice único. */
+const CHAVE_DUPLICADA = '23505';
+
+/** O pedido que já nasceu deste `local_id`, se houver. */
+async function pedidoDoLocalId(
+  local_id: string,
+  company_id: string,
+): Promise<OrderWithItems | null> {
+  const { data } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('company_id', company_id)
+    .eq('local_id', local_id)
+    .maybeSingle();
+
+  const existente = data as { id: string } | null;
+  return existente ? getOrderById(existente.id, company_id) : null;
+}
+
 export interface OrigemPedido {
   /** Quem montou. `showcase` é o único que pode ficar sem cliente. */
   source: OrderSource;
@@ -125,6 +144,15 @@ export async function createOrder(
   origem: OrigemPedido = { source: 'rep' },
 ): Promise<OrderWithItems | null> {
   const daVitrine = origem.source === 'showcase';
+
+  // Pedido offline reenviado: se ele já entrou, devolve o que existe em vez de
+  // criar outro. O aparelho só limpa a fila quando a resposta chega, então uma
+  // resposta perdida no caminho (sinal caindo, servidor reiniciando) faz a fila
+  // ser reenviada inteira — e o segundo pedido idêntico vira segunda nota.
+  if (body.local_id) {
+    const jaEntrou = await pedidoDoLocalId(body.local_id, company_id);
+    if (jaEntrou) return jaEntrou;
+  }
 
   // Sem a 014, `orders.customer_id` ainda é NOT NULL e não há onde guardar o
   // contato do visitante: o pedido de vitrine simplesmente não cabe no banco.
@@ -219,6 +247,15 @@ export async function createOrder(
   if (recusouOStatus(orderError) && statusInicial === 'pending_rep') {
     temTriagem = false;
     ({ data: order, error: orderError } = await gravar('pending_approval'));
+  }
+
+  // Duas requisições com o mesmo `local_id` ao mesmo tempo passam as duas pela
+  // checagem lá em cima antes de qualquer uma inserir — acontece quando a
+  // sincronização automática ao reconectar coincide com o toque no botão. Quem
+  // perder a corrida encontra o pedido do outro em vez de devolver erro.
+  if ((orderError as { code?: string } | null)?.code === CHAVE_DUPLICADA && body.local_id) {
+    const doOutro = await pedidoDoLocalId(body.local_id, company_id);
+    if (doOutro) return doOutro;
   }
 
   if (orderError || !order) return null;
