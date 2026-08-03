@@ -66,8 +66,15 @@ export interface RepListItem {
   legal_name: string | null;
   phone: string | null;
   active: boolean;
+  /** Tabela do catálogo dele — a que vale quando não há cliente em jogo. */
   price_table_id: string | null;
   price_table_name: string | null;
+  /**
+   * Tabelas que ele PODE atribuir a um cliente ou a uma vitrine (migração 018).
+   * Sempre contém `price_table_id`. Com um item só, o rep não escolhe nada e
+   * nenhuma rota revela a existência das outras.
+   */
+  price_table_ids: string[];
   commission_rate: number;
   /** Código do rep no ERP — define a carteira de clientes que ele enxerga. */
   erp_rep_id: string | null;
@@ -80,7 +87,10 @@ export interface CreateRepRequest {
   email: string;
   password: string;
   cpf: string;
+  /** Tabela do catálogo dele. Se `price_table_ids` vier, precisa estar dentro. */
   price_table_id: string;
+  /** Tabelas que ele pode atribuir. Omitido = só a `price_table_id`. */
+  price_table_ids?: string[];
   legal_name?: string | null;
   phone?: string | null;
   /** Percentual de comissão (ex.: 10 = 10%). Padrão 10 se omitido. */
@@ -95,6 +105,8 @@ export interface UpdateRepRequest {
   email?: string;
   cpf?: string;
   price_table_id?: string;
+  /** Substitui o conjunto inteiro. Ausente = conjunto não muda. */
+  price_table_ids?: string[];
   legal_name?: string | null;
   phone?: string | null;
   active?: boolean;

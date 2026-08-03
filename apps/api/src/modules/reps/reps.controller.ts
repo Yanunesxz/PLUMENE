@@ -1,6 +1,21 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CreateRepRequest, UpdateRepRequest } from '@csb/shared';
-import { listReps, createRep, updateRep, deleteRep, listPriceTables } from './reps.service.js';
+import {
+  listReps,
+  createRep,
+  updateRep,
+  deleteRep,
+  listPriceTables,
+  listRepPriceTables,
+} from './reps.service.js';
+
+/**
+ * Mais de uma tabela só é possível com a migração 018 aplicada. Sem ela, o rep
+ * fica com a tabela única — e o gerente precisa saber disso, senão sai da tela
+ * achando que atribuiu duas.
+ */
+const AVISO_MIGRACAO =
+  'Salvo, mas só com UMA tabela: o recurso de múltiplas tabelas ainda não foi liberado no banco (migração 018).';
 
 export async function listRepsHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id } = request.user;
@@ -14,6 +29,23 @@ export async function listPriceTablesHandler(
 ): Promise<void> {
   const { company_id } = request.user;
   const tables = await listPriceTables(company_id);
+  await reply.send({ data: tables });
+}
+
+/**
+ * Tabelas que quem pediu pode atribuir. Gerente/admin recebem todas; o
+ * representante recebe só o conjunto dele — é isso que impede o João de
+ * descobrir que a tabela da Maria existe.
+ */
+export async function minhasPriceTablesHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id, sub, role } = request.user;
+  const tables =
+    role === 'manager' || role === 'admin'
+      ? await listPriceTables(company_id)
+      : await listRepPriceTables(company_id, sub);
   await reply.send({ data: tables });
 }
 
@@ -48,7 +80,10 @@ export async function createRepHandler(request: FastifyRequest, reply: FastifyRe
     return;
   }
 
-  await reply.status(201).send({ data: result.rep });
+  await reply.status(201).send({
+    data: result.rep,
+    ...(result.conjunto_ignorado ? { aviso: AVISO_MIGRACAO } : {}),
+  });
 }
 
 export async function deleteRepHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -115,5 +150,8 @@ export async function updateRepHandler(request: FastifyRequest, reply: FastifyRe
     return;
   }
 
-  await reply.send({ data: result.rep });
+  await reply.send({
+    data: result.rep,
+    ...(result.conjunto_ignorado ? { aviso: AVISO_MIGRACAO } : {}),
+  });
 }

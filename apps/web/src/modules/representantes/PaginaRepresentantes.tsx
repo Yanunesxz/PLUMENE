@@ -3,12 +3,12 @@ import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Percent, Search 
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/interface/Input.js';
-import { Select } from '../../components/interface/Select.js';
 import { Button } from '../../components/interface/Button.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { cn } from '@/lib/utils';
 import type {
   RepListItem,
   PriceTable,
@@ -28,6 +28,8 @@ const EMPTY = {
   commission_rate: '10',
   erp_rep_id: '',
   active: true,
+  /** Tabelas que ele pode atribuir a um cliente. Sempre contém price_table_id. */
+  price_table_ids: [] as string[],
 };
 
 export function PaginaRepresentantes() {
@@ -62,6 +64,19 @@ export function PaginaRepresentantes() {
     (e: { target: { value: string } }) =>
       setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  /**
+   * Marca/desmarca uma tabela do conjunto. Desmarcar a que era principal move a
+   * principal para a primeira que sobrou — um rep cuja tabela de catálogo ele
+   * não pode usar é estado inválido, e o servidor corrigiria de qualquer forma.
+   */
+  const alternarTabela = (id: string) =>
+    setForm((f) => {
+      const marcada = f.price_table_ids.includes(id);
+      const ids = marcada ? f.price_table_ids.filter((x) => x !== id) : [...f.price_table_ids, id];
+      const principal = ids.includes(f.price_table_id) ? f.price_table_id : (ids[0] ?? '');
+      return { ...f, price_table_ids: ids, price_table_id: principal };
+    });
+
   useEffect(() => {
     if (!token) return;
     void api.get<ApiResponse<RepListItem[]>>('/reps', token).then((r) => setReps(r.data)).catch(() => setReps([]));
@@ -95,6 +110,12 @@ export function PaginaRepresentantes() {
       commission_rate: String(rep.commission_rate ?? 10),
       erp_rep_id: rep.erp_rep_id ?? '',
       active: rep.active,
+      // Rep antigo (antes da 018) chega sem conjunto: cai na tabela única dele.
+      price_table_ids: rep.price_table_ids?.length
+        ? rep.price_table_ids
+        : rep.price_table_id
+          ? [rep.price_table_id]
+          : [],
     });
     setError('');
     setShowForm(true);
@@ -153,7 +174,7 @@ export function PaginaRepresentantes() {
     e.preventDefault();
     setError('');
     if (!form.name || !form.email || !form.cpf || !form.price_table_id) {
-      setError('Preencha nome, e-mail, CPF e tabela.');
+      setError('Preencha nome, e-mail, CPF e marque ao menos uma tabela.');
       return;
     }
     if (!isEditing && !form.password) {
@@ -169,6 +190,7 @@ export function PaginaRepresentantes() {
           email: form.email,
           cpf: form.cpf,
           price_table_id: form.price_table_id,
+          price_table_ids: form.price_table_ids,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
           commission_rate: Number(form.commission_rate) || 10,
@@ -176,26 +198,43 @@ export function PaginaRepresentantes() {
           active: form.active,
           ...(form.password ? { password: form.password } : {}),
         };
-        const res = await api.patch<ApiResponse<RepListItem>>(`/reps/${editingId}`, payload, token);
+        const res = await api.patch<ApiResponse<RepListItem> & { aviso?: string }>(
+          `/reps/${editingId}`,
+          payload,
+          token,
+        );
         setReps((prev) => (prev ?? []).map((r) => (r.id === editingId ? res.data : r)));
-        setToast({ message: 'Representante atualizado!', type: 'success' });
+        setToast(
+          res.aviso
+            ? { message: res.aviso, type: 'error' }
+            : { message: 'Representante atualizado!', type: 'success' },
+        );
       } else {
         const payload: CreateRepRequest = {
           name: form.name,
           email: form.email,
           cpf: form.cpf,
           price_table_id: form.price_table_id,
+          price_table_ids: form.price_table_ids,
           password: form.password,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
           commission_rate: Number(form.commission_rate) || 10,
           erp_rep_id: form.erp_rep_id || null,
         };
-        const res = await api.post<ApiResponse<RepListItem>>('/reps', payload, token);
+        const res = await api.post<ApiResponse<RepListItem> & { aviso?: string }>(
+          '/reps',
+          payload,
+          token,
+        );
         setReps((prev) =>
           [res.data, ...(prev ?? [])].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
         );
-        setToast({ message: 'Representante cadastrado!', type: 'success' });
+        setToast(
+          res.aviso
+            ? { message: res.aviso, type: 'error' }
+            : { message: 'Representante cadastrado!', type: 'success' },
+        );
       }
       closeForm();
     } catch (err) {
@@ -242,16 +281,72 @@ export function PaginaRepresentantes() {
             <Field label="Telefone / WhatsApp">
               <Input value={form.phone} onChange={set('phone')} placeholder="Opcional" inputMode="tel" />
             </Field>
-            <Field label="Tabela de preço" required>
-              <Select value={form.price_table_id} onChange={set('price_table_id')}>
-                <option value="">Selecione a tabela</option>
-                {tables.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-              </Select>
-            </Field>
+            {/* Conjunto de tabelas: o que este representante pode atribuir a um
+                cliente. Uma marcada = ele não escolhe nada e nunca fica sabendo
+                que as outras existem. Duas ou mais = ele escolhe, cliente a
+                cliente. A principal é a que vale no catálogo dele. */}
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Tabelas de preço<span className="ml-0.5 text-danger">*</span>
+              </label>
+              <p className="text-xs text-muted-foreground">
+                Marque todas que ele pode usar. Com mais de uma, ele escolhe a tabela de cada
+                cliente dele. A <strong>principal</strong> é a que aparece no catálogo dele.
+              </p>
+
+              <div className="mt-1 divide-y divide-border overflow-hidden rounded-lg border border-input">
+                {tables.length === 0 && (
+                  <p className="p-3 text-sm text-muted-foreground">Nenhuma tabela cadastrada.</p>
+                )}
+                {tables.map((t) => {
+                  const marcada = form.price_table_ids.includes(t.id);
+                  const principal = form.price_table_id === t.id;
+                  return (
+                    <div
+                      key={t.id}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 transition-colors',
+                        marcada ? 'bg-muted/50' : 'bg-card',
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        id={`tabela-${t.id}`}
+                        checked={marcada}
+                        onChange={() => alternarTabela(t.id)}
+                        className="h-4 w-4 shrink-0 accent-foreground"
+                      />
+                      <label
+                        htmlFor={`tabela-${t.id}`}
+                        className="min-w-0 flex-1 cursor-pointer truncate text-sm text-foreground"
+                      >
+                        {t.name}
+                      </label>
+
+                      {marcada &&
+                        (principal ? (
+                          <Badge>principal</Badge>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setForm((f) => ({ ...f, price_table_id: t.id }))}
+                            className="shrink-0 rounded px-2 py-1 text-xs font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+                          >
+                            tornar principal
+                          </button>
+                        ))}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {form.price_table_ids.length > 1 && (
+                <p className="text-xs text-muted-foreground">
+                  {form.price_table_ids.length} tabelas — este representante vai escolher a tabela
+                  de cada cliente.
+                </p>
+              )}
+            </div>
             <Field label="Código no ERP">
               <Input
                 value={form.erp_rep_id}
