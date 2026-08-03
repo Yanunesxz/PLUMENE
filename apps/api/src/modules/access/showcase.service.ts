@@ -128,6 +128,26 @@ export async function listarVitrines(company_id: string, rep_id: string): Promis
   return (data as LinhaVitrine[]).map(paraLista);
 }
 
+/**
+ * Encerra o link porque o pedido dele foi enviado.
+ *
+ * Um link é uma conversa: a pessoa escolhe, fecha e pronto. Deixá-lo vivo depois
+ * do envio permite um segundo e um terceiro pedido pelo mesmo endereço, e o
+ * representante recebe pedidos soltos sem saber se é correção, adição ou
+ * duplicata. Encerrar aqui torna essa dúvida impossível.
+ *
+ * Sem `company_id`/`rep_id` no filtro porque quem chama é o próprio visitante,
+ * cujo token não carrega representante nenhum — o id do link vem do `sub` do
+ * JWT, que o servidor assinou.
+ */
+export async function encerrarVitrinePorPedido(link_id: string): Promise<void> {
+  await supabase
+    .from('showcase_links')
+    .update({ revoked_at: new Date().toISOString() })
+    .eq('id', link_id)
+    .is('revoked_at', null);
+}
+
 /** Revoga na hora. Usado quando o representante percebe que o link circulou. */
 export async function revogarVitrine(
   id: string,

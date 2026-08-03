@@ -29,12 +29,10 @@ const cliente = {
     trade_name: 'Loja da Ana',
     cnpj: '12345678000199',
     whatsapp: '32999990000',
-    price_table_id: 'tabela-1',
   },
   error: null,
 };
 
-const tabela = { data: { name: 'TABELA 01' }, error: null };
 const representante = { data: { name: 'Carlos', phone: '32988887777' }, error: null };
 
 const produtos = {
@@ -53,7 +51,6 @@ describe('há quanto tempo a loja não compra', () => {
   it('conta os dias desde o pedido mais recente que virou compra', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: {
         data: [
@@ -84,7 +81,6 @@ describe('há quanto tempo a loja não compra', () => {
   it('pedido recusado não vira compra — nem no gasto, nem na data', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: {
         data: [
@@ -111,7 +107,6 @@ describe('há quanto tempo a loja não compra', () => {
   it('loja que nunca pediu não inventa data', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: { data: [], error: null },
     });
@@ -130,7 +125,6 @@ describe('o que a loja mais compra', () => {
   it('soma as quantidades e põe a peça mais comprada na frente', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: {
         data: [
@@ -164,7 +158,6 @@ describe('o que a loja mais compra', () => {
   it('repetir a compra traz os itens do último pedido, não os do primeiro', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: {
         data: [
@@ -193,7 +186,6 @@ describe('a conta que a loja vê', () => {
   it('traz o WhatsApp do representante — é por onde ela fala com a fábrica', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: { data: [], error: null },
     });
@@ -202,7 +194,21 @@ describe('a conta que a loja vê', () => {
 
     expect(area!.conta.rep_name).toBe('Carlos');
     expect(area!.conta.rep_whatsapp).toBe('32988887777');
-    expect(area!.conta.price_table_name).toBe('TABELA 01');
+  });
+
+  it('não conta para a loja em qual tabela de preço ela está', async () => {
+    const { montarMinhaArea, fake } = await carregar({
+      customers: cliente,
+      users: representante,
+      orders: { data: [], error: null },
+    });
+
+    const area = await montarMinhaArea(EMPRESA, CLIENTE, REP);
+
+    // Saber que está na "TABELA 03" é saber que existem 01 e 02. Não sai nem no
+    // payload: a checagem é na resposta inteira, não só no que a tela desenha.
+    expect(JSON.stringify(area)).not.toContain('price_table');
+    expect(fake.filtrosDe('price_tables')).toHaveLength(0);
   });
 
   it('cadastro que não existe devolve nulo em vez de tela pela metade', async () => {
@@ -214,7 +220,6 @@ describe('a conta que a loja vê', () => {
   it('conta pedidos em análise para a loja saber que não sumiram', async () => {
     const { montarMinhaArea } = await carregar({
       customers: cliente,
-      price_tables: tabela,
       users: representante,
       orders: {
         data: [

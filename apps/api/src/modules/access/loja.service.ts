@@ -49,9 +49,12 @@ export async function montarMinhaArea(
   customer_id: string,
   rep_id: string | null | undefined,
 ): Promise<MinhaAreaLoja | null> {
+  // `price_table_id` fica de fora de propósito: qual tabela a loja está não sai
+  // daqui nem no payload. Saber que está na "TABELA 03" é saber que existem 01 e
+  // 02 — conversa para ter com o representante, não informação de tela.
   const { data: cliente } = await supabase
     .from('customers')
-    .select('name, trade_name, cnpj, whatsapp, price_table_id')
+    .select('name, trade_name, cnpj, whatsapp')
     .eq('id', customer_id)
     .maybeSingle();
 
@@ -62,13 +65,9 @@ export async function montarMinhaArea(
     trade_name: string | null;
     cnpj: string | null;
     whatsapp: string | null;
-    price_table_id: string | null;
   };
 
-  const [tabela, rep, pedidosResposta] = await Promise.all([
-    c.price_table_id
-      ? supabase.from('price_tables').select('name').eq('id', c.price_table_id).maybeSingle()
-      : Promise.resolve({ data: null }),
+  const [rep, pedidosResposta] = await Promise.all([
     rep_id
       ? supabase.from('users').select('name, phone').eq('id', rep_id).maybeSingle()
       : Promise.resolve({ data: null }),
@@ -87,7 +86,6 @@ export async function montarMinhaArea(
     trade_name: c.trade_name,
     cnpj: c.cnpj,
     whatsapp: c.whatsapp,
-    price_table_name: (tabela.data as { name: string } | null)?.name ?? null,
     rep_name: repDados?.name ?? null,
     rep_whatsapp: repDados?.phone ?? null,
   };

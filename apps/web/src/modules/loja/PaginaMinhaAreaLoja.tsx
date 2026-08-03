@@ -342,7 +342,6 @@ export function PaginaMinhaAreaLoja() {
           <Linha rotulo="CNPJ" valor={conta.cnpj} mono />
           <Linha rotulo="WhatsApp" valor={conta.whatsapp} />
           <Linha rotulo="E-mail de acesso" valor={user?.email} />
-          <Linha rotulo="Tabela de preço" valor={conta.price_table_name} />
           <Linha rotulo="Representante" valor={conta.rep_name} />
         </dl>
 

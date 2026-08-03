@@ -153,7 +153,11 @@ export async function abrirConviteHandler(request: FastifyRequest, reply: Fastif
   }
 
   await reply.send({
-    data: { customer_name: abertura.customer_name, company_name: abertura.company_name },
+    data: {
+      customer_name: abertura.customer_name,
+      company_name: abertura.company_name,
+      nome_sugerido: abertura.nome_sugerido,
+    },
   });
 }
 
@@ -162,7 +166,7 @@ export async function aceitarConviteHandler(request: FastifyRequest, reply: Fast
   const body = await parseBody(aceitarConviteSchema, request.body, reply);
   if (!body) return;
 
-  const resultado = await usarConvite(token, body.email, body.password);
+  const resultado = await usarConvite(token, body.email, body.password, body.name);
   if (!resultado.ok) {
     if (resultado.motivo === 'email_em_uso') {
       await reply.status(409).send({
@@ -281,9 +285,12 @@ export async function minhaContaHandler(request: FastifyRequest, reply: FastifyR
     return;
   }
 
+  // Sem `price_table_id`: qual tabela a loja está não sai daqui nem no payload.
+  // Saber que está na "TABELA 03" é saber que existem 01 e 02 — conversa para
+  // ter com o representante, não informação de tela.
   const { data: cliente } = await supabase
     .from('customers')
-    .select('name, trade_name, cnpj, whatsapp, price_table_id')
+    .select('name, trade_name, cnpj, whatsapp')
     .eq('id', customer_id)
     .maybeSingle();
 
@@ -297,19 +304,13 @@ export async function minhaContaHandler(request: FastifyRequest, reply: FastifyR
     trade_name: string | null;
     cnpj: string | null;
     whatsapp: string | null;
-    price_table_id: string | null;
   };
 
-  const [tabela, rep] = await Promise.all([
-    c.price_table_id
-      ? supabase.from('price_tables').select('name').eq('id', c.price_table_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-    rep_id
-      ? supabase.from('users').select('name, phone').eq('id', rep_id).maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  const { data: rep } = rep_id
+    ? await supabase.from('users').select('name, phone').eq('id', rep_id).maybeSingle()
+    : { data: null };
 
-  const repDados = rep.data as { name: string; phone: string | null } | null;
+  const repDados = rep as { name: string; phone: string | null } | null;
 
   await reply.send({
     data: {
@@ -317,7 +318,6 @@ export async function minhaContaHandler(request: FastifyRequest, reply: FastifyR
       trade_name: c.trade_name,
       cnpj: c.cnpj,
       whatsapp: c.whatsapp,
-      price_table_name: (tabela.data as { name: string } | null)?.name ?? null,
       rep_name: repDados?.name ?? null,
       rep_whatsapp: repDados?.phone ?? null,
     },

@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useParams } from 'react-router-dom';
-import { Search, PackageSearch, ShoppingCart, Check, Clock } from 'lucide-react';
+import { Search, PackageSearch, ShoppingCart, Check, Clock, Info } from 'lucide-react';
 import { Logo } from '../../components/interface/Logo.js';
 import { Input } from '../../components/interface/Input.js';
 import { Button } from '../../components/interface/Button.js';
@@ -159,6 +159,10 @@ export function PaginaVitrine() {
             {sessao?.rep_name ? `${sessao.rep_name} vai` : 'O representante vai'} conferir e falar com você no
             WhatsApp informado.
           </p>
+          <p className="mt-5 rounded-lg bg-muted px-3 py-2.5 text-xs leading-relaxed text-muted-foreground">
+            Este link foi encerrado agora — cada link vale por um pedido. Para fazer outro, é só pedir um
+            novo {sessao?.rep_name ? `a ${sessao.rep_name}` : 'ao representante'}.
+          </p>
         </div>
       </div>
     );
@@ -249,8 +253,17 @@ export function PaginaVitrine() {
           <div className="absolute inset-0 bg-foreground/40" onClick={() => setFechando(false)} aria-hidden />
           <div className="animate-slide-up relative w-full max-w-md rounded-t-2xl bg-card p-5 sm:rounded-2xl">
             <h2 className="titulo mb-1 text-[22px] leading-none text-foreground">Quase lá</h2>
-            <p className="mb-4 text-sm text-muted-foreground">
+            <p className="mb-3 text-sm text-muted-foreground">
               O representante precisa saber com quem falar para confirmar o pedido.
+            </p>
+            {/* Antes de enviar, não depois: o link vale por um pedido, e a
+                pessoa tem que saber disso enquanto ainda dá para adicionar. */}
+            <p className="mb-4 flex items-start gap-2 rounded-lg bg-warn-soft px-3 py-2 text-xs leading-relaxed text-warn-soft-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+              <span>
+                Confira se está tudo aqui: <strong>ao enviar, este link deixa de funcionar</strong> e o
+                pedido segue para o representante.
+              </span>
             </p>
 
             <form onSubmit={(e) => void enviar(e)} className="space-y-4">

@@ -61,10 +61,19 @@ export interface LinkCriado {
 export interface ConvitePublico {
   customer_name: string;
   company_name: string;
+  /**
+   * Sugestão para o campo "nome da loja", já limpa do prefixo de CNPJ que a
+   * razão social do ERP carrega. A loja pode corrigir: é o nome dela que vai
+   * aparecer no app, e o cadastro do ERP nem sempre tem o nome pelo qual ela é
+   * conhecida.
+   */
+  nome_sugerido: string;
 }
 
 /** Corpo do formulário que a loja preenche no convite. */
 export interface AceitarConviteRequest {
+  /** Como a loja quer ser chamada. Vira `users.name`. */
+  name: string;
   email: string;
   password: string;
 }
@@ -76,13 +85,18 @@ export interface SessaoVitrine {
   rep_name: string;
 }
 
-/** O que a loja vê da própria conta. Tudo em leitura — cadastro é da fábrica. */
+/**
+ * O que a loja vê da própria conta. Tudo em leitura — cadastro é da fábrica.
+ *
+ * Não tem tabela de preço, e não é esquecimento: saber em qual tabela está é
+ * saber que existem outras. Isso é conversa entre a loja e o representante, não
+ * informação de tela.
+ */
 export interface MinhaContaLoja {
   name: string;
   trade_name: string | null;
   cnpj: string | null;
   whatsapp: string | null;
-  price_table_name: string | null;
   rep_name: string | null;
   /** Para a loja falar com quem responde por ela sem procurar contato. */
   rep_whatsapp: string | null;

@@ -33,8 +33,14 @@ const convitePendente = {
   used_at: null,
   revoked_at: null,
   created_at: ontem(),
-  customers: { name: 'Loja da Ana' },
+  customers: { name: 'Loja da Ana', trade_name: null },
   companies: { name: 'Corpo Sensual' },
+};
+
+/** Como o ERP entrega de verdade: razão social com o CNPJ na frente. */
+const conviteDoErp = {
+  ...convitePendente,
+  customers: { name: '28.566.837 LUIS RICARDO BUSCARIOLI', trade_name: 'Moda Íntima Ricardo' },
 };
 
 beforeEach(() => {
@@ -114,6 +120,26 @@ describe('abrir o convite', () => {
     expect((r as { ok: true; customer_name: string }).customer_name).toBe('Loja da Ana');
   });
 
+  it('sugere o nome fantasia sem o CNPJ que o ERP cola na frente', async () => {
+    const { abrirConvite } = await carregar({ store_invites: { data: conviteDoErp, error: null } });
+
+    const r = await abrirConvite('token');
+    // Sem isto a loja se cadastra e se vê no app como "28.566.837 LUIS...".
+    expect((r as { ok: true; nome_sugerido: string }).nome_sugerido).toBe('Moda Íntima Ricardo');
+  });
+
+  it('sem nome fantasia, cai na razão social — também sem o prefixo numérico', async () => {
+    const { abrirConvite } = await carregar({
+      store_invites: {
+        data: { ...conviteDoErp, customers: { name: '28.566.837 LUIS RICARDO', trade_name: null } },
+        error: null,
+      },
+    });
+
+    const r = await abrirConvite('token');
+    expect((r as { ok: true; nome_sugerido: string }).nome_sugerido).toBe('LUIS RICARDO');
+  });
+
   it('recusa convite já usado', async () => {
     const { abrirConvite } = await carregar({
       store_invites: { data: { ...convitePendente, used_at: ontem() }, error: null },
@@ -152,10 +178,12 @@ describe('usar o convite', () => {
       ],
     });
 
-    const r = await usarConvite('token', 'Loja@Email.com', 'senha123');
+    const r = await usarConvite('token', 'Loja@Email.com', 'senha123', 'Ana Modas');
     expect(r).toEqual({ ok: true, user_id: 'usuario-novo' });
 
     const criado = fake.ultimaGravacao('users', 'insert')!.valores as Record<string, unknown>;
+    // O nome é o que a LOJA digitou, não o que o ERP tem cadastrado.
+    expect(criado['name']).toBe('Ana Modas');
     expect(criado['role']).toBe('store');
     expect(criado['customer_id']).toBe(CLIENTE);
     expect(criado['company_id']).toBe(EMPRESA);

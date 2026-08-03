@@ -239,7 +239,8 @@ export function PaginaAcessos() {
             <p className="text-sm font-medium text-foreground">Mostrar o catálogo por um tempo</p>
             <p className="mb-3 mt-1 text-xs leading-relaxed text-muted-foreground">
               Para quem só quer dar uma olhada. Sem conta e sem senha: mostra os seus preços e para
-              de funcionar sozinho. Se a pessoa fechar pedido, ele cai aqui com o contato dela.
+              de funcionar sozinho. Vale por <strong>um pedido</strong> — assim que a pessoa envia, o
+              link se encerra e o pedido cai para você com o contato dela.
             </p>
             <div className="grid grid-cols-4 gap-2">
               {SHOWCASE_DURATIONS.map((h) => (

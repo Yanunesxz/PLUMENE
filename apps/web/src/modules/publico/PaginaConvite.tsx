@@ -25,6 +25,7 @@ export function PaginaConvite() {
   const [carregando, setCarregando] = useState(true);
   const [erroLink, setErroLink] = useState('');
 
+  const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [confirmacao, setConfirmacao] = useState('');
@@ -36,7 +37,11 @@ export function PaginaConvite() {
     api
       .get<ApiResponse<ConvitePublico>>(`/public/invite/${token}`)
       .then((res) => {
-        if (!cancelado) setConvite(res.data);
+        if (cancelado) return;
+        setConvite(res.data);
+        // Começa preenchido com o nome do cadastro, já sem o CNPJ na frente. A
+        // loja corrige se quiser: é este nome que ela vai ver no app todo dia.
+        setNome(res.data.nome_sugerido);
       })
       .catch((e: unknown) => {
         if (!cancelado) setErroLink(e instanceof Error ? e.message : 'Não foi possível abrir o convite.');
@@ -53,6 +58,10 @@ export function PaginaConvite() {
     e.preventDefault();
     setErro('');
 
+    if (nome.trim().length < 2) {
+      setErro('Informe o nome da sua loja.');
+      return;
+    }
     if (senha.length < 6) {
       setErro('A senha precisa de ao menos 6 caracteres.');
       return;
@@ -65,6 +74,7 @@ export function PaginaConvite() {
     setEnviando(true);
     try {
       const res = await api.post<ApiResponse<LoginResponse>>(`/public/invite/${token}`, {
+        name: nome.trim(),
         email,
         password: senha,
       });
@@ -101,6 +111,24 @@ export function PaginaConvite() {
             </p>
 
             <form onSubmit={(e) => void enviar(e)} className="space-y-4">
+              <div className="space-y-1.5">
+                <label htmlFor="nome" className="text-sm font-medium text-foreground">
+                  Nome da loja
+                </label>
+                <Input
+                  id="nome"
+                  value={nome}
+                  onChange={(e) => setNome(e.target.value)}
+                  required
+                  maxLength={120}
+                  autoComplete="organization"
+                  placeholder="Como sua loja é conhecida"
+                />
+                <p className="text-xs text-muted-foreground">
+                  É como você vai aparecer aqui dentro. Pode corrigir.
+                </p>
+              </div>
+
               <div className="space-y-1.5">
                 <label htmlFor="email" className="text-sm font-medium text-foreground">
                   E-mail

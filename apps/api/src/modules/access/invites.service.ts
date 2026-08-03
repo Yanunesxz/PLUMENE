@@ -11,6 +11,11 @@ import { INVITE_EXPIRY_DAYS, type StoreInvite } from '@csb/shared';
  * de preço, o CNPJ e o dono do pedido.
  */
 
+interface DadosCliente {
+  name: string;
+  trade_name?: string | null;
+}
+
 interface LinhaConvite {
   id: string;
   company_id: string;
@@ -20,12 +25,35 @@ interface LinhaConvite {
   used_at: string | null;
   revoked_at: string | null;
   created_at: string;
-  customers?: { name: string } | { name: string }[] | null;
+  customers?: DadosCliente | DadosCliente[] | null;
+}
+
+function dadosCliente(c: LinhaConvite['customers']): DadosCliente | null {
+  if (!c) return null;
+  return Array.isArray(c) ? (c[0] ?? null) : c;
 }
 
 function nomeCliente(c: LinhaConvite['customers']): string {
-  if (!c) return 'Cliente';
-  return Array.isArray(c) ? (c[0]?.name ?? 'Cliente') : c.name;
+  return dadosCliente(c)?.name ?? 'Cliente';
+}
+
+/**
+ * O nome que a loja reconhece como sendo dela.
+ *
+ * A razão social vem do ERP com o CNPJ na frente — "28.566.837 LUIS RICARDO
+ * BUSCARIOLI". Preencher o cadastro com isso faz a loja se ver no app com um
+ * nome que ela não usa. Prefere o nome fantasia, tira o prefixo numérico, e se
+ * não sobrar nada apresentável devolve vazio: melhor o campo em branco do que
+ * um nome errado que ninguém repara e fica para sempre.
+ */
+function nomeSugerido(c: LinhaConvite['customers']): string {
+  const dados = dadosCliente(c);
+  if (!dados) return '';
+  for (const candidato of [dados.trade_name, dados.name]) {
+    const limpo = (candidato ?? '').replace(/^[\d.\-/\s]+/, '').trim();
+    if (limpo.length >= 2) return limpo;
+  }
+  return '';
 }
 
 function statusDe(l: LinhaConvite): StoreInvite['status'] {
@@ -103,14 +131,20 @@ export async function criarConvite(
 }
 
 export type AberturaConvite =
-  | { ok: true; convite: LinhaConvite; customer_name: string; company_name: string }
+  | {
+      ok: true;
+      convite: LinhaConvite;
+      customer_name: string;
+      company_name: string;
+      nome_sugerido: string;
+    }
   | { ok: false; motivo: 'invalido' | 'expirado' | 'usado' | 'revogado' };
 
 /** Valida sem consumir — a tela pública chama isto antes de mostrar o formulário. */
 export async function abrirConvite(token: string): Promise<AberturaConvite> {
   const { data } = await supabase
     .from('store_invites')
-    .select('*, customers(name), companies(name)')
+    .select('*, customers(name, trade_name), companies(name)')
     .eq('token_hash', hashToken(token))
     .maybeSingle();
 
@@ -126,6 +160,7 @@ export async function abrirConvite(token: string): Promise<AberturaConvite> {
     ok: true,
     convite,
     customer_name: nomeCliente(convite.customers),
+    nome_sugerido: nomeSugerido(convite.customers),
     company_name: !empresa ? '' : Array.isArray(empresa) ? (empresa[0]?.name ?? '') : empresa.name,
   };
 }
@@ -160,6 +195,7 @@ export async function usarConvite(
   token: string,
   email: string,
   senha: string,
+  nome?: string,
 ): Promise<UsoConvite> {
   const abertura = await abrirConvite(token);
   if (!abertura.ok) return { ok: false, motivo: abertura.motivo };
@@ -188,7 +224,9 @@ export async function usarConvite(
     .insert({
       company_id: convite.company_id,
       customer_id: convite.customer_id,
-      name: abertura.customer_name,
+      // O nome que a LOJA informou. A razão social do ERP só entra se ela não
+      // mandar nada — é ela quem sabe como quer ser chamada.
+      name: nome?.trim() || abertura.customer_name,
       email: emailNormalizado,
       password_hash: await hashPassword(senha),
       role: 'store',

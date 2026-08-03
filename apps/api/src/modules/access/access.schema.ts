@@ -16,6 +16,7 @@ export const criarVitrineSchema = z.object({
 });
 
 export const aceitarConviteSchema = z.object({
+  name: z.string().trim().min(2, 'Informe o nome da loja').max(120),
   email: z.string().email('Informe um e-mail válido').max(160),
   password: z.string().min(6, 'A senha precisa de ao menos 6 caracteres').max(72),
 });

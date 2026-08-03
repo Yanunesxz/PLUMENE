@@ -112,6 +112,41 @@ describe('abrir a vitrine', () => {
   });
 });
 
+describe('o link vale por um pedido', () => {
+  it('encerra assim que o pedido sai — dois pedidos pelo mesmo link é confusão', async () => {
+    const { encerrarVitrinePorPedido, fake } = await carregar({
+      showcase_links: { data: { id: 'link-1' }, error: null },
+    });
+
+    await encerrarVitrinePorPedido('link-1');
+
+    const gravou = fake.ultimaGravacao('showcase_links', 'update')!.valores as { revoked_at: string };
+    expect(gravou.revoked_at).toBeTruthy();
+  });
+
+  it('só encerra o que ainda está aberto — não reescreve a data de quem já foi revogado', async () => {
+    const { encerrarVitrinePorPedido, fake } = await carregar({
+      showcase_links: { data: { id: 'link-1' }, error: null },
+    });
+
+    await encerrarVitrinePorPedido('link-1');
+
+    const condicoes = fake.filtrosDe('showcase_links', 'is').map((f) => f.args[0]);
+    expect(condicoes).toContain('revoked_at');
+  });
+
+  it('link encerrado não abre de novo', async () => {
+    const { abrirVitrine } = await carregar({
+      showcase_links: {
+        data: { ...linkBase, expires_at: daquiAHoras(5), revoked_at: horasAtras(0.1) },
+        error: null,
+      },
+    });
+
+    expect(await abrirVitrine('mesmo-token')).toEqual({ ok: false, motivo: 'revogado' });
+  });
+});
+
 describe('criar a vitrine', () => {
   it('guarda o hash e devolve o token em claro uma única vez', async () => {
     const { criarVitrine, fake } = await carregar({

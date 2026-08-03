@@ -9,6 +9,7 @@ import {
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
+import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
 
@@ -85,6 +86,19 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
       await reply.status(422).send({ error: 'Não foi possível criar o pedido', code: 'CREATE_FAILED', statusCode: 422 });
       return;
     }
+
+    // O link da vitrine morre com o pedido que saiu dele. `sub` do token de
+    // visitante É o id do link — foi o servidor que assinou. Só depois de o
+    // pedido existir: falhar aqui não pode custar a compra, então o encerramento
+    // não derruba a resposta.
+    if (role === 'guest') {
+      try {
+        await encerrarVitrinePorPedido(sub);
+      } catch (erro) {
+        request.log.error({ err: erro, link: sub }, 'pedido criado, mas a vitrine seguiu aberta');
+      }
+    }
+
     await reply.status(201).send({ data: order });
   } catch (err) {
     if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
