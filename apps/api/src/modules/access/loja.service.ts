@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { buscarPorIds } from '../../lib/paginacao.js';
 import type { MinhaAreaLoja, OrderStatus, PecaComprada, PedidoResumido } from '@csb/shared';
 
 /**
@@ -99,27 +100,31 @@ export async function montarMinhaArea(
   const produtos = new Map<string, LinhaProduto>();
 
   if (valem.length > 0) {
-    const { data: itens } = await supabase
-      .from('order_items')
-      .select('order_id, product_id, variant_id, quantity')
-      .in(
-        'order_id',
-        valem.map((p) => p.id),
-      );
+    // Paginado: são até 200 pedidos, e uma loja que compra grade fechada passa
+    // de 1.000 itens fácil. O corte do PostgREST é mudo — o histórico de peças
+    // e o total simplesmente sairiam menores do que a verdade.
+    const itens = await buscarPorIds<LinhaItem>(
+      valem.map((p) => p.id),
+      (lote, de, ate) =>
+        supabase
+          .from('order_items')
+          .select('order_id, product_id, variant_id, quantity')
+          .in('order_id', lote)
+          .range(de, ate),
+    );
 
-    for (const item of (itens ?? []) as LinhaItem[]) {
+    for (const item of itens) {
       const lista = itensPorPedido.get(item.order_id);
       if (lista) lista.push(item);
       else itensPorPedido.set(item.order_id, [item]);
     }
 
-    const idsProduto = [...new Set(((itens ?? []) as LinhaItem[]).map((i) => i.product_id))];
+    const idsProduto = [...new Set(itens.map((i) => i.product_id))];
     if (idsProduto.length > 0) {
-      const { data: linhas } = await supabase
-        .from('products')
-        .select('id, name, sku, image_url')
-        .in('id', idsProduto);
-      for (const p of (linhas ?? []) as LinhaProduto[]) produtos.set(p.id, p);
+      const linhas = await buscarPorIds<LinhaProduto>(idsProduto, (lote, de, ate) =>
+        supabase.from('products').select('id, name, sku, image_url').in('id', lote).range(de, ate),
+      );
+      for (const p of linhas) produtos.set(p.id, p);
     }
   }
 

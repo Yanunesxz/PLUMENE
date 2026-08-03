@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { buscarTudo } from '../../lib/paginacao.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
 import { ORDER_STATUS_FLOW } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
@@ -9,20 +10,24 @@ export async function getOrders(
   rep_id: string,
   customer_id?: string | null,
 ): Promise<Order[]> {
-  let query = supabase
-    .from('orders')
-    .select('*')
-    .eq('company_id', company_id)
-    .order('created_at', { ascending: false });
+  // Paginado: o PostgREST corta em 1.000 linhas SEM avisar. Passando disso, o
+  // gerente veria a lista mais antiga sumir da tela — e as somas do painel
+  // (vendas do mês, comissão, ticket) sairiam erradas sem nada indicar erro.
+  return buscarTudo<Order>((de, ate) => {
+    let query = supabase
+      .from('orders')
+      .select('*')
+      .eq('company_id', company_id)
+      .order('created_at', { ascending: false })
+      .range(de, ate);
 
-  if (role === 'rep') query = query.eq('rep_id', rep_id);
-  // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
-  // tenha quem tiver montado (ela mesma ou o representante).
-  if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
+    if (role === 'rep') query = query.eq('rep_id', rep_id);
+    // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
+    // tenha quem tiver montado (ela mesma ou o representante).
+    if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
 
-  const { data, error } = await query;
-  if (error || !data) return [];
-  return data as Order[];
+    return query;
+  });
 }
 
 export async function getOrderById(

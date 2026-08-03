@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { buscarPorIds, buscarTudo } from '../../lib/paginacao.js';
 import type { CatalogVariant, ProductWithPrice } from '@csb/shared';
 
 /** Tabelas de preço da empresa (id + nome) — para o seletor de consulta no catálogo. */
@@ -58,35 +59,53 @@ export async function getProducts(
 ): Promise<ProductWithPrice[]> {
   const { price_table_id, includeStock = false, onlyPriced = false } = options;
 
-  const { data: products, error } = await supabase
-    .from('products')
-    .select(PRODUCT_COLUMNS)
-    .eq('company_id', company_id)
-    .eq('active', true)
-    .order('name');
+  const products = await buscarTudo<Record<string, unknown>>((de, ate) =>
+    supabase
+      .from('products')
+      .select(PRODUCT_COLUMNS)
+      .eq('company_id', company_id)
+      .eq('active', true)
+      .order('name')
+      .range(de, ate),
+  );
 
-  if (error || !products) return [];
+  if (products.length === 0) return [];
 
   const productIds = products.map((p) => p.id as string);
 
   // Variantes (tamanhos) de cada produto — a grade vem do ERP (adulto P/M/G…,
   // juvenil/infantil em números). Cores são sortidas, então é só (produto×tamanho).
-  const { data: variants } = await supabase
-    .from('product_variants')
-    .select('id, product_id, size, stock_quantity, stock_committed')
-    .in('product_id', productIds)
-    .eq('active', true);
+  //
+  // PAGINADO, e não é zelo à toa: são ~5 tamanhos para cada um dos 313 produtos,
+  // ou seja ~1.500 linhas contra o teto de 1.000 do PostgREST. Numa consulta só,
+  // um terço do catálogo voltava SEM grade — e produto sem grade não abre o
+  // seletor de tamanho, então simplesmente não dava para vender. O corte é
+  // silencioso: vem um array menor, sem erro nenhum.
+  const variants = await buscarPorIds<{
+    id: string;
+    product_id: string;
+    size: string;
+    stock_quantity: number;
+    stock_committed: number;
+  }>(productIds, (lote, de, ate) =>
+    supabase
+      .from('product_variants')
+      .select('id, product_id, size, stock_quantity, stock_committed')
+      .in('product_id', lote)
+      .eq('active', true)
+      .range(de, ate),
+  );
 
   const variantsByProduct = new Map<string, CatalogVariant[]>();
-  for (const v of variants ?? []) {
-    const pid = v.product_id as string;
+  for (const v of variants) {
+    const pid = v.product_id;
     // O ERP às vezes devolve estoque negativo (baixa lançada antes da entrada).
     // Piso em zero: negativo não é "menos que esgotado", é esgotado.
-    const available = Math.max(0, (v.stock_quantity as number) - (v.stock_committed as number));
+    const available = Math.max(0, v.stock_quantity - v.stock_committed);
     const arr = variantsByProduct.get(pid) ?? [];
     arr.push({
-      id: v.id as string,
-      size: v.size as string,
+      id: v.id,
+      size: v.size,
       in_stock: available > 0,
       ...(includeStock ? { available } : {}),
     });
@@ -95,12 +114,20 @@ export async function getProducts(
 
   const priceMap = new Map<string, number>();
   if (price_table_id) {
-    const { data: prices } = await supabase
-      .from('product_prices')
-      .select('product_id, price')
-      .eq('price_table_id', price_table_id)
-      .in('product_id', productIds);
-    for (const pp of prices ?? []) priceMap.set(pp.product_id as string, pp.price as number);
+    // Uma linha por produto nesta tabela, então hoje cabe folgado — mas paginado
+    // pelo mesmo motivo: o dia em que o catálogo passar de 1.000 itens, o preço
+    // sumiria em silêncio e metade do catálogo abriria vazia.
+    const prices = await buscarPorIds<{ product_id: string; price: number }>(
+      productIds,
+      (lote, de, ate) =>
+        supabase
+          .from('product_prices')
+          .select('product_id, price')
+          .eq('price_table_id', price_table_id)
+          .in('product_id', lote)
+          .range(de, ate),
+    );
+    for (const pp of prices) priceMap.set(pp.product_id, pp.price);
   }
 
   const withPrice = products.map((p) => ({
