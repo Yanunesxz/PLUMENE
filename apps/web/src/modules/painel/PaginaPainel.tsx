@@ -7,6 +7,7 @@ import { useDecidirPedido } from '../../hooks/useDecidirPedido.js';
 import { api } from '../../services/api.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
+import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
@@ -77,6 +78,8 @@ export function PaginaPainel() {
   return (
     <div className="space-y-6 p-4 md:p-6">
       <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Painel</h1>
+
+      <CartaoInstalar />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={TrendingUp} tint="green" value={formatBRL(metrics.vendasMes)} label="Vendas do mês" />

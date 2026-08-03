@@ -23,6 +23,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
+import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
@@ -173,6 +174,8 @@ export function PaginaMinhaArea() {
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
+
+      <CartaoInstalar />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
