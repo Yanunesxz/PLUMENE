@@ -15,12 +15,22 @@ interface EventoDeInstalacao extends Event {
 
 /**
  * - `instalado`: já está rodando como app, não há o que oferecer.
- * - `pronto`: o navegador liberou o convite — um toque instala.
- * - `manual`: iPhone/iPad. O Safari não tem convite programático; o jeito é
- *   ensinar o caminho do menu Compartilhar.
- * - `indisponivel`: navegador que não instala, ou convite ainda não liberado.
+ * - `pronto`: o navegador liberou o convite — um toque instala. É o caso do
+ *   Chrome, Edge, Samsung Internet e Opera, no Android e no computador.
+ * - `manual-apple`: iPhone/iPad. A Apple **não implementa** a API de instalação
+ *   em nenhum navegador do iOS, de propósito — só o menu Compartilhar do Safari
+ *   adiciona à tela de início. Não há como automatizar; resta ensinar.
+ * - `manual-firefox`: o Firefox instala pelo menu dele, mas também não dispara
+ *   o convite programático. Sem este caso o cartão sumia e o usuário de Firefox
+ *   nunca ficava sabendo que dá para instalar.
+ * - `indisponivel`: navegador que não instala.
  */
-export type EstadoInstalacao = 'instalado' | 'pronto' | 'manual' | 'indisponivel';
+export type EstadoInstalacao =
+  | 'instalado'
+  | 'pronto'
+  | 'manual-apple'
+  | 'manual-firefox'
+  | 'indisponivel';
 
 let convite: EventoDeInstalacao | null = null;
 let jaInstalado = false;
@@ -49,6 +59,12 @@ function ehApple(): boolean {
   const ua = navigator.userAgent;
   if (/iphone|ipod|ipad/i.test(ua)) return true;
   return /macintosh/i.test(ua) && navigator.maxTouchPoints > 1;
+}
+
+/** `fxios` é o Firefox do iOS — lá vale a regra da Apple, não a do Firefox. */
+function ehFirefox(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  return /firefox|fxios/i.test(navigator.userAgent);
 }
 
 /** Chamado uma vez, no arranque do app. */
@@ -86,7 +102,10 @@ export function assinarInstalacao(ouvinte: () => void): () => void {
 export function estadoDaInstalacao(): EstadoInstalacao {
   if (jaInstalado) return 'instalado';
   if (convite) return 'pronto';
-  if (ehApple()) return 'manual';
+  // A regra da Apple vale para QUALQUER navegador no iPhone: Chrome e Firefox
+  // no iOS são o Safari por baixo e seguem a mesma limitação.
+  if (ehApple()) return 'manual-apple';
+  if (ehFirefox()) return 'manual-firefox';
   return 'indisponivel';
 }
 

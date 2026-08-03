@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Smartphone, Share, Plus, Check } from 'lucide-react';
+import { useState, type ReactNode } from 'react';
+import { Smartphone, Share, Plus, Check, MoreVertical, Download } from 'lucide-react';
 import { useInstalarApp } from '../../hooks/useInstalarApp.js';
 import { pedirInstalacao } from '../../lib/instalarApp.js';
 import { Button } from './Button.js';
@@ -7,9 +7,13 @@ import { Button } from './Button.js';
 /**
  * Convite para deixar o sistema como aplicativo na tela inicial.
  *
- * Instalado, o app abre em tela cheia, entra no aparelho pelo ícone e funciona
- * offline de verdade — sem isso, o representante em campo depende de achar a
- * aba certa no navegador.
+ * Instalado, o app abre em tela cheia, entra no aparelho pelo ícone e guarda o
+ * catálogo para funcionar sem internet — que é o motivo de existir, não um
+ * detalhe: o representante trabalha em loja com sinal ruim.
+ *
+ * Chrome, Edge, Samsung Internet e Opera instalam com um toque. iPhone e
+ * Firefox não têm essa API, então recebem o caminho do menu — um botão que não
+ * faz nada seria pior do que nenhum botão.
  *
  * Some sozinho quando já está instalado: oferecer o que a pessoa já tem é ruído
  * permanente numa tela que ela abre todo dia.
@@ -21,7 +25,7 @@ export function CartaoInstalar() {
 
   if (estado === 'instalado' || estado === 'indisponivel') return null;
 
-  const noApple = estado === 'manual';
+  const automatico = estado === 'pronto';
 
   const instalar = async () => {
     setInstalando(true);
@@ -47,35 +51,77 @@ export function CartaoInstalar() {
           </div>
         </div>
 
-        {noApple ? (
-          <Button size="md" variant="outline" className="shrink-0" onClick={() => setComoFazer((v) => !v)}>
-            {comoFazer ? 'Fechar' : 'Como fazer'}
-          </Button>
-        ) : (
+        {automatico ? (
           <Button size="md" className="shrink-0" disabled={instalando} onClick={() => void instalar()}>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             {instalando ? 'Instalando…' : 'Adicionar'}
           </Button>
+        ) : (
+          <Button size="md" variant="outline" className="shrink-0" onClick={() => setComoFazer((v) => !v)}>
+            {comoFazer ? 'Fechar' : 'Como fazer'}
+          </Button>
         )}
       </div>
 
-      {/* No iPhone não existe convite programático: o caminho é o menu do
-          Safari, e descrever o ícone importa mais do que nomeá-lo. */}
       {comoFazer ? (
-        <ol className="mt-4 space-y-2 border-t border-primary/20 pt-3 text-sm text-foreground">
-          <Passo numero={1} icone={Share}>
-            Toque em <strong>Compartilhar</strong> — o quadradinho com a seta para cima, na barra de
-            baixo do Safari.
-          </Passo>
-          <Passo numero={2} icone={Plus}>
-            Role a lista e escolha <strong>Adicionar à Tela de Início</strong>.
-          </Passo>
-          <Passo numero={3} icone={Check}>
-            Confirme em <strong>Adicionar</strong>. O ícone aparece junto dos seus outros aplicativos.
-          </Passo>
-        </ol>
+        <div className="mt-4 border-t border-primary/20 pt-3">
+          {estado === 'manual-apple' ? <PassosApple /> : <PassosFirefox />}
+        </div>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * iPhone e iPad.
+ *
+ * A Apple não expõe instalação para o site pedir — em nenhum navegador do iOS,
+ * porque todos usam o motor do Safari. O caminho é o menu Compartilhar, e
+ * descrever o ícone importa mais do que nomeá-lo: ninguém procura por "Share".
+ */
+function PassosApple() {
+  return (
+    <>
+      <ol className="space-y-2 text-sm text-foreground">
+        <Passo numero={1} icone={Share}>
+          Toque em <strong>Compartilhar</strong> — o quadradinho com a seta para cima, na barra de
+          baixo.
+        </Passo>
+        <Passo numero={2} icone={Plus}>
+          Role a lista e escolha <strong>Adicionar à Tela de Início</strong>.
+        </Passo>
+        <Passo numero={3} icone={Check}>
+          Confirme em <strong>Adicionar</strong>. O ícone aparece junto dos seus outros aplicativos.
+        </Passo>
+      </ol>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        Não achou a opção? Abra este mesmo endereço no <strong>Safari</strong> — no iPhone, só ele
+        adiciona à tela de início.
+      </p>
+    </>
+  );
+}
+
+/** Firefox: instala pelo menu, mas não avisa o site que dá para instalar. */
+function PassosFirefox() {
+  return (
+    <>
+      <ol className="space-y-2 text-sm text-foreground">
+        <Passo numero={1} icone={MoreVertical}>
+          Toque nos <strong>três pontinhos</strong> do navegador.
+        </Passo>
+        <Passo numero={2} icone={Download}>
+          Escolha <strong>Instalar</strong> (em algumas versões, «Adicionar à tela inicial»).
+        </Passo>
+        <Passo numero={3} icone={Check}>
+          Confirme. O ícone aparece junto dos seus outros aplicativos.
+        </Passo>
+      </ol>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        No <strong>Chrome</strong> a instalação é um toque só — se preferir, abra este endereço por
+        lá.
+      </p>
+    </>
   );
 }
 
@@ -86,7 +132,7 @@ function Passo({
 }: {
   numero: number;
   icone: typeof Share;
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
   return (
     <li className="flex items-start gap-2.5">
