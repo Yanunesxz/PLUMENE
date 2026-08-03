@@ -3,6 +3,7 @@ import { LogOut, WifiOff } from 'lucide-react';
 import { Logo } from '../interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { usePedidosEsperando } from '../../hooks/usePedidosEsperando.js';
 import { navItemsForRole } from './navItems.js';
 import { USER_ROLE_LABELS } from '@csb/shared';
 import { cn } from '../../lib/utils.js';
@@ -12,6 +13,7 @@ export function SideNav() {
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
   const items = navItemsForRole(user?.role);
+  const esperando = usePedidosEsperando();
   const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
 
   const handleLogout = () => {
@@ -39,28 +41,39 @@ export function SideNav() {
 
       {/* Navegação */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
-        {items.map(({ to, label, icon: Icon, end }) => (
-          <NavLink
-            key={to}
-            to={to}
-            end={end ?? false}
-            className={({ isActive }) =>
-              cn(
-                'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                isActive
-                  ? 'bg-primary-soft text-primary-soft-foreground'
-                  : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-              )
-            }
-          >
-            {({ isActive }) => (
-              <>
-                <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.5 : 2} />
-                <span>{label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
+        {items.map(({ to, label, icon: Icon, end, fila }) => {
+          const aguardando = fila ? esperando[fila] : 0;
+          return (
+            <NavLink
+              key={to}
+              to={to}
+              end={end ?? false}
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-primary-soft text-primary-soft-foreground'
+                    : 'text-muted-foreground hover:bg-muted hover:text-foreground',
+                )
+              }
+            >
+              {({ isActive }) => (
+                <>
+                  <Icon className="h-[18px] w-[18px]" strokeWidth={isActive ? 2.5 : 2} />
+                  <span className="flex-1">{label}</span>
+                  {aguardando > 0 && (
+                    <span
+                      aria-label={`${aguardando} aguardando você`}
+                      className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground"
+                    >
+                      {aguardando > 99 ? '99+' : aguardando}
+                    </span>
+                  )}
+                </>
+              )}
+            </NavLink>
+          );
+        })}
       </nav>
 
       {/* Usuário */}

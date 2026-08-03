@@ -10,10 +10,16 @@ export interface NavItem {
   icon: LucideIcon;
   /** Casa exata da rota (evita "ativo" em sub-rotas). */
   end?: boolean;
+  /**
+   * Fila de decisão que este item abre. Quando há pedido parado nela, o menu
+   * mostra o número — é assim que o representante descobre que chegou algo sem
+   * precisar abrir a tela para conferir.
+   */
+  fila?: 'triagem' | 'aprovacao';
 }
 
 const repItems: NavItem[] = [
-  { to: '/minha-area', label: 'Minha área', icon: Gauge },
+  { to: '/minha-area', label: 'Minha área', icon: Gauge, fila: 'triagem' },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
@@ -28,7 +34,7 @@ const storeItems: NavItem[] = [
 ];
 
 const managerItems: NavItem[] = [
-  { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { to: '/dashboard', label: 'Painel', icon: LayoutDashboard, fila: 'aprovacao' },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
