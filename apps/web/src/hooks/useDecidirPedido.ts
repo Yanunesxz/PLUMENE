@@ -18,6 +18,15 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
 
   const decidir = async (orderId: string, status: OrderStatus): Promise<boolean> => {
     if (!token || decidindo) return false;
+
+    // Decidir é irreversível e vale para outras pessoas — não entra na fila
+    // offline. Sem este aviso, o toque falharia com "erro de rede" e quem
+    // decidiu ficaria sem saber se passou ou não.
+    if (!navigator.onLine) {
+      aoTerminar?.('Você está sem internet. Conecte para decidir o pedido.', true);
+      return false;
+    }
+
     setDecidindo(orderId);
     try {
       await api.patch<ApiResponse<Order>>(`/orders/${orderId}/status`, { status }, token);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
@@ -13,10 +13,12 @@ import {
   Info,
   Store,
   CalendarClock,
+  WifiOff,
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { api } from '../../services/api.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { useCartStore } from '../../store/cartStore.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
@@ -26,6 +28,35 @@ import { cn, formatBRL } from '../../lib/utils.js';
 import { STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { ApiResponse, MinhaAreaLoja, PecaComprada, ProductWithPrice } from '@csb/shared';
+
+/**
+ * A última resposta boa fica no aparelho.
+ *
+ * A loja abre isto na loja dela, muitas vezes sem sinal. Guardar o payload
+ * inteiro (são 12 peças e 10 pedidos, cabe folgado) é o que faz a tela abrir
+ * offline com o histórico de ontem em vez de um aviso de erro. Fora do Dexie de
+ * propósito: é UMA linha por usuário, não uma coleção para consultar.
+ */
+const CACHE_KEY = 'csb-minha-area-loja';
+
+function lerCache(userId: string | undefined): MinhaAreaLoja | null {
+  if (!userId) return null;
+  try {
+    const cru = localStorage.getItem(`${CACHE_KEY}:${userId}`);
+    return cru ? (JSON.parse(cru) as MinhaAreaLoja) : null;
+  } catch {
+    return null;
+  }
+}
+
+function gravarCache(userId: string | undefined, area: MinhaAreaLoja): void {
+  if (!userId) return;
+  try {
+    localStorage.setItem(`${CACHE_KEY}:${userId}`, JSON.stringify(area));
+  } catch {
+    /* aparelho sem espaço: a tela funciona online do mesmo jeito */
+  }
+}
 
 /**
  * "Minha área" da loja.
@@ -38,10 +69,16 @@ import type { ApiResponse, MinhaAreaLoja, PecaComprada, ProductWithPrice } from 
 export function PaginaMinhaAreaLoja() {
   const navigate = useNavigate();
   const { token, user } = useAuthStore();
+  const online = useOnlineStatus();
   const adicionarAoCarrinho = useCartStore((s) => s.add);
   const limparCarrinho = useCartStore((s) => s.clear);
 
-  const [area, setArea] = useState<MinhaAreaLoja | null | undefined>(undefined);
+  // Já começa com o que estiver guardado: a tela abre preenchida e só troca
+  // quando a resposta nova chega. Sem sinal, é isto que a loja vê.
+  const [area, setArea] = useState<MinhaAreaLoja | null | undefined>(
+    () => lerCache(user?.id) ?? undefined,
+  );
+  const [desatualizado, setDesatualizado] = useState(false);
   const [repetindo, setRepetindo] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
@@ -51,9 +88,17 @@ export function PaginaMinhaAreaLoja() {
     if (!token) return;
     api
       .get<ApiResponse<MinhaAreaLoja>>('/minha-area', token)
-      .then((r) => setArea(r.data))
-      .catch(() => setArea(null));
-  }, [token]);
+      .then((r) => {
+        setArea(r.data);
+        setDesatualizado(false);
+        gravarCache(user?.id, r.data);
+      })
+      .catch(() => {
+        const guardado = lerCache(user?.id);
+        setArea(guardado);
+        setDesatualizado(guardado !== null);
+      });
+  }, [token, user?.id]);
 
   const primeiroNome = (area?.conta.trade_name ?? area?.conta.name ?? user?.name ?? '')
     .trim()
@@ -138,8 +183,16 @@ export function PaginaMinhaAreaLoja() {
       <div className="p-4 md:p-6">
         <h1 className="titulo mb-2 text-[26px] leading-none text-foreground md:text-[32px]">Minha área</h1>
         <p className="text-sm text-muted-foreground">
-          Não conseguimos carregar seus dados agora. Verifique a conexão e tente de novo.
+          {online
+            ? 'Não conseguimos carregar seus dados agora. Tente de novo em instantes.'
+            : 'Você está sem internet e ainda não temos seus dados guardados neste aparelho. Abra esta tela uma vez com conexão.'}
         </p>
+        <Link
+          to="/catalog"
+          className={cn('mt-4 inline-flex', buttonVariants({ size: 'sm', variant: 'outline' }))}
+        >
+          Abrir o catálogo
+        </Link>
       </div>
     );
   }
@@ -157,6 +210,13 @@ export function PaginaMinhaAreaLoja() {
           {conta.rep_name ? `Seu representante é ${conta.rep_name}` : 'Sua área de compras'}
         </p>
       </div>
+
+      {desatualizado && (
+        <p className="flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
+          <WifiOff className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+          Sem internet — mostrando os dados da última vez que você abriu.
+        </p>
+      )}
 
       <UltimaCompra
         dias={resumo.dias_desde_ultimo}
