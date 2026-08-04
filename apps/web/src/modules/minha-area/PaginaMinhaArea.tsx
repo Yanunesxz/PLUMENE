@@ -26,7 +26,8 @@ import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
-import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
+import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
+import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
 
 // Gerente comercial (suporte) por WhatsApp — número (55) 32 9 9849-3177.
 // É quem controla senhas e acessos; o rep fala com ele por aqui.
@@ -94,6 +95,11 @@ export function PaginaMinhaArea() {
       .reduce((s, o) => s + (o.total ?? 0), 0);
     const faturadoTotal = invoiced.reduce((s, o) => s + (o.total ?? 0), 0);
     return {
+      // A bonificação conta o que ele ENVIOU no mês, não o que a fábrica já
+      // faturou — são coisas diferentes, e o aviso da fábrica é explícito.
+      enviadoNoMes: list
+        .filter((o) => thisMonth(o.created_at) && contaParaAMeta(o.status))
+        .reduce((s, o) => s + (o.total ?? 0), 0),
       faturadoMes,
       comissaoMes: faturadoMes * rate,
       comissaoTotal: faturadoTotal * rate,
@@ -174,6 +180,8 @@ export function PaginaMinhaArea() {
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
+
+      <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} />
 
       <CartaoInstalar />
 
