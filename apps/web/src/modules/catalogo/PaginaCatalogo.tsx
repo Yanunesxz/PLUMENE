@@ -23,12 +23,42 @@ interface PriceTableOption {
 
 type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
-// Basta UM tamanho com peça para o produto ser vendável. A quantidade em si só
-// chega para gerente/admin (ver catalog.service), então não dá para somar aqui.
-const temEstoque = (p: ProductWithPrice) => (p.variants ?? []).some((v) => v.in_stock);
-
 // Plumene é outra marca (códigos 2xxx/22xxx) — não entra neste catálogo.
 const isPlumene = (sku: string) => /^2/.test(sku);
+
+// ─── Segmento (público da peça) ──────────────────────────────────────────────
+// O ERP não tem esse campo: quem diz é o próprio nome do produto, como no
+// catálogo impresso ("Pijama Longo Malha Feminino", "… Infantil Masc.",
+// "… Juvenil Fem."). Infantil e juvenil andam juntos — é a mesma prateleira
+// para o lojista.
+export type Segmento = 'feminino' | 'masculino' | 'infantil_masculino' | 'infantil_feminino';
+
+export const SEGMENTOS: { key: Segmento; label: string }[] = [
+  { key: 'feminino', label: 'Apenas Feminino' },
+  { key: 'masculino', label: 'Apenas Masculino' },
+  { key: 'infantil_masculino', label: 'Apenas Infantil/Juvenil Masculino' },
+  { key: 'infantil_feminino', label: 'Apenas Infantil/Juvenil Feminino' },
+];
+
+// Peças que só existem na linha feminina — nelas a fábrica não escreve o gênero
+// no nome porque é óbvio ("CAMISOLA DE ALÇA", "SHORT DOLL REGATA MALHA").
+// Tecido NÃO serve de pista: há pijama de liganete masculino no catálogo.
+const PECA_FEMININA = /camisol|short ?doll|camis[ãa]o|robe|baby ?doll|gestante|vestido|cropped/;
+
+export const segmentoDoProduto = (p: Pick<ProductWithPrice, 'name'>): Segmento | null => {
+  const nome = p.name.toLowerCase();
+  const infantil = /infantil|juvenil|infanto|teen/.test(nome);
+  // "fem." / "feminino" e "masc." / "masculino" — sempre no início da palavra.
+  const feminino = /\bfem/.test(nome);
+  const masculino = /\bmasc/.test(nome);
+  if (feminino !== masculino) {
+    if (infantil) return masculino ? 'infantil_masculino' : 'infantil_feminino';
+    return masculino ? 'masculino' : 'feminino';
+  }
+  // Sem gênero escrito (ou família com os dois): só o tipo de peça decide.
+  if (PECA_FEMININA.test(nome)) return infantil ? 'infantil_feminino' : 'feminino';
+  return null;
+};
 
 export function PaginaCatalogo() {
   const { token, user } = useAuthStore();
@@ -43,9 +73,8 @@ export function PaginaCatalogo() {
   const [search, setSearch] = useState('');
   const [brand, setBrand] = useState<string>(ALL);
   const [sort, setSort] = useState<SortKey>('code');
-  const [inStockOnly, setInStockOnly] = useState(false);
-  // Produtos sem foto ficam ocultos por padrão (catálogo mais limpo); reversível.
-  const [showNoPhoto, setShowNoPhoto] = useState(false);
+  // Segmento: um por vez; clicar no chip ativo limpa o filtro.
+  const [segmento, setSegmento] = useState<Segmento | null>(null);
   const [loading, setLoading] = useState(false);
   const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
 
@@ -124,11 +153,6 @@ export function PaginaCatalogo() {
     return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
   }, [allProducts]);
 
-  const noPhotoCount = useMemo(
-    () => (allProducts ?? []).filter((p) => p.active && !p.image_url && !isPlumene(p.sku)).length,
-    [allProducts],
-  );
-
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const compare = (a: ProductWithPrice, b: ProductWithPrice) => {
@@ -147,9 +171,9 @@ export function PaginaCatalogo() {
     return (allProducts ?? [])
       .filter((p) => p.active)
       .filter((p) => !isPlumene(p.sku))
-      .filter((p) => showNoPhoto || !!p.image_url)
+      .filter((p) => !!p.image_url)
       .filter((p) => brand === ALL || p.brand === brand)
-      .filter((p) => !inStockOnly || temEstoque(p))
+      .filter((p) => !segmento || segmentoDoProduto(p) === segmento)
       .filter(
         (p) =>
           !q ||
@@ -159,7 +183,7 @@ export function PaginaCatalogo() {
       )
       .sort(compare);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [allProducts, search, brand, sort, inStockOnly, showNoPhoto, overlayPrices]);
+  }, [allProducts, search, brand, sort, segmento, overlayPrices]);
 
   // Agrupa as variações de COR: produtos com o mesmo `variant_group` viram um
   // card único (com bolinhas de cor). Preserva a ordem: o grupo aparece na
@@ -195,6 +219,7 @@ export function PaginaCatalogo() {
         <p className="text-sm text-muted-foreground">
           {filtered.length} {filtered.length === 1 ? 'produto' : 'produtos'}
           {brand !== ALL && ` · ${brand}`}
+          {segmento && ` · ${SEGMENTOS.find((s) => s.key === segmento)!.label.replace('Apenas ', '')}`}
         </p>
       </div>
 
@@ -250,14 +275,15 @@ export function PaginaCatalogo() {
       )}
 
       <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
-        <Chip active={inStockOnly} onClick={() => setInStockOnly((v) => !v)}>
-          Só com estoque
-        </Chip>
-        {noPhotoCount > 0 && (
-          <Chip active={showNoPhoto} onClick={() => setShowNoPhoto((v) => !v)}>
-            {showNoPhoto ? 'Ocultar sem foto' : `Mostrar sem foto (${noPhotoCount})`}
+        {SEGMENTOS.map((s) => (
+          <Chip
+            key={s.key}
+            active={segmento === s.key}
+            onClick={() => setSegmento((v) => (v === s.key ? null : s.key))}
+          >
+            {s.label}
           </Chip>
-        )}
+        ))}
         {brands.length > 0 && (
           <>
             <span className="w-px shrink-0 self-stretch bg-border" aria-hidden />
@@ -291,7 +317,7 @@ export function PaginaCatalogo() {
           <div className="space-y-0.5">
             <p className="font-medium text-foreground">Nenhum produto encontrado</p>
             <p className="text-sm text-muted-foreground">
-              {search || brand !== ALL
+              {search || brand !== ALL || segmento
                 ? 'Tente ajustar a busca ou os filtros.'
                 : 'O catálogo será carregado assim que houver conexão.'}
             </p>
