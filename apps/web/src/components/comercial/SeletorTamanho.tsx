@@ -9,6 +9,10 @@ export interface PickedSize {
   variant_id: string | null;
   size: string;
   quantity: number;
+  /** Código da cor no catálogo ("01"). null = peça sem cor cadastrada. */
+  color_code?: string | null;
+  /** Nome da cor, para a observação do pedido. */
+  color_name?: string | null;
 }
 
 interface SeletorTamanhoProps {
@@ -34,21 +38,53 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
   // guardada por (cor × tamanho) para não perder o que já foi marcado ao trocar.
   const [activeId, setActiveId] = useState(product.id);
   const active = colors.find((c) => c.id === activeId) ?? product;
-  const [qty, setQty] = useState<Record<string, number>>({}); // chave: "productId|size"
+
+  // Cores do catálogo impresso desta peça (migração 019). Diferente do
+  // `colorGroup`, que são produtos irmãos: aqui é UM produto com N cores.
+  const coresCatalogo = active.colors ?? [];
+  const temCoresCatalogo = coresCatalogo.length > 0;
+  const [corAtiva, setCorAtiva] = useState<string | null>(null);
+  const corSelecionada = temCoresCatalogo
+    ? (coresCatalogo.find((c) => c.codigo === corAtiva) ?? coresCatalogo[0]!)
+    : null;
+
+  // Chave: "productId|codigoDaCor|size" — o lojista monta a grade de uma cor,
+  // troca de cor e monta outra sem perder a primeira.
+  const [qty, setQty] = useState<Record<string, number>>({});
 
   const variants = ordenarGrade(active.variants ?? []);
-  const key = (size: string) => `${active.id}|${size}`;
+  const key = (size: string) => `${active.id}|${corSelecionada?.codigo ?? '-'}|${size}`;
 
   const bump = (size: string, delta: number) =>
     setQty((q) => ({ ...q, [key(size)]: Math.max(0, (q[key(size)] ?? 0) + delta) }));
 
-  const activeQty = variants.reduce((s, v) => s + (qty[key(v.size)] ?? 0), 0);
-  const totalValue = activeQty * (active.price ?? 0);
+  // Total da peça inteira, somando TODAS as cores — é o que vai para o carrinho.
+  const totalPecas = Object.values(qty).reduce((s, n) => s + n, 0);
+  const totalValue = totalPecas * (active.price ?? 0);
+
+  /** Quantas peças já marcadas numa cor — para o selo na bolinha. */
+  const qtdDaCor = (codigo: string) =>
+    variants.reduce((s, v) => s + (qty[`${active.id}|${codigo}|${v.size}`] ?? 0), 0);
 
   const confirm = () => {
-    const lines: PickedSize[] = variants
-      .filter((v) => (qty[key(v.size)] ?? 0) > 0)
-      .map((v) => ({ variant_id: v.id, size: v.size, quantity: qty[key(v.size)] ?? 0 }));
+    const lines: PickedSize[] = [];
+    // Percorre TODAS as cores, não só a que está na tela: o lojista pode ter
+    // marcado 3 na azul, trocado para a rosa e marcado mais 2.
+    const cores = temCoresCatalogo ? coresCatalogo : [null];
+    for (const cor of cores) {
+      for (const v of variants) {
+        const n = qty[`${active.id}|${cor?.codigo ?? '-'}|${v.size}`] ?? 0;
+        if (n > 0) {
+          lines.push({
+            variant_id: v.id,
+            size: v.size,
+            quantity: n,
+            color_code: cor?.codigo ?? null,
+            color_name: cor?.nome ?? null,
+          });
+        }
+      }
+    }
     if (lines.length > 0) onConfirm(active, lines);
     onClose();
   };
@@ -91,8 +127,54 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
         </div>
 
         <div className="flex-1 overflow-y-auto p-4">
+          {/* Cores do catálogo impresso: o lojista escolhe uma, monta a grade,
+              troca e monta outra. O que já marcou fica guardado por cor. */}
+          {temCoresCatalogo ? (
+            <div className="mb-4">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Cores / Estampas:{' '}
+                <span className="text-foreground">{corSelecionada?.nome ?? '—'}</span>
+              </p>
+              <div className="flex flex-wrap gap-2.5">
+                {coresCatalogo.map((c) => {
+                  const selecionada = c.codigo === (corSelecionada?.codigo ?? '');
+                  const marcadas = qtdDaCor(c.codigo);
+                  return (
+                    <button
+                      key={c.codigo}
+                      type="button"
+                      title={c.nome ?? c.codigo}
+                      onClick={() => setCorAtiva(c.codigo)}
+                      aria-label={`Cor ${c.nome ?? c.codigo}`}
+                      aria-pressed={selecionada}
+                      className={cn(
+                        'relative flex h-11 w-11 flex-col items-center justify-center rounded-full border text-[10px] font-semibold transition',
+                        selecionada
+                          ? 'border-foreground ring-2 ring-foreground/25'
+                          : 'border-border hover:border-foreground/50',
+                      )}
+                      style={
+                        c.variadas
+                          ? { background: SORTIDO_GRADIENT }
+                          : { backgroundColor: c.hex ?? FALLBACK_HEX }
+                      }
+                    >
+                      {/* O número é o que a fábrica confere na separação. */}
+                      <span className="rounded bg-card/85 px-1 text-foreground">{c.codigo}</span>
+                      {marcadas > 0 && (
+                        <span className="tnum absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
+                          {marcadas}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
+
           {/* Cor: sempre visível. Com variações → bolinhas de cor; sem cor → "Sortido". */}
-          <div className="mb-4">
+          <div className={cn('mb-4', temCoresCatalogo && 'hidden')}>
             <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Cor: <span className="text-foreground">{hasColors ? (active.color_name ?? '—') : 'Sortido'}</span>
             </p>
@@ -133,7 +215,11 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
             )}
           </div>
 
-          <p className="mb-2.5 text-xs font-medium text-muted-foreground">Quantidade por tamanho</p>
+          <p className="mb-2.5 text-xs font-medium text-muted-foreground">
+            {corSelecionada
+              ? `Quantidade por tamanho — ${corSelecionada.nome ?? corSelecionada.codigo}`
+              : 'Quantidade por tamanho'}
+          </p>
           {variants.length === 0 ? (
             <p className="py-6 text-center text-sm text-muted-foreground">
               Esta cor não tem grade de tamanhos cadastrada.
@@ -191,14 +277,31 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
         >
           <div className="mb-3 flex items-center justify-between text-sm">
             <span className="tnum text-muted-foreground">
-              {activeQty} {activeQty === 1 ? 'peça' : 'peças'}
-              {hasColors ? (active.color_name ? ` · ${active.color_name}` : '') : ' · Sortido'}
+              {totalPecas} {totalPecas === 1 ? 'peça' : 'peças'}
+              {temCoresCatalogo
+                ? ''
+                : hasColors
+                  ? active.color_name
+                    ? ` · ${active.color_name}`
+                    : ''
+                  : ' · Sortido'}
             </span>
             {active.price != null && (
               <span className="tnum text-base font-semibold text-foreground">{formatBRL(totalValue)}</span>
             )}
           </div>
-          <Button size="lg" className="w-full" disabled={activeQty === 0} onClick={confirm}>
+          {/* Resumo por cor: sem ele o lojista que marcou 3 azuis e trocou para
+              a rosa não tem como conferir o que já pediu sem voltar bolinha a
+              bolinha. */}
+          {temCoresCatalogo && totalPecas > 0 && (
+            <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
+              {coresCatalogo
+                .filter((c) => qtdDaCor(c.codigo) > 0)
+                .map((c) => `${qtdDaCor(c.codigo)} ${c.nome ?? c.codigo}`)
+                .join(' · ')}
+            </p>
+          )}
+          <Button size="lg" className="w-full" disabled={totalPecas === 0} onClick={confirm}>
             Adicionar ao pedido
           </Button>
         </div>

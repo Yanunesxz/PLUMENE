@@ -101,4 +101,23 @@ export interface ProductWithPrice
   /** Preço na tabela consultada. `null` = sem preço nessa tabela. */
   price: number | null;
   variants?: CatalogVariant[];
+  /** Cores do catálogo impresso (migração 019). Vazio = peça sem cor definida. */
+  colors?: CatalogColor[];
+}
+
+// ─── Cor do catálogo impresso ────────────────────────────────────────────────
+/**
+ * As cores NÃO existem no ERP — lá a fábrica trabalha só com sortido. Elas vêm
+ * do catálogo impresso e servem para o lojista pedir "3 na azul". O pedido
+ * continua indo ao ERP como sortido; a cor viaja na observação.
+ */
+export interface CatalogColor {
+  /** Número da bolinha no catálogo ("01"). É por ele que a fábrica confere. */
+  codigo: string;
+  /** Nome legível: "azul marinho", "Cor única", "Variadas", "Cores variadas". */
+  nome: string | null;
+  /** Cor da bolinha. `null` quando é Variadas — ali a cor não significa peça. */
+  hex: string | null;
+  /** Bolinha rotulada VARIADAS no catálogo. Nunca chamar de "sortidas". */
+  variadas: boolean;
 }

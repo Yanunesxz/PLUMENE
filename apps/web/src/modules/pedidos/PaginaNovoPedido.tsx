@@ -14,6 +14,7 @@ import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
+import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 
 export function PaginaNovoPedido() {
@@ -92,7 +93,9 @@ export function PaginaNovoPedido() {
     const local_id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const payload: CreateOrderRequest = {
       ...(ehLoja ? {} : { customer_id: customerId }),
-      notes: notes || undefined,
+      // O ERP recebe o item como sortido; a cor escolhida viaja na observação,
+      // logo abaixo do que o representante digitou.
+      notes: juntarObservacao(notes, observacaoDeCores(items)),
       local_id,
       // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
       // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
@@ -220,11 +223,12 @@ export function PaginaNovoPedido() {
                     <p className="text-xs text-muted-foreground">
                       {item.sku}
                       {item.size ? ` · Tam ${item.size}` : ''}
+                      {item.color_name ? ` · ${item.color_name}` : ''}
                     </p>
                   </div>
                   <button
                     type="button"
-                    onClick={() => removeItem(item.product_id, item.size)}
+                    onClick={() => removeItem(item.product_id, item.size, item.color_code)}
                     aria-label="Remover item"
                     className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
                   >
@@ -238,7 +242,7 @@ export function PaginaNovoPedido() {
                     <div className="flex items-center">
                       <button
                         type="button"
-                        onClick={() => setQuantity(item.product_id, item.size, item.quantity - 1)}
+                        onClick={() => setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)}
                         aria-label="Diminuir quantidade"
                         className="flex h-11 w-11 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted"
                       >
@@ -248,12 +252,12 @@ export function PaginaNovoPedido() {
                         type="number"
                         min={1}
                         value={item.quantity}
-                        onChange={(e) => setQuantity(item.product_id, item.size, Number(e.target.value))}
+                        onChange={(e) => setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)}
                         className="h-11 w-12 border-y border-input bg-background text-center text-sm text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
                       />
                       <button
                         type="button"
-                        onClick={() => setQuantity(item.product_id, item.size, item.quantity + 1)}
+                        onClick={() => setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)}
                         aria-label="Aumentar quantidade"
                         className="flex h-11 w-11 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted"
                       >
@@ -270,7 +274,7 @@ export function PaginaNovoPedido() {
                         min={0}
                         step={0.01}
                         value={item.unit_price}
-                        onChange={(e) => setUnitPrice(item.product_id, item.size, Number(e.target.value))}
+                        onChange={(e) => setUnitPrice(item.product_id, item.size, Number(e.target.value), item.color_code)}
                         className="h-11 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       />
                     ) : (
@@ -350,6 +354,8 @@ export function PaginaNovoPedido() {
                 sku: chosen.sku,
                 quantity: l.quantity,
                 unit_price: chosen.price ?? 0,
+                color_code: l.color_code ?? null,
+                color_name: l.color_name ?? null,
               }),
             )
           }

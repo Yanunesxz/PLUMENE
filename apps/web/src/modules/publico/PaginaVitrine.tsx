@@ -10,6 +10,7 @@ import { CartaoProduto } from '../../components/comercial/CartaoProduto.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { api } from '../../services/api.js';
 import { formatBRL } from '../../lib/utils.js';
+import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { ApiResponse, ProductWithPrice, SessaoVitrine } from '@csb/shared';
 
 interface Linha {
@@ -20,6 +21,8 @@ interface Linha {
   nome: string;
   quantidade: number;
   preco: number;
+  color_code?: string | null;
+  color_name?: string | null;
 }
 
 const ehPlumene = (sku: string) => /^2/.test(sku);
@@ -112,6 +115,8 @@ export function PaginaVitrine() {
         {
           guest_name: nome.trim(),
           guest_whatsapp: whatsapp,
+          // O ERP recebe tudo como sortido; a cor escolhida vai na observação.
+          notes: juntarObservacao(undefined, observacaoDeCores(linhas)),
           items: linhas.map((l) => ({
             product_id: l.product_id,
             variant_id: l.variant_id ?? undefined,
@@ -329,8 +334,13 @@ export function PaginaVitrine() {
             setLinhas((atuais) => {
               const proximas = [...atuais];
               for (const e of escolhas) {
+                // A cor entra na chave: 3 na azul e 2 na rosa são duas linhas,
+                // senão a observação sairia com uma cor só e a quantidade errada.
                 const i = proximas.findIndex(
-                  (l) => l.product_id === escolhido.id && l.size === e.size,
+                  (l) =>
+                    l.product_id === escolhido.id &&
+                    l.size === e.size &&
+                    (l.color_code ?? null) === (e.color_code ?? null),
                 );
                 if (i >= 0) {
                   proximas[i] = { ...proximas[i]!, quantidade: proximas[i]!.quantidade + e.quantity };
@@ -343,6 +353,8 @@ export function PaginaVitrine() {
                     nome: escolhido.name,
                     quantidade: e.quantity,
                     preco: escolhido.price ?? 0,
+                    color_code: e.color_code ?? null,
+                    color_name: e.color_name ?? null,
                   });
                 }
               }

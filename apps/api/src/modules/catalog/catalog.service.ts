@@ -1,6 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { buscarPorIds, buscarTudo } from '../../lib/paginacao.js';
-import type { CatalogVariant, ProductWithPrice } from '@csb/shared';
+import type { CatalogColor, CatalogVariant, ProductWithPrice } from '@csb/shared';
 
 /** Tabelas de preço da empresa (id + nome) — para o seletor de consulta no catálogo. */
 export async function listCompanyPriceTables(
@@ -112,6 +112,37 @@ export async function getProducts(
     variantsByProduct.set(pid, arr);
   }
 
+  // Cores do catálogo impresso (migração 019). Paginado pelo mesmo motivo das
+  // variantes: são ~3 cores para cada um dos 152 produtos que têm.
+  //
+  // A migração pode não estar aplicada — nesse caso o PostgREST recusa e o
+  // catálogo segue sem cor, em vez de abrir vazio.
+  const coresPorProduto = new Map<string, CatalogColor[]>();
+  try {
+    const cores = await buscarPorIds<{
+      product_id: string;
+      codigo: string;
+      nome: string | null;
+      hex: string | null;
+      variadas: boolean;
+      ordem: number;
+    }>(productIds, (lote, de, ate) =>
+      supabase
+        .from('product_colors')
+        .select('product_id, codigo, nome, hex, variadas, ordem')
+        .in('product_id', lote)
+        .order('ordem')
+        .range(de, ate),
+    );
+    for (const c of cores) {
+      const arr = coresPorProduto.get(c.product_id) ?? [];
+      arr.push({ codigo: c.codigo, nome: c.nome, hex: c.hex, variadas: c.variadas });
+      coresPorProduto.set(c.product_id, arr);
+    }
+  } catch {
+    /* sem a 019 o catálogo continua funcionando, só sem bolinha de cor */
+  }
+
   const priceMap = new Map<string, number>();
   if (price_table_id) {
     // Uma linha por produto nesta tabela, então hoje cabe folgado — mas paginado
@@ -134,6 +165,7 @@ export async function getProducts(
     ...p,
     price: priceMap.get(p.id as string) ?? null,
     variants: variantsByProduct.get(p.id as string) ?? [],
+    colors: coresPorProduto.get(p.id as string) ?? [],
   })) as ProductWithPrice[];
 
   return onlyPriced ? withPrice.filter((p) => p.price != null) : withPrice;
