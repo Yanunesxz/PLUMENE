@@ -202,6 +202,79 @@ describe('trocar a tabela de um cliente', () => {
   });
 });
 
+// ─── A ficha do cliente ──────────────────────────────────────────────────────
+
+describe('ficha do cliente', () => {
+  const cadastro = {
+    id: 'c1',
+    name: 'WORKMARKER',
+    trade_name: 'Workmarker',
+    cnpj: '14526776629',
+    whatsapp: '32988546656',
+    email: null,
+    address: null,
+    credit_limit: 5000,
+    blocked: false,
+    block_reason: null,
+    price_table_id: 't2',
+  };
+
+  it('devolve cadastro, tabela e histórico do mais recente para o mais antigo', async () => {
+    const { obterCliente } = await carregarClientes({
+      customers: { data: cadastro, error: null },
+      orders: {
+        data: [
+          { id: 'o2', order_number: 14535, status: 'approved', total: 800, created_at: '2026-08-01' },
+          { id: 'o1', order_number: 14530, status: 'approved', total: 1200, created_at: '2026-07-02' },
+        ],
+        error: null,
+      },
+    });
+
+    const ficha = await obterCliente(EMPRESA, 'c1', { rep_id: REP });
+
+    expect(ficha!.price_table_id).toBe('t2');
+    expect(ficha!.pedidos.map((p) => p.id)).toEqual(['o2', 'o1']);
+  });
+
+  it('pedido sem total vira zero em vez de nulo na tela', async () => {
+    const { obterCliente } = await carregarClientes({
+      customers: { data: cadastro, error: null },
+      orders: {
+        data: [{ id: 'o1', order_number: null, status: 'draft', total: null, created_at: '2026-08-01' }],
+        error: null,
+      },
+    });
+
+    const ficha = await obterCliente(EMPRESA, 'c1', { rep_id: REP });
+
+    expect(ficha!.pedidos[0]!.total).toBe(0);
+  });
+
+  it('cliente de outra carteira não abre — e nem os pedidos dele são consultados', async () => {
+    const { obterCliente, fake } = await carregarClientes({
+      customers: { data: null, error: null },
+      orders: { data: [{ id: 'o1' }], error: null },
+    });
+
+    expect(await obterCliente(EMPRESA, 'c9', { rep_id: REP })).toBeNull();
+    expect(fake.filtrosDe('orders')).toHaveLength(0);
+  });
+
+  it('procura o cliente nas duas metades da carteira', async () => {
+    const { obterCliente, fake } = await carregarClientes({
+      customers: { data: cadastro, error: null },
+      orders: { data: [], error: null },
+    });
+
+    await obterCliente(EMPRESA, 'c1', { rep_id: REP, erp_rep_id: '04518' });
+
+    expect(fake.filtrosDe('customers', 'or')[0]!.args[0]).toBe(
+      'rep_id.eq.rep-1,rep_erp_id.eq.04518',
+    );
+  });
+});
+
 // ─── Cadastro com a tabela escolhida ─────────────────────────────────────────
 
 describe('cadastro de cliente', () => {

@@ -9,6 +9,7 @@ import { PaginaPedidos } from '../modules/pedidos/PaginaPedidos.js';
 import { PaginaNovoPedido } from '../modules/pedidos/PaginaNovoPedido.js';
 import { PaginaDetalhePedido } from '../modules/pedidos/PaginaDetalhePedido.js';
 import { PaginaClientes } from '../modules/clientes/PaginaClientes.js';
+import { PaginaCliente } from '../modules/clientes/PaginaCliente.js';
 import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
 import { PaginaConvite } from '../modules/publico/PaginaConvite.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
@@ -81,6 +82,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { path: 'orders/new', element: <PaginaNovoPedido /> },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },
           { path: 'customers', element: <PaginaClientes /> },
+          { path: 'customers/:id', element: <PaginaCliente /> },
           {
             path: 'acessos',
             element: <PrivateRoute roles={['rep', 'manager', 'admin']} />,

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Link2, Ban, Clock, Store, Eye } from 'lucide-react';
+import { Link2, Ban, Clock, Store, Eye, Tag } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -16,6 +16,7 @@ import { cn } from '../../lib/utils.js';
 import { SHOWCASE_DURATIONS } from '@csb/shared';
 import type {
   ApiResponse,
+  CustomerListItem,
   LinkCriado,
   ShowcaseDuration,
   ShowcaseLink,
@@ -58,6 +59,7 @@ export function PaginaAcessos() {
   const [aba, setAba] = useState<Aba>('convites');
   const [tabelaEscolhida, setTabelaEscolhida] = useState('');
   const [confirmando, setConfirmando] = useState<ShowcaseDuration | null>(null);
+  const [confirmandoConvite, setConfirmandoConvite] = useState(false);
   const [convites, setConvites] = useState<StoreInvite[] | null>(null);
   const [vitrines, setVitrines] = useState<ShowcaseLink[] | null>(null);
   const [clienteId, setClienteId] = useState('');
@@ -66,6 +68,21 @@ export function PaginaAcessos() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const clientes = useLiveQuery(() => db.customers.orderBy('name').toArray(), []);
+  const escolhido = clientes?.find((c) => c.id === clienteId);
+  const nomeDaLoja = escolhido?.trade_name?.trim() || escolhido?.name || 'Esta loja';
+
+  // O cache pode ser anterior ao dia em que `price_table_id` passou a vir na
+  // lista. Sem esta releitura, a faixa acima diria "sem tabela cadastrada" para
+  // cliente que tem — e a confirmação mentiria junto.
+  useEffect(() => {
+    if (!token) return;
+    api
+      .getLista<ApiResponse<CustomerListItem[]>>('/customers', token)
+      .then((res) => db.customers.bulkPut(res.data))
+      .catch(() => {
+        /* offline: vale o cache */
+      });
+  }, [token]);
 
   const recarregar = useCallback(async () => {
     if (!token) return;
@@ -80,6 +97,16 @@ export function PaginaAcessos() {
   useEffect(() => {
     void recarregar();
   }, [recarregar]);
+
+  /**
+   * A conta de loja herda a tabela do CADASTRO do cliente — a loja vai comprar
+   * por ela todo mês, sozinha, sem ninguém conferindo. Então o representante vê
+   * qual é antes de gerar, e confirma nomeando-a.
+   */
+  const pedirConvite = () => {
+    if (!clienteId) return;
+    setConfirmandoConvite(true);
+  };
 
   const gerarConvite = async () => {
     if (!token || !clienteId) return;
@@ -96,8 +123,10 @@ export function PaginaAcessos() {
         whatsapp: cliente?.whatsapp ?? undefined,
       });
       setClienteId('');
+      setConfirmandoConvite(false);
       await recarregar();
     } catch (e) {
+      setConfirmandoConvite(false);
       setToast({ message: e instanceof Error ? e.message : 'Não foi possível gerar o convite', type: 'error' });
     } finally {
       setOcupado(false);
@@ -217,11 +246,41 @@ export function PaginaAcessos() {
                   }))}
                 />
               </div>
-              <Button disabled={!clienteId || ocupado} onClick={() => void gerarConvite()}>
+              <Button disabled={!clienteId || ocupado} onClick={pedirConvite}>
                 <Link2 className="h-4 w-4" strokeWidth={2.5} />
                 Gerar convite
               </Button>
             </div>
+
+            {/* Qual tabela a conta vai herdar, antes de gerar. Sem isto o
+                representante criava a conta às cegas e só descobria o preço
+                errado quando a loja já tinha comprado por ele. */}
+            {escolhido && (
+              <div
+                className={cn(
+                  'mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs',
+                  escolhido.price_table_id
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-warn-soft text-warn-soft-foreground',
+                )}
+              >
+                <Tag className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                {escolhido.price_table_id ? (
+                  <span>
+                    Vai comprar na{' '}
+                    <strong className="font-semibold">
+                      {/* Tabela fora do conjunto de quem olha não tem o nome revelado. */}
+                      {nomeDe(escolhido.price_table_id) ?? 'outra tabela'}
+                    </strong>
+                  </span>
+                ) : (
+                  <span>
+                    <strong className="font-semibold">Sem tabela cadastrada</strong> — vai comprar
+                    pela sua tabela principal
+                  </span>
+                )}
+              </div>
+            )}
           </div>
 
           {convites === null ? (
@@ -326,6 +385,26 @@ export function PaginaAcessos() {
             </ul>
           )}
         </>
+      )}
+
+      {confirmandoConvite && escolhido && (
+        <ConfirmarTabela
+          titulo={
+            escolhido.price_table_id
+              ? `${nomeDaLoja} está cadastrada na ${nomeDe(escolhido.price_table_id) ?? 'outra tabela'}.`
+              : `${nomeDaLoja} está sem tabela cadastrada.`
+          }
+          detalhe={
+            escolhido.price_table_id
+              ? 'A conta dela vai comprar por essa tabela, sozinha, sem passar por você. Tem certeza?'
+              : 'A conta dela vai comprar pela sua tabela principal. Se esta loja deveria ter tabela própria, cadastre antes de criar a conta.'
+          }
+          tabela={nomeDe(escolhido.price_table_id) ?? ''}
+          {...(escolhido.price_table_id ? {} : { rotuloConfirmar: 'Criar assim mesmo' })}
+          ocupado={ocupado}
+          onConfirmar={() => void gerarConvite()}
+          onCancelar={() => setConfirmandoConvite(false)}
+        />
       )}
 
       {confirmando !== null && (

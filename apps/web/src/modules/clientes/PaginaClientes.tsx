@@ -1,7 +1,16 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, ChevronRight, Building2, MessageCircle, UserPlus, X, Tag } from 'lucide-react';
+import {
+  Search,
+  Users,
+  ChevronRight,
+  Building2,
+  MessageCircle,
+  UserPlus,
+  X,
+  ShoppingCart,
+} from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -14,7 +23,6 @@ import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
-import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
@@ -29,7 +37,6 @@ export function PaginaClientes() {
   const [form, setForm] = useState({ ...EMPTY_CUST });
   const [tabelaEscolhida, setTabelaEscolhida] = useState('');
   const [confirmando, setConfirmando] = useState(false);
-  const [trocando, setTrocando] = useState<CustomerListItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -60,9 +67,17 @@ export function PaginaClientes() {
       });
   }, [token]);
 
-  const handleSelect = (customer: { id: string; blocked: boolean }) => {
-    if (customer.blocked) return;
-    void navigate(`/orders/new?customer_id=${customer.id}`);
+  /**
+   * Abre a ficha, não um pedido em branco.
+   *
+   * Antes, tocar no cliente já começava a venda: o representante escolhia o
+   * primeiro produto sem ter visto por qual tabela aquela loja compra nem
+   * quando ela comprou pela última vez. Quem quer vender direto tem o botão de
+   * carrinho no próprio cartão. Cliente bloqueado também abre — é justamente
+   * onde se lê o motivo do bloqueio.
+   */
+  const handleSelect = (customer: { id: string }) => {
+    void navigate(`/customers/${customer.id}`);
   };
 
   /**
@@ -255,8 +270,7 @@ export function PaginaClientes() {
               <button
                 type="button"
                 onClick={() => handleSelect(customer)}
-                disabled={customer.blocked}
-                className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
               >
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary">
                   <Building2 className="h-5 w-5" strokeWidth={2} />
@@ -280,20 +294,17 @@ export function PaginaClientes() {
                 </div>
               </button>
 
-              {/* Só para quem tem mais de uma tabela: para os outros não há o
-                  que trocar, e o rótulo só contaria que existem outras. */}
-              {precisaEscolher && (
+              {/* Atalho para vender direto, sem passar pela ficha. A tabela e o
+                  botão de trocar vivem na ficha: aqui já são três alvos de
+                  toque, e um quarto no celular vira erro de dedo. */}
+              {!customer.blocked && (
                 <button
                   type="button"
-                  onClick={() => setTrocando(customer)}
-                  aria-label={`Trocar a tabela de preço de ${customer.name}`}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-warn hover:bg-warn-soft hover:text-warn-soft-foreground"
+                  onClick={() => void navigate(`/orders/new?customer_id=${customer.id}`)}
+                  aria-label={`Novo pedido para ${customer.name}`}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary-soft hover:text-primary"
                 >
-                  <Tag className="h-3.5 w-3.5" strokeWidth={2} />
-                  {customer.price_table_id
-                    ? // Tabela fora do conjunto dele não tem o nome revelado.
-                      (nomeDe(customer.price_table_id) ?? 'outra tabela')
-                    : 'sem tabela'}
+                  <ShoppingCart className="h-[18px] w-[18px]" strokeWidth={2} />
                 </button>
               )}
 
@@ -328,17 +339,6 @@ export function PaginaClientes() {
           ocupado={saving}
           onConfirmar={() => void cadastrar()}
           onCancelar={() => setConfirmando(false)}
-        />
-      )}
-
-      {trocando && (
-        <TrocarTabelaDoCliente
-          cliente={trocando}
-          tabelas={tabelas}
-          nomeDe={nomeDe}
-          onTrocado={(c) => setToast({ message: `${c.name} agora compra na ${nomeDe(c.price_table_id) ?? 'tabela escolhida'}.`, type: 'success' })}
-          onErro={(m) => setToast({ message: m, type: 'error' })}
-          onFechar={() => setTrocando(null)}
         />
       )}
 

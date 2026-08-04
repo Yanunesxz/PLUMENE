@@ -9,6 +9,12 @@ interface Props {
   detalhe: string;
   /** Vai no botão de confirmar — é a segunda vez que o nome aparece. */
   tabela: string;
+  /**
+   * Substitui o rótulo do botão. Só para o caso em que não há nome a repetir:
+   * cliente sem tabela cadastrada. Aí o botão assume o risco em palavras
+   * ("Criar assim mesmo") em vez de fingir que existe uma tabela.
+   */
+  rotuloConfirmar?: string;
   ocupado?: boolean;
   onConfirmar: () => void;
   onCancelar: () => void;
@@ -27,6 +33,7 @@ export function ConfirmarTabela({
   titulo,
   detalhe,
   tabela,
+  rotuloConfirmar,
   ocupado,
   onConfirmar,
   onCancelar,
@@ -61,7 +68,7 @@ export function ConfirmarTabela({
                 Salvando…
               </>
             ) : (
-              `Sim, ${tabela}`
+              (rotuloConfirmar ?? `Sim, ${tabela}`)
             )}
           </Button>
         </div>

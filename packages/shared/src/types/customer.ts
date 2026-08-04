@@ -1,3 +1,5 @@
+import type { OrderStatus } from '../constants/orderStatus.js';
+
 // ─── Tabela de preço ──────────────────────────────────────────────────────────
 export interface PriceTable {
   id: string;
@@ -90,4 +92,39 @@ export interface CreateCustomerRequest {
  */
 export interface UpdateCustomerTableRequest {
   price_table_id: string;
+}
+
+/** Um pedido na ficha do cliente. Sem contagem de peças de propósito: somar
+ *  peças exige cruzar `order_items` de todos os pedidos, e a ficha não mostra
+ *  isso — seriam duas consultas grandes para um número que ninguém lê aqui. */
+export interface PedidoDoCliente {
+  id: string;
+  order_number: number | null;
+  status: OrderStatus;
+  total: number;
+  created_at: string;
+}
+
+/**
+ * A ficha do cliente, como o representante a vê.
+ *
+ * Diferente de `MinhaAreaLoja` em uma coisa que importa: aqui a tabela de preço
+ * APARECE. Para a loja ela é escondida (saber que está na 03 é saber que
+ * existem 01 e 02); para quem vende, é o dado que decide o preço e precisa
+ * estar à vista antes de começar o pedido.
+ */
+export interface CustomerDetail {
+  id: string;
+  name: string;
+  trade_name: string | null;
+  cnpj: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  address: string | null;
+  credit_limit: number | null;
+  blocked: boolean;
+  block_reason: string | null;
+  price_table_id: string | null;
+  /** Do mais recente para o mais antigo. */
+  pedidos: PedidoDoCliente[];
 }

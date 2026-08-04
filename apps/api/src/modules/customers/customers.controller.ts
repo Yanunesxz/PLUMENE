@@ -1,5 +1,10 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { getCustomers, createCustomer, atualizarTabelaDoCliente } from './customers.service.js';
+import {
+  getCustomers,
+  createCustomer,
+  atualizarTabelaDoCliente,
+  obterCliente,
+} from './customers.service.js';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createCustomerSchema, trocarTabelaDoClienteSchema } from './customers.schema.js';
@@ -20,6 +25,33 @@ export async function listCustomers(request: FastifyRequest, reply: FastifyReply
     erp_rep_id,
   );
   await reply.send({ data: customers });
+}
+
+/**
+ * A ficha de um cliente: cadastro, tabela e histórico.
+ *
+ * 404 tanto para cliente inexistente quanto para cliente de outra carteira —
+ * distinguir os dois contaria ao representante que a loja existe e é de outro.
+ */
+export async function getCustomerHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
+  const { id } = request.params as { id: string };
+
+  const cliente = await obterCliente(company_id, id, {
+    rep_id,
+    erp_rep_id: erp_rep_id ?? null,
+    irrestrito: role === 'manager' || role === 'admin',
+  });
+
+  if (!cliente) {
+    await reply.status(404).send({
+      error: 'Cliente não encontrado na sua carteira',
+      code: 'NOT_FOUND',
+      statusCode: 404,
+    });
+    return;
+  }
+  await reply.send({ data: cliente });
 }
 
 /**
