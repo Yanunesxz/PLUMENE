@@ -37,11 +37,10 @@ export function observacaoDeCores(linhas: LinhaComCor[]): string {
     else somado.set(k, { linha: l, total: qtd(l) });
   }
 
+  // Só o nome, sem o número da bolinha: o Yan pediu que o número não apareça
+  // em lugar nenhum, nem aqui.
   return [...somado.values()]
-    .map(({ linha: l, total }) => {
-      const nome = l.color_name && l.color_name !== l.color_code ? ` ${l.color_name}` : '';
-      return `${l.sku} ${total}${l.size} ${l.color_code}${nome}`;
-    })
+    .map(({ linha: l, total }) => `${l.sku} ${total}${l.size} ${l.color_name ?? ''}`.trimEnd())
     .join('\n');
 }
 

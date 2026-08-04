@@ -7,12 +7,20 @@ import { observacaoDeCores, juntarObservacao } from '../apps/web/src/lib/observa
  * fábrica separa. Formato errado aqui = peça errada despachada.
  */
 describe('observação com as cores escolhidas', () => {
-  it('escreve uma linha por cor, no formato que a fábrica lê', () => {
+  it('escreve uma linha por cor, com o NOME e sem o número da bolinha', () => {
     const obs = observacaoDeCores([
       { sku: '0015', size: 'M', quantidade: 3, color_code: '02', color_name: 'azul' },
       { sku: '0015', size: 'M', quantidade: 3, color_code: '01', color_name: 'rosa' },
     ]);
-    expect(obs).toBe('0015 3M 02 azul\n0015 3M 01 rosa');
+    expect(obs).toBe('0015 3M azul\n0015 3M rosa');
+  });
+
+  it('não vaza o número da bolinha em lugar nenhum do texto', () => {
+    const obs = observacaoDeCores([
+      { sku: '0171', size: 'M', quantidade: 1, color_code: '03', color_name: 'marrom' },
+    ]);
+    expect(obs).toBe('0171 1M marrom');
+    expect(obs).not.toContain('03');
   });
 
   it('soma a mesma peça/tamanho/cor marcada duas vezes', () => {
@@ -22,7 +30,7 @@ describe('observação com as cores escolhidas', () => {
       { sku: '0015', size: 'M', quantidade: 3, color_code: '02', color_name: 'azul' },
       { sku: '0015', size: 'M', quantidade: 2, color_code: '02', color_name: 'azul' },
     ]);
-    expect(obs).toBe('0015 5M 02 azul');
+    expect(obs).toBe('0015 5M azul');
   });
 
   it('ignora peça sem cor cadastrada — a linha não informaria nada', () => {
@@ -30,27 +38,20 @@ describe('observação com as cores escolhidas', () => {
       { sku: '0090', size: 'G', quantidade: 4, color_code: null, color_name: null },
       { sku: '0015', size: 'P', quantidade: 1, color_code: '01', color_name: 'rosa' },
     ]);
-    expect(obs).toBe('0015 1P 01 rosa');
+    expect(obs).toBe('0015 1P rosa');
   });
 
   it('mantém "Variadas" como nome, nunca "sortidas"', () => {
     const obs = observacaoDeCores([
       { sku: '0171', size: 'GG', quantidade: 2, color_code: '04', color_name: 'Variadas' },
     ]);
-    expect(obs).toBe('0171 2GG 04 Variadas');
+    expect(obs).toBe('0171 2GG Variadas');
     expect(obs.toLowerCase()).not.toContain('sortid');
   });
 
-  it('não repete o código quando o nome é o próprio código', () => {
-    const obs = observacaoDeCores([
-      { sku: '0015', size: 'M', quantidade: 1, color_code: '02', color_name: '02' },
-    ]);
-    expect(obs).toBe('0015 1M 02');
-  });
-
   it('preserva o que a pessoa digitou e acrescenta as cores embaixo', () => {
-    expect(juntarObservacao('entregar até sexta', '0015 3M 02 azul')).toBe(
-      'entregar até sexta\n\n0015 3M 02 azul',
+    expect(juntarObservacao('entregar até sexta', '0015 3M azul')).toBe(
+      'entregar até sexta\n\n0015 3M azul',
     );
   });
 

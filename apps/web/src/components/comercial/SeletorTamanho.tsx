@@ -148,7 +148,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                       aria-label={`Cor ${c.nome ?? c.codigo}`}
                       aria-pressed={selecionada}
                       className={cn(
-                        'relative flex h-11 w-11 flex-col items-center justify-center rounded-full border text-[10px] font-semibold transition',
+                        'relative flex h-11 w-11 items-center justify-center rounded-full border transition',
                         selecionada
                           ? 'border-foreground ring-2 ring-foreground/25'
                           : 'border-border hover:border-foreground/50',
@@ -159,8 +159,9 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                           : { backgroundColor: c.hex ?? FALLBACK_HEX }
                       }
                     >
-                      {/* O número é o que a fábrica confere na separação. */}
-                      <span className="rounded bg-card/85 px-1 text-foreground">{c.codigo}</span>
+                      {selecionada && (
+                        <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
+                      )}
                       {marcadas > 0 && (
                         <span className="tnum absolute -right-1 -top-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-bold text-background">
                           {marcadas}
@@ -216,8 +217,8 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
           </div>
 
           <p className="mb-2.5 text-xs font-medium text-muted-foreground">
-            {corSelecionada
-              ? `Quantidade por tamanho — ${corSelecionada.nome ?? corSelecionada.codigo}`
+            {corSelecionada?.nome
+              ? `Quantidade por tamanho — ${corSelecionada.nome}`
               : 'Quantidade por tamanho'}
           </p>
           {variants.length === 0 ? (
@@ -297,7 +298,7 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
             <p className="mb-3 text-xs leading-relaxed text-muted-foreground">
               {coresCatalogo
                 .filter((c) => qtdDaCor(c.codigo) > 0)
-                .map((c) => `${qtdDaCor(c.codigo)} ${c.nome ?? c.codigo}`)
+                .map((c) => `${qtdDaCor(c.codigo)} ${c.nome ?? 'sem nome'}`)
                 .join(' · ')}
             </p>
           )}
