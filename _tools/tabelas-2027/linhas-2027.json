@@ -1,0 +1,1988 @@
+[
+ {
+  "sku": "0015",
+  "nome": "Camisola De Alça",
+  "tamanho": "PP AO GG",
+  "preco": 21.9
+ },
+ {
+  "sku": "0015",
+  "nome": "Camisola De Alça",
+  "tamanho": "EG",
+  "preco": 23.9
+ },
+ {
+  "sku": "0070",
+  "nome": "Short Doll Com Renda Liganete",
+  "tamanho": "P AO GG",
+  "preco": 38.9
+ },
+ {
+  "sku": "0070",
+  "nome": "Short Doll Com Renda Liganete",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0072",
+  "nome": "Camisola Com Renda Liganete",
+  "tamanho": "P AO GG",
+  "preco": 36.9
+ },
+ {
+  "sku": "0072",
+  "nome": "Camisola Com Renda Liganete",
+  "tamanho": "EG",
+  "preco": 40.9
+ },
+ {
+  "sku": "0080",
+  "nome": "Short Doll Com Renda Liganete",
+  "tamanho": "P AO GG",
+  "preco": 38.9
+ },
+ {
+  "sku": "0080",
+  "nome": "Short Doll Com Renda Liganete",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0083",
+  "nome": "Camisola Aberta Regata Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 36.5
+ },
+ {
+  "sku": "0083",
+  "nome": "Camisola Aberta Regata Liganete",
+  "tamanho": "EG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0085",
+  "nome": "Pijama Regata Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0085",
+  "nome": "Pijama Regata Liganete",
+  "tamanho": "EG",
+  "preco": 36.5
+ },
+ {
+  "sku": "0086",
+  "nome": "Pijama Manga Curta Com Calça Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0086",
+  "nome": "Pijama Manga Curta Com Calça Liganete",
+  "tamanho": "EG",
+  "preco": 48.9
+ },
+ {
+  "sku": "0087",
+  "nome": "Camisola Aberta Manga Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0087",
+  "nome": "Camisola Aberta Manga Liganete",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0088",
+  "nome": "Pijama Aberto Liganete",
+  "tamanho": "P AO GG",
+  "preco": 40.5
+ },
+ {
+  "sku": "0088",
+  "nome": "Pijama Aberto Liganete",
+  "tamanho": "EG",
+  "preco": 44.5
+ },
+ {
+  "sku": "0090",
+  "nome": "Camisola Gestante Liganete",
+  "tamanho": "P AO GG",
+  "preco": 34.9
+ },
+ {
+  "sku": "0090",
+  "nome": "Camisola Gestante Liganete",
+  "tamanho": "EG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0091",
+  "nome": "Camisola Alça Liganete Estampada",
+  "tamanho": "P AO GG",
+  "preco": 37.5
+ },
+ {
+  "sku": "0091",
+  "nome": "Camisola Alça Liganete Estampada",
+  "tamanho": "EG",
+  "preco": 40.9
+ },
+ {
+  "sku": "0092",
+  "nome": "Camisola Gestante De Liganete",
+  "tamanho": "P AO GG",
+  "preco": 34.9
+ },
+ {
+  "sku": "0092",
+  "nome": "Camisola Gestante De Liganete",
+  "tamanho": "EG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0093",
+  "nome": "Camisola Alça Liganete Lisa",
+  "tamanho": "P AO GG",
+  "preco": 38.9
+ },
+ {
+  "sku": "0093",
+  "nome": "Camisola Alça Liganete Lisa",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0094",
+  "nome": "Camisola De Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 34.9
+ },
+ {
+  "sku": "0094",
+  "nome": "Camisola De Liganete",
+  "tamanho": "EG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0095",
+  "nome": "Camisola Gestante Alça Liganete",
+  "tamanho": "P AO GG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0095",
+  "nome": "Camisola Gestante Alça Liganete",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0096",
+  "nome": "Camisola Gestante Lisa Liganete",
+  "tamanho": "P AO GG",
+  "preco": 46.9
+ },
+ {
+  "sku": "0096",
+  "nome": "Camisola Gestante Lisa Liganete",
+  "tamanho": "EG",
+  "preco": 51.5
+ },
+ {
+  "sku": "0102",
+  "nome": "Pijama Mescla Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 27.9
+ },
+ {
+  "sku": "0103",
+  "nome": "Pijama De Malha Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 25.5
+ },
+ {
+  "sku": "0104",
+  "nome": "Pijama Regata Mescla Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 25.5
+ },
+ {
+  "sku": "0107",
+  "nome": "Pijama Familia Feminino",
+  "tamanho": "P AO GG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0107",
+  "nome": "Pijama Familia Feminino",
+  "tamanho": "EG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0109",
+  "nome": "Short Doll Regata Bolinha",
+  "tamanho": "PP AO GG",
+  "preco": 30.9
+ },
+ {
+  "sku": "0109",
+  "nome": "Short Doll Regata Bolinha",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0110",
+  "nome": "Short Doll Regata Malha",
+  "tamanho": "PP AO GG",
+  "preco": 26.9
+ },
+ {
+  "sku": "0110",
+  "nome": "Short Doll Regata Malha",
+  "tamanho": "EG",
+  "preco": 29.5
+ },
+ {
+  "sku": "0111",
+  "nome": "Camisola Regata Malha",
+  "tamanho": "PP AO GG",
+  "preco": 22.9
+ },
+ {
+  "sku": "0111",
+  "nome": "Camisola Regata Malha",
+  "tamanho": "EG",
+  "preco": 24.9
+ },
+ {
+  "sku": "0114",
+  "nome": "Pijama Familia Infantil Fem.",
+  "tamanho": "2-4-6-8",
+  "preco": 26.9
+ },
+ {
+  "sku": "0115",
+  "nome": "Short Doll Alça Malha",
+  "tamanho": "P AO GG",
+  "preco": 24.9
+ },
+ {
+  "sku": "0115",
+  "nome": "Short Doll Alça Malha",
+  "tamanho": "EG",
+  "preco": 27.9
+ },
+ {
+  "sku": "0116",
+  "nome": "Short Doll Alça Malha Bolinha",
+  "tamanho": "P AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0116",
+  "nome": "Short Doll Alça Malha Bolinha",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0122",
+  "nome": "Pijama De Manga Malha",
+  "tamanho": "PP AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0122",
+  "nome": "Pijama De Manga Malha",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0123",
+  "nome": "Pijama Aberto De Manga Bordado",
+  "tamanho": "P AO GG",
+  "preco": 38.9
+ },
+ {
+  "sku": "0123",
+  "nome": "Pijama Aberto De Manga Bordado",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0124",
+  "nome": "Short Doll De Manga Infantil Fem .",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 19.9
+ },
+ {
+  "sku": "0125",
+  "nome": "Camisola Bordada De Manga",
+  "tamanho": "P AO GG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0125",
+  "nome": "Camisola Bordada De Manga",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0126",
+  "nome": "Camisola Bordada Aberta",
+  "tamanho": "P AO GG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0126",
+  "nome": "Camisola Bordada Aberta",
+  "tamanho": "EG",
+  "preco": 41.9
+ },
+ {
+  "sku": "0128",
+  "nome": "Pijama Aberto De Manga Estampado",
+  "tamanho": "P AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0128",
+  "nome": "Pijama Aberto De Manga Estampado",
+  "tamanho": "EG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0129",
+  "nome": "Pijama Bordado Regata Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0129",
+  "nome": "Pijama Bordado Regata Masc.",
+  "tamanho": "EG",
+  "preco": 44.9
+ },
+ {
+  "sku": "0130",
+  "nome": "Pijama Bordado Manga Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0130",
+  "nome": "Pijama Bordado Manga Masc.",
+  "tamanho": "48-50-52-54",
+  "preco": 53.9
+ },
+ {
+  "sku": "0131",
+  "nome": "Short De Malha Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 14.9
+ },
+ {
+  "sku": "0131",
+  "nome": "Short De Malha Masculino",
+  "tamanho": "EG",
+  "preco": 16.5
+ },
+ {
+  "sku": "0135",
+  "nome": "Short De Malha Estampado Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 14.9
+ },
+ {
+  "sku": "0135",
+  "nome": "Short De Malha Estampado Masculino",
+  "tamanho": "EG",
+  "preco": 16.9
+ },
+ {
+  "sku": "0139",
+  "nome": "Pijama Regata Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 22.9
+ },
+ {
+  "sku": "0140",
+  "nome": "Pijama Longo Malha Feminino",
+  "tamanho": "PP AO GG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0140",
+  "nome": "Pijama Longo Malha Feminino",
+  "tamanho": "EG",
+  "preco": 46.9
+ },
+ {
+  "sku": "0141",
+  "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 34.9
+ },
+ {
+  "sku": "0142",
+  "nome": "Pijama Longo Malha Infantil Fem.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 28.5
+ },
+ {
+  "sku": "0143",
+  "nome": "Pijama Longo Malha Infantil Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 28.5
+ },
+ {
+  "sku": "0145",
+  "nome": "Pijama Longo Malha Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 49.5
+ },
+ {
+  "sku": "0145",
+  "nome": "Pijama Longo Malha Masculino",
+  "tamanho": "EG",
+  "preco": 52.9
+ },
+ {
+  "sku": "0159",
+  "nome": "Pijama Longo Moletinho Estampado",
+  "tamanho": "PP AO GG",
+  "preco": 72.5
+ },
+ {
+  "sku": "0159",
+  "nome": "Pijama Longo Moletinho Estampado",
+  "tamanho": "EG",
+  "preco": 78.9
+ },
+ {
+  "sku": "0160",
+  "nome": "Pijama Longo Moletinho Flanelado Fem.",
+  "tamanho": "PP AO GG",
+  "preco": 68.9
+ },
+ {
+  "sku": "0160",
+  "nome": "Pijama Longo Moletinho Flanelado Fem.",
+  "tamanho": "EG",
+  "preco": 74.5
+ },
+ {
+  "sku": "0161",
+  "nome": "Pijama Longo Moletinho Aberto Fem.",
+  "tamanho": "PP AO GG",
+  "preco": 75.9
+ },
+ {
+  "sku": "0161",
+  "nome": "Pijama Longo Moletinho Aberto Fem.",
+  "tamanho": "EG",
+  "preco": 83.5
+ },
+ {
+  "sku": "0162",
+  "nome": "Pijama Longo Moletinho Infantil Fem.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 45.9
+ },
+ {
+  "sku": "0163",
+  "nome": "Pijama Longo Moletinho Infantil Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 45.9
+ },
+ {
+  "sku": "0169",
+  "nome": "Pijama Longo Moletinho Fem.",
+  "tamanho": "PP AO GG",
+  "preco": 76.9
+ },
+ {
+  "sku": "0169",
+  "nome": "Pijama Longo Moletinho Fem.",
+  "tamanho": "EG",
+  "preco": 84.5
+ },
+ {
+  "sku": "0171",
+  "nome": "Pijama Longo Moletinho Masc.",
+  "tamanho": "P AO GG",
+  "preco": 79.9
+ },
+ {
+  "sku": "0171",
+  "nome": "Pijama Longo Moletinho Masc.",
+  "tamanho": "EG",
+  "preco": 87.9
+ },
+ {
+  "sku": "0172",
+  "nome": "Pijama Longo Moletinho Aberto Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 86.9
+ },
+ {
+  "sku": "0172",
+  "nome": "Pijama Longo Moletinho Aberto Masc.",
+  "tamanho": "EG",
+  "preco": 92.5
+ },
+ {
+  "sku": "0179",
+  "nome": "Pijama Longo Infantil Plush Fem.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 49.9
+ },
+ {
+  "sku": "0199",
+  "nome": "Pijama Longo Plush Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 73.5
+ },
+ {
+  "sku": "0199",
+  "nome": "Pijama Longo Plush Liso Fem.",
+  "tamanho": "EG",
+  "preco": 79.5
+ },
+ {
+  "sku": "0200",
+  "nome": "Pijama Longo Plush Masculino",
+  "tamanho": "P AO GG",
+  "preco": 86.9
+ },
+ {
+  "sku": "0200",
+  "nome": "Pijama Longo Plush Masculino",
+  "tamanho": "EG",
+  "preco": 95.5
+ },
+ {
+  "sku": "0201",
+  "nome": "Pijama Longo Infantil Plush Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 49.9
+ },
+ {
+  "sku": "0202",
+  "nome": "Pijama Longo Juvenil Plush Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 63.9
+ },
+ {
+  "sku": "0203",
+  "nome": "Pijama Estampado Manga Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 20.9
+ },
+ {
+  "sku": "0204",
+  "nome": "Pijama Longo Juvenil Plush Fem.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 63.9
+ },
+ {
+  "sku": "0216",
+  "nome": "Short Doll Alça Malha Onça",
+  "tamanho": "P AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0216",
+  "nome": "Short Doll Alça Malha Onça",
+  "tamanho": "EG",
+  "preco": 31.9
+ },
+ {
+  "sku": "0220",
+  "nome": "Pijama Longo Canelado Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0220",
+  "nome": "Pijama Longo Canelado Liso Fem.",
+  "tamanho": "EG",
+  "preco": 59.9
+ },
+ {
+  "sku": "0221",
+  "nome": "Pijama Longo Canelado Estampado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0221",
+  "nome": "Pijama Longo Canelado Estampado Fem.",
+  "tamanho": "EG",
+  "preco": 59.9
+ },
+ {
+  "sku": "0222",
+  "nome": "Pijama De Calça Canelado Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "0222",
+  "nome": "Pijama De Calça Canelado Liso Fem.",
+  "tamanho": "EG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0223",
+  "nome": "Pijama De Calça Canelado Estampado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "0223",
+  "nome": "Pijama De Calça Canelado Estampado Fem.",
+  "tamanho": "EG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0239",
+  "nome": "Pijama Estampado Regata Infantil Masc.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 19.9
+ },
+ {
+  "sku": "0240",
+  "nome": "Pijama Longo Estampado Aberto Fem.",
+  "tamanho": "PP AO GG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0240",
+  "nome": "Pijama Longo Estampado Aberto Fem.",
+  "tamanho": "EG",
+  "preco": 53.5
+ },
+ {
+  "sku": "0242",
+  "nome": "Pijama Longo Estampado Infantil Fem.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 31.9
+ },
+ {
+  "sku": "0245",
+  "nome": "Pijama Longo Estampado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0245",
+  "nome": "Pijama Longo Estampado Fem.",
+  "tamanho": "EG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0250",
+  "nome": "Pijama Longo De Onça Fem.",
+  "tamanho": "P AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0260",
+  "nome": "Pijama Longo Suede Felpado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0260",
+  "nome": "Pijama Longo Suede Felpado Fem.",
+  "tamanho": "EG",
+  "preco": 52.9
+ },
+ {
+  "sku": "0262",
+  "nome": "Pijama Longo Moletinho Estampado Inf. Fem.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 48.9
+ },
+ {
+  "sku": "0263",
+  "nome": "Pijama Longo Moletinho Estampado Inf. Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 48.9
+ },
+ {
+  "sku": "0300",
+  "nome": "Robe De Seda",
+  "tamanho": "P AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0301",
+  "nome": "Robe De Liganete",
+  "tamanho": "P AO GG",
+  "preco": 44.9
+ },
+ {
+  "sku": "0301",
+  "nome": "Robe De Liganete",
+  "tamanho": "EG",
+  "preco": 48.9
+ },
+ {
+  "sku": "0303",
+  "nome": "Pijama Longo Estampado Infantil Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 31.9
+ },
+ {
+  "sku": "0304",
+  "nome": "Pijama Família Masculino",
+  "tamanho": "P AO GG",
+  "preco": 40.9
+ },
+ {
+  "sku": "0304",
+  "nome": "Pijama Família Masculino",
+  "tamanho": "EG",
+  "preco": 44.9
+ },
+ {
+  "sku": "0305",
+  "nome": "Pijama Família Juvenil Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 29.9
+ },
+ {
+  "sku": "0306",
+  "nome": "Pijama Família Infantil Masc.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 24.9
+ },
+ {
+  "sku": "0307",
+  "nome": "Pijama Família Feminino",
+  "tamanho": "P AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0307",
+  "nome": "Pijama Família Feminino",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0308",
+  "nome": "Pijama Família Juvenil Fem.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 29.9
+ },
+ {
+  "sku": "0309",
+  "nome": "Pijama Família Infantil Fem.",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 24.9
+ },
+ {
+  "sku": "0310",
+  "nome": "Pijama Regata Malha",
+  "tamanho": "P AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0310",
+  "nome": "Pijama Regata Malha",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0316",
+  "nome": "Short Doll Nadador De Onça",
+  "tamanho": "PP AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0316",
+  "nome": "Short Doll Nadador De Onça",
+  "tamanho": "EG",
+  "preco": 31.9
+ },
+ {
+  "sku": "0321",
+  "nome": "Pijama De Bermuda Gestante",
+  "tamanho": "P AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0321",
+  "nome": "Pijama De Bermuda Gestante",
+  "tamanho": "EG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0325",
+  "nome": "Camisola De Gestante Listrado",
+  "tamanho": "P AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0325",
+  "nome": "Camisola De Gestante Listrado",
+  "tamanho": "EG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0327",
+  "nome": "Camisola Gestante Estampada",
+  "tamanho": "P AO GG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0327",
+  "nome": "Camisola Gestante Estampada",
+  "tamanho": "EG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0328",
+  "nome": "Camisola Gestante Alça Malha",
+  "tamanho": "P AO GG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0328",
+  "nome": "Camisola Gestante Alça Malha",
+  "tamanho": "EG",
+  "preco": 45.9
+ },
+ {
+  "sku": "0329",
+  "nome": "Pijama Estampado Regata Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0329",
+  "nome": "Pijama Estampado Regata Masc.",
+  "tamanho": "EG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0330",
+  "nome": "Pijama Estampado Manga Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0330",
+  "nome": "Pijama Estampado Manga Masc.",
+  "tamanho": "EG",
+  "preco": 52.9
+ },
+ {
+  "sku": "0350",
+  "nome": "Camisola Bordada Aberta",
+  "tamanho": "P AO GG",
+  "preco": 40.5
+ },
+ {
+  "sku": "0350",
+  "nome": "Camisola Bordada Aberta",
+  "tamanho": "EG",
+  "preco": 44.9
+ },
+ {
+  "sku": "0352",
+  "nome": "Camisola Bordada",
+  "tamanho": "P AO GG",
+  "preco": 42.9
+ },
+ {
+  "sku": "0354",
+  "nome": "Short Doll Alça Canelado",
+  "tamanho": "P AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0354",
+  "nome": "Short Doll Alça Canelado",
+  "tamanho": "EG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0355",
+  "nome": "Short Doll Regata Canelado",
+  "tamanho": "P AO GG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0355",
+  "nome": "Short Doll Regata Canelado",
+  "tamanho": "EG",
+  "preco": 41.9
+ },
+ {
+  "sku": "0358",
+  "nome": "Short Doll Alça Jovem",
+  "tamanho": "P AO GG",
+  "preco": 33.9
+ },
+ {
+  "sku": "0358",
+  "nome": "Short Doll Alça Jovem",
+  "tamanho": "EG",
+  "preco": 36.9
+ },
+ {
+  "sku": "0359",
+  "nome": "Short Doll Regata Composé",
+  "tamanho": "P AO GG",
+  "preco": 33.9
+ },
+ {
+  "sku": "0359",
+  "nome": "Short Doll Regata Composé",
+  "tamanho": "EG",
+  "preco": 36.9
+ },
+ {
+  "sku": "0380",
+  "nome": "Camisola Nadador",
+  "tamanho": "PP AO GG",
+  "preco": 26.9
+ },
+ {
+  "sku": "0380",
+  "nome": "Camisola Nadador",
+  "tamanho": "EG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0390",
+  "nome": "Short Doll Nadador",
+  "tamanho": "PP AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0390",
+  "nome": "Short Doll Nadador",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0402",
+  "nome": "Pijama Familia Manga Masc.",
+  "tamanho": "P AO GG",
+  "preco": 44.9
+ },
+ {
+  "sku": "0402",
+  "nome": "Pijama Familia Manga Masc.",
+  "tamanho": "EG",
+  "preco": 47.9
+ },
+ {
+  "sku": "0403",
+  "nome": "Pijama Familia Regata Masc.",
+  "tamanho": "P AO GG",
+  "preco": 40.9
+ },
+ {
+  "sku": "0404",
+  "nome": "Pijama Familia Juvenil Masc.",
+  "tamanho": "10-12-14-16",
+  "preco": 32.9
+ },
+ {
+  "sku": "0407",
+  "nome": "Pijama Familia Infantil Masc.",
+  "tamanho": "2-4-6-8",
+  "preco": 26.9
+ },
+ {
+  "sku": "0429",
+  "nome": "Pijama Mescla Regata Masc.",
+  "tamanho": "PP AO GG",
+  "preco": 47.9
+ },
+ {
+  "sku": "0429",
+  "nome": "Pijama Mescla Regata Masc.",
+  "tamanho": "EG",
+  "preco": 52.5
+ },
+ {
+  "sku": "0430",
+  "nome": "Pijama Mescla Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "0430",
+  "nome": "Pijama Mescla Masculino",
+  "tamanho": "EG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0499",
+  "nome": "Pijama Bermuda Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 37.5
+ },
+ {
+  "sku": "0499",
+  "nome": "Pijama Bermuda Liganete",
+  "tamanho": "EG",
+  "preco": 40.5
+ },
+ {
+  "sku": "0500",
+  "nome": "Camisola Alça Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 23.9
+ },
+ {
+  "sku": "0500",
+  "nome": "Camisola Alça Liganete",
+  "tamanho": "EG",
+  "preco": 26.5
+ },
+ {
+  "sku": "0501",
+  "nome": "Pijama Regata Estampada Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 31.9
+ },
+ {
+  "sku": "0501",
+  "nome": "Pijama Regata Estampada Liganete",
+  "tamanho": "EG",
+  "preco": 33.9
+ },
+ {
+  "sku": "0502",
+  "nome": "Short Doll Alça Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 27.5
+ },
+ {
+  "sku": "0502",
+  "nome": "Short Doll Alça Liganete",
+  "tamanho": "EG",
+  "preco": 29.5
+ },
+ {
+  "sku": "0550",
+  "nome": "Short Liganete Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 15.9
+ },
+ {
+  "sku": "0550",
+  "nome": "Short Liganete Masculino",
+  "tamanho": "EG",
+  "preco": 17.9
+ },
+ {
+  "sku": "0570",
+  "nome": "Pijama Liganete Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0570",
+  "nome": "Pijama Liganete Masculino",
+  "tamanho": "EG",
+  "preco": 47.9
+ },
+ {
+  "sku": "0582",
+  "nome": "Pijama Regata Renda",
+  "tamanho": "P AO GG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0582",
+  "nome": "Pijama Regata Renda",
+  "tamanho": "EG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0590",
+  "nome": "Pijama Regata Pescador",
+  "tamanho": "PP AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0590",
+  "nome": "Pijama Regata Pescador",
+  "tamanho": "EG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0595",
+  "nome": "Jogo De Robe Bordado",
+  "tamanho": "P AO GG",
+  "preco": 69.9
+ },
+ {
+  "sku": "0595",
+  "nome": "Jogo De Robe Bordado",
+  "tamanho": "EG",
+  "preco": 75.9
+ },
+ {
+  "sku": "0601",
+  "nome": "Short Doll Regata Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 29.5
+ },
+ {
+  "sku": "0601",
+  "nome": "Short Doll Regata Liganete",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0605",
+  "nome": "Camisola Regata Liganete",
+  "tamanho": "PP AO GG",
+  "preco": 26.5
+ },
+ {
+  "sku": "0605",
+  "nome": "Camisola Regata Liganete",
+  "tamanho": "EG",
+  "preco": 28.5
+ },
+ {
+  "sku": "0640",
+  "nome": "Camisola Gestante",
+  "tamanho": "P AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0640",
+  "nome": "Camisola Gestante",
+  "tamanho": "EG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0650",
+  "nome": "Camisola Estampada Manga",
+  "tamanho": "P AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0650",
+  "nome": "Camisola Estampada Manga",
+  "tamanho": "EG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0690",
+  "nome": "Pijama Manga Pescador",
+  "tamanho": "PP AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0690",
+  "nome": "Pijama Manga Pescador",
+  "tamanho": "EG",
+  "preco": 41.9
+ },
+ {
+  "sku": "0702",
+  "nome": "Camisola Alça",
+  "tamanho": "P AO GG",
+  "preco": 26.9
+ },
+ {
+  "sku": "0702",
+  "nome": "Camisola Alça",
+  "tamanho": "EG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0703",
+  "nome": "Camisola Regata",
+  "tamanho": "P AO GG",
+  "preco": 28.5
+ },
+ {
+  "sku": "0703",
+  "nome": "Camisola Regata",
+  "tamanho": "48-50-52-54",
+  "preco": 38.9
+ },
+ {
+  "sku": "0704",
+  "nome": "Short Doll De Alça",
+  "tamanho": "P AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0704",
+  "nome": "Short Doll De Alça",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0705",
+  "nome": "Short Doll Regata",
+  "tamanho": "P AO GG",
+  "preco": 34.9
+ },
+ {
+  "sku": "0705",
+  "nome": "Short Doll Regata",
+  "tamanho": "48-50-52-54",
+  "preco": 44.9
+ },
+ {
+  "sku": "0706",
+  "nome": "Pijama De Manga Feminino",
+  "tamanho": "P AO GG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0706",
+  "nome": "Pijama De Manga Feminino",
+  "tamanho": "48-50-52-54",
+  "preco": 47.9
+ },
+ {
+  "sku": "0707",
+  "nome": "Pijama Regata Infantil Feminino",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 27.5
+ },
+ {
+  "sku": "0710",
+  "nome": "Camisola Alça Estampada",
+  "tamanho": "PP AO GG",
+  "preco": 27.5
+ },
+ {
+  "sku": "0710",
+  "nome": "Camisola Alça Estampada",
+  "tamanho": "EG",
+  "preco": 29.5
+ },
+ {
+  "sku": "0714",
+  "nome": "Pijama Cropped",
+  "tamanho": "P AO GG",
+  "preco": 40.5
+ },
+ {
+  "sku": "0714",
+  "nome": "Pijama Cropped",
+  "tamanho": "EG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0715",
+  "nome": "Camisão Estampado",
+  "tamanho": "P AO GG",
+  "preco": 37.9
+ },
+ {
+  "sku": "0715",
+  "nome": "Camisão Estampado",
+  "tamanho": "EG",
+  "preco": 41.9
+ },
+ {
+  "sku": "0716",
+  "nome": "Pijama De Liganete Masc.",
+  "tamanho": "P AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "0716",
+  "nome": "Pijama De Liganete Masc.",
+  "tamanho": "EG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0719",
+  "nome": "Pijama Aberto Estampado Manga",
+  "tamanho": "P AO GG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0719",
+  "nome": "Pijama Aberto Estampado Manga",
+  "tamanho": "EG",
+  "preco": 41.5
+ },
+ {
+  "sku": "0720",
+  "nome": "Short Doll Alça Estampado",
+  "tamanho": "PP AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0720",
+  "nome": "Short Doll Alça Estampado",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0730",
+  "nome": "Short Doll Nadador Estampado",
+  "tamanho": "PP AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0730",
+  "nome": "Short Doll Nadador Estampado",
+  "tamanho": "EG",
+  "preco": 38.5
+ },
+ {
+  "sku": "0750",
+  "nome": "Short Doll Alça Mescla",
+  "tamanho": "PP AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0750",
+  "nome": "Short Doll Alça Mescla",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0760",
+  "nome": "Short Doll Nadador Mescla",
+  "tamanho": "PP AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0760",
+  "nome": "Short Doll Nadador Mescla",
+  "tamanho": "EG",
+  "preco": 39.5
+ },
+ {
+  "sku": "0770",
+  "nome": "Camisola Nadador Mescla",
+  "tamanho": "P AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0770",
+  "nome": "Camisola Nadador Mescla",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0800",
+  "nome": "Short Doll Nadador Mescla",
+  "tamanho": "P AO GG",
+  "preco": 36.9
+ },
+ {
+  "sku": "0800",
+  "nome": "Short Doll Nadador Mescla",
+  "tamanho": "EG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0810",
+  "nome": "Short Doll Regata Mescla Infantil Fem.",
+  "tamanho": "1-2-4-6-8 anos",
+  "preco": 16.9
+ },
+ {
+  "sku": "0815",
+  "nome": "Pijama Juvenil Alça Fem.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 32.9
+ },
+ {
+  "sku": "0816",
+  "nome": "Pijama Juvenil Nadador Fem.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 32.9
+ },
+ {
+  "sku": "0819",
+  "nome": "Conjunto Short Teen",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 33.9
+ },
+ {
+  "sku": "0841",
+  "nome": "Short Doll Alça Malha",
+  "tamanho": "P AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0841",
+  "nome": "Short Doll Alça Malha",
+  "tamanho": "EG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0845",
+  "nome": "Short Doll Regata Cós Duplo",
+  "tamanho": "P AO GG",
+  "preco": 35.9
+ },
+ {
+  "sku": "0845",
+  "nome": "Short Doll Regata Cós Duplo",
+  "tamanho": "EG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0848",
+  "nome": "Pijama Regata Canelado",
+  "tamanho": "P AO GG",
+  "preco": 39.9
+ },
+ {
+  "sku": "0848",
+  "nome": "Pijama Regata Canelado",
+  "tamanho": "EG",
+  "preco": 43.9
+ },
+ {
+  "sku": "0849",
+  "nome": "Vestido Suede Canelado",
+  "tamanho": "P AO GG",
+  "preco": 41.9
+ },
+ {
+  "sku": "0849",
+  "nome": "Vestido Suede Canelado",
+  "tamanho": "EG",
+  "preco": 45.9
+ },
+ {
+  "sku": "0851",
+  "nome": "Pijama Americano Liso",
+  "tamanho": "P AO GG",
+  "preco": 49.5
+ },
+ {
+  "sku": "0851",
+  "nome": "Pijama Americano Liso",
+  "tamanho": "EG",
+  "preco": 54.5
+ },
+ {
+  "sku": "0852",
+  "nome": "Pijama Manga Curta Com Calça",
+  "tamanho": "PP AO GG",
+  "preco": 48.5
+ },
+ {
+  "sku": "0852",
+  "nome": "Pijama Manga Curta Com Calça",
+  "tamanho": "EG",
+  "preco": 52.9
+ },
+ {
+  "sku": "0853",
+  "nome": "Pijama Americano Curto",
+  "tamanho": "PP AO GG",
+  "preco": 49.5
+ },
+ {
+  "sku": "0853",
+  "nome": "Pijama Americano Curto",
+  "tamanho": "EG",
+  "preco": 54.5
+ },
+ {
+  "sku": "0854",
+  "nome": "Camisola Americana De Malha",
+  "tamanho": "P AO GG",
+  "preco": 46.9
+ },
+ {
+  "sku": "0854",
+  "nome": "Camisola Americana De Malha",
+  "tamanho": "EG",
+  "preco": 50.9
+ },
+ {
+  "sku": "0855",
+  "nome": "Camisola Americana Manga Comprida",
+  "tamanho": "P AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "0855",
+  "nome": "Camisola Americana Manga Comprida",
+  "tamanho": "EG",
+  "preco": 54.9
+ },
+ {
+  "sku": "0870",
+  "nome": "Pijama Longo Listrado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 53.5
+ },
+ {
+  "sku": "0870",
+  "nome": "Pijama Longo Listrado Fem.",
+  "tamanho": "EG",
+  "preco": 57.9
+ },
+ {
+  "sku": "0880",
+  "nome": "Pijama Longo Malha Mescla Fem.",
+  "tamanho": "P AO GG",
+  "preco": 53.5
+ },
+ {
+  "sku": "0880",
+  "nome": "Pijama Longo Malha Mescla Fem.",
+  "tamanho": "EG",
+  "preco": 58.5
+ },
+ {
+  "sku": "0890",
+  "nome": "Pijama Longo Aberto Mescla Fem.",
+  "tamanho": "P AO GG",
+  "preco": 56.9
+ },
+ {
+  "sku": "0901",
+  "nome": "Short Doll Regata Listrado",
+  "tamanho": "PP AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0901",
+  "nome": "Short Doll Regata Listrado",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0911",
+  "nome": "Short Doll Alça Listrado",
+  "tamanho": "PP AO GG",
+  "preco": 29.9
+ },
+ {
+  "sku": "0911",
+  "nome": "Short Doll Alça Listrado",
+  "tamanho": "EG",
+  "preco": 32.9
+ },
+ {
+  "sku": "0981",
+  "nome": "Pijama Longo Malha Mescla Infantil Fem.",
+  "tamanho": "2-4-6-8",
+  "preco": 35.9
+ },
+ {
+  "sku": "0990",
+  "nome": "Pijama Longo Malha Mescla Fem.",
+  "tamanho": "P AO GG",
+  "preco": 56.9
+ },
+ {
+  "sku": "0990",
+  "nome": "Pijama Longo Malha Mescla Fem.",
+  "tamanho": "EG",
+  "preco": 61.9
+ },
+ {
+  "sku": "1001",
+  "nome": "Pijama Longo Aberto Feminino",
+  "tamanho": "P AO GG",
+  "preco": 69.9
+ },
+ {
+  "sku": "1001",
+  "nome": "Pijama Longo Aberto Feminino",
+  "tamanho": "EG",
+  "preco": 75.9
+ },
+ {
+  "sku": "1002",
+  "nome": "Pijama Longo Mescla Liso Masc.",
+  "tamanho": "P AO GG",
+  "preco": 59.9
+ },
+ {
+  "sku": "1002",
+  "nome": "Pijama Longo Mescla Liso Masc.",
+  "tamanho": "EG",
+  "preco": 64.9
+ },
+ {
+  "sku": "1003",
+  "nome": "Pijama Manga Curta Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 64.9
+ },
+ {
+  "sku": "1003",
+  "nome": "Pijama Manga Curta Liso Fem.",
+  "tamanho": "EG",
+  "preco": 69.9
+ },
+ {
+  "sku": "1004",
+  "nome": "Pijama Longo Plush Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 79.9
+ },
+ {
+  "sku": "1004",
+  "nome": "Pijama Longo Plush Liso Fem.",
+  "tamanho": "EG",
+  "preco": 86.9
+ },
+ {
+  "sku": "1005",
+  "nome": "Pijama Longo Moletinho Aberto Fem.",
+  "tamanho": "P AO GG",
+  "preco": 82.9
+ },
+ {
+  "sku": "1005",
+  "nome": "Pijama Longo Moletinho Aberto Fem.",
+  "tamanho": "EG",
+  "preco": 89.9
+ },
+ {
+  "sku": "1007",
+  "nome": "Pijama Longo Moletinho Infantil Fem.",
+  "tamanho": "2-4-6-8",
+  "preco": 54.9
+ },
+ {
+  "sku": "1008",
+  "nome": "Pijama Longo Moletinho Adulto Fem.",
+  "tamanho": "P AO GG",
+  "preco": 79.9
+ },
+ {
+  "sku": "1008",
+  "nome": "Pijama Longo Moletinho Adulto Fem.",
+  "tamanho": "EG",
+  "preco": 85.9
+ },
+ {
+  "sku": "1009",
+  "nome": "Pijama Longo Moletinho Adulto Masc.",
+  "tamanho": "P AO GG",
+  "preco": 79.9
+ },
+ {
+  "sku": "1009",
+  "nome": "Pijama Longo Moletinho Adulto Masc.",
+  "tamanho": "EG",
+  "preco": 85.9
+ },
+ {
+  "sku": "1010",
+  "nome": "Pijama Juvenil Manga Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 32.9
+ },
+ {
+  "sku": "1011",
+  "nome": "Pijama Juvenil Regata Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 30.9
+ },
+ {
+  "sku": "1012",
+  "nome": "Pijama Juvenil Mescla Regata Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 33.9
+ },
+ {
+  "sku": "1013",
+  "nome": "Pijama Juvenil Mescla Manga Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 35.9
+ },
+ {
+  "sku": "1020",
+  "nome": "Pijama Longo Moletinho Juvenil Fem.",
+  "tamanho": "10-12-14-16",
+  "preco": 59.9
+ },
+ {
+  "sku": "1021",
+  "nome": "Pijama Longo Moletinho Juvenill Masc.",
+  "tamanho": "10-12-14-16",
+  "preco": 59.9
+ },
+ {
+  "sku": "1023",
+  "nome": "Pijama Longo Moletinho Infantil Masc.",
+  "tamanho": "2-4-6-8",
+  "preco": 54.9
+ },
+ {
+  "sku": "1024",
+  "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+  "tamanho": "2-4-6-8",
+  "preco": 35.9
+ },
+ {
+  "sku": "1025",
+  "nome": "Pijama Manga Curta Listrado Masc.",
+  "tamanho": "P AO GG",
+  "preco": 54.9
+ },
+ {
+  "sku": "1025",
+  "nome": "Pijama Manga Curta Listrado Masc.",
+  "tamanho": "EG",
+  "preco": 59.9
+ },
+ {
+  "sku": "1026",
+  "nome": "Pijama Longo Moletinho Bolso Adulto Fem.",
+  "tamanho": "P AO GG",
+  "preco": 84.9
+ },
+ {
+  "sku": "1026",
+  "nome": "Pijama Longo Moletinho Bolso Adulto Fem.",
+  "tamanho": "EG",
+  "preco": 92.9
+ },
+ {
+  "sku": "1027",
+  "nome": "Pijama Longo Laço Feminino Adulto",
+  "tamanho": "P AO GG",
+  "preco": 88.9
+ },
+ {
+  "sku": "1027",
+  "nome": "Pijama Longo Laço Feminino Adulto",
+  "tamanho": "EG",
+  "preco": 96.9
+ },
+ {
+  "sku": "1030",
+  "nome": "Conjunto Longo Gestante Feminino",
+  "tamanho": "P AO GG",
+  "preco": 61.9
+ },
+ {
+  "sku": "1030",
+  "nome": "Conjunto Longo Gestante Feminino",
+  "tamanho": "EG",
+  "preco": 68.9
+ },
+ {
+  "sku": "1031",
+  "nome": "Pijama Longo Flamê Liso Feminino",
+  "tamanho": "P AO GG",
+  "preco": 54.9
+ },
+ {
+  "sku": "1031",
+  "nome": "Pijama Longo Flamê Liso Feminino",
+  "tamanho": "EG",
+  "preco": 59.9
+ },
+ {
+  "sku": "1032",
+  "nome": "Pijama Longo Plush Masculino",
+  "tamanho": "P AO GG",
+  "preco": 86.9
+ },
+ {
+  "sku": "1032",
+  "nome": "Pijama Longo Plush Masculino",
+  "tamanho": "EG",
+  "preco": 95.5
+ },
+ {
+  "sku": "1033",
+  "nome": "Pijama Longo Canelado Feminino",
+  "tamanho": "P AO GG",
+  "preco": 54.9
+ },
+ {
+  "sku": "1033",
+  "nome": "Pijama Longo Canelado Feminino",
+  "tamanho": "EG",
+  "preco": 59.9
+ },
+ {
+  "sku": "1034",
+  "nome": "Pijama de Alça Canelado Feminino",
+  "tamanho": "P AO GG",
+  "preco": 32.9
+ },
+ {
+  "sku": "1034",
+  "nome": "Pijama de Alça Canelado Feminino",
+  "tamanho": "EG",
+  "preco": 35.9
+ },
+ {
+  "sku": "1035",
+  "nome": "Pijama de Alça Canelado Bordado Fem.",
+  "tamanho": "P AO GG",
+  "preco": 37.9
+ },
+ {
+  "sku": "1035",
+  "nome": "Pijama de Alça Canelado Bordado Fem.",
+  "tamanho": "EG",
+  "preco": 40.9
+ },
+ {
+  "sku": "1036",
+  "nome": "Pijama de Alça Família Feminino",
+  "tamanho": "P AO GG",
+  "preco": 39.9
+ },
+ {
+  "sku": "1037",
+  "nome": "Pijama Família Masculino",
+  "tamanho": "P AO GG",
+  "preco": 49.9
+ },
+ {
+  "sku": "1038",
+  "nome": "Pijama Família Infantil Feminino",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 29.9
+ },
+ {
+  "sku": "1039",
+  "nome": "Pijama Família Infantil Masculino",
+  "tamanho": "2-4-6-8 anos",
+  "preco": 32.9
+ },
+ {
+  "sku": "1040",
+  "nome": "Pijama Família Juvenil Feminino",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 35.9
+ },
+ {
+  "sku": "1041",
+  "nome": "Pijama Família Juvenil Masculino",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 35.9
+ },
+ {
+  "sku": "1042",
+  "nome": "Pijama de Alça Suede Feminino",
+  "tamanho": "P AO GG",
+  "preco": 24.9
+ },
+ {
+  "sku": "1042",
+  "nome": "Pijama de Alça Suede Feminino",
+  "tamanho": "XG",
+  "preco": 27.5
+ },
+ {
+  "sku": "1043",
+  "nome": "Pijama de Alça Suede Liso Fem.",
+  "tamanho": "P AO GG",
+  "preco": 27.9
+ },
+ {
+  "sku": "1043",
+  "nome": "Pijama de Alça Suede Liso Fem.",
+  "tamanho": "XG",
+  "preco": 30.9
+ },
+ {
+  "sku": "1400",
+  "nome": "Pijama Longo Juvenil Malha Fem.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 36.5
+ },
+ {
+  "sku": "1460",
+  "nome": "Pijama Longo Juvenil Malha Masc.",
+  "tamanho": "10-12-14-16 anos",
+  "preco": 38.5
+ },
+ {
+  "sku": "2130",
+  "nome": "Pijama Aberto Bordado Manga Masc.",
+  "tamanho": "P AO GG",
+  "preco": 49.5
+ },
+ {
+  "sku": "2130",
+  "nome": "Pijama Aberto Bordado Manga Masc.",
+  "tamanho": "EG",
+  "preco": 53.9
+ },
+ {
+  "sku": "2131",
+  "nome": "Pijama Regata Malha",
+  "tamanho": "PP AO GG",
+  "preco": 33.9
+ },
+ {
+  "sku": "2131",
+  "nome": "Pijama Regata Malha",
+  "tamanho": "EG",
+  "preco": 36.9
+ },
+ {
+  "sku": "2134",
+  "nome": "Short Doll Regata Estampado",
+  "tamanho": "PP AO GG",
+  "preco": 33.9
+ },
+ {
+  "sku": "2134",
+  "nome": "Short Doll Regata Estampado",
+  "tamanho": "EG",
+  "preco": 36.9
+ },
+ {
+  "sku": "2226",
+  "nome": "Camisola Aberta Estampada",
+  "tamanho": "P AO GG",
+  "preco": 39.5
+ },
+ {
+  "sku": "2226",
+  "nome": "Camisola Aberta Estampada",
+  "tamanho": "EG",
+  "preco": 43.9
+ },
+ {
+  "sku": "4130",
+  "nome": "Pijama Aberto Com Calça Masc.",
+  "tamanho": "P AO GG",
+  "preco": 53.9
+ },
+ {
+  "sku": "4130",
+  "nome": "Pijama Aberto Com Calça Masc.",
+  "tamanho": "EG",
+  "preco": 59.5
+ },
+ {
+  "sku": "4131",
+  "nome": "Pijama Longo Aberto Masculino",
+  "tamanho": "PP AO GG",
+  "preco": 56.9
+ },
+ {
+  "sku": "4131",
+  "nome": "Pijama Longo Aberto Masculino",
+  "tamanho": "EG",
+  "preco": 62.5
+ }
+]

@@ -68,8 +68,13 @@ def consolidar(itens: list[dict]) -> dict:
 
 def main() -> None:
     saida = {}
+    linhas_cruas = []
     for n in ("01", "02", "03"):
         itens = ler(ORIGEM / f"TABELA PRECO {n} - 2027.pdf")
+        if n == "01":
+            # Linha a linha, com a faixa de tamanho — é daqui que sai o cadastro
+            # dos tamanhos dos produtos novos.
+            linhas_cruas = itens
         por_sku = consolidar(itens)
         saida[n] = por_sku
         maiores = sum(1 for r in por_sku.values() if r["preco_maior"] is not None)
@@ -83,7 +88,10 @@ def main() -> None:
     (AQUI / "tabelas-2027.json").write_text(
         json.dumps(saida, ensure_ascii=False, indent=1), encoding="utf-8"
     )
-    print("ok -> tabelas-2027.json")
+    (AQUI / "linhas-2027.json").write_text(
+        json.dumps(linhas_cruas, ensure_ascii=False, indent=1), encoding="utf-8"
+    )
+    print("ok -> tabelas-2027.json + linhas-2027.json")
 
 
 if __name__ == "__main__":
