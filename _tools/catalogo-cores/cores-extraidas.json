@@ -279,6 +279,34 @@
   ],
   "origem": "t3-inverno.pdf p.9"
  },
+ "0162": {
+  "sku": "0162",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.10"
+ },
+ "0160": {
+  "sku": "0160",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.10"
+ },
  "0172": {
   "sku": "0172",
   "nome": "MOLETINHO",
@@ -384,6 +412,90 @@
   ],
   "origem": "t3-inverno.pdf p.12"
  },
+ "1009": {
+  "sku": "1009",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#969695",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.16"
+ },
+ "1008": {
+  "sku": "1008",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#969695",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.16"
+ },
+ "1023": {
+  "sku": "1023",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.17"
+ },
+ "1020": {
+  "sku": "1020",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.17"
+ },
+ "1007": {
+  "sku": "1007",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.17"
+ },
+ "1021": {
+  "sku": "1021",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.17"
+ },
  "1004": {
   "sku": "1004",
   "nome": "PLUSH",
@@ -446,6 +558,76 @@
    }
   ],
   "origem": "t3-inverno.pdf p.20"
+ },
+ "0201": {
+  "sku": "0201",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#313538",
+    "variadas": false,
+    "ordem": 0,
+    "unica": false
+   },
+   {
+    "codigo": "02",
+    "hex": "#1C2F4D",
+    "variadas": false,
+    "ordem": 1,
+    "unica": false
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C341F",
+    "variadas": false,
+    "ordem": 2,
+    "unica": false
+   },
+   {
+    "codigo": "04",
+    "hex": "#AEAEAE",
+    "variadas": false,
+    "ordem": 3,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.21"
+ },
+ "0202": {
+  "sku": "0202",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#313538",
+    "variadas": false,
+    "ordem": 0,
+    "unica": false
+   },
+   {
+    "codigo": "02",
+    "hex": "#1C2F4D",
+    "variadas": false,
+    "ordem": 1,
+    "unica": false
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C341F",
+    "variadas": false,
+    "ordem": 2,
+    "unica": false
+   },
+   {
+    "codigo": "04",
+    "hex": "#AEAEAE",
+    "variadas": false,
+    "ordem": 3,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.21"
  },
  "0199": {
   "sku": "0199",
@@ -531,6 +713,34 @@
   ],
   "origem": "t3-inverno.pdf p.22"
  },
+ "0204": {
+  "sku": "0204",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.23"
+ },
+ "0179": {
+  "sku": "0179",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.23"
+ },
  "1033": {
   "sku": "1033",
   "nome": "CANELADO",
@@ -586,6 +796,34 @@
    }
   ],
   "origem": "t3-inverno.pdf p.25"
+ },
+ "0223": {
+  "sku": "0223",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.26"
+ },
+ "0221": {
+  "sku": "0221",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.26"
  },
  "0220": {
   "sku": "0220",
@@ -656,6 +894,34 @@
    }
   ],
   "origem": "t3-inverno.pdf p.27"
+ },
+ "0260": {
+  "sku": "0260",
+  "nome": "SUEDE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.29"
+ },
+ "0250": {
+  "sku": "0250",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.31"
  },
  "4131": {
   "sku": "4131",
@@ -853,6 +1119,76 @@
   ],
   "origem": "t3-inverno.pdf p.36"
  },
+ "0855": {
+  "sku": "0855",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.37"
+ },
+ "0854": {
+  "sku": "0854",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.37"
+ },
+ "1030": {
+  "sku": "1030",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.38"
+ },
+ "0851": {
+  "sku": "0851",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.39"
+ },
+ "0719": {
+  "sku": "0719",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.39"
+ },
  "1002": {
   "sku": "1002",
   "nome": "MALHA PV",
@@ -950,6 +1286,118 @@
    }
   ],
   "origem": "t3-inverno.pdf p.42"
+ },
+ "0990": {
+  "sku": "0990",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#969695",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.46"
+ },
+ "0981": {
+  "sku": "0981",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#969695",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.46"
+ },
+ "1024": {
+  "sku": "1024",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.47"
+ },
+ "1025": {
+  "sku": "1025",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-inverno.pdf p.47"
+ },
+ "0245": {
+  "sku": "0245",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.50"
+ },
+ "0242": {
+  "sku": "0242",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.50"
+ },
+ "0240": {
+  "sku": "0240",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.51"
+ },
+ "0852": {
+  "sku": "0852",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.51"
  },
  "0140": {
   "sku": "0140",
@@ -1055,6 +1503,62 @@
    }
   ],
   "origem": "t3-inverno.pdf p.53"
+ },
+ "0880": {
+  "sku": "0880",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.54"
+ },
+ "0141": {
+  "sku": "0141",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.54"
+ },
+ "0890": {
+  "sku": "0890",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.55"
+ },
+ "0870": {
+  "sku": "0870",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-inverno.pdf p.55"
  },
  "1042": {
   "sku": "1042",
@@ -1223,6 +1727,90 @@
    }
   ],
   "origem": "t3-verao.pdf p.10"
+ },
+ "1036": {
+  "sku": "1036",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#1E2B4E",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.13"
+ },
+ "1038": {
+  "sku": "1038",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#B7DEDE",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.13"
+ },
+ "1037": {
+  "sku": "1037",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#1E2B4E",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.14"
+ },
+ "1039": {
+  "sku": "1039",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#B7DEDE",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.14"
+ },
+ "1040": {
+  "sku": "1040",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#1E2B4E",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.15"
+ },
+ "1041": {
+  "sku": "1041",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#B7DEDE",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.15"
  },
  "0800": {
   "sku": "0800",
@@ -1504,26 +2092,33 @@
   ],
   "origem": "t3-verao.pdf p.24"
  },
- "1030": {
-  "sku": "1030",
+ "0328": {
+  "sku": "0328",
   "nome": "MALHA PV",
   "cores": [
    {
     "codigo": "01",
-    "hex": "#93A0C5",
-    "variadas": false,
+    "hex": "#989898",
+    "variadas": true,
     "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#602632",
-    "variadas": false,
-    "ordem": 1,
     "unica": false
    }
   ],
-  "origem": "t3-verao.pdf p.26"
+  "origem": "t3-verao.pdf p.25"
+ },
+ "0327": {
+  "sku": "0327",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.25"
  },
  "0640": {
   "sku": "0640",
@@ -1784,61 +2379,19 @@
   ],
   "origem": "t3-verao.pdf p.30"
  },
- "0719": {
-  "sku": "0719",
+ "0853": {
+  "sku": "0853",
   "nome": "MALHA PV",
   "cores": [
    {
     "codigo": "01",
-    "hex": "#D4BEC0",
-    "variadas": false,
+    "hex": "#989898",
+    "variadas": true,
     "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#DCBAC7",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#D9CCC3",
-    "variadas": false,
-    "ordem": 2,
     "unica": false
    }
   ],
-  "origem": "t3-verao.pdf p.30"
- },
- "0851": {
-  "sku": "0851",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#EBDAEB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#DB2E6B",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-verao.pdf p.32"
+  "origem": "t3-verao.pdf p.31"
  },
  "2134": {
   "sku": "2134",
@@ -2960,33 +3513,33 @@
   ],
   "origem": "t3-verao.pdf p.53"
  },
- "1025": {
-  "sku": "1025",
+ "0135": {
+  "sku": "0135",
   "nome": "MALHA PV",
   "cores": [
    {
     "codigo": "01",
-    "hex": "#425C27",
-    "variadas": false,
+    "hex": "#989898",
+    "variadas": true,
     "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#8ED2EA",
-    "variadas": false,
-    "ordem": 2,
     "unica": false
    }
   ],
-  "origem": "t3-verao.pdf p.54"
+  "origem": "t3-verao.pdf p.55"
+ },
+ "0131": {
+  "sku": "0131",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.55"
  },
  "0216": {
   "sku": "0216",
@@ -3128,6 +3681,20 @@
   ],
   "origem": "t3-verao.pdf p.57"
  },
+ "0714": {
+  "sku": "0714",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.58"
+ },
  "0359": {
   "sku": "0359",
   "nome": "MALHA PV",
@@ -3183,6 +3750,20 @@
    }
   ],
   "origem": "t3-verao.pdf p.59"
+ },
+ "0819": {
+  "sku": "0819",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.60"
  },
  "0816": {
   "sku": "0816",
@@ -3394,6 +3975,20 @@
   ],
   "origem": "t3-verao.pdf p.63"
  },
+ "0810": {
+  "sku": "0810",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.65"
+ },
  "0102": {
   "sku": "0102",
   "nome": "MALHA PV",
@@ -3519,6 +4114,286 @@
    }
   ],
   "origem": "t3-verao.pdf p.67"
+ },
+ "0124": {
+  "sku": "0124",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.68"
+ },
+ "0118": {
+  "sku": "0118",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.68"
+ },
+ "0121": {
+  "sku": "0121",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.69"
+ },
+ "0219": {
+  "sku": "0219",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.69"
+ },
+ "0119": {
+  "sku": "0119",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.70"
+ },
+ "2014": {
+  "sku": "2014",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.70"
+ },
+ "0203": {
+  "sku": "0203",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.71"
+ },
+ "0239": {
+  "sku": "0239",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.71"
+ },
+ "0107": {
+  "sku": "0107",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#86B8E4",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.72"
+ },
+ "0403": {
+  "sku": "0403",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#85C2D0",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.72"
+ },
+ "0114": {
+  "sku": "0114",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#86B8E4",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.73"
+ },
+ "0407": {
+  "sku": "0407",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#85C2D0",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.73"
+ },
+ "0402": {
+  "sku": "0402",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#86B8E4",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.74"
+ },
+ "0404": {
+  "sku": "0404",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#85C2D0",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.74"
+ },
+ "0307": {
+  "sku": "0307",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E5E0DD",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.75"
+ },
+ "0304": {
+  "sku": "0304",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#5E5F7A",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.75"
+ },
+ "0309": {
+  "sku": "0309",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E5E0DD",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.76"
+ },
+ "0306": {
+  "sku": "0306",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#666882",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.76"
+ },
+ "0308": {
+  "sku": "0308",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E5E0DD",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.77"
+ },
+ "0305": {
+  "sku": "0305",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#595B76",
+    "variadas": false,
+    "ordem": 0,
+    "unica": true
+   }
+  ],
+  "origem": "t3-verao.pdf p.77"
  },
  "0093": {
   "sku": "0093",
@@ -3681,6 +4556,258 @@
   ],
   "origem": "t3-verao.pdf p.81"
  },
+ "0091": {
+  "sku": "0091",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.83"
+ },
+ "0500": {
+  "sku": "0500",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.84"
+ },
+ "0502": {
+  "sku": "0502",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.84"
+ },
+ "0605": {
+  "sku": "0605",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.85"
+ },
+ "0601": {
+  "sku": "0601",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.85"
+ },
+ "0582": {
+  "sku": "0582",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.86"
+ },
+ "0085": {
+  "sku": "0085",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.86"
+ },
+ "0501": {
+  "sku": "0501",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.87"
+ },
+ "0499": {
+  "sku": "0499",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.87"
+ },
+ "0088": {
+  "sku": "0088",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.88"
+ },
+ "0087": {
+  "sku": "0087",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.88"
+ },
+ "0094": {
+  "sku": "0094",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.89"
+ },
+ "0083": {
+  "sku": "0083",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.89"
+ },
+ "0086": {
+  "sku": "0086",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.90"
+ },
+ "0095": {
+  "sku": "0095",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.91"
+ },
+ "0096": {
+  "sku": "0096",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.91"
+ },
+ "0090": {
+  "sku": "0090",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.92"
+ },
+ "0092": {
+  "sku": "0092",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.92"
+ },
  "0716": {
   "sku": "0716",
   "nome": "LIGANETE",
@@ -3722,5 +4849,33 @@
    }
   ],
   "origem": "t3-verao.pdf p.94"
+ },
+ "0550": {
+  "sku": "0550",
+  "nome": "LIGANETE",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#989898",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.95"
+ },
+ "0108": {
+  "sku": "0108",
+  "nome": "SEDA",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#8E8E8D",
+    "variadas": true,
+    "ordem": 0,
+    "unica": false
+   }
+  ],
+  "origem": "t3-verao.pdf p.95"
  }
 }

@@ -56,8 +56,31 @@ def extrair_pagina(pagina, resolucao=150):
         c for c in pagina.curves
         if 15 < (c["x1"] - c["x0"]) < 40 and 15 < (c["bottom"] - c["top"]) < 40
     ]
+
+    # Em algumas paginas as bolinhas sao IMAGEM, nao desenho vetorial — ali
+    # `curves` vem vazio. Nesses casos a numeracao no rodape denuncia o bloco:
+    # a bolinha fica ~16pt acima do numero. Sem isto a pagina inteira se perdia.
     if not bolinhas:
-        return [], []
+        # Ancora no cabecalho "CORES / ESTAMPAS": so numero ABAIXO dele e cor.
+        # Sem essa ancora, "01 AO 08" e "10 AO 16" (as faixas de TAMANHO, que
+        # tambem sao dois digitos e ficam no rodape) entravam como se fossem cor.
+        cabecalho = [w for w in palavras if w["text"].strip().upper() in {"CORES", "ESTAMPAS"}]
+        if not cabecalho:
+            return [], []
+        y_cabecalho = min(w["top"] for w in cabecalho)
+
+        numeros_rodape = [
+            w for w in palavras
+            if NUM_COR.match(w["text"].strip()) and w["top"] > y_cabecalho
+        ]
+        if len(numeros_rodape) < 2:
+            return [], []
+        y_num = min(w["top"] for w in numeros_rodape)
+        bolinhas = [
+            {"x0": w["x0"], "x1": w["x1"], "top": y_num - 29, "bottom": y_num - 3}
+            for w in numeros_rodape
+            if abs(w["top"] - y_num) < 6
+        ]
 
     rotulos = [
         w for w in palavras
@@ -83,6 +106,33 @@ def extrair_pagina(pagina, resolucao=150):
             key=lambda w: w["x0"],
         )
         if not numeros:
+            # Bloco SEM numeracao: uma bolinha so, rotulada ÚNICA ou VARIADAS.
+            # E o layout mais comum das paginas com duas referencias lado a lado
+            # (ex.: 1008 e 1009 dividindo a mesma bolinha). Exigir numero aqui
+            # descartava a pagina inteira — 33 das 42 paginas sem cor eram isto.
+            rotulo_perto = [
+                r for r in rotulos
+                if y_bolinha - 40 < r["top"] < y_bolinha + 50
+            ]
+            if not rotulo_perto:
+                continue
+
+            texto = " ".join(r["text"] for r in rotulo_perto).upper()
+            eh_variada = "VARIAD" in texto
+            for bolinha in fileira:
+                cx_pt = (bolinha["x0"] + bolinha["x1"]) / 2
+                hexa = media_cor(img, int(cx_pt * escala), int((y_bolinha + 13) * escala))
+                blocos.append({
+                    "y": y_bolinha,
+                    "x_centro": cx_pt,
+                    "cores": [{
+                        "codigo": "01",
+                        "hex": hexa,
+                        "variadas": eh_variada,
+                        "ordem": 0,
+                        "unica": not eh_variada,
+                    }],
+                })
             continue
 
         # Dois blocos podem dividir a MESMA fileira, lado a lado (o 1004 PLUSH e

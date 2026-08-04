@@ -1,0 +1,3482 @@
+{
+ "01": {
+  "0015": {
+   "sku": "0015",
+   "nome": "Camisola De Alça",
+   "preco": 21.9,
+   "preco_maior": 23.9
+  },
+  "0070": {
+   "sku": "0070",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0072": {
+   "sku": "0072",
+   "nome": "Camisola Com Renda Liganete",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0080": {
+   "sku": "0080",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0083": {
+   "sku": "0083",
+   "nome": "Camisola Aberta Regata Liganete",
+   "preco": 36.5,
+   "preco_maior": 39.5
+  },
+  "0085": {
+   "sku": "0085",
+   "nome": "Pijama Regata Liganete",
+   "preco": 32.9,
+   "preco_maior": 36.5
+  },
+  "0086": {
+   "sku": "0086",
+   "nome": "Pijama Manga Curta Com Calça Liganete",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0087": {
+   "sku": "0087",
+   "nome": "Camisola Aberta Manga Liganete",
+   "preco": 38.5,
+   "preco_maior": 42.9
+  },
+  "0088": {
+   "sku": "0088",
+   "nome": "Pijama Aberto Liganete",
+   "preco": 40.5,
+   "preco_maior": 44.5
+  },
+  "0090": {
+   "sku": "0090",
+   "nome": "Camisola Gestante Liganete",
+   "preco": 34.9,
+   "preco_maior": 38.5
+  },
+  "0091": {
+   "sku": "0091",
+   "nome": "Camisola Alça Liganete Estampada",
+   "preco": 37.5,
+   "preco_maior": 40.9
+  },
+  "0092": {
+   "sku": "0092",
+   "nome": "Camisola Gestante De Liganete",
+   "preco": 34.9,
+   "preco_maior": 38.5
+  },
+  "0093": {
+   "sku": "0093",
+   "nome": "Camisola Alça Liganete Lisa",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0094": {
+   "sku": "0094",
+   "nome": "Camisola De Liganete",
+   "preco": 34.9,
+   "preco_maior": 38.5
+  },
+  "0095": {
+   "sku": "0095",
+   "nome": "Camisola Gestante Alça Liganete",
+   "preco": 39.9,
+   "preco_maior": 42.9
+  },
+  "0096": {
+   "sku": "0096",
+   "nome": "Camisola Gestante Lisa Liganete",
+   "preco": 46.9,
+   "preco_maior": 51.5
+  },
+  "0102": {
+   "sku": "0102",
+   "nome": "Pijama Mescla Infantil Masc.",
+   "preco": 27.9,
+   "preco_maior": null
+  },
+  "0103": {
+   "sku": "0103",
+   "nome": "Pijama De Malha Infantil Masc.",
+   "preco": 25.5,
+   "preco_maior": null
+  },
+  "0104": {
+   "sku": "0104",
+   "nome": "Pijama Regata Mescla Infantil Masc.",
+   "preco": 25.5,
+   "preco_maior": null
+  },
+  "0107": {
+   "sku": "0107",
+   "nome": "Pijama Familia Feminino",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0109": {
+   "sku": "0109",
+   "nome": "Short Doll Regata Bolinha",
+   "preco": 30.9,
+   "preco_maior": 32.9
+  },
+  "0110": {
+   "sku": "0110",
+   "nome": "Short Doll Regata Malha",
+   "preco": 26.9,
+   "preco_maior": 29.5
+  },
+  "0111": {
+   "sku": "0111",
+   "nome": "Camisola Regata Malha",
+   "preco": 22.9,
+   "preco_maior": 24.9
+  },
+  "0114": {
+   "sku": "0114",
+   "nome": "Pijama Familia Infantil Fem.",
+   "preco": 26.9,
+   "preco_maior": null
+  },
+  "0115": {
+   "sku": "0115",
+   "nome": "Short Doll Alça Malha",
+   "preco": 24.9,
+   "preco_maior": 27.9
+  },
+  "0116": {
+   "sku": "0116",
+   "nome": "Short Doll Alça Malha Bolinha",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0122": {
+   "sku": "0122",
+   "nome": "Pijama De Manga Malha",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0123": {
+   "sku": "0123",
+   "nome": "Pijama Aberto De Manga Bordado",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0124": {
+   "sku": "0124",
+   "nome": "Short Doll De Manga Infantil Fem .",
+   "preco": 19.9,
+   "preco_maior": null
+  },
+  "0125": {
+   "sku": "0125",
+   "nome": "Camisola Bordada De Manga",
+   "preco": 39.5,
+   "preco_maior": 42.9
+  },
+  "0126": {
+   "sku": "0126",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 37.9,
+   "preco_maior": 41.9
+  },
+  "0128": {
+   "sku": "0128",
+   "nome": "Pijama Aberto De Manga Estampado",
+   "preco": 38.5,
+   "preco_maior": 41.5
+  },
+  "0129": {
+   "sku": "0129",
+   "nome": "Pijama Bordado Regata Masc.",
+   "preco": 41.5,
+   "preco_maior": 44.9
+  },
+  "0130": {
+   "sku": "0130",
+   "nome": "Pijama Bordado Manga Masc.",
+   "preco": 43.9,
+   "preco_maior": 53.9
+  },
+  "0131": {
+   "sku": "0131",
+   "nome": "Short De Malha Masculino",
+   "preco": 14.9,
+   "preco_maior": 16.5
+  },
+  "0135": {
+   "sku": "0135",
+   "nome": "Short De Malha Estampado Masculino",
+   "preco": 14.9,
+   "preco_maior": 16.9
+  },
+  "0139": {
+   "sku": "0139",
+   "nome": "Pijama Regata Infantil Masc.",
+   "preco": 22.9,
+   "preco_maior": null
+  },
+  "0140": {
+   "sku": "0140",
+   "nome": "Pijama Longo Malha Feminino",
+   "preco": 42.9,
+   "preco_maior": 46.9
+  },
+  "0141": {
+   "sku": "0141",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 34.9,
+   "preco_maior": null
+  },
+  "0142": {
+   "sku": "0142",
+   "nome": "Pijama Longo Malha Infantil Fem.",
+   "preco": 28.5,
+   "preco_maior": null
+  },
+  "0143": {
+   "sku": "0143",
+   "nome": "Pijama Longo Malha Infantil Masc.",
+   "preco": 28.5,
+   "preco_maior": null
+  },
+  "0145": {
+   "sku": "0145",
+   "nome": "Pijama Longo Malha Masculino",
+   "preco": 49.5,
+   "preco_maior": 52.9
+  },
+  "0159": {
+   "sku": "0159",
+   "nome": "Pijama Longo Moletinho Estampado",
+   "preco": 72.5,
+   "preco_maior": 78.9
+  },
+  "0160": {
+   "sku": "0160",
+   "nome": "Pijama Longo Moletinho Flanelado Fem.",
+   "preco": 68.9,
+   "preco_maior": 74.5
+  },
+  "0161": {
+   "sku": "0161",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 75.9,
+   "preco_maior": 83.5
+  },
+  "0162": {
+   "sku": "0162",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 45.9,
+   "preco_maior": null
+  },
+  "0163": {
+   "sku": "0163",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 45.9,
+   "preco_maior": null
+  },
+  "0169": {
+   "sku": "0169",
+   "nome": "Pijama Longo Moletinho Fem.",
+   "preco": 76.9,
+   "preco_maior": 84.5
+  },
+  "0171": {
+   "sku": "0171",
+   "nome": "Pijama Longo Moletinho Masc.",
+   "preco": 79.9,
+   "preco_maior": 87.9
+  },
+  "0172": {
+   "sku": "0172",
+   "nome": "Pijama Longo Moletinho Aberto Masc.",
+   "preco": 86.9,
+   "preco_maior": 92.5
+  },
+  "0179": {
+   "sku": "0179",
+   "nome": "Pijama Longo Infantil Plush Fem.",
+   "preco": 49.9,
+   "preco_maior": null
+  },
+  "0199": {
+   "sku": "0199",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 73.5,
+   "preco_maior": 79.5
+  },
+  "0200": {
+   "sku": "0200",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 86.9,
+   "preco_maior": 95.5
+  },
+  "0201": {
+   "sku": "0201",
+   "nome": "Pijama Longo Infantil Plush Masc.",
+   "preco": 49.9,
+   "preco_maior": null
+  },
+  "0202": {
+   "sku": "0202",
+   "nome": "Pijama Longo Juvenil Plush Masc.",
+   "preco": 63.9,
+   "preco_maior": null
+  },
+  "0203": {
+   "sku": "0203",
+   "nome": "Pijama Estampado Manga Infantil Masc.",
+   "preco": 20.9,
+   "preco_maior": null
+  },
+  "0204": {
+   "sku": "0204",
+   "nome": "Pijama Longo Juvenil Plush Fem.",
+   "preco": 63.9,
+   "preco_maior": null
+  },
+  "0216": {
+   "sku": "0216",
+   "nome": "Short Doll Alça Malha Onça",
+   "preco": 29.9,
+   "preco_maior": 31.9
+  },
+  "0220": {
+   "sku": "0220",
+   "nome": "Pijama Longo Canelado Liso Fem.",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "0221": {
+   "sku": "0221",
+   "nome": "Pijama Longo Canelado Estampado Fem.",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "0222": {
+   "sku": "0222",
+   "nome": "Pijama De Calça Canelado Liso Fem.",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0223": {
+   "sku": "0223",
+   "nome": "Pijama De Calça Canelado Estampado Fem.",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0239": {
+   "sku": "0239",
+   "nome": "Pijama Estampado Regata Infantil Masc.",
+   "preco": 19.9,
+   "preco_maior": null
+  },
+  "0240": {
+   "sku": "0240",
+   "nome": "Pijama Longo Estampado Aberto Fem.",
+   "preco": 48.5,
+   "preco_maior": 53.5
+  },
+  "0242": {
+   "sku": "0242",
+   "nome": "Pijama Longo Estampado Infantil Fem.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0245": {
+   "sku": "0245",
+   "nome": "Pijama Longo Estampado Fem.",
+   "preco": 43.9,
+   "preco_maior": 48.5
+  },
+  "0250": {
+   "sku": "0250",
+   "nome": "Pijama Longo De Onça Fem.",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "0260": {
+   "sku": "0260",
+   "nome": "Pijama Longo Suede Felpado Fem.",
+   "preco": 48.5,
+   "preco_maior": 52.9
+  },
+  "0262": {
+   "sku": "0262",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Fem.",
+   "preco": 48.9,
+   "preco_maior": null
+  },
+  "0263": {
+   "sku": "0263",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Masc.",
+   "preco": 48.9,
+   "preco_maior": null
+  },
+  "0300": {
+   "sku": "0300",
+   "nome": "Robe De Seda",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0301": {
+   "sku": "0301",
+   "nome": "Robe De Liganete",
+   "preco": 44.9,
+   "preco_maior": 48.9
+  },
+  "0303": {
+   "sku": "0303",
+   "nome": "Pijama Longo Estampado Infantil Masc.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0304": {
+   "sku": "0304",
+   "nome": "Pijama Família Masculino",
+   "preco": 40.9,
+   "preco_maior": 44.9
+  },
+  "0305": {
+   "sku": "0305",
+   "nome": "Pijama Família Juvenil Masc.",
+   "preco": 29.9,
+   "preco_maior": null
+  },
+  "0306": {
+   "sku": "0306",
+   "nome": "Pijama Família Infantil Masc.",
+   "preco": 24.9,
+   "preco_maior": null
+  },
+  "0307": {
+   "sku": "0307",
+   "nome": "Pijama Família Feminino",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0308": {
+   "sku": "0308",
+   "nome": "Pijama Família Juvenil Fem.",
+   "preco": 29.9,
+   "preco_maior": null
+  },
+  "0309": {
+   "sku": "0309",
+   "nome": "Pijama Família Infantil Fem.",
+   "preco": 24.9,
+   "preco_maior": null
+  },
+  "0310": {
+   "sku": "0310",
+   "nome": "Pijama Regata Malha",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0316": {
+   "sku": "0316",
+   "nome": "Short Doll Nadador De Onça",
+   "preco": 29.9,
+   "preco_maior": 31.9
+  },
+  "0321": {
+   "sku": "0321",
+   "nome": "Pijama De Bermuda Gestante",
+   "preco": 35.9,
+   "preco_maior": 37.9
+  },
+  "0325": {
+   "sku": "0325",
+   "nome": "Camisola De Gestante Listrado",
+   "preco": 35.9,
+   "preco_maior": 37.9
+  },
+  "0327": {
+   "sku": "0327",
+   "nome": "Camisola Gestante Estampada",
+   "preco": 39.5,
+   "preco_maior": 42.9
+  },
+  "0328": {
+   "sku": "0328",
+   "nome": "Camisola Gestante Alça Malha",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0329": {
+   "sku": "0329",
+   "nome": "Pijama Estampado Regata Masc.",
+   "preco": 43.9,
+   "preco_maior": 48.5
+  },
+  "0330": {
+   "sku": "0330",
+   "nome": "Pijama Estampado Manga Masc.",
+   "preco": 48.5,
+   "preco_maior": 52.9
+  },
+  "0350": {
+   "sku": "0350",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 40.5,
+   "preco_maior": 44.9
+  },
+  "0352": {
+   "sku": "0352",
+   "nome": "Camisola Bordada",
+   "preco": 42.9,
+   "preco_maior": null
+  },
+  "0354": {
+   "sku": "0354",
+   "nome": "Short Doll Alça Canelado",
+   "preco": 38.5,
+   "preco_maior": 41.5
+  },
+  "0355": {
+   "sku": "0355",
+   "nome": "Short Doll Regata Canelado",
+   "preco": 37.9,
+   "preco_maior": 41.9
+  },
+  "0358": {
+   "sku": "0358",
+   "nome": "Short Doll Alça Jovem",
+   "preco": 33.9,
+   "preco_maior": 36.9
+  },
+  "0359": {
+   "sku": "0359",
+   "nome": "Short Doll Regata Composé",
+   "preco": 33.9,
+   "preco_maior": 36.9
+  },
+  "0380": {
+   "sku": "0380",
+   "nome": "Camisola Nadador",
+   "preco": 26.9,
+   "preco_maior": 29.9
+  },
+  "0390": {
+   "sku": "0390",
+   "nome": "Short Doll Nadador",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0402": {
+   "sku": "0402",
+   "nome": "Pijama Familia Manga Masc.",
+   "preco": 44.9,
+   "preco_maior": 47.9
+  },
+  "0403": {
+   "sku": "0403",
+   "nome": "Pijama Familia Regata Masc.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "0404": {
+   "sku": "0404",
+   "nome": "Pijama Familia Juvenil Masc.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0407": {
+   "sku": "0407",
+   "nome": "Pijama Familia Infantil Masc.",
+   "preco": 26.9,
+   "preco_maior": null
+  },
+  "0429": {
+   "sku": "0429",
+   "nome": "Pijama Mescla Regata Masc.",
+   "preco": 47.9,
+   "preco_maior": 52.5
+  },
+  "0430": {
+   "sku": "0430",
+   "nome": "Pijama Mescla Masculino",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0499": {
+   "sku": "0499",
+   "nome": "Pijama Bermuda Liganete",
+   "preco": 37.5,
+   "preco_maior": 40.5
+  },
+  "0500": {
+   "sku": "0500",
+   "nome": "Camisola Alça Liganete",
+   "preco": 23.9,
+   "preco_maior": 26.5
+  },
+  "0501": {
+   "sku": "0501",
+   "nome": "Pijama Regata Estampada Liganete",
+   "preco": 31.9,
+   "preco_maior": 33.9
+  },
+  "0502": {
+   "sku": "0502",
+   "nome": "Short Doll Alça Liganete",
+   "preco": 27.5,
+   "preco_maior": 29.5
+  },
+  "0550": {
+   "sku": "0550",
+   "nome": "Short Liganete Masculino",
+   "preco": 15.9,
+   "preco_maior": 17.9
+  },
+  "0570": {
+   "sku": "0570",
+   "nome": "Pijama Liganete Masculino",
+   "preco": 43.9,
+   "preco_maior": 47.9
+  },
+  "0582": {
+   "sku": "0582",
+   "nome": "Pijama Regata Renda",
+   "preco": 39.5,
+   "preco_maior": 43.9
+  },
+  "0590": {
+   "sku": "0590",
+   "nome": "Pijama Regata Pescador",
+   "preco": 38.5,
+   "preco_maior": 41.5
+  },
+  "0595": {
+   "sku": "0595",
+   "nome": "Jogo De Robe Bordado",
+   "preco": 69.9,
+   "preco_maior": 75.9
+  },
+  "0601": {
+   "sku": "0601",
+   "nome": "Short Doll Regata Liganete",
+   "preco": 29.5,
+   "preco_maior": 32.9
+  },
+  "0605": {
+   "sku": "0605",
+   "nome": "Camisola Regata Liganete",
+   "preco": 26.5,
+   "preco_maior": 28.5
+  },
+  "0640": {
+   "sku": "0640",
+   "nome": "Camisola Gestante",
+   "preco": 38.5,
+   "preco_maior": 41.5
+  },
+  "0650": {
+   "sku": "0650",
+   "nome": "Camisola Estampada Manga",
+   "preco": 35.9,
+   "preco_maior": 39.5
+  },
+  "0690": {
+   "sku": "0690",
+   "nome": "Pijama Manga Pescador",
+   "preco": 38.5,
+   "preco_maior": 41.9
+  },
+  "0702": {
+   "sku": "0702",
+   "nome": "Camisola Alça",
+   "preco": 26.9,
+   "preco_maior": 29.9
+  },
+  "0703": {
+   "sku": "0703",
+   "nome": "Camisola Regata",
+   "preco": 28.5,
+   "preco_maior": 38.9
+  },
+  "0704": {
+   "sku": "0704",
+   "nome": "Short Doll De Alça",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0705": {
+   "sku": "0705",
+   "nome": "Short Doll Regata",
+   "preco": 34.9,
+   "preco_maior": 44.9
+  },
+  "0706": {
+   "sku": "0706",
+   "nome": "Pijama De Manga Feminino",
+   "preco": 37.9,
+   "preco_maior": 47.9
+  },
+  "0707": {
+   "sku": "0707",
+   "nome": "Pijama Regata Infantil Feminino",
+   "preco": 27.5,
+   "preco_maior": null
+  },
+  "0710": {
+   "sku": "0710",
+   "nome": "Camisola Alça Estampada",
+   "preco": 27.5,
+   "preco_maior": 29.5
+  },
+  "0714": {
+   "sku": "0714",
+   "nome": "Pijama Cropped",
+   "preco": 40.5,
+   "preco_maior": 43.9
+  },
+  "0715": {
+   "sku": "0715",
+   "nome": "Camisão Estampado",
+   "preco": 37.9,
+   "preco_maior": 41.9
+  },
+  "0716": {
+   "sku": "0716",
+   "nome": "Pijama De Liganete Masc.",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0719": {
+   "sku": "0719",
+   "nome": "Pijama Aberto Estampado Manga",
+   "preco": 38.5,
+   "preco_maior": 41.5
+  },
+  "0720": {
+   "sku": "0720",
+   "nome": "Short Doll Alça Estampado",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0730": {
+   "sku": "0730",
+   "nome": "Short Doll Nadador Estampado",
+   "preco": 35.9,
+   "preco_maior": 38.5
+  },
+  "0750": {
+   "sku": "0750",
+   "nome": "Short Doll Alça Mescla",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0760": {
+   "sku": "0760",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 35.9,
+   "preco_maior": 39.5
+  },
+  "0770": {
+   "sku": "0770",
+   "nome": "Camisola Nadador Mescla",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0800": {
+   "sku": "0800",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0810": {
+   "sku": "0810",
+   "nome": "Short Doll Regata Mescla Infantil Fem.",
+   "preco": 16.9,
+   "preco_maior": null
+  },
+  "0815": {
+   "sku": "0815",
+   "nome": "Pijama Juvenil Alça Fem.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0816": {
+   "sku": "0816",
+   "nome": "Pijama Juvenil Nadador Fem.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0819": {
+   "sku": "0819",
+   "nome": "Conjunto Short Teen",
+   "preco": 33.9,
+   "preco_maior": null
+  },
+  "0841": {
+   "sku": "0841",
+   "nome": "Short Doll Alça Malha",
+   "preco": 35.9,
+   "preco_maior": 39.9
+  },
+  "0845": {
+   "sku": "0845",
+   "nome": "Short Doll Regata Cós Duplo",
+   "preco": 35.9,
+   "preco_maior": 39.9
+  },
+  "0848": {
+   "sku": "0848",
+   "nome": "Pijama Regata Canelado",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0849": {
+   "sku": "0849",
+   "nome": "Vestido Suede Canelado",
+   "preco": 41.9,
+   "preco_maior": 45.9
+  },
+  "0851": {
+   "sku": "0851",
+   "nome": "Pijama Americano Liso",
+   "preco": 49.5,
+   "preco_maior": 54.5
+  },
+  "0852": {
+   "sku": "0852",
+   "nome": "Pijama Manga Curta Com Calça",
+   "preco": 48.5,
+   "preco_maior": 52.9
+  },
+  "0853": {
+   "sku": "0853",
+   "nome": "Pijama Americano Curto",
+   "preco": 49.5,
+   "preco_maior": 54.5
+  },
+  "0854": {
+   "sku": "0854",
+   "nome": "Camisola Americana De Malha",
+   "preco": 46.9,
+   "preco_maior": 50.9
+  },
+  "0855": {
+   "sku": "0855",
+   "nome": "Camisola Americana Manga Comprida",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0870": {
+   "sku": "0870",
+   "nome": "Pijama Longo Listrado Fem.",
+   "preco": 53.5,
+   "preco_maior": 57.9
+  },
+  "0880": {
+   "sku": "0880",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 53.5,
+   "preco_maior": 58.5
+  },
+  "0890": {
+   "sku": "0890",
+   "nome": "Pijama Longo Aberto Mescla Fem.",
+   "preco": 56.9,
+   "preco_maior": null
+  },
+  "0901": {
+   "sku": "0901",
+   "nome": "Short Doll Regata Listrado",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0911": {
+   "sku": "0911",
+   "nome": "Short Doll Alça Listrado",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0981": {
+   "sku": "0981",
+   "nome": "Pijama Longo Malha Mescla Infantil Fem.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "0990": {
+   "sku": "0990",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 56.9,
+   "preco_maior": 61.9
+  },
+  "1001": {
+   "sku": "1001",
+   "nome": "Pijama Longo Aberto Feminino",
+   "preco": 69.9,
+   "preco_maior": 75.9
+  },
+  "1002": {
+   "sku": "1002",
+   "nome": "Pijama Longo Mescla Liso Masc.",
+   "preco": 59.9,
+   "preco_maior": 64.9
+  },
+  "1003": {
+   "sku": "1003",
+   "nome": "Pijama Manga Curta Liso Fem.",
+   "preco": 64.9,
+   "preco_maior": 69.9
+  },
+  "1004": {
+   "sku": "1004",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 79.9,
+   "preco_maior": 86.9
+  },
+  "1005": {
+   "sku": "1005",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 82.9,
+   "preco_maior": 89.9
+  },
+  "1007": {
+   "sku": "1007",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 54.9,
+   "preco_maior": null
+  },
+  "1008": {
+   "sku": "1008",
+   "nome": "Pijama Longo Moletinho Adulto Fem.",
+   "preco": 79.9,
+   "preco_maior": 85.9
+  },
+  "1009": {
+   "sku": "1009",
+   "nome": "Pijama Longo Moletinho Adulto Masc.",
+   "preco": 79.9,
+   "preco_maior": 85.9
+  },
+  "1010": {
+   "sku": "1010",
+   "nome": "Pijama Juvenil Manga Masc.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "1011": {
+   "sku": "1011",
+   "nome": "Pijama Juvenil Regata Masc.",
+   "preco": 30.9,
+   "preco_maior": null
+  },
+  "1012": {
+   "sku": "1012",
+   "nome": "Pijama Juvenil Mescla Regata Masc.",
+   "preco": 33.9,
+   "preco_maior": null
+  },
+  "1013": {
+   "sku": "1013",
+   "nome": "Pijama Juvenil Mescla Manga Masc.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "1020": {
+   "sku": "1020",
+   "nome": "Pijama Longo Moletinho Juvenil Fem.",
+   "preco": 59.9,
+   "preco_maior": null
+  },
+  "1021": {
+   "sku": "1021",
+   "nome": "Pijama Longo Moletinho Juvenill Masc.",
+   "preco": 59.9,
+   "preco_maior": null
+  },
+  "1023": {
+   "sku": "1023",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 54.9,
+   "preco_maior": null
+  },
+  "1024": {
+   "sku": "1024",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "1025": {
+   "sku": "1025",
+   "nome": "Pijama Manga Curta Listrado Masc.",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "1026": {
+   "sku": "1026",
+   "nome": "Pijama Longo Moletinho Bolso Adulto Fem.",
+   "preco": 84.9,
+   "preco_maior": 92.9
+  },
+  "1027": {
+   "sku": "1027",
+   "nome": "Pijama Longo Laço Feminino Adulto",
+   "preco": 88.9,
+   "preco_maior": 96.9
+  },
+  "1030": {
+   "sku": "1030",
+   "nome": "Conjunto Longo Gestante Feminino",
+   "preco": 61.9,
+   "preco_maior": 68.9
+  },
+  "1031": {
+   "sku": "1031",
+   "nome": "Pijama Longo Flamê Liso Feminino",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "1032": {
+   "sku": "1032",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 86.9,
+   "preco_maior": 95.5
+  },
+  "1033": {
+   "sku": "1033",
+   "nome": "Pijama Longo Canelado Feminino",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "1034": {
+   "sku": "1034",
+   "nome": "Pijama de Alça Canelado Feminino",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "1035": {
+   "sku": "1035",
+   "nome": "Pijama de Alça Canelado Bordado Fem.",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "1036": {
+   "sku": "1036",
+   "nome": "Pijama de Alça Família Feminino",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "1037": {
+   "sku": "1037",
+   "nome": "Pijama Família Masculino",
+   "preco": 49.9,
+   "preco_maior": null
+  },
+  "1038": {
+   "sku": "1038",
+   "nome": "Pijama Família Infantil Feminino",
+   "preco": 29.9,
+   "preco_maior": null
+  },
+  "1039": {
+   "sku": "1039",
+   "nome": "Pijama Família Infantil Masculino",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "1040": {
+   "sku": "1040",
+   "nome": "Pijama Família Juvenil Feminino",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "1041": {
+   "sku": "1041",
+   "nome": "Pijama Família Juvenil Masculino",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "1042": {
+   "sku": "1042",
+   "nome": "Pijama de Alça Suede Feminino",
+   "preco": 24.9,
+   "preco_maior": 27.5
+  },
+  "1043": {
+   "sku": "1043",
+   "nome": "Pijama de Alça Suede Liso Fem.",
+   "preco": 27.9,
+   "preco_maior": 30.9
+  },
+  "1400": {
+   "sku": "1400",
+   "nome": "Pijama Longo Juvenil Malha Fem.",
+   "preco": 36.5,
+   "preco_maior": null
+  },
+  "1460": {
+   "sku": "1460",
+   "nome": "Pijama Longo Juvenil Malha Masc.",
+   "preco": 38.5,
+   "preco_maior": null
+  },
+  "2130": {
+   "sku": "2130",
+   "nome": "Pijama Aberto Bordado Manga Masc.",
+   "preco": 49.5,
+   "preco_maior": 53.9
+  },
+  "2131": {
+   "sku": "2131",
+   "nome": "Pijama Regata Malha",
+   "preco": 33.9,
+   "preco_maior": 36.9
+  },
+  "2134": {
+   "sku": "2134",
+   "nome": "Short Doll Regata Estampado",
+   "preco": 33.9,
+   "preco_maior": 36.9
+  },
+  "2226": {
+   "sku": "2226",
+   "nome": "Camisola Aberta Estampada",
+   "preco": 39.5,
+   "preco_maior": 43.9
+  },
+  "4130": {
+   "sku": "4130",
+   "nome": "Pijama Aberto Com Calça Masc.",
+   "preco": 53.9,
+   "preco_maior": 59.5
+  },
+  "4131": {
+   "sku": "4131",
+   "nome": "Pijama Longo Aberto Masculino",
+   "preco": 56.9,
+   "preco_maior": 62.5
+  }
+ },
+ "02": {
+  "0015": {
+   "sku": "0015",
+   "nome": "Camisola De Alça",
+   "preco": 24.9,
+   "preco_maior": 26.9
+  },
+  "0070": {
+   "sku": "0070",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0072": {
+   "sku": "0072",
+   "nome": "Camisola Com Renda Liganete",
+   "preco": 40.9,
+   "preco_maior": 45.0
+  },
+  "0080": {
+   "sku": "0080",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0083": {
+   "sku": "0083",
+   "nome": "Camisola Aberta Regata Liganete",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0085": {
+   "sku": "0085",
+   "nome": "Pijama Regata Liganete",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0086": {
+   "sku": "0086",
+   "nome": "Pijama Manga Curta Com Calça Liganete",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0087": {
+   "sku": "0087",
+   "nome": "Camisola Aberta Manga Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0088": {
+   "sku": "0088",
+   "nome": "Pijama Aberto Liganete",
+   "preco": 44.9,
+   "preco_maior": 49.0
+  },
+  "0090": {
+   "sku": "0090",
+   "nome": "Camisola Gestante Liganete",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0091": {
+   "sku": "0091",
+   "nome": "Camisola Alça Liganete Estampada",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "0092": {
+   "sku": "0092",
+   "nome": "Camisola Gestante De Liganete",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0093": {
+   "sku": "0093",
+   "nome": "Camisola Alça Liganete Lisa",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0094": {
+   "sku": "0094",
+   "nome": "Camisola De Liganete",
+   "preco": 38.9,
+   "preco_maior": 42.9
+  },
+  "0095": {
+   "sku": "0095",
+   "nome": "Camisola Gestante Alça Liganete",
+   "preco": 43.9,
+   "preco_maior": 47.9
+  },
+  "0096": {
+   "sku": "0096",
+   "nome": "Camisola Gestante Lisa Liganete",
+   "preco": 51.9,
+   "preco_maior": 56.9
+  },
+  "0102": {
+   "sku": "0102",
+   "nome": "Pijama Mescla Infantil Masc.",
+   "preco": 30.9,
+   "preco_maior": null
+  },
+  "0103": {
+   "sku": "0103",
+   "nome": "Pijama De Malha Infantil Masc.",
+   "preco": 28.9,
+   "preco_maior": null
+  },
+  "0104": {
+   "sku": "0104",
+   "nome": "Pijama Regata Mescla Infantil Masc.",
+   "preco": 28.9,
+   "preco_maior": null
+  },
+  "0107": {
+   "sku": "0107",
+   "nome": "Pijama Familia Feminino",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0109": {
+   "sku": "0109",
+   "nome": "Short Doll Regata Bolinha",
+   "preco": 34.0,
+   "preco_maior": 36.9
+  },
+  "0110": {
+   "sku": "0110",
+   "nome": "Short Doll Regata Malha",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0111": {
+   "sku": "0111",
+   "nome": "Camisola Regata Malha",
+   "preco": 25.9,
+   "preco_maior": 27.9
+  },
+  "0114": {
+   "sku": "0114",
+   "nome": "Pijama Familia Infantil Fem.",
+   "preco": 29.9,
+   "preco_maior": null
+  },
+  "0115": {
+   "sku": "0115",
+   "nome": "Short Doll Alça Malha",
+   "preco": 27.9,
+   "preco_maior": 30.9
+  },
+  "0116": {
+   "sku": "0116",
+   "nome": "Short Doll Alça Malha Bolinha",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0122": {
+   "sku": "0122",
+   "nome": "Pijama De Manga Malha",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0123": {
+   "sku": "0123",
+   "nome": "Pijama Aberto De Manga Bordado",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0124": {
+   "sku": "0124",
+   "nome": "Short Doll De Manga Infantil Fem .",
+   "preco": 21.9,
+   "preco_maior": null
+  },
+  "0125": {
+   "sku": "0125",
+   "nome": "Camisola Bordada De Manga",
+   "preco": 43.9,
+   "preco_maior": 47.9
+  },
+  "0126": {
+   "sku": "0126",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 41.9,
+   "preco_maior": 46.9
+  },
+  "0128": {
+   "sku": "0128",
+   "nome": "Pijama Aberto De Manga Estampado",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0129": {
+   "sku": "0129",
+   "nome": "Pijama Bordado Regata Masc.",
+   "preco": 45.9,
+   "preco_maior": 49.9
+  },
+  "0130": {
+   "sku": "0130",
+   "nome": "Pijama Bordado Manga Masc.",
+   "preco": 48.9,
+   "preco_maior": 59.9
+  },
+  "0131": {
+   "sku": "0131",
+   "nome": "Short De Malha Masculino",
+   "preco": 16.9,
+   "preco_maior": 18.9
+  },
+  "0135": {
+   "sku": "0135",
+   "nome": "Short De Malha Estampado Masculino",
+   "preco": 16.9,
+   "preco_maior": 18.9
+  },
+  "0139": {
+   "sku": "0139",
+   "nome": "Pijama Regata Infantil Masc.",
+   "preco": 25.9,
+   "preco_maior": null
+  },
+  "0140": {
+   "sku": "0140",
+   "nome": "Pijama Longo Malha Feminino",
+   "preco": 47.9,
+   "preco_maior": 51.9
+  },
+  "0141": {
+   "sku": "0141",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 38.9,
+   "preco_maior": null
+  },
+  "0142": {
+   "sku": "0142",
+   "nome": "Pijama Longo Malha Infantil Fem.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0143": {
+   "sku": "0143",
+   "nome": "Pijama Longo Malha Infantil Masc.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0145": {
+   "sku": "0145",
+   "nome": "Pijama Longo Malha Masculino",
+   "preco": 54.9,
+   "preco_maior": 58.9
+  },
+  "0159": {
+   "sku": "0159",
+   "nome": "Pijama Longo Moletinho Estampado",
+   "preco": 79.9,
+   "preco_maior": 86.9
+  },
+  "0160": {
+   "sku": "0160",
+   "nome": "Pijama Longo Moletinho Flanelado Fem.",
+   "preco": 75.9,
+   "preco_maior": 82.0
+  },
+  "0161": {
+   "sku": "0161",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 83.9,
+   "preco_maior": 91.9
+  },
+  "0162": {
+   "sku": "0162",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 50.9,
+   "preco_maior": null
+  },
+  "0163": {
+   "sku": "0163",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 50.9,
+   "preco_maior": null
+  },
+  "0169": {
+   "sku": "0169",
+   "nome": "Pijama Longo Moletinho Fem.",
+   "preco": 84.9,
+   "preco_maior": 93.0
+  },
+  "0171": {
+   "sku": "0171",
+   "nome": "Pijama Longo Moletinho Masc.",
+   "preco": 87.9,
+   "preco_maior": 96.9
+  },
+  "0172": {
+   "sku": "0172",
+   "nome": "Pijama Longo Moletinho Aberto Masc.",
+   "preco": 95.9,
+   "preco_maior": 101.9
+  },
+  "0179": {
+   "sku": "0179",
+   "nome": "Pijama Longo Infantil Plush Fem.",
+   "preco": 54.9,
+   "preco_maior": null
+  },
+  "0199": {
+   "sku": "0199",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 80.9,
+   "preco_maior": 87.9
+  },
+  "0200": {
+   "sku": "0200",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 95.9,
+   "preco_maior": 105.9
+  },
+  "0201": {
+   "sku": "0201",
+   "nome": "Pijama Longo Infantil Plush Masc.",
+   "preco": 54.9,
+   "preco_maior": null
+  },
+  "0202": {
+   "sku": "0202",
+   "nome": "Pijama Longo Juvenil Plush Masc.",
+   "preco": 70.9,
+   "preco_maior": null
+  },
+  "0203": {
+   "sku": "0203",
+   "nome": "Pijama Estampado Manga Infantil Masc.",
+   "preco": 23.0,
+   "preco_maior": null
+  },
+  "0204": {
+   "sku": "0204",
+   "nome": "Pijama Longo Juvenil Plush Fem.",
+   "preco": 70.9,
+   "preco_maior": null
+  },
+  "0216": {
+   "sku": "0216",
+   "nome": "Short Doll Alça Malha Onça",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0220": {
+   "sku": "0220",
+   "nome": "Pijama Longo Canelado Liso Fem.",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "0221": {
+   "sku": "0221",
+   "nome": "Pijama Longo Canelado Estampado Fem.",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "0222": {
+   "sku": "0222",
+   "nome": "Pijama De Calça Canelado Liso Fem.",
+   "preco": 54.9,
+   "preco_maior": 60.9
+  },
+  "0223": {
+   "sku": "0223",
+   "nome": "Pijama De Calça Canelado Estampado Fem.",
+   "preco": 54.9,
+   "preco_maior": 60.9
+  },
+  "0239": {
+   "sku": "0239",
+   "nome": "Pijama Estampado Regata Infantil Masc.",
+   "preco": 21.9,
+   "preco_maior": null
+  },
+  "0240": {
+   "sku": "0240",
+   "nome": "Pijama Longo Estampado Aberto Fem.",
+   "preco": 53.9,
+   "preco_maior": 58.9
+  },
+  "0242": {
+   "sku": "0242",
+   "nome": "Pijama Longo Estampado Infantil Fem.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "0245": {
+   "sku": "0245",
+   "nome": "Pijama Longo Estampado Fem.",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0250": {
+   "sku": "0250",
+   "nome": "Pijama Longo De Onça Fem.",
+   "preco": 48.9,
+   "preco_maior": null
+  },
+  "0260": {
+   "sku": "0260",
+   "nome": "Pijama Longo Suede Felpado Fem.",
+   "preco": 53.9,
+   "preco_maior": 58.9
+  },
+  "0262": {
+   "sku": "0262",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Fem.",
+   "preco": 53.9,
+   "preco_maior": null
+  },
+  "0263": {
+   "sku": "0263",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Masc.",
+   "preco": 53.9,
+   "preco_maior": null
+  },
+  "0300": {
+   "sku": "0300",
+   "nome": "Robe De Seda",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0301": {
+   "sku": "0301",
+   "nome": "Robe De Liganete",
+   "preco": 49.9,
+   "preco_maior": 53.9
+  },
+  "0303": {
+   "sku": "0303",
+   "nome": "Pijama Longo Estampado Infantil Masc.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "0304": {
+   "sku": "0304",
+   "nome": "Pijama Família Masculino",
+   "preco": 45.0,
+   "preco_maior": 49.9
+  },
+  "0305": {
+   "sku": "0305",
+   "nome": "Pijama Família Juvenil Masc.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0306": {
+   "sku": "0306",
+   "nome": "Pijama Família Infantil Masc.",
+   "preco": 27.9,
+   "preco_maior": null
+  },
+  "0307": {
+   "sku": "0307",
+   "nome": "Pijama Família Feminino",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0308": {
+   "sku": "0308",
+   "nome": "Pijama Família Juvenil Fem.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0309": {
+   "sku": "0309",
+   "nome": "Pijama Família Infantil Fem.",
+   "preco": 27.9,
+   "preco_maior": null
+  },
+  "0310": {
+   "sku": "0310",
+   "nome": "Pijama Regata Malha",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0316": {
+   "sku": "0316",
+   "nome": "Short Doll Nadador De Onça",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0321": {
+   "sku": "0321",
+   "nome": "Pijama De Bermuda Gestante",
+   "preco": 39.9,
+   "preco_maior": 41.9
+  },
+  "0325": {
+   "sku": "0325",
+   "nome": "Camisola De Gestante Listrado",
+   "preco": 39.9,
+   "preco_maior": 41.9
+  },
+  "0327": {
+   "sku": "0327",
+   "nome": "Camisola Gestante Estampada",
+   "preco": 43.9,
+   "preco_maior": 47.9
+  },
+  "0328": {
+   "sku": "0328",
+   "nome": "Camisola Gestante Alça Malha",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0329": {
+   "sku": "0329",
+   "nome": "Pijama Estampado Regata Masc.",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0330": {
+   "sku": "0330",
+   "nome": "Pijama Estampado Manga Masc.",
+   "preco": 53.9,
+   "preco_maior": 58.9
+  },
+  "0350": {
+   "sku": "0350",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 44.9,
+   "preco_maior": 49.9
+  },
+  "0352": {
+   "sku": "0352",
+   "nome": "Camisola Bordada",
+   "preco": 47.9,
+   "preco_maior": null
+  },
+  "0354": {
+   "sku": "0354",
+   "nome": "Short Doll Alça Canelado",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0355": {
+   "sku": "0355",
+   "nome": "Short Doll Regata Canelado",
+   "preco": 41.9,
+   "preco_maior": 46.9
+  },
+  "0358": {
+   "sku": "0358",
+   "nome": "Short Doll Alça Jovem",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "0359": {
+   "sku": "0359",
+   "nome": "Short Doll Regata Composé",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "0380": {
+   "sku": "0380",
+   "nome": "Camisola Nadador",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0390": {
+   "sku": "0390",
+   "nome": "Short Doll Nadador",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0402": {
+   "sku": "0402",
+   "nome": "Pijama Familia Manga Masc.",
+   "preco": 49.9,
+   "preco_maior": 52.9
+  },
+  "0403": {
+   "sku": "0403",
+   "nome": "Pijama Familia Regata Masc.",
+   "preco": 45.0,
+   "preco_maior": null
+  },
+  "0404": {
+   "sku": "0404",
+   "nome": "Pijama Familia Juvenil Masc.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0407": {
+   "sku": "0407",
+   "nome": "Pijama Familia Infantil Masc.",
+   "preco": 29.9,
+   "preco_maior": null
+  },
+  "0429": {
+   "sku": "0429",
+   "nome": "Pijama Mescla Regata Masc.",
+   "preco": 52.9,
+   "preco_maior": 57.9
+  },
+  "0430": {
+   "sku": "0430",
+   "nome": "Pijama Mescla Masculino",
+   "preco": 54.9,
+   "preco_maior": 60.9
+  },
+  "0499": {
+   "sku": "0499",
+   "nome": "Pijama Bermuda Liganete",
+   "preco": 41.9,
+   "preco_maior": 44.9
+  },
+  "0500": {
+   "sku": "0500",
+   "nome": "Camisola Alça Liganete",
+   "preco": 26.9,
+   "preco_maior": 29.9
+  },
+  "0501": {
+   "sku": "0501",
+   "nome": "Pijama Regata Estampada Liganete",
+   "preco": 35.9,
+   "preco_maior": 37.9
+  },
+  "0502": {
+   "sku": "0502",
+   "nome": "Short Doll Alça Liganete",
+   "preco": 30.9,
+   "preco_maior": 32.9
+  },
+  "0550": {
+   "sku": "0550",
+   "nome": "Short Liganete Masculino",
+   "preco": 17.9,
+   "preco_maior": 19.9
+  },
+  "0570": {
+   "sku": "0570",
+   "nome": "Pijama Liganete Masculino",
+   "preco": 48.9,
+   "preco_maior": 52.9
+  },
+  "0582": {
+   "sku": "0582",
+   "nome": "Pijama Regata Renda",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0590": {
+   "sku": "0590",
+   "nome": "Pijama Regata Pescador",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0595": {
+   "sku": "0595",
+   "nome": "Jogo De Robe Bordado",
+   "preco": 76.9,
+   "preco_maior": 83.9
+  },
+  "0601": {
+   "sku": "0601",
+   "nome": "Short Doll Regata Liganete",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0605": {
+   "sku": "0605",
+   "nome": "Camisola Regata Liganete",
+   "preco": 29.9,
+   "preco_maior": 31.9
+  },
+  "0640": {
+   "sku": "0640",
+   "nome": "Camisola Gestante",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0650": {
+   "sku": "0650",
+   "nome": "Camisola Estampada Manga",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0690": {
+   "sku": "0690",
+   "nome": "Pijama Manga Pescador",
+   "preco": 42.9,
+   "preco_maior": 46.9
+  },
+  "0702": {
+   "sku": "0702",
+   "nome": "Camisola Alça",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0703": {
+   "sku": "0703",
+   "nome": "Camisola Regata",
+   "preco": 31.9,
+   "preco_maior": 42.9
+  },
+  "0704": {
+   "sku": "0704",
+   "nome": "Short Doll De Alça",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0705": {
+   "sku": "0705",
+   "nome": "Short Doll Regata",
+   "preco": 38.9,
+   "preco_maior": 49.9
+  },
+  "0706": {
+   "sku": "0706",
+   "nome": "Pijama De Manga Feminino",
+   "preco": 41.9,
+   "preco_maior": 52.9
+  },
+  "0707": {
+   "sku": "0707",
+   "nome": "Pijama Regata Infantil Feminino",
+   "preco": 30.9,
+   "preco_maior": null
+  },
+  "0710": {
+   "sku": "0710",
+   "nome": "Camisola Alça Estampada",
+   "preco": 30.9,
+   "preco_maior": 32.9
+  },
+  "0714": {
+   "sku": "0714",
+   "nome": "Pijama Cropped",
+   "preco": 44.9,
+   "preco_maior": 48.9
+  },
+  "0715": {
+   "sku": "0715",
+   "nome": "Camisão Estampado",
+   "preco": 41.9,
+   "preco_maior": 46.9
+  },
+  "0716": {
+   "sku": "0716",
+   "nome": "Pijama De Liganete Masc.",
+   "preco": 54.9,
+   "preco_maior": 60.9
+  },
+  "0719": {
+   "sku": "0719",
+   "nome": "Pijama Aberto Estampado Manga",
+   "preco": 42.9,
+   "preco_maior": 45.9
+  },
+  "0720": {
+   "sku": "0720",
+   "nome": "Short Doll Alça Estampado",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0730": {
+   "sku": "0730",
+   "nome": "Short Doll Nadador Estampado",
+   "preco": 39.9,
+   "preco_maior": 42.9
+  },
+  "0750": {
+   "sku": "0750",
+   "nome": "Short Doll Alça Mescla",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0760": {
+   "sku": "0760",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0770": {
+   "sku": "0770",
+   "nome": "Camisola Nadador Mescla",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0800": {
+   "sku": "0800",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0810": {
+   "sku": "0810",
+   "nome": "Short Doll Regata Mescla Infantil Fem.",
+   "preco": 18.9,
+   "preco_maior": null
+  },
+  "0815": {
+   "sku": "0815",
+   "nome": "Pijama Juvenil Alça Fem.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0816": {
+   "sku": "0816",
+   "nome": "Pijama Juvenil Nadador Fem.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0819": {
+   "sku": "0819",
+   "nome": "Conjunto Short Teen",
+   "preco": 37.9,
+   "preco_maior": null
+  },
+  "0841": {
+   "sku": "0841",
+   "nome": "Short Doll Alça Malha",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0845": {
+   "sku": "0845",
+   "nome": "Short Doll Regata Cós Duplo",
+   "preco": 39.9,
+   "preco_maior": 43.9
+  },
+  "0848": {
+   "sku": "0848",
+   "nome": "Pijama Regata Canelado",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0849": {
+   "sku": "0849",
+   "nome": "Vestido Suede Canelado",
+   "preco": 46.9,
+   "preco_maior": 50.9
+  },
+  "0851": {
+   "sku": "0851",
+   "nome": "Pijama Americano Liso",
+   "preco": 54.9,
+   "preco_maior": 60.0
+  },
+  "0852": {
+   "sku": "0852",
+   "nome": "Pijama Manga Curta Com Calça",
+   "preco": 53.9,
+   "preco_maior": 58.9
+  },
+  "0853": {
+   "sku": "0853",
+   "nome": "Pijama Americano Curto",
+   "preco": 54.9,
+   "preco_maior": 60.0
+  },
+  "0854": {
+   "sku": "0854",
+   "nome": "Camisola Americana De Malha",
+   "preco": 51.9,
+   "preco_maior": 56.0
+  },
+  "0855": {
+   "sku": "0855",
+   "nome": "Camisola Americana Manga Comprida",
+   "preco": 54.9,
+   "preco_maior": 60.9
+  },
+  "0870": {
+   "sku": "0870",
+   "nome": "Pijama Longo Listrado Fem.",
+   "preco": 58.9,
+   "preco_maior": 63.9
+  },
+  "0880": {
+   "sku": "0880",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 58.9,
+   "preco_maior": 64.9
+  },
+  "0890": {
+   "sku": "0890",
+   "nome": "Pijama Longo Aberto Mescla Fem.",
+   "preco": 62.9,
+   "preco_maior": null
+  },
+  "0901": {
+   "sku": "0901",
+   "nome": "Short Doll Regata Listrado",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0911": {
+   "sku": "0911",
+   "nome": "Short Doll Alça Listrado",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0981": {
+   "sku": "0981",
+   "nome": "Pijama Longo Malha Mescla Infantil Fem.",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "0990": {
+   "sku": "0990",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 62.9,
+   "preco_maior": 68.9
+  },
+  "1001": {
+   "sku": "1001",
+   "nome": "Pijama Longo Aberto Feminino",
+   "preco": 76.9,
+   "preco_maior": 83.9
+  },
+  "1002": {
+   "sku": "1002",
+   "nome": "Pijama Longo Mescla Liso Masc.",
+   "preco": 65.9,
+   "preco_maior": 71.9
+  },
+  "1003": {
+   "sku": "1003",
+   "nome": "Pijama Manga Curta Liso Fem.",
+   "preco": 71.9,
+   "preco_maior": 76.9
+  },
+  "1004": {
+   "sku": "1004",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 87.9,
+   "preco_maior": 95.9
+  },
+  "1005": {
+   "sku": "1005",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 91.9,
+   "preco_maior": 98.9
+  },
+  "1007": {
+   "sku": "1007",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 60.9,
+   "preco_maior": null
+  },
+  "1008": {
+   "sku": "1008",
+   "nome": "Pijama Longo Moletinho Adulto Fem.",
+   "preco": 87.9,
+   "preco_maior": 94.9
+  },
+  "1009": {
+   "sku": "1009",
+   "nome": "Pijama Longo Moletinho Adulto Masc.",
+   "preco": 87.9,
+   "preco_maior": 94.9
+  },
+  "1010": {
+   "sku": "1010",
+   "nome": "Pijama Juvenil Manga Masc.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "1011": {
+   "sku": "1011",
+   "nome": "Pijama Juvenil Regata Masc.",
+   "preco": 34.0,
+   "preco_maior": null
+  },
+  "1012": {
+   "sku": "1012",
+   "nome": "Pijama Juvenil Mescla Regata Masc.",
+   "preco": 37.9,
+   "preco_maior": null
+  },
+  "1013": {
+   "sku": "1013",
+   "nome": "Pijama Juvenil Mescla Manga Masc.",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "1020": {
+   "sku": "1020",
+   "nome": "Pijama Longo Moletinho Juvenil Fem.",
+   "preco": 65.9,
+   "preco_maior": null
+  },
+  "1021": {
+   "sku": "1021",
+   "nome": "Pijama Longo Moletinho Juvenill Masc.",
+   "preco": 65.9,
+   "preco_maior": null
+  },
+  "1023": {
+   "sku": "1023",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 60.9,
+   "preco_maior": null
+  },
+  "1024": {
+   "sku": "1024",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "1025": {
+   "sku": "1025",
+   "nome": "Pijama Manga Curta Listrado Masc.",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "1026": {
+   "sku": "1026",
+   "nome": "Pijama Longo Moletinho Bolso Adulto Fem.",
+   "preco": 93.9,
+   "preco_maior": 102.9
+  },
+  "1027": {
+   "sku": "1027",
+   "nome": "Pijama Longo Laço Feminino Adulto",
+   "preco": 97.9,
+   "preco_maior": 106.9
+  },
+  "1030": {
+   "sku": "1030",
+   "nome": "Conjunto Longo Gestante Feminino",
+   "preco": 68.9,
+   "preco_maior": 75.9
+  },
+  "1031": {
+   "sku": "1031",
+   "nome": "Pijama Longo Flamê Liso Feminino",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "1032": {
+   "sku": "1032",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 95.9,
+   "preco_maior": 105.9
+  },
+  "1033": {
+   "sku": "1033",
+   "nome": "Pijama Longo Canelado Feminino",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "1034": {
+   "sku": "1034",
+   "nome": "Pijama de Alça Canelado Feminino",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "1035": {
+   "sku": "1035",
+   "nome": "Pijama de Alça Canelado Bordado Fem.",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "1036": {
+   "sku": "1036",
+   "nome": "Pijama de Alça Família Feminino",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "1037": {
+   "sku": "1037",
+   "nome": "Pijama Família Masculino",
+   "preco": 54.9,
+   "preco_maior": null
+  },
+  "1038": {
+   "sku": "1038",
+   "nome": "Pijama Família Infantil Feminino",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "1039": {
+   "sku": "1039",
+   "nome": "Pijama Família Infantil Masculino",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "1040": {
+   "sku": "1040",
+   "nome": "Pijama Família Juvenil Feminino",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "1041": {
+   "sku": "1041",
+   "nome": "Pijama Família Juvenil Masculino",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "1042": {
+   "sku": "1042",
+   "nome": "Pijama de Alça Suede Feminino",
+   "preco": 27.9,
+   "preco_maior": 30.9
+  },
+  "1043": {
+   "sku": "1043",
+   "nome": "Pijama de Alça Suede Liso Fem.",
+   "preco": 30.9,
+   "preco_maior": 34.0
+  },
+  "1400": {
+   "sku": "1400",
+   "nome": "Pijama Longo Juvenil Malha Fem.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "1460": {
+   "sku": "1460",
+   "nome": "Pijama Longo Juvenil Malha Masc.",
+   "preco": 42.9,
+   "preco_maior": null
+  },
+  "2130": {
+   "sku": "2130",
+   "nome": "Pijama Aberto Bordado Manga Masc.",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "2131": {
+   "sku": "2131",
+   "nome": "Pijama Regata Malha",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "2134": {
+   "sku": "2134",
+   "nome": "Short Doll Regata Estampado",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "2226": {
+   "sku": "2226",
+   "nome": "Camisola Aberta Estampada",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "4130": {
+   "sku": "4130",
+   "nome": "Pijama Aberto Com Calça Masc.",
+   "preco": 59.9,
+   "preco_maior": 65.9
+  },
+  "4131": {
+   "sku": "4131",
+   "nome": "Pijama Longo Aberto Masculino",
+   "preco": 62.9,
+   "preco_maior": 68.9
+  }
+ },
+ "03": {
+  "0015": {
+   "sku": "0015",
+   "nome": "Camisola De Alça",
+   "preco": 27.9,
+   "preco_maior": 29.9
+  },
+  "0070": {
+   "sku": "0070",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 47.9,
+   "preco_maior": 52.9
+  },
+  "0072": {
+   "sku": "0072",
+   "nome": "Camisola Com Renda Liganete",
+   "preco": 45.0,
+   "preco_maior": 49.9
+  },
+  "0080": {
+   "sku": "0080",
+   "nome": "Short Doll Com Renda Liganete",
+   "preco": 47.9,
+   "preco_maior": 52.9
+  },
+  "0083": {
+   "sku": "0083",
+   "nome": "Camisola Aberta Regata Liganete",
+   "preco": 45.0,
+   "preco_maior": 48.9
+  },
+  "0085": {
+   "sku": "0085",
+   "nome": "Pijama Regata Liganete",
+   "preco": 40.9,
+   "preco_maior": 45.0
+  },
+  "0086": {
+   "sku": "0086",
+   "nome": "Pijama Manga Curta Com Calça Liganete",
+   "preco": 53.9,
+   "preco_maior": 59.9
+  },
+  "0087": {
+   "sku": "0087",
+   "nome": "Camisola Aberta Manga Liganete",
+   "preco": 47.9,
+   "preco_maior": 52.9
+  },
+  "0088": {
+   "sku": "0088",
+   "nome": "Pijama Aberto Liganete",
+   "preco": 49.9,
+   "preco_maior": 53.9
+  },
+  "0090": {
+   "sku": "0090",
+   "nome": "Camisola Gestante Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0091": {
+   "sku": "0091",
+   "nome": "Camisola Alça Liganete Estampada",
+   "preco": 46.9,
+   "preco_maior": 49.9
+  },
+  "0092": {
+   "sku": "0092",
+   "nome": "Camisola Gestante De Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0093": {
+   "sku": "0093",
+   "nome": "Camisola Alça Liganete Lisa",
+   "preco": 47.9,
+   "preco_maior": 52.9
+  },
+  "0094": {
+   "sku": "0094",
+   "nome": "Camisola De Liganete",
+   "preco": 42.9,
+   "preco_maior": 47.9
+  },
+  "0095": {
+   "sku": "0095",
+   "nome": "Camisola Gestante Alça Liganete",
+   "preco": 48.9,
+   "preco_maior": 52.9
+  },
+  "0096": {
+   "sku": "0096",
+   "nome": "Camisola Gestante Lisa Liganete",
+   "preco": 57.9,
+   "preco_maior": 62.9
+  },
+  "0102": {
+   "sku": "0102",
+   "nome": "Pijama Mescla Infantil Masc.",
+   "preco": 34.0,
+   "preco_maior": null
+  },
+  "0103": {
+   "sku": "0103",
+   "nome": "Pijama De Malha Infantil Masc.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0104": {
+   "sku": "0104",
+   "nome": "Pijama Regata Mescla Infantil Masc.",
+   "preco": 31.9,
+   "preco_maior": null
+  },
+  "0107": {
+   "sku": "0107",
+   "nome": "Pijama Familia Feminino",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0109": {
+   "sku": "0109",
+   "nome": "Short Doll Regata Bolinha",
+   "preco": 37.9,
+   "preco_maior": 40.9
+  },
+  "0110": {
+   "sku": "0110",
+   "nome": "Short Doll Regata Malha",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0111": {
+   "sku": "0111",
+   "nome": "Camisola Regata Malha",
+   "preco": 28.9,
+   "preco_maior": 30.9
+  },
+  "0114": {
+   "sku": "0114",
+   "nome": "Pijama Familia Infantil Fem.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0115": {
+   "sku": "0115",
+   "nome": "Short Doll Alça Malha",
+   "preco": 30.9,
+   "preco_maior": 34.0
+  },
+  "0116": {
+   "sku": "0116",
+   "nome": "Short Doll Alça Malha Bolinha",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0122": {
+   "sku": "0122",
+   "nome": "Pijama De Manga Malha",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0123": {
+   "sku": "0123",
+   "nome": "Pijama Aberto De Manga Bordado",
+   "preco": 47.9,
+   "preco_maior": 52.9
+  },
+  "0124": {
+   "sku": "0124",
+   "nome": "Short Doll De Manga Infantil Fem .",
+   "preco": 24.9,
+   "preco_maior": null
+  },
+  "0125": {
+   "sku": "0125",
+   "nome": "Camisola Bordada De Manga",
+   "preco": 48.9,
+   "preco_maior": 52.9
+  },
+  "0126": {
+   "sku": "0126",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 46.9,
+   "preco_maior": 51.9
+  },
+  "0128": {
+   "sku": "0128",
+   "nome": "Pijama Aberto De Manga Estampado",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0129": {
+   "sku": "0129",
+   "nome": "Pijama Bordado Regata Masc.",
+   "preco": 50.9,
+   "preco_maior": 54.9
+  },
+  "0130": {
+   "sku": "0130",
+   "nome": "Pijama Bordado Manga Masc.",
+   "preco": 53.9,
+   "preco_maior": 65.9
+  },
+  "0131": {
+   "sku": "0131",
+   "nome": "Short De Malha Masculino",
+   "preco": 18.9,
+   "preco_maior": 20.9
+  },
+  "0135": {
+   "sku": "0135",
+   "nome": "Short De Malha Estampado Masculino",
+   "preco": 18.9,
+   "preco_maior": 20.9
+  },
+  "0139": {
+   "sku": "0139",
+   "nome": "Pijama Regata Infantil Masc.",
+   "preco": 28.9,
+   "preco_maior": null
+  },
+  "0140": {
+   "sku": "0140",
+   "nome": "Pijama Longo Malha Feminino",
+   "preco": 52.9,
+   "preco_maior": 57.9
+  },
+  "0141": {
+   "sku": "0141",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 42.9,
+   "preco_maior": null
+  },
+  "0142": {
+   "sku": "0142",
+   "nome": "Pijama Longo Malha Infantil Fem.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "0143": {
+   "sku": "0143",
+   "nome": "Pijama Longo Malha Infantil Masc.",
+   "preco": 35.9,
+   "preco_maior": null
+  },
+  "0145": {
+   "sku": "0145",
+   "nome": "Pijama Longo Malha Masculino",
+   "preco": 60.9,
+   "preco_maior": 64.9
+  },
+  "0159": {
+   "sku": "0159",
+   "nome": "Pijama Longo Moletinho Estampado",
+   "preco": 87.9,
+   "preco_maior": 95.9
+  },
+  "0160": {
+   "sku": "0160",
+   "nome": "Pijama Longo Moletinho Flanelado Fem.",
+   "preco": 83.9,
+   "preco_maior": 90.9
+  },
+  "0161": {
+   "sku": "0161",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 92.9,
+   "preco_maior": 101.9
+  },
+  "0162": {
+   "sku": "0162",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 56.0,
+   "preco_maior": null
+  },
+  "0163": {
+   "sku": "0163",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 56.0,
+   "preco_maior": null
+  },
+  "0169": {
+   "sku": "0169",
+   "nome": "Pijama Longo Moletinho Fem.",
+   "preco": 93.9,
+   "preco_maior": 102.9
+  },
+  "0171": {
+   "sku": "0171",
+   "nome": "Pijama Longo Moletinho Masc.",
+   "preco": 96.9,
+   "preco_maior": 106.9
+  },
+  "0172": {
+   "sku": "0172",
+   "nome": "Pijama Longo Moletinho Aberto Masc.",
+   "preco": 105.9,
+   "preco_maior": 112.9
+  },
+  "0179": {
+   "sku": "0179",
+   "nome": "Pijama Longo Infantil Plush Fem.",
+   "preco": 60.9,
+   "preco_maior": null
+  },
+  "0199": {
+   "sku": "0199",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 89.0,
+   "preco_maior": 96.9
+  },
+  "0200": {
+   "sku": "0200",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 105.9,
+   "preco_maior": 116.9
+  },
+  "0201": {
+   "sku": "0201",
+   "nome": "Pijama Longo Infantil Plush Masc.",
+   "preco": 60.9,
+   "preco_maior": null
+  },
+  "0202": {
+   "sku": "0202",
+   "nome": "Pijama Longo Juvenil Plush Masc.",
+   "preco": 78.0,
+   "preco_maior": null
+  },
+  "0203": {
+   "sku": "0203",
+   "nome": "Pijama Estampado Manga Infantil Masc.",
+   "preco": 25.9,
+   "preco_maior": null
+  },
+  "0204": {
+   "sku": "0204",
+   "nome": "Pijama Longo Juvenil Plush Fem.",
+   "preco": 78.0,
+   "preco_maior": null
+  },
+  "0216": {
+   "sku": "0216",
+   "nome": "Short Doll Alça Malha Onça",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0220": {
+   "sku": "0220",
+   "nome": "Pijama Longo Canelado Liso Fem.",
+   "preco": 67.0,
+   "preco_maior": 72.9
+  },
+  "0221": {
+   "sku": "0221",
+   "nome": "Pijama Longo Canelado Estampado Fem.",
+   "preco": 67.0,
+   "preco_maior": 72.9
+  },
+  "0222": {
+   "sku": "0222",
+   "nome": "Pijama De Calça Canelado Liso Fem.",
+   "preco": 60.9,
+   "preco_maior": 67.0
+  },
+  "0223": {
+   "sku": "0223",
+   "nome": "Pijama De Calça Canelado Estampado Fem.",
+   "preco": 60.9,
+   "preco_maior": 67.0
+  },
+  "0239": {
+   "sku": "0239",
+   "nome": "Pijama Estampado Regata Infantil Masc.",
+   "preco": 24.9,
+   "preco_maior": null
+  },
+  "0240": {
+   "sku": "0240",
+   "nome": "Pijama Longo Estampado Aberto Fem.",
+   "preco": 59.9,
+   "preco_maior": 64.9
+  },
+  "0242": {
+   "sku": "0242",
+   "nome": "Pijama Longo Estampado Infantil Fem.",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "0245": {
+   "sku": "0245",
+   "nome": "Pijama Longo Estampado Fem.",
+   "preco": 53.9,
+   "preco_maior": 59.9
+  },
+  "0250": {
+   "sku": "0250",
+   "nome": "Pijama Longo De Onça Fem.",
+   "preco": 53.9,
+   "preco_maior": null
+  },
+  "0260": {
+   "sku": "0260",
+   "nome": "Pijama Longo Suede Felpado Fem.",
+   "preco": 59.9,
+   "preco_maior": 64.9
+  },
+  "0262": {
+   "sku": "0262",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Fem.",
+   "preco": 59.9,
+   "preco_maior": null
+  },
+  "0263": {
+   "sku": "0263",
+   "nome": "Pijama Longo Moletinho Estampado Inf. Masc.",
+   "preco": 59.9,
+   "preco_maior": null
+  },
+  "0300": {
+   "sku": "0300",
+   "nome": "Robe De Seda",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "0301": {
+   "sku": "0301",
+   "nome": "Robe De Liganete",
+   "preco": 54.9,
+   "preco_maior": 59.9
+  },
+  "0303": {
+   "sku": "0303",
+   "nome": "Pijama Longo Estampado Infantil Masc.",
+   "preco": 39.9,
+   "preco_maior": null
+  },
+  "0304": {
+   "sku": "0304",
+   "nome": "Pijama Família Masculino",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0305": {
+   "sku": "0305",
+   "nome": "Pijama Família Juvenil Masc.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0306": {
+   "sku": "0306",
+   "nome": "Pijama Família Infantil Masc.",
+   "preco": 30.9,
+   "preco_maior": null
+  },
+  "0307": {
+   "sku": "0307",
+   "nome": "Pijama Família Feminino",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0308": {
+   "sku": "0308",
+   "nome": "Pijama Família Juvenil Fem.",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "0309": {
+   "sku": "0309",
+   "nome": "Pijama Família Infantil Fem.",
+   "preco": 30.9,
+   "preco_maior": null
+  },
+  "0310": {
+   "sku": "0310",
+   "nome": "Pijama Regata Malha",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0316": {
+   "sku": "0316",
+   "nome": "Short Doll Nadador De Onça",
+   "preco": 36.9,
+   "preco_maior": 39.9
+  },
+  "0321": {
+   "sku": "0321",
+   "nome": "Pijama De Bermuda Gestante",
+   "preco": 43.9,
+   "preco_maior": 46.9
+  },
+  "0325": {
+   "sku": "0325",
+   "nome": "Camisola De Gestante Listrado",
+   "preco": 43.9,
+   "preco_maior": 46.9
+  },
+  "0327": {
+   "sku": "0327",
+   "nome": "Camisola Gestante Estampada",
+   "preco": 48.9,
+   "preco_maior": 52.9
+  },
+  "0328": {
+   "sku": "0328",
+   "nome": "Camisola Gestante Alça Malha",
+   "preco": 52.9,
+   "preco_maior": 56.0
+  },
+  "0329": {
+   "sku": "0329",
+   "nome": "Pijama Estampado Regata Masc.",
+   "preco": 53.9,
+   "preco_maior": 59.9
+  },
+  "0330": {
+   "sku": "0330",
+   "nome": "Pijama Estampado Manga Masc.",
+   "preco": 59.9,
+   "preco_maior": 64.9
+  },
+  "0350": {
+   "sku": "0350",
+   "nome": "Camisola Bordada Aberta",
+   "preco": 49.9,
+   "preco_maior": 54.9
+  },
+  "0352": {
+   "sku": "0352",
+   "nome": "Camisola Bordada",
+   "preco": 52.9,
+   "preco_maior": null
+  },
+  "0354": {
+   "sku": "0354",
+   "nome": "Short Doll Alça Canelado",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0355": {
+   "sku": "0355",
+   "nome": "Short Doll Regata Canelado",
+   "preco": 46.9,
+   "preco_maior": 51.9
+  },
+  "0358": {
+   "sku": "0358",
+   "nome": "Short Doll Alça Jovem",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "0359": {
+   "sku": "0359",
+   "nome": "Short Doll Regata Composé",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "0380": {
+   "sku": "0380",
+   "nome": "Camisola Nadador",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0390": {
+   "sku": "0390",
+   "nome": "Short Doll Nadador",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0402": {
+   "sku": "0402",
+   "nome": "Pijama Familia Manga Masc.",
+   "preco": 54.9,
+   "preco_maior": 58.9
+  },
+  "0403": {
+   "sku": "0403",
+   "nome": "Pijama Familia Regata Masc.",
+   "preco": 49.9,
+   "preco_maior": null
+  },
+  "0404": {
+   "sku": "0404",
+   "nome": "Pijama Familia Juvenil Masc.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "0407": {
+   "sku": "0407",
+   "nome": "Pijama Familia Infantil Masc.",
+   "preco": 32.9,
+   "preco_maior": null
+  },
+  "0429": {
+   "sku": "0429",
+   "nome": "Pijama Mescla Regata Masc.",
+   "preco": 58.9,
+   "preco_maior": 63.9
+  },
+  "0430": {
+   "sku": "0430",
+   "nome": "Pijama Mescla Masculino",
+   "preco": 60.9,
+   "preco_maior": 67.0
+  },
+  "0499": {
+   "sku": "0499",
+   "nome": "Pijama Bermuda Liganete",
+   "preco": 46.9,
+   "preco_maior": 49.9
+  },
+  "0500": {
+   "sku": "0500",
+   "nome": "Camisola Alça Liganete",
+   "preco": 29.9,
+   "preco_maior": 32.9
+  },
+  "0501": {
+   "sku": "0501",
+   "nome": "Pijama Regata Estampada Liganete",
+   "preco": 39.9,
+   "preco_maior": 41.9
+  },
+  "0502": {
+   "sku": "0502",
+   "nome": "Short Doll Alça Liganete",
+   "preco": 34.0,
+   "preco_maior": 36.9
+  },
+  "0550": {
+   "sku": "0550",
+   "nome": "Short Liganete Masculino",
+   "preco": 19.9,
+   "preco_maior": 21.9
+  },
+  "0570": {
+   "sku": "0570",
+   "nome": "Pijama Liganete Masculino",
+   "preco": 53.9,
+   "preco_maior": 58.9
+  },
+  "0582": {
+   "sku": "0582",
+   "nome": "Pijama Regata Renda",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0590": {
+   "sku": "0590",
+   "nome": "Pijama Regata Pescador",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0595": {
+   "sku": "0595",
+   "nome": "Jogo De Robe Bordado",
+   "preco": 84.9,
+   "preco_maior": 92.9
+  },
+  "0601": {
+   "sku": "0601",
+   "nome": "Short Doll Regata Liganete",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0605": {
+   "sku": "0605",
+   "nome": "Camisola Regata Liganete",
+   "preco": 32.9,
+   "preco_maior": 35.9
+  },
+  "0640": {
+   "sku": "0640",
+   "nome": "Camisola Gestante",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0650": {
+   "sku": "0650",
+   "nome": "Camisola Estampada Manga",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0690": {
+   "sku": "0690",
+   "nome": "Pijama Manga Pescador",
+   "preco": 47.9,
+   "preco_maior": 51.9
+  },
+  "0702": {
+   "sku": "0702",
+   "nome": "Camisola Alça",
+   "preco": 32.9,
+   "preco_maior": 36.9
+  },
+  "0703": {
+   "sku": "0703",
+   "nome": "Camisola Regata",
+   "preco": 35.9,
+   "preco_maior": 47.9
+  },
+  "0704": {
+   "sku": "0704",
+   "nome": "Short Doll De Alça",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0705": {
+   "sku": "0705",
+   "nome": "Short Doll Regata",
+   "preco": 42.9,
+   "preco_maior": 54.9
+  },
+  "0706": {
+   "sku": "0706",
+   "nome": "Pijama De Manga Feminino",
+   "preco": 46.9,
+   "preco_maior": 58.9
+  },
+  "0707": {
+   "sku": "0707",
+   "nome": "Pijama Regata Infantil Feminino",
+   "preco": 34.0,
+   "preco_maior": null
+  },
+  "0710": {
+   "sku": "0710",
+   "nome": "Camisola Alça Estampada",
+   "preco": 34.0,
+   "preco_maior": 36.9
+  },
+  "0714": {
+   "sku": "0714",
+   "nome": "Pijama Cropped",
+   "preco": 49.9,
+   "preco_maior": 53.9
+  },
+  "0715": {
+   "sku": "0715",
+   "nome": "Camisão Estampado",
+   "preco": 46.9,
+   "preco_maior": 51.9
+  },
+  "0716": {
+   "sku": "0716",
+   "nome": "Pijama De Liganete Masc.",
+   "preco": 60.9,
+   "preco_maior": 67.0
+  },
+  "0719": {
+   "sku": "0719",
+   "nome": "Pijama Aberto Estampado Manga",
+   "preco": 47.9,
+   "preco_maior": 50.9
+  },
+  "0720": {
+   "sku": "0720",
+   "nome": "Short Doll Alça Estampado",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0730": {
+   "sku": "0730",
+   "nome": "Short Doll Nadador Estampado",
+   "preco": 43.9,
+   "preco_maior": 47.9
+  },
+  "0750": {
+   "sku": "0750",
+   "nome": "Short Doll Alça Mescla",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "0760": {
+   "sku": "0760",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0770": {
+   "sku": "0770",
+   "nome": "Camisola Nadador Mescla",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0800": {
+   "sku": "0800",
+   "nome": "Short Doll Nadador Mescla",
+   "preco": 45.0,
+   "preco_maior": 48.9
+  },
+  "0810": {
+   "sku": "0810",
+   "nome": "Short Doll Regata Mescla Infantil Fem.",
+   "preco": 20.9,
+   "preco_maior": null
+  },
+  "0815": {
+   "sku": "0815",
+   "nome": "Pijama Juvenil Alça Fem.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "0816": {
+   "sku": "0816",
+   "nome": "Pijama Juvenil Nadador Fem.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "0819": {
+   "sku": "0819",
+   "nome": "Conjunto Short Teen",
+   "preco": 41.9,
+   "preco_maior": null
+  },
+  "0841": {
+   "sku": "0841",
+   "nome": "Short Doll Alça Malha",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0845": {
+   "sku": "0845",
+   "nome": "Short Doll Regata Cós Duplo",
+   "preco": 43.9,
+   "preco_maior": 48.9
+  },
+  "0848": {
+   "sku": "0848",
+   "nome": "Pijama Regata Canelado",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "0849": {
+   "sku": "0849",
+   "nome": "Vestido Suede Canelado",
+   "preco": 51.9,
+   "preco_maior": 56.0
+  },
+  "0851": {
+   "sku": "0851",
+   "nome": "Pijama Americano Liso",
+   "preco": 60.9,
+   "preco_maior": 66.0
+  },
+  "0852": {
+   "sku": "0852",
+   "nome": "Pijama Manga Curta Com Calça",
+   "preco": 59.9,
+   "preco_maior": 64.9
+  },
+  "0853": {
+   "sku": "0853",
+   "nome": "Pijama Americano Curto",
+   "preco": 60.9,
+   "preco_maior": 66.0
+  },
+  "0854": {
+   "sku": "0854",
+   "nome": "Camisola Americana De Malha",
+   "preco": 57.9,
+   "preco_maior": 61.9
+  },
+  "0855": {
+   "sku": "0855",
+   "nome": "Camisola Americana Manga Comprida",
+   "preco": 60.9,
+   "preco_maior": 67.0
+  },
+  "0870": {
+   "sku": "0870",
+   "nome": "Pijama Longo Listrado Fem.",
+   "preco": 64.9,
+   "preco_maior": 70.9
+  },
+  "0880": {
+   "sku": "0880",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 64.9,
+   "preco_maior": 71.9
+  },
+  "0890": {
+   "sku": "0890",
+   "nome": "Pijama Longo Aberto Mescla Fem.",
+   "preco": 69.9,
+   "preco_maior": null
+  },
+  "0901": {
+   "sku": "0901",
+   "nome": "Short Doll Regata Listrado",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0911": {
+   "sku": "0911",
+   "nome": "Short Doll Alça Listrado",
+   "preco": 36.9,
+   "preco_maior": 40.9
+  },
+  "0981": {
+   "sku": "0981",
+   "nome": "Pijama Longo Malha Mescla Infantil Fem.",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "0990": {
+   "sku": "0990",
+   "nome": "Pijama Longo Malha Mescla Fem.",
+   "preco": 69.9,
+   "preco_maior": 75.9
+  },
+  "1001": {
+   "sku": "1001",
+   "nome": "Pijama Longo Aberto Feminino",
+   "preco": 84.9,
+   "preco_maior": 92.9
+  },
+  "1002": {
+   "sku": "1002",
+   "nome": "Pijama Longo Mescla Liso Masc.",
+   "preco": 72.9,
+   "preco_maior": 79.9
+  },
+  "1003": {
+   "sku": "1003",
+   "nome": "Pijama Manga Curta Liso Fem.",
+   "preco": 79.9,
+   "preco_maior": 84.9
+  },
+  "1004": {
+   "sku": "1004",
+   "nome": "Pijama Longo Plush Liso Fem.",
+   "preco": 96.9,
+   "preco_maior": 105.9
+  },
+  "1005": {
+   "sku": "1005",
+   "nome": "Pijama Longo Moletinho Aberto Fem.",
+   "preco": 101.9,
+   "preco_maior": 108.9
+  },
+  "1007": {
+   "sku": "1007",
+   "nome": "Pijama Longo Moletinho Infantil Fem.",
+   "preco": 67.0,
+   "preco_maior": null
+  },
+  "1008": {
+   "sku": "1008",
+   "nome": "Pijama Longo Moletinho Adulto Fem.",
+   "preco": 96.9,
+   "preco_maior": 104.9
+  },
+  "1009": {
+   "sku": "1009",
+   "nome": "Pijama Longo Moletinho Adulto Masc.",
+   "preco": 96.9,
+   "preco_maior": 104.9
+  },
+  "1010": {
+   "sku": "1010",
+   "nome": "Pijama Juvenil Manga Masc.",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "1011": {
+   "sku": "1011",
+   "nome": "Pijama Juvenil Regata Masc.",
+   "preco": 37.9,
+   "preco_maior": null
+  },
+  "1012": {
+   "sku": "1012",
+   "nome": "Pijama Juvenil Mescla Regata Masc.",
+   "preco": 41.9,
+   "preco_maior": null
+  },
+  "1013": {
+   "sku": "1013",
+   "nome": "Pijama Juvenil Mescla Manga Masc.",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "1020": {
+   "sku": "1020",
+   "nome": "Pijama Longo Moletinho Juvenil Fem.",
+   "preco": 72.9,
+   "preco_maior": null
+  },
+  "1021": {
+   "sku": "1021",
+   "nome": "Pijama Longo Moletinho Juvenill Masc.",
+   "preco": 72.9,
+   "preco_maior": null
+  },
+  "1023": {
+   "sku": "1023",
+   "nome": "Pijama Longo Moletinho Infantil Masc.",
+   "preco": 67.0,
+   "preco_maior": null
+  },
+  "1024": {
+   "sku": "1024",
+   "nome": "Pijama Longo Malha Mescla Infantil Masc.",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "1025": {
+   "sku": "1025",
+   "nome": "Pijama Manga Curta Listrado Masc.",
+   "preco": 67.0,
+   "preco_maior": 72.9
+  },
+  "1026": {
+   "sku": "1026",
+   "nome": "Pijama Longo Moletinho Bolso Adulto Fem.",
+   "preco": 103.9,
+   "preco_maior": 113.9
+  },
+  "1027": {
+   "sku": "1027",
+   "nome": "Pijama Longo Laço Feminino Adulto",
+   "preco": 107.9,
+   "preco_maior": 117.9
+  },
+  "1030": {
+   "sku": "1030",
+   "nome": "Conjunto Longo Gestante Feminino",
+   "preco": 75.9,
+   "preco_maior": 83.9
+  },
+  "1031": {
+   "sku": "1031",
+   "nome": "Pijama Longo Flamê Liso Feminino",
+   "preco": 67.0,
+   "preco_maior": 72.9
+  },
+  "1032": {
+   "sku": "1032",
+   "nome": "Pijama Longo Plush Masculino",
+   "preco": 105.9,
+   "preco_maior": 116.9
+  },
+  "1033": {
+   "sku": "1033",
+   "nome": "Pijama Longo Canelado Feminino",
+   "preco": 67.0,
+   "preco_maior": 72.9
+  },
+  "1034": {
+   "sku": "1034",
+   "nome": "Pijama de Alça Canelado Feminino",
+   "preco": 40.9,
+   "preco_maior": 43.9
+  },
+  "1035": {
+   "sku": "1035",
+   "nome": "Pijama de Alça Canelado Bordado Fem.",
+   "preco": 46.9,
+   "preco_maior": 49.9
+  },
+  "1036": {
+   "sku": "1036",
+   "nome": "Pijama de Alça Família Feminino",
+   "preco": 48.9,
+   "preco_maior": null
+  },
+  "1037": {
+   "sku": "1037",
+   "nome": "Pijama Família Masculino",
+   "preco": 60.9,
+   "preco_maior": null
+  },
+  "1038": {
+   "sku": "1038",
+   "nome": "Pijama Família Infantil Feminino",
+   "preco": 36.9,
+   "preco_maior": null
+  },
+  "1039": {
+   "sku": "1039",
+   "nome": "Pijama Família Infantil Masculino",
+   "preco": 40.9,
+   "preco_maior": null
+  },
+  "1040": {
+   "sku": "1040",
+   "nome": "Pijama Família Juvenil Feminino",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "1041": {
+   "sku": "1041",
+   "nome": "Pijama Família Juvenil Masculino",
+   "preco": 43.9,
+   "preco_maior": null
+  },
+  "1042": {
+   "sku": "1042",
+   "nome": "Pijama de Alça Suede Feminino",
+   "preco": 30.9,
+   "preco_maior": 34.0
+  },
+  "1043": {
+   "sku": "1043",
+   "nome": "Pijama de Alça Suede Liso Fem.",
+   "preco": 34.0,
+   "preco_maior": 37.9
+  },
+  "1400": {
+   "sku": "1400",
+   "nome": "Pijama Longo Juvenil Malha Fem.",
+   "preco": 45.0,
+   "preco_maior": null
+  },
+  "1460": {
+   "sku": "1460",
+   "nome": "Pijama Longo Juvenil Malha Masc.",
+   "preco": 47.9,
+   "preco_maior": null
+  },
+  "2130": {
+   "sku": "2130",
+   "nome": "Pijama Aberto Bordado Manga Masc.",
+   "preco": 60.9,
+   "preco_maior": 65.9
+  },
+  "2131": {
+   "sku": "2131",
+   "nome": "Pijama Regata Malha",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "2134": {
+   "sku": "2134",
+   "nome": "Short Doll Regata Estampado",
+   "preco": 41.9,
+   "preco_maior": 45.0
+  },
+  "2226": {
+   "sku": "2226",
+   "nome": "Camisola Aberta Estampada",
+   "preco": 48.9,
+   "preco_maior": 53.9
+  },
+  "4130": {
+   "sku": "4130",
+   "nome": "Pijama Aberto Com Calça Masc.",
+   "preco": 65.9,
+   "preco_maior": 72.9
+  },
+  "4131": {
+   "sku": "4131",
+   "nome": "Pijama Longo Aberto Masculino",
+   "preco": 69.9,
+   "preco_maior": 75.9
+  }
+ }
+}
