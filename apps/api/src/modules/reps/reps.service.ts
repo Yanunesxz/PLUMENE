@@ -26,8 +26,13 @@ interface RepRow {
   price_tables: EmbeddedTable;
 }
 
+// O embed precisa NOMEAR a FK: depois da migração 018 existem dois caminhos
+// entre users e price_tables — o direto (users.price_table_id) e o de
+// muitos-para-muitos via rep_price_tables. Com dois, o PostgREST recusa a query
+// INTEIRA (PGRST201) em vez de escolher um, e a tela de representantes ficava
+// vazia com "0 cadastrados" enquanto o cadastro novo falhava ao reler o registro.
 const REP_BASE =
-  'id, name, email, cpf, legal_name, phone, active, price_table_id, commission_rate, created_at, price_tables(name)';
+  'id, name, email, cpf, legal_name, phone, active, price_table_id, commission_rate, created_at, price_tables!users_price_table_id_fkey(name)';
 
 // users.erp_rep_id vem da migração 012, que pode não estar aplicada ainda.
 // Pedir uma coluna inexistente faz o PostgREST recusar a query INTEIRA — a tela
@@ -240,7 +245,13 @@ export async function createRep(
     .select(await repSelect())
     .single();
 
-  if (error || !data) return { ok: false, reason: 'error' };
+  if (error || !data) {
+    // "Não foi possível criar o representante" sozinho não diz nada a quem vai
+    // consertar. O PGRST201 do embed ambíguo passou despercebido justamente
+    // assim: a tela dizia isso e o motivo real ficava invisível.
+    console.error('[reps] falha ao criar representante:', error?.code, error?.message);
+    return { ok: false, reason: 'error' };
+  }
 
   const linha = data as unknown as RepRow;
   const gravou = await gravarConjunto(company_id, linha.id, conjunto);
@@ -355,7 +366,10 @@ export async function updateRep(
     .select(await repSelect())
     .maybeSingle();
 
-  if (error) return { ok: false, reason: 'error' };
+  if (error) {
+    console.error('[reps] falha ao atualizar representante:', error.code, error.message);
+    return { ok: false, reason: 'error' };
+  }
   if (!data) return { ok: false, reason: 'not_found' };
 
   const linha = data as unknown as RepRow;
