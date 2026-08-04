@@ -1,5 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { hashPassword } from '../../lib/password.js';
+import { priceTableBelongsToCompany } from '../catalog/catalog.service.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
 import { DEFAULT_COMMISSION_RATE } from '@csb/shared';
 
@@ -194,6 +195,53 @@ export async function repPodeUsarTabela(
 ): Promise<boolean> {
   const permitidas = await listRepPriceTables(company_id, user_id);
   return permitidas.some((t) => t.id === price_table_id);
+}
+
+export type TabelaResolvida =
+  | { ok: true; price_table_id: string | null }
+  | { ok: false; motivo: 'fora_do_conjunto' | 'escolha_obrigatoria' };
+
+/**
+ * Traduz "a tabela que veio no corpo" na tabela que de fato vale.
+ *
+ * É o ponto único onde a escolha do representante é conferida, usado tanto no
+ * cadastro de cliente quanto na geração do link temporário. Ter dois lugares
+ * decidindo isso é como um deles acaba esquecido.
+ *
+ * Duas recusas, e nenhuma é detalhe:
+ *
+ * • `fora_do_conjunto` — pediu tabela que não é dele. A tela nem mostra a
+ *   opção, então isso é chamada direta à API: 403, sem dizer se a tabela existe.
+ * • `escolha_obrigatoria` — tem duas ou mais e não escolheu. O servidor NÃO
+ *   arbitra uma. Cair na principal em silêncio é exatamente o erro caro que
+ *   este recurso existe para impedir: o cliente da região 3 nascendo na 2 e
+ *   ninguém percebendo até a fatura.
+ *
+ * Com uma tabela só não há o que escolher — usa a dele e nada muda.
+ */
+export async function resolverTabelaEscolhida(
+  company_id: string,
+  user_id: string,
+  role: string,
+  escolhida: string | null | undefined,
+): Promise<TabelaResolvida> {
+  // Gerente e admin atribuem qualquer tabela da empresa — são eles que definem
+  // o conjunto dos outros.
+  if (role === 'manager' || role === 'admin') {
+    if (!escolhida) return { ok: true, price_table_id: null };
+    const daEmpresa = await priceTableBelongsToCompany(escolhida, company_id);
+    return daEmpresa ? { ok: true, price_table_id: escolhida } : { ok: false, motivo: 'fora_do_conjunto' };
+  }
+
+  const conjunto = await listRepPriceTables(company_id, user_id);
+
+  if (escolhida) {
+    return conjunto.some((t) => t.id === escolhida)
+      ? { ok: true, price_table_id: escolhida }
+      : { ok: false, motivo: 'fora_do_conjunto' };
+  }
+  if (conjunto.length >= 2) return { ok: false, motivo: 'escolha_obrigatoria' };
+  return { ok: true, price_table_id: conjunto[0]?.id ?? null };
 }
 
 export async function listPriceTables(company_id: string): Promise<PriceTable[]> {

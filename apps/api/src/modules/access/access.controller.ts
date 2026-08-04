@@ -18,6 +18,7 @@ import {
   revogarVitrine,
 } from './showcase.service.js';
 import { montarMinhaArea } from './loja.service.js';
+import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { buildAuthPayload, getTokenConfig } from '../auth/auth.service.js';
 import type { User } from '@csb/shared';
 
@@ -81,13 +82,33 @@ export async function revogarConviteHandler(request: FastifyRequest, reply: Fast
 // ─── Vitrine (representante) ─────────────────────────────────────────────────
 
 export async function criarVitrineHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub, price_table_id } = request.user;
+  const { company_id, sub, role, price_table_id } = request.user;
   const body = await parseBody(criarVitrineSchema, request.body, reply);
   if (!body) return;
 
+  // Mesma revalidação do cadastro de cliente: o link mostra preço, e mostrar o
+  // preço errado a um desconhecido é o mesmo estrago sem ninguém para conferir.
+  const tabela = await resolverTabelaEscolhida(company_id, sub, role, body.price_table_id);
+  if (!tabela.ok) {
+    if (tabela.motivo === 'escolha_obrigatoria') {
+      await reply.status(400).send({
+        error: 'Escolha a tabela de preço do link.',
+        code: 'PRICE_TABLE_REQUIRED',
+        statusCode: 400,
+      });
+      return;
+    }
+    await reply.status(403).send({
+      error: 'Esta tabela de preço não está disponível para você.',
+      code: 'FORBIDDEN',
+      statusCode: 403,
+    });
+    return;
+  }
+
   let vitrine;
   try {
-    vitrine = await criarVitrine(company_id, sub, price_table_id ?? null, body.hours);
+    vitrine = await criarVitrine(company_id, sub, tabela.price_table_id ?? price_table_id ?? null, body.hours);
   } catch (err) {
     if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
       request.log.error('Vitrine indisponível: migração 014 não aplicada');

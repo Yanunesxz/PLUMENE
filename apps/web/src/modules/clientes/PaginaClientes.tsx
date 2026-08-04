@@ -1,16 +1,20 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate } from 'react-router-dom';
-import { Search, Users, ChevronRight, Building2, MessageCircle, UserPlus, X } from 'lucide-react';
+import { Search, Users, ChevronRight, Building2, MessageCircle, UserPlus, X, Tag } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
+import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Input } from '../../components/interface/Input.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
+import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
+import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
@@ -19,9 +23,13 @@ const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: ''
 export function PaginaClientes() {
   const { token } = useAuthStore();
   const navigate = useNavigate();
+  const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
   const [search, setSearch] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ ...EMPTY_CUST });
+  const [tabelaEscolhida, setTabelaEscolhida] = useState('');
+  const [confirmando, setConfirmando] = useState(false);
+  const [trocando, setTrocando] = useState<CustomerListItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -57,7 +65,13 @@ export function PaginaClientes() {
     void navigate(`/orders/new?customer_id=${customer.id}`);
   };
 
-  const handleCreate = async (e: FormEvent) => {
+  /**
+   * Valida e decide se ainda falta um aviso.
+   *
+   * Quem tem duas tabelas ou mais não grava direto: passa pela confirmação que
+   * nomeia a tabela. Quem tem uma só nem vê o assunto — o fluxo é o de sempre.
+   */
+  const handleCreate = (e: FormEvent) => {
     e.preventDefault();
     setError('');
     const digitos = (v: string) => v.replace(/\D/g, '');
@@ -87,6 +101,18 @@ export function PaginaClientes() {
       setError('Informe o endereço do cliente.');
       return;
     }
+    if (precisaEscolher && !tabelaEscolhida) {
+      setError('Escolha a tabela de preço deste cliente.');
+      return;
+    }
+    if (precisaEscolher) {
+      setConfirmando(true);
+      return;
+    }
+    void cadastrar();
+  };
+
+  const cadastrar = async () => {
     if (!token) return;
     setSaving(true);
     try {
@@ -97,13 +123,18 @@ export function PaginaClientes() {
         whatsapp: form.whatsapp || null,
         email: form.email || null,
         address: form.address || null,
+        // Sem escolha, o servidor usa a única tabela do representante.
+        ...(tabelaEscolhida ? { price_table_id: tabelaEscolhida } : {}),
       };
       const res = await api.post<ApiResponse<CustomerListItem>>('/customers', payload, token);
       await db.customers.put(res.data);
       setForm({ ...EMPTY_CUST });
+      setTabelaEscolhida('');
+      setConfirmando(false);
       setShowForm(false);
       setToast({ message: 'Cliente cadastrado!', type: 'success' });
     } catch (err) {
+      setConfirmando(false);
       setError(err instanceof Error ? err.message : 'Erro ao cadastrar cliente.');
     } finally {
       setSaving(false);
@@ -122,7 +153,7 @@ export function PaginaClientes() {
 
       {showForm && (
         <form
-          onSubmit={(e) => void handleCreate(e)}
+          onSubmit={handleCreate}
           className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm md:p-5"
         >
           <h2 className="mb-4 text-sm font-semibold text-foreground">Novo cliente</h2>
@@ -160,6 +191,14 @@ export function PaginaClientes() {
                 Endereço <span className="text-danger">*</span>
               </label>
               <Input value={form.address} onChange={setF('address')} placeholder="Rua, número, bairro, cidade - UF" />
+            </div>
+            <div className="sm:col-span-2">
+              <SeletorDeTabela
+                tabelas={tabelas}
+                valor={tabelaEscolhida}
+                onEscolher={setTabelaEscolhida}
+                contexto="cliente"
+              />
             </div>
           </div>
           {error && <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-soft-foreground">{error}</p>}
@@ -241,6 +280,23 @@ export function PaginaClientes() {
                 </div>
               </button>
 
+              {/* Só para quem tem mais de uma tabela: para os outros não há o
+                  que trocar, e o rótulo só contaria que existem outras. */}
+              {precisaEscolher && (
+                <button
+                  type="button"
+                  onClick={() => setTrocando(customer)}
+                  aria-label={`Trocar a tabela de preço de ${customer.name}`}
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-border px-2 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:border-warn hover:bg-warn-soft hover:text-warn-soft-foreground"
+                >
+                  <Tag className="h-3.5 w-3.5" strokeWidth={2} />
+                  {customer.price_table_id
+                    ? // Tabela fora do conjunto dele não tem o nome revelado.
+                      (nomeDe(customer.price_table_id) ?? 'outra tabela')
+                    : 'sem tabela'}
+                </button>
+              )}
+
               <div className="flex shrink-0 flex-col items-end gap-1.5">
                 {customer.blocked ? (
                   <Badge variant="red">Bloqueado</Badge>
@@ -262,6 +318,28 @@ export function PaginaClientes() {
             </div>
           ))}
         </div>
+      )}
+
+      {confirmando && (
+        <ConfirmarTabela
+          titulo={`Cadastrar ${form.trade_name.trim() || form.name.trim()} na ${nomeDe(tabelaEscolhida) ?? ''}?`}
+          detalhe="O preço de tudo que esta loja comprar vem desta tabela — inclusive nos pedidos que ela mesma fizer pelo login dela."
+          tabela={nomeDe(tabelaEscolhida) ?? ''}
+          ocupado={saving}
+          onConfirmar={() => void cadastrar()}
+          onCancelar={() => setConfirmando(false)}
+        />
+      )}
+
+      {trocando && (
+        <TrocarTabelaDoCliente
+          cliente={trocando}
+          tabelas={tabelas}
+          nomeDe={nomeDe}
+          onTrocado={(c) => setToast({ message: `${c.name} agora compra na ${nomeDe(c.price_table_id) ?? 'tabela escolhida'}.`, type: 'success' })}
+          onErro={(m) => setToast({ message: m, type: 'error' })}
+          onFechar={() => setTrocando(null)}
+        />
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

@@ -13,6 +13,9 @@ export const criarVitrineSchema = z.object({
     z.literal(SHOWCASE_DURATIONS[2]),
     z.literal(SHOWCASE_DURATIONS[3]),
   ]),
+  // Com qual tabela o link abre. Omitido, o servidor usa a do representante —
+  // quem tem duas ou mais precisa escolher, e essa regra é do controller.
+  price_table_id: z.string().uuid('Tabela de preço inválida').nullable().optional(),
 });
 
 export const aceitarConviteSchema = z.object({

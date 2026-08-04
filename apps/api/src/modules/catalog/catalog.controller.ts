@@ -1,6 +1,7 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import { supabase } from '../../config/supabase.js';
 import { getProducts, listCompanyPriceTables, priceTableBelongsToCompany } from './catalog.service.js';
+import { repPodeUsarTabela } from '../reps/reps.service.js';
 
 /**
  * Resolve a tabela de preço da loja.
@@ -33,21 +34,25 @@ export async function tabelaDaLoja(
 }
 
 export async function listProducts(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, role, price_table_id: doToken, customer_id, rep_id } = request.user;
+  const { company_id, sub, role, price_table_id: doToken, customer_id, rep_id } = request.user;
   const { price_table_id } = request.query as { price_table_id?: string };
 
-  // Consultar o catálogo em OUTRA tabela é atribuição de gerente/admin. O
-  // representante fica preso à tabela que o gerente atribuiu a ele; a loja e o
-  // visitante, à que o link/cadastro define. Sem esta trava bastava chamar a API
-  // com o query param para ver o catálogo inteiro em qualquer tabela da empresa.
+  // Consultar o catálogo em OUTRA tabela é atribuição de gerente/admin — e do
+  // representante DENTRO do conjunto dele. Ele precisa disso porque o pedido é
+  // precificado pela tabela do cliente: sem poder abrir o catálogo nela, leria
+  // um preço na tela e receberia outro no total. Fora do conjunto continua 403,
+  // senão bastava o query param para ver o catálogo em qualquer tabela.
   const canChooseTable = role === 'manager' || role === 'admin';
   if (price_table_id && !canChooseTable) {
-    await reply.status(403).send({
-      error: 'Somente gerente ou admin pode consultar outra tabela de preço',
-      code: 'FORBIDDEN',
-      statusCode: 403,
-    });
-    return;
+    const permitida = role === 'rep' && (await repPodeUsarTabela(company_id, sub, price_table_id));
+    if (!permitida) {
+      await reply.status(403).send({
+        error: 'Somente gerente ou admin pode consultar outra tabela de preço',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    }
   }
 
   let tableId = doToken ?? undefined;

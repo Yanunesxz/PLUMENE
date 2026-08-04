@@ -9,6 +9,9 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { LinkGerado } from './LinkGerado.js';
+import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
+import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
+import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn } from '../../lib/utils.js';
 import { SHOWCASE_DURATIONS } from '@csb/shared';
 import type {
@@ -51,7 +54,10 @@ function faltam(ate: string): string {
 
 export function PaginaAcessos() {
   const { token } = useAuthStore();
+  const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
   const [aba, setAba] = useState<Aba>('convites');
+  const [tabelaEscolhida, setTabelaEscolhida] = useState('');
+  const [confirmando, setConfirmando] = useState<ShowcaseDuration | null>(null);
   const [convites, setConvites] = useState<StoreInvite[] | null>(null);
   const [vitrines, setVitrines] = useState<ShowcaseLink[] | null>(null);
   const [clienteId, setClienteId] = useState('');
@@ -98,14 +104,32 @@ export function PaginaAcessos() {
     }
   };
 
+  /**
+   * Quem tem duas tabelas ou mais confirma antes: o link mostra preço a alguém
+   * de fora, e não há uma segunda pessoa para reparar no erro.
+   */
+  const pedirVitrine = (horas: ShowcaseDuration) => {
+    if (precisaEscolher) {
+      setConfirmando(horas);
+      return;
+    }
+    void gerarVitrine(horas);
+  };
+
   const gerarVitrine = async (horas: ShowcaseDuration) => {
     if (!token) return;
     setOcupado(true);
     try {
-      const res = await api.post<ApiResponse<LinkCriado>>('/showcase-links', { hours: horas }, token);
+      const res = await api.post<ApiResponse<LinkCriado>>(
+        '/showcase-links',
+        { hours: horas, ...(tabelaEscolhida ? { price_table_id: tabelaEscolhida } : {}) },
+        token,
+      );
       setGerado({ url: res.data.url, expiraEm: res.data.expires_at, tipo: 'vitrine', horas });
+      setConfirmando(null);
       await recarregar();
     } catch (e) {
+      setConfirmando(null);
       setToast({ message: e instanceof Error ? e.message : 'Não foi possível gerar o link', type: 'error' });
     } finally {
       setOcupado(false);
@@ -242,9 +266,22 @@ export function PaginaAcessos() {
               de funcionar sozinho. Vale por <strong>um pedido</strong> — assim que a pessoa envia, o
               link se encerra e o pedido cai para você com o contato dela.
             </p>
+            <div className="mb-3">
+              <SeletorDeTabela
+                tabelas={tabelas}
+                valor={tabelaEscolhida}
+                onEscolher={setTabelaEscolhida}
+                contexto="link"
+              />
+            </div>
             <div className="grid grid-cols-4 gap-2">
               {SHOWCASE_DURATIONS.map((h) => (
-                <Button key={h} variant="outline" disabled={ocupado} onClick={() => void gerarVitrine(h)}>
+                <Button
+                  key={h}
+                  variant="outline"
+                  disabled={ocupado || (precisaEscolher && !tabelaEscolhida)}
+                  onClick={() => pedirVitrine(h)}
+                >
                   {h}h
                 </Button>
               ))}
@@ -289,6 +326,17 @@ export function PaginaAcessos() {
             </ul>
           )}
         </>
+      )}
+
+      {confirmando !== null && (
+        <ConfirmarTabela
+          titulo={`Gerar link de ${confirmando}h com a ${nomeDe(tabelaEscolhida) ?? ''}?`}
+          detalhe="Quem abrir o link vê os preços desta tabela. Ela fica congelada: mesmo que suas tabelas mudem depois, o link continua com esta."
+          tabela={nomeDe(tabelaEscolhida) ?? ''}
+          ocupado={ocupado}
+          onConfirmar={() => void gerarVitrine(confirmando)}
+          onCancelar={() => setConfirmando(null)}
+        />
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

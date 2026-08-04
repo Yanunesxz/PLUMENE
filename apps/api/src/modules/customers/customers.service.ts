@@ -8,7 +8,8 @@ const PAGE_SIZE = 1000;
 
 // Só o que as telas usam. `select('*')` + o embed da tabela de preço (que nada
 // no app lia) tornava a lista de 1.353 clientes ~5× maior do que precisa.
-const CUSTOMER_COLUMNS = 'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp';
+const CUSTOMER_COLUMNS =
+  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id';
 
 export async function getCustomers(
   company_id: string,
@@ -56,6 +57,7 @@ export async function createCustomer(
   company_id: string,
   rep_id: string,
   body: CreateCustomerRequest,
+  price_table_id: string | null,
 ): Promise<CustomerListItem | null> {
   const { data, error } = await supabase
     .from('customers')
@@ -68,6 +70,7 @@ export async function createCustomer(
       whatsapp: body.whatsapp?.trim() || null,
       email: body.email?.trim() || null,
       address: body.address?.trim() || null,
+      price_table_id,
       blocked: false,
     })
     .select(CUSTOMER_COLUMNS)
@@ -75,4 +78,60 @@ export async function createCustomer(
 
   if (error || !data) return null;
   return data as CustomerListItem;
+}
+
+/** De quem é a carteira, para as duas metades da regra abaixo. */
+export interface EscopoDaCarteira {
+  rep_id: string;
+  erp_rep_id?: string | null;
+  /** Gerente e admin passam por qualquer cliente da empresa. */
+  irrestrito?: boolean;
+}
+
+export type TrocaDeTabela =
+  | { ok: true; cliente: CustomerListItem }
+  | { ok: false; motivo: 'cliente_nao_encontrado' | 'erro' };
+
+/**
+ * Troca a tabela de preço de um cliente. É a única edição de cadastro que o app
+ * permite — e a mais cara de errar: muda o preço de tudo que a loja comprar
+ * dali para frente, inclusive pelo login próprio dela.
+ *
+ * Quem chama JÁ precisa ter validado que `price_table_id` está no conjunto de
+ * quem pediu. Aqui vale a outra metade: o cliente é da carteira dele? A regra
+ * repete a de `getCustomers` — dono no app (`rep_id`) OU carteira do ERP
+ * (`rep_erp_id`) —, porque um rep que não enxerga o cliente na lista também não
+ * pode reprecificá-lo pela API.
+ */
+export async function atualizarTabelaDoCliente(
+  company_id: string,
+  customer_id: string,
+  price_table_id: string,
+  escopo: EscopoDaCarteira,
+): Promise<TrocaDeTabela> {
+  let consulta = supabase
+    .from('customers')
+    .select('id')
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+
+  if (!escopo.irrestrito) {
+    consulta = escopo.erp_rep_id
+      ? consulta.or(`rep_id.eq.${escopo.rep_id},rep_erp_id.eq.${escopo.erp_rep_id}`)
+      : consulta.eq('rep_id', escopo.rep_id);
+  }
+
+  const { data: cliente } = await consulta.maybeSingle();
+  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  const { data, error } = await supabase
+    .from('customers')
+    .update({ price_table_id })
+    .eq('id', customer_id)
+    .eq('company_id', company_id)
+    .select(CUSTOMER_COLUMNS)
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, motivo: 'erro' };
+  return { ok: true, cliente: data as CustomerListItem };
 }

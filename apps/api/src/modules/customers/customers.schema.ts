@@ -27,4 +27,12 @@ export const createCustomerSchema = z.object({
     .refine((v) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v), 'E-mail inválido'),
   address: z.string().trim().min(5, 'Endereço é obrigatório'),
   trade_name: z.string().trim().nullable().default(null),
+  // Opcional aqui de propósito: rep com uma tabela só não manda nada e o
+  // servidor usa a dele. Quem tem duas ou mais é obrigado a escolher, mas essa
+  // regra depende do conjunto do usuário — vive no controller, não no schema.
+  price_table_id: z.string().uuid('Tabela de preço inválida').nullable().optional(),
+});
+
+export const trocarTabelaDoClienteSchema = z.object({
+  price_table_id: z.string().uuid('Tabela de preço inválida'),
 });

@@ -48,6 +48,12 @@ export interface CreateInviteRequest {
 
 export interface CreateShowcaseLinkRequest {
   hours: ShowcaseDuration;
+  /**
+   * Com qual tabela o link abre. Omitido, usa a principal do representante.
+   * Fica congelada no link: se o conjunto do rep mudar depois, quem recebeu
+   * continua vendo o preço que foi mostrado.
+   */
+  price_table_id?: string | null;
 }
 
 /** Resposta das rotas que criam link — `url` só volta AQUI, uma única vez. */

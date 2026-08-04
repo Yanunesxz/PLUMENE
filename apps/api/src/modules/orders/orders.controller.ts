@@ -44,6 +44,17 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   let tabela = price_table_id ?? null;
   let corpo = body;
 
+  // O preço de um cliente é o do CADASTRO dele, não o de quem digita o pedido.
+  //
+  // Até aqui o pedido do representante saía na tabela DELE enquanto o mesmo
+  // cliente, comprando pelo login próprio, saía na tabela do cadastro — dois
+  // preços para a mesma loja, dependendo de quem clicou. Agora os dois caminhos
+  // usam `tabelaDaLoja()`, que cai para a tabela do rep quando o cliente não
+  // tem uma (809 dos 1.353 estão nessa situação).
+  if (role === 'rep' && body.customer_id) {
+    tabela = (await tabelaDaLoja(body.customer_id, sub)) ?? tabela;
+  }
+
   if (role === 'store') {
     if (!customer_id) {
       await reply.status(403).send({ error: 'Acesso sem loja vinculada', code: 'FORBIDDEN', statusCode: 403 });

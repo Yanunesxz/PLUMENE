@@ -239,7 +239,10 @@ describe('rotas públicas', () => {
 });
 
 describe('catálogo', () => {
-  it('bloqueia o representante que tenta consultar outra tabela de preço', async () => {
+  // O rep passou a poder abrir o catálogo nas tabelas do conjunto DELE — precisa
+  // disso porque o pedido é precificado pela tabela do cliente. Fora do
+  // conjunto (é o caso aqui: `rep_price_tables` vazia) continua 403.
+  it('bloqueia o representante que tenta consultar tabela fora do conjunto dele', async () => {
     const res = await chamar('/products?price_table_id=tabela-2', TOKEN.rep);
     expect(res.statusCode).toBe(403);
   });

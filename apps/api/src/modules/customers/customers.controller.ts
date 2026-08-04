@@ -1,7 +1,8 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { getCustomers, createCustomer } from './customers.service.js';
+import { getCustomers, createCustomer, atualizarTabelaDoCliente } from './customers.service.js';
+import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
-import { createCustomerSchema } from './customers.schema.js';
+import { createCustomerSchema, trocarTabelaDoClienteSchema } from './customers.schema.js';
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
@@ -21,22 +22,112 @@ export async function listCustomers(request: FastifyRequest, reply: FastifyReply
   await reply.send({ data: customers });
 }
 
+/**
+ * Traduz a recusa do resolvedor em resposta.
+ *
+ * O 403 não diz se a tabela existe: quem pediu uma tabela que não é dele está
+ * chamando a API por fora da tela, e a resposta não é lugar de confirmar que a
+ * tabela da região vizinha existe.
+ */
+async function recusarTabela(
+  reply: FastifyReply,
+  motivo: 'fora_do_conjunto' | 'escolha_obrigatoria',
+): Promise<void> {
+  if (motivo === 'escolha_obrigatoria') {
+    await reply.status(400).send({
+      error: 'Escolha a tabela de preço.',
+      code: 'PRICE_TABLE_REQUIRED',
+      statusCode: 400,
+    });
+    return;
+  }
+  await reply.status(403).send({
+    error: 'Esta tabela de preço não está disponível para você.',
+    code: 'FORBIDDEN',
+    statusCode: 403,
+  });
+}
+
 export async function createCustomerHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id } = request.user;
+  const { company_id, sub: rep_id, role } = request.user;
   const body = await parseBody(createCustomerSchema, request.body, reply);
   if (!body) return;
 
-  const customer = await createCustomer(company_id, rep_id, {
-    name: body.name,
-    trade_name: body.trade_name ?? null,
-    cnpj: body.cnpj ?? null,
-    whatsapp: body.whatsapp ?? null,
-    email: body.email ?? null,
-    address: body.address ?? null,
-  });
+  const tabela = await resolverTabelaEscolhida(company_id, rep_id, role, body.price_table_id);
+  if (!tabela.ok) {
+    await recusarTabela(reply, tabela.motivo);
+    return;
+  }
+
+  const customer = await createCustomer(
+    company_id,
+    rep_id,
+    {
+      name: body.name,
+      trade_name: body.trade_name ?? null,
+      cnpj: body.cnpj ?? null,
+      whatsapp: body.whatsapp ?? null,
+      email: body.email ?? null,
+      address: body.address ?? null,
+    },
+    tabela.price_table_id,
+  );
   if (!customer) {
     await reply.status(500).send({ error: 'Não foi possível criar o cliente', code: 'CREATE_FAILED', statusCode: 500 });
     return;
   }
   await reply.status(201).send({ data: customer });
+}
+
+/**
+ * Troca a tabela de preço de um cliente que já existe — a maioria veio do ERP
+ * com a tabela dele, e é aqui que o representante corrige.
+ *
+ * Duas travas independentes: a tabela pedida é do conjunto dele, e o cliente é
+ * da carteira dele. Passar em uma só não basta.
+ */
+export async function trocarTabelaDoClienteHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(trocarTabelaDoClienteSchema, request.body, reply);
+  if (!body) return;
+
+  const tabela = await resolverTabelaEscolhida(company_id, rep_id, role, body.price_table_id);
+  if (!tabela.ok) {
+    await recusarTabela(reply, tabela.motivo);
+    return;
+  }
+  // O schema exige o campo, então o resolvedor nunca devolve null aqui.
+  if (!tabela.price_table_id) {
+    await recusarTabela(reply, 'fora_do_conjunto');
+    return;
+  }
+
+  const resultado = await atualizarTabelaDoCliente(company_id, id, tabela.price_table_id, {
+    rep_id,
+    erp_rep_id: erp_rep_id ?? null,
+    irrestrito: role === 'manager' || role === 'admin',
+  });
+
+  if (!resultado.ok) {
+    if (resultado.motivo === 'cliente_nao_encontrado') {
+      await reply.status(404).send({
+        error: 'Cliente não encontrado na sua carteira',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+      return;
+    }
+    await reply.status(500).send({
+      error: 'Não foi possível trocar a tabela',
+      code: 'UPDATE_FAILED',
+      statusCode: 500,
+    });
+    return;
+  }
+
+  await reply.send({ data: resultado.cliente });
 }
