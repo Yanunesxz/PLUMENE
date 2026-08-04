@@ -26,7 +26,10 @@ interface SeletorTamanhoProps {
 }
 
 const FALLBACK_HEX = '#D1D5DB'; // cinza neutro quando a cor não foi extraída da foto
-// Bolinha "arco-íris" para produtos sem cor específica (cores sortidas).
+// Cinza da bolinha VARIADAS, o mesmo do selo impresso no catálogo.
+const VARIADAS_CINZA = '#57534E';
+// Arco-íris do "Sortido" — outra coisa: é a peça que nem chega a ter cor
+// cadastrada, não a bolinha VARIADAS de uma grade que tem.
 const SORTIDO_GRADIENT =
   'conic-gradient(from 90deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)';
 
@@ -35,9 +38,13 @@ const SORTIDO_GRADIENT =
  * duas, a da blusa e a da calça. Quando há par, a bolinha vira meio a meio —
  * é assim que o lojista reconhece a peça na página impressa. A metade de baixo
  * é a que dá nome à cor.
+ *
+ * A VARIADAS é o selo cinza escrito, igual ao do papel: um arco-íris ali dava a
+ * entender que a peça tem essas cores, quando o que ela diz é o contrário —
+ * "vem sortido, quem escolhe é a fábrica".
  */
 function fundoDaCor(c: { hex: string | null; hex_par?: string | null; variadas: boolean }) {
-  if (c.variadas) return { background: SORTIDO_GRADIENT };
+  if (c.variadas) return { backgroundColor: VARIADAS_CINZA };
   const cor = c.hex ?? FALLBACK_HEX;
   if (!c.hex_par || c.hex_par === c.hex) return { backgroundColor: cor };
   return { background: `linear-gradient(135deg, ${c.hex_par} 0% 50%, ${cor} 50% 100%)` };
@@ -168,6 +175,14 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                       )}
                       style={fundoDaCor(c)}
                     >
+                      {/* O selo escrito, como no catálogo — a bolinha cinza
+                          sozinha não diria nada. Sai da frente quando a cor
+                          está escolhida, para o check aparecer. */}
+                      {c.variadas && !selecionada && (
+                        <span className="select-none text-[8px] font-bold uppercase leading-none tracking-tight text-white">
+                          Variada
+                        </span>
+                      )}
                       {selecionada && (
                         <Check className="h-4 w-4 text-white drop-shadow" strokeWidth={3} />
                       )}
