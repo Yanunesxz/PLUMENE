@@ -15,15 +15,21 @@ import { Button } from './Button.js';
  * Firefox não têm essa API, então recebem o caminho do menu — um botão que não
  * faz nada seria pior do que nenhum botão.
  *
- * Some sozinho quando já está instalado: oferecer o que a pessoa já tem é ruído
- * permanente numa tela que ela abre todo dia.
+ * Quando o navegador não oferece o convite e não é nenhum caso conhecido, o
+ * cartão ensina o caminho do menu em vez de desaparecer. Sumir era o pior dos
+ * mundos: o Chrome não reoferece a instalação num perfil onde o app já foi
+ * instalado uma vez, e o representante que troca de aparelho ficava sem
+ * nenhuma pista de como colocar o atalho no novo.
+ *
+ * Some só quando já está instalado NESTE aparelho: aí oferecer o que a pessoa
+ * já tem é ruído permanente numa tela que ela abre todo dia.
  */
 export function CartaoInstalar() {
   const estado = useInstalarApp();
   const [comoFazer, setComoFazer] = useState(false);
   const [instalando, setInstalando] = useState(false);
 
-  if (estado === 'instalado' || estado === 'indisponivel') return null;
+  if (estado === 'instalado') return null;
 
   const automatico = estado === 'pronto';
 
@@ -65,7 +71,13 @@ export function CartaoInstalar() {
 
       {comoFazer ? (
         <div className="mt-4 border-t border-primary/20 pt-3">
-          {estado === 'manual-apple' ? <PassosApple /> : <PassosFirefox />}
+          {estado === 'manual-apple' ? (
+            <PassosApple />
+          ) : estado === 'manual-firefox' ? (
+            <PassosFirefox />
+          ) : (
+            <PassosMenu />
+          )}
         </div>
       ) : null}
     </div>
@@ -97,6 +109,36 @@ function PassosApple() {
       <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
         Não achou a opção? Abra este mesmo endereço no <strong>Safari</strong> — no iPhone, só ele
         adiciona à tela de início.
+      </p>
+    </>
+  );
+}
+
+/**
+ * Chrome, Edge, Samsung e afins quando o convite não veio.
+ *
+ * O caso mais comum não é navegador incapaz, é app JÁ INSTALADO neste perfil —
+ * o Chrome não oferece duas vezes. O texto assume isso sem acusar: descreve o
+ * caminho do menu, que funciona nos dois casos.
+ */
+function PassosMenu() {
+  return (
+    <>
+      <ol className="space-y-2 text-sm text-foreground">
+        <Passo numero={1} icone={MoreVertical}>
+          Toque nos <strong>três pontinhos</strong> do navegador, no canto.
+        </Passo>
+        <Passo numero={2} icone={Download}>
+          Escolha <strong>Instalar aplicativo</strong> — em alguns aparelhos aparece como «Adicionar
+          à tela inicial».
+        </Passo>
+        <Passo numero={3} icone={Check}>
+          Confirme. O ícone aparece junto dos seus outros aplicativos.
+        </Passo>
+      </ol>
+      <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
+        Não achou? Provavelmente o app <strong>já está instalado</strong> neste aparelho — procure o
+        ícone na tela inicial. O navegador não oferece a instalação duas vezes.
       </p>
     </>
   );

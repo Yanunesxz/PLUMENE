@@ -23,14 +23,17 @@ interface EventoDeInstalacao extends Event {
  * - `manual-firefox`: o Firefox instala pelo menu dele, mas também não dispara
  *   o convite programático. Sem este caso o cartão sumia e o usuário de Firefox
  *   nunca ficava sabendo que dá para instalar.
- * - `indisponivel`: navegador que não instala.
+ * - `manual`: o navegador não ofereceu o convite e não é nenhum dos casos
+ *   conhecidos. Acontece muito no Chrome quando o app JÁ FOI instalado neste
+ *   perfil: ele não oferece de novo. Some ≠ não dá — o caminho pelo menu
+ *   continua valendo, e é ele que o cartão ensina.
  */
 export type EstadoInstalacao =
   | 'instalado'
   | 'pronto'
   | 'manual-apple'
   | 'manual-firefox'
-  | 'indisponivel';
+  | 'manual';
 
 let convite: EventoDeInstalacao | null = null;
 let jaInstalado = false;
@@ -106,7 +109,7 @@ export function estadoDaInstalacao(): EstadoInstalacao {
   // no iOS são o Safari por baixo e seguem a mesma limitação.
   if (ehApple()) return 'manual-apple';
   if (ehFirefox()) return 'manual-firefox';
-  return 'indisponivel';
+  return 'manual';
 }
 
 /**

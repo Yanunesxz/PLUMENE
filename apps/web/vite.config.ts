@@ -13,7 +13,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['logo.png'],
+      includeAssets: ['logo.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
       manifest: {
         name: 'Representantes Corpo Sensual',
         short_name: 'Representantes',
@@ -23,10 +23,21 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
+        // O tamanho declarado tem de ser o tamanho REAL do arquivo: o Chrome
+        // baixa o ícone e confere. Apontar a logo de 1091px como se fosse de
+        // 192 reprovava o ícone, e sem ícone válido ele nunca dispara o convite
+        // de instalação — foi assim que o "Deixe na tela inicial" sumiu.
         icons: [
-          { src: 'logo.png', sizes: '192x192', type: 'image/png' },
-          { src: 'logo.png', sizes: '512x512', type: 'image/png' },
-          { src: 'logo.png', sizes: '1091x1091', type: 'image/png', purpose: 'any maskable' },
+          { src: 'pwa-192x192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: 'pwa-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          {
+            src: 'pwa-maskable-512x512.png',
+            sizes: '512x512',
+            type: 'image/png',
+            // Separado do 'any': o sistema recorta o maskable em círculo, e usar
+            // a mesma arte nos dois faz a logo aparecer cortada no Android.
+            purpose: 'maskable',
+          },
         ],
       },
       workbox: {
