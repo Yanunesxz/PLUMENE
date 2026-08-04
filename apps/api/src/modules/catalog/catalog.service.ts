@@ -113,30 +113,48 @@ export async function getProducts(
   }
 
   // Cores do catálogo impresso (migração 019). Paginado pelo mesmo motivo das
-  // variantes: são ~3 cores para cada um dos 152 produtos que têm.
+  // variantes: são ~3 cores para cada produto do catálogo.
   //
   // A migração pode não estar aplicada — nesse caso o PostgREST recusa e o
   // catálogo segue sem cor, em vez de abrir vazio.
   const coresPorProduto = new Map<string, CatalogColor[]>();
-  try {
-    const cores = await buscarPorIds<{
-      product_id: string;
-      codigo: string;
-      nome: string | null;
-      hex: string | null;
-      variadas: boolean;
-      ordem: number;
-    }>(productIds, (lote, de, ate) =>
+  type LinhaDeCor = {
+    product_id: string;
+    codigo: string;
+    nome: string | null;
+    hex: string | null;
+    hex_par?: string | null;
+    estampa?: boolean | null;
+    variadas: boolean;
+    ordem: number;
+  };
+
+  // A segunda bolinha e o marcador de estampa são da 020. Se ela ainda não
+  // rodou, o PostgREST recusa as colunas — e aí é melhor mostrar a cor sem o
+  // par do que sumir com a bolinha inteira.
+  const COLUNAS = 'product_id, codigo, nome, hex, variadas, ordem';
+  const ler = (colunas: string) =>
+    buscarPorIds<LinhaDeCor>(productIds, (lote, de, ate) =>
       supabase
         .from('product_colors')
-        .select('product_id, codigo, nome, hex, variadas, ordem')
+        .select(colunas)
         .in('product_id', lote)
         .order('ordem')
         .range(de, ate),
     );
+
+  try {
+    const cores = await ler(`${COLUNAS}, hex_par, estampa`).catch(() => ler(COLUNAS));
     for (const c of cores) {
       const arr = coresPorProduto.get(c.product_id) ?? [];
-      arr.push({ codigo: c.codigo, nome: c.nome, hex: c.hex, variadas: c.variadas });
+      arr.push({
+        codigo: c.codigo,
+        nome: c.nome,
+        hex: c.hex,
+        hex_par: c.hex_par ?? null,
+        estampa: Boolean(c.estampa),
+        variadas: c.variadas,
+      });
       coresPorProduto.set(c.product_id, arr);
     }
   } catch {

@@ -1,1578 +1,31 @@
 {
- "1027": {
-  "sku": "1027",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#825746",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#E0858E",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.5"
- },
- "0159": {
-  "sku": "0159",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#81554B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#E0A198",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.6"
- },
- "0262": {
-  "sku": "0262",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#81554B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#E0A198",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.6"
- },
- "1005": {
-  "sku": "1005",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#81554B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#E0A198",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.6"
- },
- "0161": {
-  "sku": "0161",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#CFB2AD",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#E0858E",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#E0A198",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.7"
- },
- "0169": {
-  "sku": "0169",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#D5B0A0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#233455",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#000000",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.7"
- },
- "0263": {
-  "sku": "0263",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#E8829B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#D8B4A5",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.9"
- },
- "1026": {
-  "sku": "1026",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#E8829B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#D8B4A5",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.9"
- },
- "0162": {
-  "sku": "0162",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.10"
- },
- "0160": {
-  "sku": "0160",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.10"
- },
- "0172": {
-  "sku": "0172",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#825746",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.11"
- },
- "0163": {
-  "sku": "0163",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#7D5444",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.12"
- },
- "0171": {
-  "sku": "0171",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#7D5444",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.12"
- },
- "1009": {
-  "sku": "1009",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#969695",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.16"
- },
- "1008": {
-  "sku": "1008",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#969695",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.16"
- },
- "1023": {
-  "sku": "1023",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.17"
- },
- "1020": {
-  "sku": "1020",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.17"
- },
- "1007": {
-  "sku": "1007",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.17"
- },
- "1021": {
-  "sku": "1021",
-  "nome": "MOLETINHO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.17"
- },
- "1004": {
-  "sku": "1004",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8F241E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#162947",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#35393C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.20"
- },
- "1032": {
-  "sku": "1032",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#303437",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1D304E",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#2C341F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#ADADAD",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.20"
- },
- "0201": {
-  "sku": "0201",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#313538",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1C2F4D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#2C341F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#AEAEAE",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.21"
- },
- "0202": {
-  "sku": "0202",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#313538",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1C2F4D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#2C341F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#AEAEAE",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.21"
- },
- "0199": {
-  "sku": "0199",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#AD7365",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#AFAFAF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#9A2E2C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#6D788A",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   },
-   {
-    "codigo": "05",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 4,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.22"
- },
- "0200": {
-  "sku": "0200",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#313538",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1C2F4D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#2C341F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#AEAEAE",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   },
-   {
-    "codigo": "05",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 4,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.22"
- },
- "0204": {
-  "sku": "0204",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.23"
- },
- "0179": {
-  "sku": "0179",
-  "nome": "PLUSH",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.23"
- },
- "1033": {
-  "sku": "1033",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#152862",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1A181D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.25"
- },
- "0222": {
-  "sku": "0222",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#152862",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#1A181D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.25"
- },
- "0223": {
-  "sku": "0223",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.26"
- },
- "0221": {
-  "sku": "0221",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.26"
- },
- "0220": {
-  "sku": "0220",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#B76F8F",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#BCAFB9",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#41568A",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#B0A389",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.27"
- },
- "1034": {
-  "sku": "1034",
-  "nome": "CANELADO",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#B76F8F",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#BCAFB9",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#41568A",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#B0A389",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.27"
- },
- "0260": {
-  "sku": "0260",
-  "nome": "SUEDE",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.29"
- },
- "0250": {
-  "sku": "0250",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.31"
- },
- "4131": {
-  "sku": "4131",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#9BC1D3",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.32"
- },
- "1460": {
-  "sku": "1460",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#202F48",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#78735D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.32"
- },
- "0145": {
-  "sku": "0145",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#9BC1D3",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.35"
- },
- "0143": {
-  "sku": "0143",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#202F48",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#78735D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.35"
- },
- "4130": {
-  "sku": "4130",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#9BC1D3",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.36"
- },
- "0303": {
-  "sku": "0303",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#243652",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#847F67",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#9BC1D3",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.36"
- },
- "0855": {
-  "sku": "0855",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.37"
- },
- "0854": {
-  "sku": "0854",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.37"
- },
- "1030": {
-  "sku": "1030",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.38"
- },
- "0851": {
-  "sku": "0851",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.39"
- },
- "0719": {
-  "sku": "0719",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.39"
- },
- "1002": {
-  "sku": "1002",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#000000",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#3D4D64",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.41"
- },
- "1031": {
-  "sku": "1031",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#000000",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#3D4D64",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.41"
- },
- "1001": {
-  "sku": "1001",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#555460",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#C974A8",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.42"
- },
- "1003": {
-  "sku": "1003",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#555460",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#C974A8",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 2,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.42"
- },
- "0990": {
-  "sku": "0990",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#969695",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.46"
- },
- "0981": {
-  "sku": "0981",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#969695",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.46"
- },
- "1024": {
-  "sku": "1024",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.47"
- },
- "1025": {
-  "sku": "1025",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
-   }
-  ],
-  "origem": "t3-inverno.pdf p.47"
- },
- "0245": {
-  "sku": "0245",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.50"
- },
- "0242": {
-  "sku": "0242",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.50"
- },
- "0240": {
-  "sku": "0240",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.51"
- },
- "0852": {
-  "sku": "0852",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.51"
- },
- "0140": {
-  "sku": "0140",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#E887A3",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#B04A64",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#A86E6B",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.52"
- },
- "0142": {
-  "sku": "0142",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#E887A3",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#B04A64",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#A86E6B",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.52"
- },
- "1400": {
-  "sku": "1400",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#E887A3",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#B04A64",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#A86E6B",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
-   },
-   {
-    "codigo": "04",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 3,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.53"
- },
- "0880": {
-  "sku": "0880",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.54"
- },
- "0141": {
-  "sku": "0141",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.54"
- },
- "0890": {
-  "sku": "0890",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.55"
- },
- "0870": {
-  "sku": "0870",
-  "nome": "MALHA PV",
-  "cores": [
-   {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
-   }
-  ],
-  "origem": "t3-inverno.pdf p.55"
- },
  "1042": {
   "sku": "1042",
   "nome": "SUEDE",
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E6B4B0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#D57273",
+    "badge": false,
+    "hex_par": "#DEBABC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 1
    }
   ],
-  "origem": "t3-verao.pdf p.4"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.4",
+  "confianca": "pareado"
  },
  "1043": {
   "sku": "1043",
@@ -1580,20 +33,37 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C5D1E9",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#C2CFE6",
+    "badge": false,
+    "hex_par": "#ABC9E3",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#425687",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#3F5484",
+    "badge": false,
+    "hex_par": "#FFFFFF",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
    }
   ],
-  "origem": "t3-verao.pdf p.4"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.4",
+  "confianca": "pareado"
  },
  "0355": {
   "sku": "0355",
@@ -1601,27 +71,65 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E7EAF1",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E9EAEF",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#93462C",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#97492F",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#E3ADC4",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E2AFC2",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.6"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.6",
+  "confianca": "pareado"
+ },
+ "1034": {
+  "sku": "1034",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.6",
+  "confianca": "pareado"
  },
  "0848": {
   "sku": "0848",
@@ -1629,27 +137,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#462D30",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#472E2F",
+    "badge": false,
+    "hex_par": "#CCB3AB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#746E54",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#736D55",
+    "badge": false,
+    "hex_par": "#B9B5B1",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#91184B",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#941D4E",
+    "badge": false,
+    "hex_par": "#E0AABE",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.7"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.7",
+  "confianca": "pareado"
  },
  "0354": {
   "sku": "0354",
@@ -1657,27 +185,83 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#B3CEE9",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#B5CEE7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#E2ACC3",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#E2AFC2",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#191722",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#1A1923",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.7"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.7",
+  "confianca": "pareado"
+ },
+ "0222": {
+  "sku": "0222",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.8",
+  "confianca": "compartilhado"
+ },
+ "0223": {
+  "sku": "0223",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.8",
+  "confianca": "compartilhado"
  },
  "0849": {
   "sku": "0849",
@@ -1685,27 +269,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#241F25",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#222025",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#222745",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#212947",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#E6739E",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E7759E",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.9"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.9",
+  "confianca": "pareado"
  },
  "1035": {
   "sku": "1035",
@@ -1713,20 +317,37 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#90442A",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#97492F",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#E4AEC5",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#E2AFC2",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
    }
   ],
-  "origem": "t3-verao.pdf p.10"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.10",
+  "confianca": "pareado"
  },
  "1036": {
   "sku": "1036",
@@ -1734,13 +355,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#1E2B4E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.13"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.13",
+  "confianca": "compartilhado"
  },
  "1038": {
   "sku": "1038",
@@ -1748,13 +373,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#B7DEDE",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.13"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.13",
+  "confianca": "compartilhado"
  },
  "1037": {
   "sku": "1037",
@@ -1762,13 +391,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#1E2B4E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.14"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.14",
+  "confianca": "compartilhado"
  },
  "1039": {
   "sku": "1039",
@@ -1776,13 +409,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#B7DEDE",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.14"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.14",
+  "confianca": "compartilhado"
  },
  "1040": {
   "sku": "1040",
@@ -1790,13 +427,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#1E2B4E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.15"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.15",
+  "confianca": "compartilhado"
  },
  "1041": {
   "sku": "1041",
@@ -1804,13 +445,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#B7DEDE",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#B8DEDD",
+    "badge": false,
+    "hex_par": "#1E2A4D",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.15"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.15",
+  "confianca": "compartilhado"
  },
  "0800": {
   "sku": "0800",
@@ -1818,34 +463,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C3B9C9",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#B59BB7",
+    "badge": false,
+    "hex_par": "#D793B8",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BE7B6D",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#B59E9E",
+    "badge": false,
+    "hex_par": "#8A7F8D",
+    "estampa": true,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#C891A2",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#9183A1",
+    "badge": false,
+    "hex_par": "#4B62AB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#427B8A",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#A49EA7",
+    "badge": false,
+    "hex_par": "#7DCAD3",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.16"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.16",
+  "confianca": "pareado"
  },
  "0770": {
   "sku": "0770",
@@ -1853,27 +521,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#925A77",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#955E7B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#374254",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#384355",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#C2638D",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BC5D89",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.17"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.17",
+  "confianca": "pareado"
  },
  "0760": {
   "sku": "0760",
@@ -1881,34 +569,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#EA99B1",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E998B1",
+    "badge": false,
+    "hex_par": "#64BBCC",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#2F5882",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#2E5881",
+    "badge": false,
+    "hex_par": "#D691B6",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#E53A42",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E43942",
+    "badge": false,
+    "hex_par": "#6E75A0",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#EA99B1",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#E998B1",
+    "badge": false,
+    "hex_par": "#4B61A9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.18"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.18",
+  "confianca": "compartilhado"
  },
  "0750": {
   "sku": "0750",
@@ -1916,34 +627,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#EA99B1",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E998B1",
+    "badge": false,
+    "hex_par": "#64BBCC",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#2F5882",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#2E5881",
+    "badge": false,
+    "hex_par": "#D691B6",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#E53A42",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E43942",
+    "badge": false,
+    "hex_par": "#6E75A0",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#EA99B1",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#E998B1",
+    "badge": false,
+    "hex_par": "#4B61A9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.18"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.18",
+  "confianca": "compartilhado"
  },
  "0841": {
   "sku": "0841",
@@ -1951,27 +685,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#96ABBD",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#7F9BB6",
+    "badge": false,
+    "hex_par": "#AFDAE3",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B59FAA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#918CA1",
+    "badge": false,
+    "hex_par": "#F6BBCC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#D78DAE",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#C28FAB",
+    "badge": false,
+    "hex_par": "#19408C",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.19"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.19",
+  "confianca": "pareado"
  },
  "0845": {
   "sku": "0845",
@@ -1979,55 +733,113 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A797B2",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BB9BAC",
+    "badge": false,
+    "hex_par": "#AEC2DB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B59FAA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#918CA1",
+    "badge": false,
+    "hex_par": "#F6BBCC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#D78DAE",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#C28FAB",
+    "badge": false,
+    "hex_par": "#19408C",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.19"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.19",
+  "confianca": "pareado"
+ },
+ "1003": {
+  "sku": "1003",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#4F66AD",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#EC8AB8",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#696D93",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.21",
+  "confianca": "pareado"
  },
  "0321": {
   "sku": "0321",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#DDB5B7",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#BEA2A6",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#A3AABD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.23"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.23",
+  "confianca": "pareado"
  },
  "0325": {
   "sku": "0325",
@@ -2035,27 +847,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#DDB5B7",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DFA7AA",
+    "badge": false,
+    "hex_par": "#EFA2A0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BEA2A6",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BDA0A2",
+    "badge": false,
+    "hex_par": "#CCAEAB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A3AABD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A4ADC1",
+    "badge": false,
+    "hex_par": "#B5BCCD",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.23"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.23",
+  "confianca": "pareado"
  },
  "0352": {
   "sku": "0352",
@@ -2063,62 +895,131 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#F1A8A4",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#F1A7A4",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#E4A5CA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#E3A5CA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A2C8DA",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A2C7D9",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#C0C3D5",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.24"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.24",
+  "confianca": "pareado"
  },
  "0328": {
   "sku": "0328",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.25"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.25",
+  "confianca": "compartilhado"
  },
  "0327": {
   "sku": "0327",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.25"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.25",
+  "confianca": "compartilhado"
+ },
+ "1030": {
+  "sku": "1030",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#A0A4CB",
+    "badge": false,
+    "hex_par": "#EFBED4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#824F56",
+    "badge": false,
+    "hex_par": "#F1A7A4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.26",
+  "confianca": "pareado"
  },
  "0640": {
   "sku": "0640",
@@ -2126,34 +1027,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#91B8D0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#9BBED4",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A562A7",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#AE7BB5",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B48273",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BB9184",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#B8B8BA",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#929995",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.27"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.27",
+  "confianca": "pareado"
  },
  "0595": {
   "sku": "0595",
@@ -2161,41 +1085,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A1B3A8",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#A1B2A7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#C2D3E8",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#C1D3E8",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#F1D8E8",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#F0D8E7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#D2B4AE",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
     "hex": "#C0C3D5",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.27"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.27",
+  "confianca": "pareado"
  },
  "0126": {
   "sku": "0126",
@@ -2203,41 +1153,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#87928A",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#8E9792",
+    "badge": false,
+    "hex_par": "#A1B2A7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B9D4EF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#AFCCE8",
+    "badge": false,
+    "hex_par": "#B6CCE1",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#EBA5C1",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#EBD0DD",
+    "badge": false,
+    "hex_par": "#ECDEE7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#BEA2A6",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#BDA0A2",
+    "badge": false,
+    "hex_par": "#CCAEAB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#A5ACBF",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#A4ADC1",
+    "badge": false,
+    "hex_par": "#B5BCCD",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.28"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.28",
+  "confianca": "compartilhado"
  },
  "0123": {
   "sku": "0123",
@@ -2245,41 +1221,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#87928A",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#8E9792",
+    "badge": false,
+    "hex_par": "#A1B2A7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B9D4EF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#AFCCE8",
+    "badge": false,
+    "hex_par": "#B6CCE1",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#EBA5C1",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#EBD0DD",
+    "badge": false,
+    "hex_par": "#ECDEE7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#BEA2A6",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#BDA0A2",
+    "badge": false,
+    "hex_par": "#CCAEAB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#A5ACBF",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#A4ADC1",
+    "badge": false,
+    "hex_par": "#B5BCCD",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.28"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.28",
+  "confianca": "compartilhado"
  },
  "0125": {
   "sku": "0125",
@@ -2287,34 +1289,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#ECA8A7",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#ECA8A6",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#E4A5CA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#E3A5CA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A2C8DA",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A2C7D9",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#C0C3D5",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.29"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.29",
+  "confianca": "compartilhado"
  },
  "0350": {
   "sku": "0350",
@@ -2322,34 +1347,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#ECA8A7",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#ECA8A6",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#E4A5CA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#E3A5CA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A2C8DA",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A2C7D9",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#C0C3D5",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.29"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.29",
+  "confianca": "compartilhado"
  },
  "2226": {
   "sku": "2226",
@@ -2357,41 +1405,149 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#D4BEC0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#D7C8C9",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#DCBAC7",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#DECBD4",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#D9CCC3",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E5DACE",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.30"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.30",
+  "confianca": "pareado"
+ },
+ "0719": {
+  "sku": "0719",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.30",
+  "confianca": "pareado"
  },
  "0853": {
   "sku": "0853",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.31"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.31",
+  "confianca": "compartilhado"
+ },
+ "0854": {
+  "sku": "0854",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.31",
+  "confianca": "compartilhado"
+ },
+ "0851": {
+  "sku": "0851",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#EBD9EA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#DB2D6A",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.32",
+  "confianca": "pareado"
  },
  "2134": {
   "sku": "2134",
@@ -2399,34 +1555,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E6E5EA",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E4E2E6",
+    "badge": false,
+    "hex_par": "#AFC5DA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B28F94",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#998AA0",
+    "badge": false,
+    "hex_par": "#DDBDBE",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#DAD9AD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#D6D3C0",
+    "badge": false,
+    "hex_par": "#BDC8C2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#A8BCC8",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#9EB8C5",
+    "badge": false,
+    "hex_par": "#98BDD2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.33"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.33",
+  "confianca": "compartilhado"
  },
  "2131": {
   "sku": "2131",
@@ -2434,34 +1613,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E6E5EA",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E4E2E6",
+    "badge": false,
+    "hex_par": "#AFC5DA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B28F94",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#998AA0",
+    "badge": false,
+    "hex_par": "#DDBDBE",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#DAD9AD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#D6D3C0",
+    "badge": false,
+    "hex_par": "#BDC8C2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#A8BCC8",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#9EB8C5",
+    "badge": false,
+    "hex_par": "#98BDD2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.33"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.33",
+  "confianca": "compartilhado"
  },
  "0590": {
   "sku": "0590",
@@ -2469,41 +1671,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E18878",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#E08778",
+    "badge": false,
+    "hex_par": "#D6C4BB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#529292",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#519292",
+    "badge": false,
+    "hex_par": "#A5D4CD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BE497F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BE487E",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.34"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.34",
+  "confianca": "pareado"
  },
  "0128": {
   "sku": "0128",
@@ -2511,34 +1739,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#BE497F",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BE487E",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#529292",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#519292",
+    "badge": false,
+    "hex_par": "#A5D4CD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#E18878",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#E08778",
+    "badge": false,
+    "hex_par": "#D6C4BB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#21284C",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#21284B",
+    "badge": false,
+    "hex_par": "#B3C8DD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.34"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.34",
+  "confianca": "pareado"
  },
  "0690": {
   "sku": "0690",
@@ -2546,48 +1797,77 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#3E4A85",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#3E4984",
+    "badge": false,
+    "hex_par": "#C9DACE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BE497F",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BE487E",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#E18878",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#E08778",
+    "badge": false,
+    "hex_par": "#D6C4BB",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
    },
    {
     "codigo": "06",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 5,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 5
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 6
    }
   ],
-  "origem": "t3-verao.pdf p.35"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.35",
+  "confianca": "pareado"
  },
  "0122": {
   "sku": "0122",
@@ -2595,34 +1875,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#3E4A85",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#3E4984",
+    "badge": false,
+    "hex_par": "#C9DACE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BE497F",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BE487E",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#F0A9C7",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#F0A8C7",
+    "badge": false,
+    "hex_par": "#F4D9E9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.35"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.35",
+  "confianca": "pareado"
  },
  "0310": {
   "sku": "0310",
@@ -2630,41 +1933,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B36A99",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#B26A99",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#3E4A85",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#3E4984",
+    "badge": false,
+    "hex_par": "#C9DACE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.36"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.36",
+  "confianca": "pareado"
  },
  "0390": {
   "sku": "0390",
@@ -2672,34 +2001,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#717962",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#727763",
+    "badge": false,
+    "hex_par": "#D1D0CC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#D5CDD7",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#D3C0D0",
+    "badge": false,
+    "hex_par": "#D291BF",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#ABD5D2",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#AAD2CB",
+    "badge": false,
+    "hex_par": "#ABD7CE",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#EED2C5",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#E7C4B8",
+    "badge": false,
+    "hex_par": "#DA5953",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.37"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.37",
+  "confianca": "pareado"
  },
  "0380": {
   "sku": "0380",
@@ -2707,34 +2059,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#53603C",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#525F3C",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#D693C0",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#D592C0",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B8DBD1",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B8DAD1",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.37"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.37",
+  "confianca": "pareado"
  },
  "0115": {
   "sku": "0115",
@@ -2742,34 +2117,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#E28370",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.38"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.38",
+  "confianca": "pareado"
  },
  "0015": {
   "sku": "0015",
@@ -2777,41 +2175,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B36A99",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#B26A99",
+    "badge": false,
+    "hex_par": "#DAC6D1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#3E4A85",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#3E4984",
+    "badge": false,
+    "hex_par": "#D8EBDE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
     "hex": "#E28370",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.38"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.38",
+  "confianca": "pareado"
  },
  "0111": {
   "sku": "0111",
@@ -2819,34 +2243,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#478E90",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#468D90",
+    "badge": false,
+    "hex_par": "#B0D7D0",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#E28370",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.39"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.39",
+  "confianca": "compartilhado"
  },
  "0110": {
   "sku": "0110",
@@ -2854,34 +2301,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C04763",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BF4663",
+    "badge": false,
+    "hex_par": "#DBCBD9",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#478E90",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#468D90",
+    "badge": false,
+    "hex_par": "#B0D7D0",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#E28370",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#20284C",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#1F274B",
+    "badge": false,
+    "hex_par": "#B3C8DF",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.39"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.39",
+  "confianca": "compartilhado"
  },
  "0705": {
   "sku": "0705",
@@ -2889,27 +2359,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#F1A8AB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#F1A8AA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#ACC4B1",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#ABC4B1",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.40"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.40",
+  "confianca": "pareado"
  },
  "0707": {
   "sku": "0707",
@@ -2917,27 +2407,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#F1A8AB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#F1A8AA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#DAB8B8",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#D9B8B8",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.40"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.40",
+  "confianca": "pareado"
  },
  "0703": {
   "sku": "0703",
@@ -2945,27 +2455,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#F29CBB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#F29BBB",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A6CBE7",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A6CAE7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.41"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.41",
+  "confianca": "pareado"
  },
  "0706": {
   "sku": "0706",
@@ -2973,27 +2503,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#ACC4B1",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#ABC4B1",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#DAB8B8",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#D9B8B8",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.42"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.42",
+  "confianca": "pareado"
  },
  "0702": {
   "sku": "0702",
@@ -3001,27 +2551,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#F29CBB",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#F29BBB",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BB4C18",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BA4B17",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.43"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.43",
+  "confianca": "pareado"
  },
  "0704": {
   "sku": "0704",
@@ -3029,27 +2599,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#DAB8B8",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#D9B8B8",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#A6CBE7",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#A6CAE7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.43"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.43",
+  "confianca": "pareado"
  },
  "0911": {
   "sku": "0911",
@@ -3057,41 +2647,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#2D355F",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#585F83",
+    "badge": false,
+    "hex_par": "#EDDFD4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#171C36",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#42465D",
+    "badge": false,
+    "hex_par": "#C3162B",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#9FB0C0",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BBA7B5",
+    "badge": false,
+    "hex_par": "#AAABD6",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#D18687",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#DC898B",
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#6E696B",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#716C6F",
+    "badge": false,
+    "hex_par": "#FFFFFF",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.45"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.45",
+  "confianca": "compartilhado"
  },
  "0901": {
   "sku": "0901",
@@ -3099,69 +2715,85 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#2D355F",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#585F83",
+    "badge": false,
+    "hex_par": "#EDDFD4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#171C36",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#42465D",
+    "badge": false,
+    "hex_par": "#C3162B",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#9FB0C0",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BBA7B5",
+    "badge": false,
+    "hex_par": "#AAABD6",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#D18687",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#DC898B",
+    "badge": false,
+    "hex_par": "#DCCAC2",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
-    "hex": "#6E696B",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "hex": "#716C6F",
+    "badge": false,
+    "hex_par": "#FFFFFF",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.45"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.45",
+  "confianca": "compartilhado"
  },
  "0650": {
   "sku": "0650",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#D9787D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#343B58",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
-   },
-   {
-    "codigo": "03",
-    "hex": "#75454C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.46"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.46",
+  "confianca": "pareado"
  },
  "0715": {
   "sku": "0715",
@@ -3169,27 +2801,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#D9787D",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DC898B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#343B58",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#616171",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#75454C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#83545B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.46"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.46",
+  "confianca": "pareado"
  },
  "0720": {
   "sku": "0720",
@@ -3197,27 +2849,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#DE7AA3",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DE79A2",
+    "badge": false,
+    "hex_par": "#E5D5E3",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A47FAA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#A37FAA",
+    "badge": false,
+    "hex_par": "#DEC8C3",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BA9678",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B99677",
+    "badge": false,
+    "hex_par": "#DCD2CA",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.47"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.47",
+  "confianca": "compartilhado"
  },
  "0710": {
   "sku": "0710",
@@ -3225,27 +2897,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#DE7AA3",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DE79A2",
+    "badge": false,
+    "hex_par": "#E5D5E3",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A47FAA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#A37FAA",
+    "badge": false,
+    "hex_par": "#DEC8C3",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BA9678",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B99677",
+    "badge": false,
+    "hex_par": "#DCD2CA",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.47"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.47",
+  "confianca": "compartilhado"
  },
  "0730": {
   "sku": "0730",
@@ -3254,26 +2946,46 @@
    {
     "codigo": "01",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "badge": false,
+    "hex_par": "#B3B3BE",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A47FAA",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#A37FAA",
+    "badge": false,
+    "hex_par": "#DDC7C3",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BA9678",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B99677",
+    "badge": false,
+    "hex_par": "#DCD2CA",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.49"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.49",
+  "confianca": "pareado"
  },
  "0330": {
   "sku": "0330",
@@ -3282,26 +2994,46 @@
    {
     "codigo": "01",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "badge": false,
+    "hex_par": "#B3B3BE",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#1C2240",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#1C223F",
+    "badge": false,
+    "hex_par": "#8D8595",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BA9678",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B99677",
+    "badge": false,
+    "hex_par": "#DCD2CA",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.49"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.49",
+  "confianca": "pareado"
  },
  "0430": {
   "sku": "0430",
@@ -3309,34 +3041,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#9E5160",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AD7C87",
+    "badge": false,
+    "hex_par": "#A15772",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#857F89",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#6F7191",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8C8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#60768B",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8998AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.50"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.50",
+  "confianca": "pareado"
  },
  "0130": {
   "sku": "0130",
@@ -3344,41 +3099,67 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
     "hex": "#CFCECB",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#2F414F",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#689B83",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
     "hex": "#726D6B",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.51"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.51",
+  "confianca": "pareado"
  },
  "2130": {
   "sku": "2130",
@@ -3386,27 +3167,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#8ED2EA",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#8ED1EA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#53603C",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#525F3C",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.51"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.51",
+  "confianca": "pareado"
  },
  "0429": {
   "sku": "0429",
@@ -3414,34 +3215,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#9B5260",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AC7B87",
+    "badge": false,
+    "hex_par": "#A25872",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#857F89",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#797A97",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8B8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#60768B",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8A98AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.52"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.52",
+  "confianca": "pareado"
  },
  "0329": {
   "sku": "0329",
@@ -3449,27 +3273,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A1B3A8",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#A1B2A7",
+    "badge": false,
+    "hex_par": "#CFCFD3",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#1C2240",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#1C223F",
+    "badge": false,
+    "hex_par": "#8D8595",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BA9678",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B99677",
+    "badge": false,
+    "hex_par": "#DCD2CA",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.53"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.53",
+  "confianca": "pareado"
  },
  "0129": {
   "sku": "0129",
@@ -3477,69 +3321,169 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A1B3A8",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#A1B2A7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#CFCECB",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
     "hex": "#2F414F",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
    },
    {
     "codigo": "05",
     "hex": "#726D6B",
-    "variadas": false,
-    "ordem": 4,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 4
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 5
    }
   ],
-  "origem": "t3-verao.pdf p.53"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.53",
+  "confianca": "pareado"
+ },
+ "4130": {
+  "sku": "4130",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#8ED1EA",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.54",
+  "confianca": "pareado"
+ },
+ "1025": {
+  "sku": "1025",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#9CA0AB",
+    "badge": false,
+    "hex_par": "#818290",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.54",
+  "confianca": "pareado"
  },
  "0135": {
   "sku": "0135",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.55"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.55",
+  "confianca": "compartilhado"
  },
  "0131": {
   "sku": "0131",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.55"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.55",
+  "confianca": "compartilhado"
  },
  "0216": {
   "sku": "0216",
@@ -3547,34 +3491,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C4D9DC",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#C2D8DD",
+    "badge": false,
+    "hex_par": "#D0E3EA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A59686",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#96826E",
+    "badge": false,
+    "hex_par": "#F2C4DB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#695A5A",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#645251",
+    "badge": false,
+    "hex_par": "#DCD7D4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#3C342F",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#64584C",
+    "badge": false,
+    "hex_par": "#DFBCBC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.56"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.56",
+  "confianca": "compartilhado"
  },
  "0316": {
   "sku": "0316",
@@ -3582,34 +3549,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#C4D9DC",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#C2D8DD",
+    "badge": false,
+    "hex_par": "#D0E3EA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#A59686",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#96826E",
+    "badge": false,
+    "hex_par": "#F2C4DB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#695A5A",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#645251",
+    "badge": false,
+    "hex_par": "#DCD7D4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#3C342F",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#64584C",
+    "badge": false,
+    "hex_par": "#DFBCBC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.56"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.56",
+  "confianca": "compartilhado"
  },
  "0116": {
   "sku": "0116",
@@ -3617,34 +3607,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#92354C",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#933950",
+    "badge": false,
+    "hex_par": "#F2C4DB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#CCC8C3",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#D0C5C3",
+    "badge": false,
+    "hex_par": "#D0446B",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B78DAD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B28DAC",
+    "badge": false,
+    "hex_par": "#EEDDD3",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#182545",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#2A2B4C",
+    "badge": false,
+    "hex_par": "#ED9FC4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.57"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.57",
+  "confianca": "compartilhado"
  },
  "0109": {
   "sku": "0109",
@@ -3652,48 +3665,93 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#92354C",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#933950",
+    "badge": false,
+    "hex_par": "#F2C4DB",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#CCC8C3",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#D0C5C3",
+    "badge": false,
+    "hex_par": "#D0446B",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B78DAD",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#B28DAC",
+    "badge": false,
+    "hex_par": "#EEDDD3",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#182545",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#2A2B4C",
+    "badge": false,
+    "hex_par": "#ED9FC4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.57"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.57",
+  "confianca": "compartilhado"
+ },
+ "0852": {
+  "sku": "0852",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.58",
+  "confianca": "compartilhado"
  },
  "0714": {
   "sku": "0714",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.58"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.58",
+  "confianca": "compartilhado"
  },
  "0359": {
   "sku": "0359",
@@ -3701,27 +3759,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#DBBDCB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DCACBF",
+    "badge": false,
+    "hex_par": "#E8DDE5",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#2C292F",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#6A666A",
+    "badge": false,
+    "hex_par": "#A7A3A9",
+    "estampa": true,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#D1A1A6",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#DEBDBE",
+    "badge": false,
+    "hex_par": "#D98588",
+    "estampa": true,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.59"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.59",
+  "confianca": "compartilhado"
  },
  "0358": {
   "sku": "0358",
@@ -3729,41 +3807,65 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#DBBDCB",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#DCACBF",
+    "badge": false,
+    "hex_par": "#E8DDE5",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#2C292F",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#6A666A",
+    "badge": false,
+    "hex_par": "#A7A3A9",
+    "estampa": true,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#D1A1A6",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#DEBDBE",
+    "badge": false,
+    "hex_par": "#D98588",
+    "estampa": true,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.59"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.59",
+  "confianca": "compartilhado"
  },
  "0819": {
   "sku": "0819",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.60"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.60",
+  "confianca": "pareado"
  },
  "0816": {
   "sku": "0816",
@@ -3771,34 +3873,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A2879E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BF9DAC",
+    "badge": false,
+    "hex_par": "#AABDD7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#6B89AF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7B96B3",
+    "badge": false,
+    "hex_par": "#A9D7E3",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B69FAA",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#918CA1",
+    "badge": false,
+    "hex_par": "#F6BBCC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#D78AAC",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#C28FAB",
+    "badge": false,
+    "hex_par": "#19408C",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.61"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.61",
+  "confianca": "compartilhado"
  },
  "0815": {
   "sku": "0815",
@@ -3806,34 +3931,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A2879E",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#BF9DAC",
+    "badge": false,
+    "hex_par": "#AABDD7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#6B89AF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7B96B3",
+    "badge": false,
+    "hex_par": "#A9D7E3",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#B69FAA",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#918CA1",
+    "badge": false,
+    "hex_par": "#F6BBCC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#D78AAC",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#C28FAB",
+    "badge": false,
+    "hex_par": "#19408C",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.61"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.61",
+  "confianca": "compartilhado"
  },
  "1011": {
   "sku": "1011",
@@ -3841,34 +3989,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#0C6AA5",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#0B69A5",
+    "badge": false,
+    "hex_par": "#A6CAE7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": "#C0B6BE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#538368",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#528368",
+    "badge": false,
+    "hex_par": "#A1B2A7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.62"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.62",
+  "confianca": "compartilhado"
  },
  "1010": {
   "sku": "1010",
@@ -3876,34 +4047,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#0C6AA5",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#0B69A5",
+    "badge": false,
+    "hex_par": "#A6CAE7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": "#C0B6BE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#538368",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#528368",
+    "badge": false,
+    "hex_par": "#A1B2A7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.62"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.62",
+  "confianca": "compartilhado"
  },
  "1013": {
   "sku": "1013",
@@ -3911,34 +4105,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A56773",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AC7C87",
+    "badge": false,
+    "hex_par": "#A15772",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#625B65",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#6B6D90",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8C8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#6F8396",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8A99AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.63"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.63",
+  "confianca": "compartilhado"
  },
  "1012": {
   "sku": "1012",
@@ -3946,48 +4163,75 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A56773",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AC7C87",
+    "badge": false,
+    "hex_par": "#A15772",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#625B65",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#6B6D90",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8C8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#6F8396",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8A99AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.63"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.63",
+  "confianca": "compartilhado"
  },
  "0810": {
   "sku": "0810",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.65"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.65",
+  "confianca": "pareado"
  },
  "0102": {
   "sku": "0102",
@@ -3995,34 +4239,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A96271",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AD7C87",
+    "badge": false,
+    "hex_par": "#A15772",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#766F79",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#6B6D90",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8C8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#6C8297",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8998AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.66"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.66",
+  "confianca": "compartilhado"
  },
  "0104": {
   "sku": "0104",
@@ -4030,34 +4297,57 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#A96271",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#AD7C87",
+    "badge": false,
+    "hex_par": "#A15772",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#766F79",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#7C787F",
+    "badge": false,
+    "hex_par": "#6E646F",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#6B6D90",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#8C8DA9",
+    "badge": false,
+    "hex_par": "#7981B0",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
    },
    {
     "codigo": "04",
-    "hex": "#6C8297",
-    "variadas": false,
-    "ordem": 3,
-    "unica": false
+    "hex": "#8998AB",
+    "badge": false,
+    "hex_par": "#86A1B7",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
    }
   ],
-  "origem": "t3-verao.pdf p.66"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.66",
+  "confianca": "compartilhado"
  },
  "0103": {
   "sku": "0103",
@@ -4065,27 +4355,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#0C6AA5",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#0B69A5",
+    "badge": false,
+    "hex_par": "#A6CAE7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#172A48",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#172A47",
+    "badge": false,
+    "hex_par": "#0A9DA2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.67"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.67",
+  "confianca": "compartilhado"
  },
  "0139": {
   "sku": "0139",
@@ -4093,139 +4403,191 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#0C6AA5",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#0B69A5",
+    "badge": false,
+    "hex_par": "#A6CAE7",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#425C27",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#415C27",
+    "badge": false,
+    "hex_par": "#E8DFCD",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#172A48",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#172A47",
+    "badge": false,
+    "hex_par": "#0A9DA2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.67"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.67",
+  "confianca": "compartilhado"
  },
  "0124": {
   "sku": "0124",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.68"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.68",
+  "confianca": "compartilhado"
  },
  "0118": {
   "sku": "0118",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.68"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.68",
+  "confianca": "compartilhado"
  },
  "0121": {
   "sku": "0121",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.69"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.69",
+  "confianca": "compartilhado"
  },
  "0219": {
   "sku": "0219",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.69"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.69",
+  "confianca": "compartilhado"
  },
  "0119": {
   "sku": "0119",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.70"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.70",
+  "confianca": "compartilhado"
  },
  "2014": {
   "sku": "2014",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.70"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.70",
+  "confianca": "compartilhado"
  },
  "0203": {
   "sku": "0203",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.71"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.71",
+  "confianca": "compartilhado"
  },
  "0239": {
   "sku": "0239",
   "nome": "MALHA PV",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.71"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.71",
+  "confianca": "compartilhado"
  },
  "0107": {
   "sku": "0107",
@@ -4233,13 +4595,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#86B8E4",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.72"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.72",
+  "confianca": "compartilhado"
  },
  "0403": {
   "sku": "0403",
@@ -4247,13 +4613,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#85C2D0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.72"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.72",
+  "confianca": "compartilhado"
  },
  "0114": {
   "sku": "0114",
@@ -4261,13 +4631,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#86B8E4",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.73"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.73",
+  "confianca": "compartilhado"
  },
  "0407": {
   "sku": "0407",
@@ -4275,13 +4649,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#85C2D0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.73"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.73",
+  "confianca": "compartilhado"
  },
  "0402": {
   "sku": "0402",
@@ -4289,13 +4667,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#86B8E4",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.74"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.74",
+  "confianca": "compartilhado"
  },
  "0404": {
   "sku": "0404",
@@ -4303,13 +4685,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#85C2D0",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#93C7D6",
+    "badge": false,
+    "hex_par": "#85B8E4",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.74"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.74",
+  "confianca": "compartilhado"
  },
  "0307": {
   "sku": "0307",
@@ -4317,13 +4703,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E5E0DD",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.75"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.75",
+  "confianca": "compartilhado"
  },
  "0304": {
   "sku": "0304",
@@ -4331,13 +4721,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#5E5F7A",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.75"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.75",
+  "confianca": "compartilhado"
  },
  "0309": {
   "sku": "0309",
@@ -4345,13 +4739,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E5E0DD",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.76"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.76",
+  "confianca": "compartilhado"
  },
  "0306": {
   "sku": "0306",
@@ -4359,13 +4757,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#666882",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.76"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.76",
+  "confianca": "compartilhado"
  },
  "0308": {
   "sku": "0308",
@@ -4373,13 +4775,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#E5E0DD",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.77"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.77",
+  "confianca": "compartilhado"
  },
  "0305": {
   "sku": "0305",
@@ -4387,13 +4793,17 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#595B76",
-    "variadas": false,
-    "ordem": 0,
-    "unica": true
+    "hex": "#3D425F",
+    "badge": false,
+    "hex_par": "#E5E0DC",
+    "estampa": true,
+    "estampa_par": false,
+    "selo": "unica",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.77"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.77",
+  "confianca": "compartilhado"
  },
  "0093": {
   "sku": "0093",
@@ -4401,27 +4811,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#3A3D90",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#393C90",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#F1A399",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#F0A299",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
     "hex": "#FFFFFF",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.79"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.79",
+  "confianca": "pareado"
  },
  "0080": {
   "sku": "0080",
@@ -4429,27 +4859,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#3A3D90",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#393C90",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#F1A399",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#F0A299",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#DA0769",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#DA0768",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.79"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.79",
+  "confianca": "pareado"
  },
  "0070": {
   "sku": "0070",
@@ -4457,20 +4907,37 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#D15D8B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#D05C8B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#172A48",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#172A47",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
    }
   ],
-  "origem": "t3-verao.pdf p.80"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.80",
+  "confianca": "pareado"
  },
  "0072": {
   "sku": "0072",
@@ -4478,27 +4945,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#D15D8B",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#D05C8B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#3A3D90",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#393C90",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#ACC4B1",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#ABC4B1",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.80"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.80",
+  "confianca": "pareado"
  },
  "0301": {
   "sku": "0301",
@@ -4506,27 +4993,47 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#312E53",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#312D52",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#9C2118",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#9C2018",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
    }
   ],
-  "origem": "t3-verao.pdf p.81"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.81",
+  "confianca": "pareado"
  },
  "0300": {
   "sku": "0300",
@@ -4535,278 +5042,360 @@
    {
     "codigo": "01",
     "hex": "#000000",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
     "hex": "#FFFFFF",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
    },
    {
     "codigo": "03",
-    "hex": "#BD1820",
-    "variadas": false,
-    "ordem": 2,
-    "unica": false
+    "hex": "#BC1820",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
    }
   ],
-  "origem": "t3-verao.pdf p.81"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.81",
+  "confianca": "pareado"
  },
  "0091": {
   "sku": "0091",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.83"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.83",
+  "confianca": "pareado"
  },
  "0500": {
   "sku": "0500",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.84"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.84",
+  "confianca": "compartilhado"
  },
  "0502": {
   "sku": "0502",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.84"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.84",
+  "confianca": "compartilhado"
  },
  "0605": {
   "sku": "0605",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.85"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.85",
+  "confianca": "compartilhado"
  },
  "0601": {
   "sku": "0601",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.85"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.85",
+  "confianca": "compartilhado"
  },
  "0582": {
   "sku": "0582",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.86"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.86",
+  "confianca": "compartilhado"
  },
  "0085": {
   "sku": "0085",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.86"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.86",
+  "confianca": "compartilhado"
  },
  "0501": {
   "sku": "0501",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.87"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.87",
+  "confianca": "compartilhado"
  },
  "0499": {
   "sku": "0499",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.87"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.87",
+  "confianca": "compartilhado"
  },
  "0088": {
   "sku": "0088",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.88"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.88",
+  "confianca": "compartilhado"
  },
  "0087": {
   "sku": "0087",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.88"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.88",
+  "confianca": "compartilhado"
  },
  "0094": {
   "sku": "0094",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.89"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.89",
+  "confianca": "compartilhado"
  },
  "0083": {
   "sku": "0083",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.89"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.89",
+  "confianca": "compartilhado"
  },
  "0086": {
   "sku": "0086",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.90"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.90",
+  "confianca": "pareado"
  },
  "0095": {
   "sku": "0095",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.91"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.91",
+  "confianca": "compartilhado"
  },
  "0096": {
   "sku": "0096",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.91"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.91",
+  "confianca": "compartilhado"
  },
  "0090": {
   "sku": "0090",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.92"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.92",
+  "confianca": "compartilhado"
  },
  "0092": {
   "sku": "0092",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.92"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.92",
+  "confianca": "compartilhado"
  },
  "0716": {
   "sku": "0716",
@@ -4814,68 +5403,1772 @@
   "cores": [
    {
     "codigo": "01",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
+    "hex": "#173965",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
    },
    {
     "codigo": "02",
-    "hex": "#B97D6C",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "hex": "#B97D6B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
    }
   ],
-  "origem": "t3-verao.pdf p.94"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.94",
+  "confianca": "pareado"
  },
  "0570": {
   "sku": "0570",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#183965",
-    "variadas": false,
-    "ordem": 0,
-    "unica": false
-   },
-   {
-    "codigo": "02",
-    "hex": "#B97D6C",
-    "variadas": false,
-    "ordem": 1,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.94"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.94",
+  "confianca": "pareado"
  },
  "0550": {
   "sku": "0550",
   "nome": "LIGANETE",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#989898",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.95"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.95",
+  "confianca": "pareado"
  },
  "0108": {
   "sku": "0108",
   "nome": "SEDA",
   "cores": [
    {
-    "codigo": "01",
-    "hex": "#8E8E8D",
-    "variadas": true,
-    "ordem": 0,
-    "unica": false
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
    }
   ],
-  "origem": "t3-verao.pdf p.95"
+  "origem": "CORPO SENSUAL - VERÃO 2027.pdf p.95",
+  "confianca": "pareado"
+ },
+ "1027": {
+  "sku": "1027",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#825746",
+    "badge": false,
+    "hex_par": "#D8B5A1",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#E0858E",
+    "badge": false,
+    "hex_par": "#E0A197",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": "#A7B0B5",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.5",
+  "confianca": "pareado"
+ },
+ "0159": {
+  "sku": "0159",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#80554B",
+    "badge": false,
+    "hex_par": "#DBDDEC",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#E0A197",
+    "badge": false,
+    "hex_par": "#A98F99",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": "#ABB9C0",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.6",
+  "confianca": "compartilhado"
+ },
+ "0262": {
+  "sku": "0262",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#80554B",
+    "badge": false,
+    "hex_par": "#DBDDEC",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#E0A197",
+    "badge": false,
+    "hex_par": "#A98F99",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": "#ABB9C0",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.6",
+  "confianca": "compartilhado"
+ },
+ "1005": {
+  "sku": "1005",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#80554B",
+    "badge": false,
+    "hex_par": "#DBDDEC",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#E0A197",
+    "badge": false,
+    "hex_par": "#A98F99",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": "#ABB9C0",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.6",
+  "confianca": "compartilhado"
+ },
+ "0161": {
+  "sku": "0161",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#CFB2AC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#E0858E",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#E0A197",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.7",
+  "confianca": "pareado"
+ },
+ "0169": {
+  "sku": "0169",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#D4AFA0",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#233354",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#000000",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.7",
+  "confianca": "pareado"
+ },
+ "0263": {
+  "sku": "0263",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.9",
+  "confianca": "pareado"
+ },
+ "1026": {
+  "sku": "1026",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E7819A",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#837F66",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#D8B3A5",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.9",
+  "confianca": "pareado"
+ },
+ "0162": {
+  "sku": "0162",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.10",
+  "confianca": "compartilhado"
+ },
+ "0160": {
+  "sku": "0160",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.10",
+  "confianca": "compartilhado"
+ },
+ "0172": {
+  "sku": "0172",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#837F66",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#825746",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.11",
+  "confianca": "pareado"
+ },
+ "0163": {
+  "sku": "0163",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.12",
+  "confianca": "pareado"
+ },
+ "0171": {
+  "sku": "0171",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#837F66",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#7C5443",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.12",
+  "confianca": "pareado"
+ },
+ "1009": {
+  "sku": "1009",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.16",
+  "confianca": "compartilhado"
+ },
+ "1008": {
+  "sku": "1008",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.16",
+  "confianca": "compartilhado"
+ },
+ "1023": {
+  "sku": "1023",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.17",
+  "confianca": "compartilhado"
+ },
+ "1020": {
+  "sku": "1020",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.17",
+  "confianca": "compartilhado"
+ },
+ "1007": {
+  "sku": "1007",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.17",
+  "confianca": "compartilhado"
+ },
+ "1021": {
+  "sku": "1021",
+  "nome": "MOLETINHO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.17",
+  "confianca": "compartilhado"
+ },
+ "1004": {
+  "sku": "1004",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#942824",
+    "badge": false,
+    "hex_par": "#AD7467",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1B2D4B",
+    "badge": false,
+    "hex_par": "#6C7688",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#303336",
+    "badge": false,
+    "hex_par": "#ADAEAE",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.20",
+  "confianca": "pareado"
+ },
+ "1032": {
+  "sku": "1032",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#303336",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1B2D4B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C3421",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": "#ACACAC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.20",
+  "confianca": "pareado"
+ },
+ "0201": {
+  "sku": "0201",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#303336",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1B2D4B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C3421",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": "#ACACAC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.21",
+  "confianca": "compartilhado"
+ },
+ "0202": {
+  "sku": "0202",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#303336",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1B2D4B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C3421",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": "#ACACAC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.21",
+  "confianca": "compartilhado"
+ },
+ "0199": {
+  "sku": "0199",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#AB7366",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#ACACAC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#942824",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": "#6A7587",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "05",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.22",
+  "confianca": "pareado"
+ },
+ "0200": {
+  "sku": "0200",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#303336",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1B2D4B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#2C3421",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": "#ACACAC",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 3
+   },
+   {
+    "codigo": "05",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 4
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.22",
+  "confianca": "pareado"
+ },
+ "0204": {
+  "sku": "0204",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.23",
+  "confianca": "compartilhado"
+ },
+ "0179": {
+  "sku": "0179",
+  "nome": "PLUSH",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.23",
+  "confianca": "compartilhado"
+ },
+ "1033": {
+  "sku": "1033",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#122760",
+    "badge": false,
+    "hex_par": "#6C7B9D",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#1F1D22",
+    "badge": false,
+    "hex_par": "#616166",
+    "estampa": false,
+    "estampa_par": true,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.25",
+  "confianca": "pareado"
+ },
+ "0221": {
+  "sku": "0221",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.26",
+  "confianca": "compartilhado"
+ },
+ "0220": {
+  "sku": "0220",
+  "nome": "CANELADO",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.27",
+  "confianca": "pareado"
+ },
+ "0260": {
+  "sku": "0260",
+  "nome": "SUEDE",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.29",
+  "confianca": "pareado"
+ },
+ "0250": {
+  "sku": "0250",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.31",
+  "confianca": "pareado"
+ },
+ "4131": {
+  "sku": "4131",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#837F66",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#9BC0D2",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.32",
+  "confianca": "pareado"
+ },
+ "1460": {
+  "sku": "1460",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#1F2F47",
+    "badge": false,
+    "hex_par": "#9BC0D2",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#77735C",
+    "badge": false,
+    "hex_par": "#BFBEBA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.32",
+  "confianca": "pareado"
+ },
+ "0145": {
+  "sku": "0145",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#233652",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#837F66",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#9BC0D2",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.35",
+  "confianca": "pareado"
+ },
+ "0143": {
+  "sku": "0143",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#1F2F47",
+    "badge": false,
+    "hex_par": "#81B9AC",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#77735C",
+    "badge": false,
+    "hex_par": "#BFBEBA",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.35",
+  "confianca": "pareado"
+ },
+ "0303": {
+  "sku": "0303",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.36",
+  "confianca": "pareado"
+ },
+ "0855": {
+  "sku": "0855",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.37",
+  "confianca": "compartilhado"
+ },
+ "1002": {
+  "sku": "1002",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#000000",
+    "badge": false,
+    "hex_par": "#4C4B56",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#3C4C63",
+    "badge": false,
+    "hex_par": "#3C445B",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.41",
+  "confianca": "compartilhado"
+ },
+ "1031": {
+  "sku": "1031",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#000000",
+    "badge": false,
+    "hex_par": "#4C4B56",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#3C4C63",
+    "badge": false,
+    "hex_par": "#3C445B",
+    "estampa": false,
+    "estampa_par": false,
+    "selo": null,
+    "ordem": 1
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.41",
+  "confianca": "compartilhado"
+ },
+ "1001": {
+  "sku": "1001",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#55535F",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#C973A7",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 2
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.42",
+  "confianca": "compartilhado"
+ },
+ "0990": {
+  "sku": "0990",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.46",
+  "confianca": "compartilhado"
+ },
+ "0981": {
+  "sku": "0981",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.46",
+  "confianca": "compartilhado"
+ },
+ "1024": {
+  "sku": "1024",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "unica",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.47",
+  "confianca": "compartilhado"
+ },
+ "0245": {
+  "sku": "0245",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.50",
+  "confianca": "compartilhado"
+ },
+ "0242": {
+  "sku": "0242",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.50",
+  "confianca": "compartilhado"
+ },
+ "0240": {
+  "sku": "0240",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.51",
+  "confianca": "compartilhado"
+ },
+ "0140": {
+  "sku": "0140",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E886A3",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#B04A64",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#A86D6B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.52",
+  "confianca": "compartilhado"
+ },
+ "0142": {
+  "sku": "0142",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E886A3",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#B04A64",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#A86D6B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.52",
+  "confianca": "compartilhado"
+ },
+ "1400": {
+  "sku": "1400",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "01",
+    "hex": "#E886A3",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 0
+   },
+   {
+    "codigo": "02",
+    "hex": "#B04A64",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 1
+   },
+   {
+    "codigo": "03",
+    "hex": "#A86D6B",
+    "badge": false,
+    "hex_par": null,
+    "estampa": false,
+    "estampa_par": null,
+    "selo": null,
+    "ordem": 2
+   },
+   {
+    "codigo": "04",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 3
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.53",
+  "confianca": "pareado"
+ },
+ "0880": {
+  "sku": "0880",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.54",
+  "confianca": "compartilhado"
+ },
+ "0141": {
+  "sku": "0141",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.54",
+  "confianca": "compartilhado"
+ },
+ "0890": {
+  "sku": "0890",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.55",
+  "confianca": "compartilhado"
+ },
+ "0870": {
+  "sku": "0870",
+  "nome": "MALHA PV",
+  "cores": [
+   {
+    "codigo": "VAR",
+    "hex": null,
+    "badge": true,
+    "hex_par": null,
+    "estampa": true,
+    "estampa_par": null,
+    "selo": "variadas",
+    "ordem": 0
+   }
+  ],
+  "origem": "CORPO SENSUAL - INVERNO 2026.pdf p.55",
+  "confianca": "compartilhado"
  }
 }

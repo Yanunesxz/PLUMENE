@@ -1,242 +1,306 @@
 # -*- coding: utf-8 -*-
 """
-Extrai o bloco CORES / ESTAMPAS de cada referencia dos catalogos.
+Extrai o bloco CORES / ESTAMPAS de cada referencia dos catalogos, ref por ref.
 
-Estrategia:
-  1. numeros de cor (01..NN) sao palavras logo abaixo das bolinhas;
-  2. a cor de cada bolinha vem do PIXEL renderizado, nao da camada vetorial
-     (as bolinhas tem circulos sobrepostos e a ordem de desenho engana);
-  3. o rotulo VARIADAS fica ACIMA da bolinha a que se refere — casa por x;
-  4. os produtos da pagina (ref de 4 digitos + nome em maiuscula) recebem o
-     bloco daquela pagina.
+Diferencas para a primeira versao:
+  * a geometria vem da camada VETORIAL e da lista de IMAGENS da pagina (centro,
+    raio, ordem) — nao de adivinhar a posicao a partir do numero embaixo;
+  * uma opcao de cor pode ter 1 ou 2 bolinhas (blusa + calca). O agrupamento e
+    por ENCOSTAMENTO em x: bolinhas da mesma opcao se sobrepoem, opcoes vizinhas
+    tem folga;
+  * a cor sai de um quadradinho DESLOCADO para a esquerda do centro, porque o
+    centro da bolinha de tras fica coberto pela da frente;
+  * a fronteira entre dois blocos e a numeracao REINICIAR (01 02 | 01 02 03);
+  * o casamento referencia <-> bloco e por CONTAGEM, nao por distancia.
 """
 import json
 import re
 import sys
-import pdfplumber
+
+import fitz
 
 REF = re.compile(r"^\d{4}$")
-NUM_COR = re.compile(r"^\d{2}$")
+NUM = re.compile(r"^\d{1,2}$")
+
+DPI = 200
+ESCALA = DPI / 72.0
+BANDA_Y = 790          # o bloco de cores vive no rodape da pagina
+GAP_OPCAO = -5.0       # bolinhas da mesma opcao se SOBREPOEM; vizinhas so encostam
+GAP_BLOCO = 30.0       # folga que separa dois blocos, quando nao ha numeracao
 
 
-def media_cor(imagem, cx, cy, raio=4):
-    """Cor media de um quadradinho no centro da bolinha."""
-    px = imagem.load()
-    larg, alt = imagem.size
-    soma = [0, 0, 0]
-    n = 0
-    for x in range(max(0, cx - raio), min(larg, cx + raio)):
-        for y in range(max(0, cy - raio), min(alt, cy + raio)):
-            p = px[x, y]
-            soma[0] += p[0]
-            soma[1] += p[1]
-            soma[2] += p[2]
-            n += 1
-    if n == 0:
-        return None
-    return "#%02X%02X%02X" % tuple(v // n for v in soma)
+def quase_quadrado(r):
+    return 18 < r.width < 40 and 18 < r.height < 40 and abs(r.width - r.height) < 2.5
 
 
-def agrupar_por_linha(itens, chave_y, tolerancia=12):
-    """Agrupa por faixa de Y. Uma pagina pode ter mais de um bloco de cores."""
-    linhas = []
-    for it in sorted(itens, key=chave_y):
-        y = chave_y(it)
-        if linhas and abs(chave_y(linhas[-1][0]) - y) <= tolerancia:
-            linhas[-1].append(it)
-        else:
-            linhas.append([it])
-    return linhas
+def circulos_da_pagina(pagina):
+    """Bolinhas do rodape. Vetoriais e as que sao imagem (tecido texturizado)."""
+    achados = []
 
-
-def extrair_pagina(pagina, resolucao=150):
-    palavras = pagina.extract_words()
-
-    bolinhas = [
-        c for c in pagina.curves
-        if 15 < (c["x1"] - c["x0"]) < 40 and 15 < (c["bottom"] - c["top"]) < 40
-    ]
-
-    # Em algumas paginas as bolinhas sao IMAGEM, nao desenho vetorial — ali
-    # `curves` vem vazio. Nesses casos a numeracao no rodape denuncia o bloco:
-    # a bolinha fica ~16pt acima do numero. Sem isto a pagina inteira se perdia.
-    if not bolinhas:
-        # Ancora no cabecalho "CORES / ESTAMPAS": so numero ABAIXO dele e cor.
-        # Sem essa ancora, "01 AO 08" e "10 AO 16" (as faixas de TAMANHO, que
-        # tambem sao dois digitos e ficam no rodape) entravam como se fossem cor.
-        cabecalho = [w for w in palavras if w["text"].strip().upper() in {"CORES", "ESTAMPAS"}]
-        if not cabecalho:
-            return [], []
-        y_cabecalho = min(w["top"] for w in cabecalho)
-
-        numeros_rodape = [
-            w for w in palavras
-            if NUM_COR.match(w["text"].strip()) and w["top"] > y_cabecalho
-        ]
-        if len(numeros_rodape) < 2:
-            return [], []
-        y_num = min(w["top"] for w in numeros_rodape)
-        bolinhas = [
-            {"x0": w["x0"], "x1": w["x1"], "top": y_num - 29, "bottom": y_num - 3}
-            for w in numeros_rodape
-            if abs(w["top"] - y_num) < 6
-        ]
-
-    rotulos = [
-        w for w in palavras
-        if "VARIAD" in w["text"].upper()
-        or "ÚNIC" in w["text"].upper()
-        or "UNIC" in w["text"].upper()
-    ]
-
-    img = pagina.to_image(resolution=resolucao).original
-    escala = resolucao / 72.0
-
-    # Cada FILEIRA de bolinhas e um bloco separado. Sem isso, uma pagina com
-    # dois blocos vira um produto com 7 cores (o 1004 PLUSH virou exatamente isso).
-    blocos = []
-    for fileira in agrupar_por_linha(bolinhas, lambda b: b["top"]):
-        y_bolinha = min(b["top"] for b in fileira)
-        numeros = sorted(
-            (
-                w for w in palavras
-                if NUM_COR.match(w["text"].strip())
-                and y_bolinha + 10 < w["top"] < y_bolinha + 45
-            ),
-            key=lambda w: w["x0"],
-        )
-        if not numeros:
-            # Bloco SEM numeracao: uma bolinha so, rotulada ÚNICA ou VARIADAS.
-            # E o layout mais comum das paginas com duas referencias lado a lado
-            # (ex.: 1008 e 1009 dividindo a mesma bolinha). Exigir numero aqui
-            # descartava a pagina inteira — 33 das 42 paginas sem cor eram isto.
-            rotulo_perto = [
-                r for r in rotulos
-                if y_bolinha - 40 < r["top"] < y_bolinha + 50
-            ]
-            if not rotulo_perto:
-                continue
-
-            texto = " ".join(r["text"] for r in rotulo_perto).upper()
-            eh_variada = "VARIAD" in texto
-            for bolinha in fileira:
-                cx_pt = (bolinha["x0"] + bolinha["x1"]) / 2
-                hexa = media_cor(img, int(cx_pt * escala), int((y_bolinha + 13) * escala))
-                blocos.append({
-                    "y": y_bolinha,
-                    "x_centro": cx_pt,
-                    "cores": [{
-                        "codigo": "01",
-                        "hex": hexa,
-                        "variadas": eh_variada,
-                        "ordem": 0,
-                        "unica": not eh_variada,
-                    }],
-                })
+    for i, d in enumerate(pagina.get_drawings()):
+        r = d["rect"]
+        # Sem preenchimento e o anel branco entre as duas bolinhas, nao e cor.
+        if r.y0 < BANDA_Y or not quase_quadrado(r) or d.get("fill") is None:
             continue
+        achados.append({"z": i, "rect": r, "fill": d["fill"], "img": False})
 
-        # Dois blocos podem dividir a MESMA fileira, lado a lado (o 1004 PLUSH e
-        # assim). O sinal de fronteira e a numeracao reiniciar: 01 02 03 | 01 02 03.
-        grupos = []
-        for num in numeros:
-            valor = int(num["text"])
-            if not grupos or valor <= int(grupos[-1][-1]["text"]):
-                grupos.append([num])
-            else:
-                grupos[-1].append(num)
+    for im in pagina.get_image_info():
+        r = fitz.Rect(im["bbox"])
+        if r.y0 < BANDA_Y or not quase_quadrado(r):
+            continue
+        achados.append({"z": 1000 + len(achados), "rect": r, "fill": None, "img": True})
 
-        for grupo in grupos:
-            cores = []
-            for i, num in enumerate(grupo):
-                cx_pt = (num["x0"] + num["x1"]) / 2
-                hexa = media_cor(img, int(cx_pt * escala), int((y_bolinha + 13) * escala))
-                eh_variada = any(
-                    abs(((r["x0"] + r["x1"]) / 2) - cx_pt) < 24
-                    and "VARIAD" in r["text"].upper()
-                    and y_bolinha - 30 < r["top"] < y_bolinha + 45
-                    for r in rotulos
-                )
-                cores.append({
-                    "codigo": num["text"].strip(),
-                    "hex": hexa,
-                    "variadas": eh_variada,
-                    "ordem": i,
-                })
+    # Uma bolinha de imagem costuma vir por cima de um retangulo de fundo com a
+    # mesma caixa. Fica so a imagem — o fill ali e um verde de placeholder.
+    vetoriais = [a for a in achados if not a["img"]]
+    imagens = [a for a in achados if a["img"]]
+    sobrando = [
+        a for a in vetoriais
+        if not any(abs(a["rect"].x0 - b["rect"].x0) < 3 and abs(a["rect"].y0 - b["rect"].y0) < 3
+                   for b in imagens)
+    ]
+    achados = sobrando + imagens
 
-            x_ini = min(n["x0"] for n in grupo)
-            x_fim = max(n["x1"] for n in grupo)
-            marcou_unica = any(
-                ("UNIC" in r["text"].upper() or "ÚNIC" in r["text"].upper())
-                and y_bolinha - 30 < r["top"] < y_bolinha + 45
-                and x_ini - 30 < ((r["x0"] + r["x1"]) / 2) < x_fim + 30
-                for r in rotulos
-            )
-            for c in cores:
-                c["unica"] = marcou_unica or len(cores) == 1
+    # O anel branco tem o mesmo centro da bolinha da frente. Descartar por
+    # tamanho perderia o branco de verdade (1043 tem uma bolinha branca).
+    fora = set()
+    for a in achados:
+        if a["fill"] != (1.0, 1.0, 1.0):
+            continue
+        ca = ((a["rect"].x0 + a["rect"].x1) / 2, (a["rect"].y0 + a["rect"].y1) / 2)
+        for b in achados:
+            if b is a or b["fill"] == (1.0, 1.0, 1.0):
+                continue
+            cb = ((b["rect"].x0 + b["rect"].x1) / 2, (b["rect"].y0 + b["rect"].y1) / 2)
+            if abs(ca[0] - cb[0]) < 1.5 and abs(ca[1] - cb[1]) < 1.5:
+                fora.add(a["z"])
+    achados = [a for a in achados if a["z"] not in fora]
 
-            blocos.append({
-                "y": y_bolinha,
-                "x_centro": (x_ini + x_fim) / 2,
-                "cores": cores,
+    saida = []
+    for a in achados:
+        r = a["rect"]
+        saida.append({
+            "z": a["z"], "img": a["img"], "fill": a["fill"],
+            "x0": r.x0, "x1": r.x1, "y0": r.y0, "y1": r.y1,
+            "cx": (r.x0 + r.x1) / 2, "cy": (r.y0 + r.y1) / 2,
+        })
+    return sorted(saida, key=lambda c: c["x0"])
+
+
+def cor_da_bolinha(pix, c, limite_x=None):
+    """
+    Media do DISCO inteiro, nao de um quadradinho no centro: em bolinha de
+    estampa (floral, listra) um quadradinho cai dentro de uma flor e devolve a
+    cor da flor, nao a da peca.
+
+    `limite_x` corta a parte que a bolinha da frente cobre — o centro da de tras
+    fica escondido, e amostrar ali devolvia a media das duas.
+    Devolve tambem o desvio, que denuncia estampa.
+    """
+    raio = (c["x1"] - c["x0"]) / 2 * 0.88
+    cx, cy = c["cx"], c["cy"]
+    amostras = []
+    passo = max(1, int(ESCALA / 3))
+    x_ini = int((cx - raio) * ESCALA)
+    x_fim = int(min(cx + raio, limite_x if limite_x is not None else 1e9) * ESCALA)
+    for i in range(max(0, x_ini), min(pix.width, x_fim), passo):
+        dx = i / ESCALA - cx
+        dy_max = (raio * raio - dx * dx) ** 0.5 if abs(dx) < raio else 0
+        j0 = int((cy - dy_max) * ESCALA)
+        j1 = int((cy + dy_max) * ESCALA)
+        for j in range(max(0, j0), min(pix.height, j1), passo):
+            amostras.append(pix.pixel(i, j)[:3])
+    if not amostras:
+        return None, 0.0
+    n = len(amostras)
+    med = [sum(a[k] for a in amostras) / n for k in range(3)]
+    desvio = max(
+        (sum((a[k] - med[k]) ** 2 for a in amostras) / n) ** 0.5 for k in range(3)
+    )
+    return "#%02X%02X%02X" % tuple(int(round(v)) for v in med), desvio
+
+
+def agrupar(itens, folga, x0, x1):
+    grupos = []
+    for it in sorted(itens, key=x0):
+        if grupos and x0(it) - max(x1(g) for g in grupos[-1]) <= folga:
+            grupos[-1].append(it)
+        else:
+            grupos.append([it])
+    return grupos
+
+
+def extrair_pagina(pagina, origem):
+    circulos = circulos_da_pagina(pagina)
+    if not circulos:
+        return []
+
+    palavras = pagina.get_text("words")
+    rotulos = [
+        {"txt": w[4].strip().upper(), "cx": (w[0] + w[2]) / 2, "cy": (w[1] + w[3]) / 2,
+         "x0": w[0], "x1": w[2]}
+        for w in palavras if w[1] > BANDA_Y - 20
+    ]
+
+    # Bolinha-selo: tem VARIADAS ou UNICA escrito DENTRO dela.
+    for c in circulos:
+        c["selo"] = None
+        for r in rotulos:
+            if not ("VARIAD" in r["txt"] or "NICA" in r["txt"]):
+                continue
+            if c["x0"] - 2 < r["cx"] < c["x1"] + 2 and c["y0"] - 2 < r["cy"] < c["y1"] + 2:
+                c["selo"] = "variadas" if "VARIAD" in r["txt"] else "unica"
+
+    pix = pagina.get_pixmap(dpi=DPI)
+
+    # ── opcoes: bolinhas encostadas sao a MESMA opcao (blusa + calca) ─────────
+    opcoes = []
+    for grupo in agrupar(circulos, GAP_OPCAO, lambda c: c["x0"], lambda c: c["x1"]):
+        # a da frente e a da direita — vale para vetor e para imagem
+        frente = max(grupo, key=lambda c: c["x0"])
+        bolinhas = []
+        for c in grupo:
+            # a de tras so aparece ate onde a da frente comeca (menos o anel)
+            corte = None if c is frente else frente["x0"] - 1.5
+            hexa, desvio = cor_da_bolinha(pix, c, corte)
+            bolinhas.append({
+                "hex": hexa, "estampa": desvio > 16, "frente": c is frente,
+                "selo": c["selo"], "badge": bool(c["selo"]),
             })
+        opcoes.append({
+            "x0": min(c["x0"] for c in grupo),
+            "x1": max(c["x1"] for c in grupo),
+            "y1": max(c["y1"] for c in grupo),
+            "selo": next((c["selo"] for c in grupo if c["selo"]), None),
+            "bolinhas": bolinhas,
+            "codigo": None,
+        })
 
-    if not blocos:
-        return [], []
+    # numero de cada opcao (01, 02 ...): fica logo abaixo, dentro da faixa em x
+    numeros = [r for r in rotulos if NUM.match(r["txt"])]
+    for o in opcoes:
+        # O numero fica ABAIXO da bolinha. Sem essa trava, a faixa de tamanho
+        # ("48 AO 54", "10 AO 16"), que tambem e numero de dois digitos e mora
+        # logo acima, virava codigo de cor.
+        perto = [
+            n for n in numeros
+            if o["x0"] - 4 < n["cx"] < o["x1"] + 4 and o["y1"] < n["cy"] < o["y1"] + 25
+        ]
+        if perto:
+            o["codigo"] = perto[0]["txt"].zfill(2)
 
-    # produtos da pagina: "0171" seguido de nome em maiuscula na mesma linha
+    # ── blocos: a numeracao REINICIAR e a fronteira ──────────────────────────
+    blocos = []
+    for o in opcoes:
+        novo = not blocos
+        if not novo:
+            ant = blocos[-1][-1]
+            # Compara com a ultima opcao NUMERADA do bloco: o selo VARIADAS fecha
+            # o bloco sem numero, e comparar com ele perdia o reinicio da conta.
+            ultimo_num = next(
+                (x["codigo"] for x in reversed(blocos[-1]) if x["codigo"]), None
+            )
+            if o["codigo"] and ultimo_num:
+                novo = int(o["codigo"]) <= int(ultimo_num)
+            else:
+                novo = o["x0"] - ant["x1"] > GAP_BLOCO
+        # o selo fecha o bloco: nunca comeca um
+        if novo and o["selo"] and blocos:
+            novo = o["x0"] - blocos[-1][-1]["x1"] > GAP_BLOCO
+        (blocos.append([o]) if novo else blocos[-1].append(o))
+
+    blocos = [{"cx": (b[0]["x0"] + b[-1]["x1"]) / 2, "opcoes": b} for b in blocos]
+
+    # rotulo UNICA escrito ABAIXO da bolinha, e nao dentro (verao p.72)
+    for b in blocos:
+        if len(b["opcoes"]) == 1 and not b["opcoes"][0]["selo"]:
+            o = b["opcoes"][0]
+            if any("NICA" in r["txt"] and o["x0"] - 20 < r["cx"] < o["x1"] + 20
+                   for r in rotulos):
+                o["selo"] = "unica"
+
+    # ── referencias da pagina ────────────────────────────────────────────────
     refs = []
     for w in palavras:
-        if REF.match(w["text"].strip()):
-            mesma_linha = [
-                v for v in palavras
-                if abs(v["top"] - w["top"]) < 4 and v["x0"] > w["x1"] and v["x0"] - w["x1"] < 90
-            ]
-            nome = " ".join(v["text"] for v in sorted(mesma_linha, key=lambda v: v["x0"]))
-            if nome and nome.upper() == nome and any(ch.isalpha() for ch in nome):
-                refs.append({
-                    "sku": w["text"].strip(),
-                    "nome": nome.strip(),
-                    "x": w["x0"],
-                    "y": w["top"],
-                })
+        if not REF.match(w[4].strip()):
+            continue
+        vizinhas = [
+            v for v in palavras
+            if abs(v[1] - w[1]) < 4 and v[0] > w[2] and v[0] - w[2] < 90
+        ]
+        nome = " ".join(v[4] for v in sorted(vizinhas, key=lambda v: v[0])).strip()
+        if nome and nome == nome.upper() and any(ch.isalpha() for ch in nome):
+            refs.append({"sku": w[4].strip(), "nome": nome, "cx": w[0] + 20})
+    refs.sort(key=lambda r: r["cx"])
+    if not refs:
+        return []
 
-    # Cada produto pega o bloco ABAIXO dele e mais proximo horizontalmente — o
-    # layout e foto, ref/nome/preco, bolinhas embaixo, em colunas.
-    centro_ref = lambda r: r["x"] + 20  # noqa: E731 - a ref fica a esquerda do card
-    for r in refs:
-        abaixo = [b for b in blocos if b["y"] >= r["y"]] or blocos
-        r["cores"] = min(
-            abaixo,
-            key=lambda b: (b["y"] - r["y"] if b["y"] >= r["y"] else 9999)
-            + abs(b["x_centro"] - centro_ref(r)) * 0.5,
-        )["cores"]
+    # ── casamento ref <-> bloco ──────────────────────────────────────────────
+    if len(blocos) == len(refs):
+        pares = list(zip(refs, sorted(blocos, key=lambda b: b["cx"])))
+        confianca = "pareado"
+    elif len(blocos) == 1:
+        pares = [(r, blocos[0]) for r in refs]
+        confianca = "compartilhado"
+    else:
+        pares = [(r, min(blocos, key=lambda b: abs(b["cx"] - r["cx"]))) for r in refs]
+        confianca = "REVISAR"
 
-    return refs, blocos
+    saida = []
+    for r, b in pares:
+        cores = []
+        for i, o in enumerate(b["opcoes"]):
+            frente = next((x for x in o["bolinhas"] if x["frente"]), o["bolinhas"][0])
+            atras = [x for x in o["bolinhas"] if not x["frente"]]
+            # A bolinha-selo (VARIADAS / UNICA escrito dentro) e um cinza
+            # decorativo: nao e a cor da peca, e nao tem numero no catalogo.
+            selo_dentro = any(x["badge"] for x in o["bolinhas"])
+            cores.append({
+                "codigo": o["codigo"] or ("VAR" if selo_dentro else str(i + 1).zfill(2)),
+                "hex": None if selo_dentro else frente["hex"],
+                "badge": selo_dentro,
+                "hex_par": None if selo_dentro else (atras[0]["hex"] if atras else None),
+                # separado por bolinha: numa opcao "liso + estampa" e o LISO que
+                # batiza a cor, e para saber qual e qual isso nao pode vir junto
+                "estampa": frente["estampa"],
+                "estampa_par": atras[0]["estampa"] if atras else None,
+                "selo": o["selo"],
+                "ordem": i,
+            })
+        saida.append({
+            "sku": r["sku"], "nome": r["nome"], "cores": cores,
+            "origem": origem, "confianca": confianca,
+        })
+    return saida
 
 
 def main(caminhos):
+    """
+    A ORDEM dos PDFs na linha de comando manda: o primeiro e o catalogo mais
+    novo. Uma referencia repetida nos dois (o 1034, o 0719, o 0852...) muda de
+    cor de uma colecao para a outra, e quem vale e a colecao vigente.
+    """
     saida = {}
+    conflitos = []
     for caminho in caminhos:
-        with pdfplumber.open(caminho) as pdf:
-            for i, pagina in enumerate(pdf.pages):
-                try:
-                    refs, blocos = extrair_pagina(pagina)
-                except Exception as e:  # pagina sem bloco, capa, etc.
-                    print(f"  ! pagina {i+1}: {e}", file=sys.stderr)
-                    continue
-                if not refs or not blocos:
-                    continue
-                for r in refs:
-                    saida.setdefault(r["sku"], {
-                        "sku": r["sku"],
-                        "nome": r["nome"],
-                        "cores": r["cores"],
-                        "origem": f"{caminho.split(chr(92))[-1]} p.{i+1}",
-                    })
-        print(f"lido: {caminho.split(chr(92))[-1]}", file=sys.stderr)
-
+        doc = fitz.open(caminho)
+        arq = caminho.replace("\\", "/").split("/")[-1]
+        for i, pagina in enumerate(doc):
+            for item in extrair_pagina(pagina, f"{arq} p.{i+1}"):
+                antigo = saida.get(item["sku"])
+                if antigo is None:
+                    saida[item["sku"]] = item
+                elif [c["hex"] for c in antigo["cores"]] != [c["hex"] for c in item["cores"]]:
+                    conflitos.append((item["sku"], antigo["origem"], item["origem"]))
+        print(f"lido: {arq}", file=sys.stderr)
+    for sku, fica, sai in conflitos:
+        print(f"  repetida: {sku} — vale {fica}, ignorado {sai}", file=sys.stderr)
+    print(f"referencias: {len(saida)}  repetidas: {len(conflitos)}", file=sys.stderr)
     print(json.dumps(saida, ensure_ascii=False, indent=1))
 
 
 if __name__ == "__main__":
+    # No Windows o stdout sai em cp1252 e o JSON com acento nasce corrompido.
+    sys.stdout.reconfigure(encoding="utf-8")
+    sys.stderr.reconfigure(encoding="utf-8")
     main(sys.argv[1:])

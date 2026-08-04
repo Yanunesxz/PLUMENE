@@ -119,13 +119,26 @@ const idsManter = manter.map((p) => p.id);
 for (let i = 0; i < idsManter.length; i += 200) {
   await db.from('product_colors').delete().in('product_id', idsManter.slice(i, i + 200));
 }
+// A 020 (hex_par, estampa) pode não ter rodado. Se faltar, grava sem elas: a
+// cor certa vale mais do que a segunda bolinha.
+const semPar = (l) => {
+  const { hex_par, estampa, ...resto } = l;
+  return resto;
+};
+let sem020 = false;
 for (let i = 0; i < linhasCor.length; i += 300) {
-  const { error } = await db.from('product_colors').insert(linhasCor.slice(i, i + 300));
+  const lote = linhasCor.slice(i, i + 300);
+  let { error } = await db.from('product_colors').insert(sem020 ? lote.map(semPar) : lote);
+  if (error && /hex_par|estampa/.test(error.message)) {
+    sem020 = true;
+    ({ error } = await db.from('product_colors').insert(lote.map(semPar)));
+  }
   if (error) {
     console.error('erro gravando cores:', error.message);
     process.exit(1);
   }
 }
+if (sem020) console.warn('aviso: migração 020 não aplicada — gravado sem hex_par/estampa.');
 
 const { count: ativos } = await db
   .from('products')

@@ -71,9 +71,29 @@ if (!APLICAR) {
   process.exit(0);
 }
 
-const { error } = await db
+// Apagar antes de gravar, e não só dar upsert: a numeração mudou (a bolinha
+// VARIADAS virou "VAR" onde o catálogo não a numera) e produtos perderam cor.
+// Um upsert deixaria as linhas velhas para trás, e o lojista veria bolinha a
+// mais.
+const { error: erroApagar } = await db
   .from('product_colors')
-  .upsert(linhas, { onConflict: 'product_id,codigo' });
+  .delete()
+  .in('product_id', [...porProduto]);
+if (erroApagar) {
+  console.error('\nERRO ao limpar as cores antigas:', erroApagar.message);
+  process.exit(1);
+}
+
+// A 020 (hex_par, estampa) pode não ter rodado ainda. Se faltar, grava o que
+// dá: a correção das cores é o que importa, o par entra quando a coluna existir.
+let { error } = await db.from('product_colors').upsert(linhas, { onConflict: 'product_id,codigo' });
+if (error && /hex_par|estampa/.test(error.message)) {
+  console.warn('aviso: migração 020 não aplicada — gravando sem hex_par/estampa.');
+  const semPar = linhas.map(({ hex_par, estampa, ...resto }) => resto);
+  ({ error } = await db
+    .from('product_colors')
+    .upsert(semPar, { onConflict: 'product_id,codigo' }));
+}
 
 if (error) {
   console.error('\nERRO ao gravar:', error.message);

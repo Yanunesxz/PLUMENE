@@ -116,8 +116,15 @@ export interface CatalogColor {
   codigo: string;
   /** Nome legível: "azul marinho", "Cor única", "Variadas", "Cores variadas". */
   nome: string | null;
-  /** Cor da bolinha. `null` quando é Variadas — ali a cor não significa peça. */
+  /** Cor da bolinha que dá nome à cor. `null` quando é Variadas. */
   hex: string | null;
+  /**
+   * A segunda bolinha da opção — no catálogo a cor quase sempre são duas
+   * sobrepostas (blusa e calça, ou liso e estampa). `null` quando é uma só.
+   */
+  hex_par?: string | null;
+  /** A opção é estampada (floral, listrado, xadrez), não uma cor chapada. */
+  estampa?: boolean;
   /** Bolinha rotulada VARIADAS no catálogo. Nunca chamar de "sortidas". */
   variadas: boolean;
 }
