@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Percent, Search } from 'lucide-react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Percent, Search, Target } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/interface/Input.js';
@@ -8,6 +8,7 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { PainelDaMeta } from '../../components/comercial/PainelDaMeta.js';
 import { cn } from '@/lib/utils';
 import type {
   RepListItem,
@@ -37,6 +38,8 @@ export function PaginaRepresentantes() {
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [tables, setTables] = useState<PriceTable[]>([]);
   const [showForm, setShowForm] = useState(false);
+  /** Representante com o painel de meta aberto. */
+  const [metaDe, setMetaDe] = useState<{ id: string; name: string } | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY });
   const [submitting, setSubmitting] = useState(false);
@@ -257,6 +260,19 @@ export function PaginaRepresentantes() {
         </Button>
       </div>
 
+      {metaDe && (
+        <PainelDaMeta
+          // Trocar de representante precisa reiniciar o painel: sem a chave, o
+          // mês escolhido e as faixas digitadas do anterior ficariam na tela.
+          key={metaDe.id}
+          repId={metaDe.id}
+          repNome={metaDe.name}
+          token={token ?? ''}
+          onFechar={() => setMetaDe(null)}
+          onAviso={(message, erro) => setToast({ message, type: erro ? 'error' : 'success' })}
+        />
+      )}
+
       {showForm && (
         <form
           onSubmit={(e) => void handleSubmit(e)}
@@ -465,6 +481,15 @@ export function PaginaRepresentantes() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {!rep.active && <Badge variant="gray">Inativo</Badge>}
+                  <button
+                    type="button"
+                    onClick={() => setMetaDe({ id: rep.id, name: rep.name })}
+                    aria-label={`Meta de ${rep.name}`}
+                    title="Meta de bonificação"
+                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                  >
+                    <Target className="h-4 w-4" />
+                  </button>
                   <button
                     type="button"
                     onClick={() => startEdit(rep)}

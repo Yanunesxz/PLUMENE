@@ -8,6 +8,7 @@ import {
   listPriceTables,
   listRepPriceTables,
 } from './reps.service.js';
+import { listarMetas, metaVigente, metasDisponiveis, salvarMeta } from './bonus.service.js';
 
 /**
  * Mais de uma tabela só é possível com a migração 018 aplicada. Sem ela, o rep
@@ -154,4 +155,52 @@ export async function updateRepHandler(request: FastifyRequest, reply: FastifyRe
     data: result.rep,
     ...(result.conjunto_ignorado ? { aviso: AVISO_MIGRACAO } : {}),
   });
+}
+
+// ─── Meta de bonificação ─────────────────────────────────────────────────────
+
+/** Histórico de metas de um representante. Só gerente e admin chegam aqui. */
+export async function listarMetasHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  const metas = await listarMetas(company_id, id);
+  await reply.send({ data: { metas, disponivel: await metasDisponiveis() } });
+}
+
+/** Grava as faixas de um mês para um representante. */
+export async function salvarMetaHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  const { competencia, faixas } =
+    (request.body as { competencia?: string; faixas?: { meta: number; bonus: number }[] }) ?? {};
+  if (!competencia || !/^\d{4}-\d{2}/.test(competencia)) {
+    await reply.status(400).send({ error: 'Informe a competência no formato AAAA-MM.' });
+    return;
+  }
+  const salvo = await salvarMeta(company_id, id, competencia, faixas ?? []);
+  await reply.send({
+    data: salvo.faixas,
+    ...(salvo.disponivel
+      ? {}
+      : { warning: 'A meta não foi gravada: a migração 021 ainda não foi aplicada no banco.' }),
+  });
+}
+
+/**
+ * As faixas do próprio representante no mês corrente.
+ *
+ * O rep pede as DELE e só as dele — o `sub` do token manda, não um id na URL.
+ */
+export async function minhaMetaHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id, sub } = request.user;
+  await reply.send({ data: await metaVigente(company_id, sub) });
 }

@@ -132,6 +132,9 @@ export const api = {
     request<T>(path, { method: 'POST', body: JSON.stringify(body), token }),
   patch: <T>(path: string, body: unknown, token?: string) =>
     request<T>(path, { method: 'PATCH', body: JSON.stringify(body), token }),
+  /** PUT quando o corpo SUBSTITUI o recurso inteiro (a meta de um mês). */
+  put: <T>(path: string, body: unknown, token?: string) =>
+    request<T>(path, { method: 'PUT', body: JSON.stringify(body), token }),
   del: <T>(path: string, token?: string) => request<T>(path, { method: 'DELETE', token }),
   /** POST de binário cru (ex.: foto já redimensionada) — não passa por JSON. */
   postBlob: <T>(path: string, blob: Blob, token?: string) =>

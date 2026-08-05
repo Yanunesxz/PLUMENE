@@ -24,10 +24,12 @@ import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
+import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
 import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
 import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
+import { useMinhaMeta } from '../../hooks/useMinhaMeta.js';
 
 // Gerente comercial (suporte) por WhatsApp — número (55) 32 9 9849-3177.
 // É quem controla senhas e acessos; o rep fala com ele por aqui.
@@ -41,6 +43,8 @@ const suporteWhatsappUrl = (nome: string) =>
 export function PaginaMinhaArea() {
   const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
+  // Faixas de bônus deste representante neste mês — quem cadastra é o gerente.
+  const faixasDoMes = useMinhaMeta();
   const orders = useLiveQuery(() => db.orders.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
   const pendingSync = useLiveQuery(() => db.sync_queue.count(), []) ?? 0;
@@ -181,9 +185,11 @@ export function PaginaMinhaArea() {
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
 
-      <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} />
+      <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} faixas={faixasDoMes} />
 
       <CartaoInstalar />
+
+      <CartaoAtualizar />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
