@@ -9,10 +9,35 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  define: {
+    // Carimbo do build, mostrado na "Minha área". Serve ao suporte: em vez de
+    // "não está atualizando", o representante lê a data da versão que está no
+    // aparelho dele e dá para saber na hora se o problema é o app ou a conta.
+    __VERSAO_BUILD__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'prompt', não 'autoUpdate'.
+      //
+      // Com 'autoUpdate' o service worker novo assumia o controle no meio da
+      // sessão (skipWaiting + clientsClaim) enquanto a aba continuava rodando o
+      // JavaScript velho. Ao abrir uma tela que só baixa quando é pedida
+      // (painel, comissões, importar), o pedaço antigo já não existia no
+      // servidor: erro de carregamento, tela branca — e a saída que sobrava
+      // para o representante era limpar o cache na mão.
+      //
+      // Em 'prompt' nada troca por baixo dos pés: a versão nova baixa inteira e
+      // fica em espera, e quem decide a hora de trocar é o app. Ele troca
+      // sozinho, sem avisar ninguém, num momento em que a tela não está sendo
+      // usada — ver `atualizarApp.ts`. O nome do modo diz "perguntar", mas o
+      // que ele dá é o controle do instante da troca; a pergunta é opcional, e
+      // aqui não existe.
+      registerType: 'prompt',
+      // O registro é nosso (`observarAtualizacao`, no arranque): precisamos da
+      // referência do registration para procurar versão nova de tempos em
+      // tempos. O script que o plugin injeta sozinho não devolve nada.
+      injectRegister: null,
       includeAssets: ['logo.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
       manifest: {
         name: 'Representantes Corpo Sensual',
@@ -42,6 +67,12 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
+        // O cache da versão anterior é apagado quando a nova assume. É isto que
+        // dispensa "limpar o cache" a cada publicação: a faxina é do próprio
+        // service worker, e as fotos dos produtos (cache separado, abaixo) não
+        // entram nela — elas continuam no aparelho, senão o catálogo inteiro
+        // desceria de novo pelo 3G da loja a cada atualização.
+        cleanupOutdatedCaches: true,
         // As fontes vêm fatiadas por alfabeto e o navegador escolhe pelo
         // unicode-range — em português só o latino é buscado. Sem isto o
         // precache guardaria cirílico, grego e matemático no celular do

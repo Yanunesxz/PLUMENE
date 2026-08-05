@@ -25,6 +25,7 @@ import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
+import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
@@ -323,6 +324,8 @@ export function PaginaMinhaAreaLoja() {
       </section>
 
       <CartaoInstalar />
+
+      <CartaoAtualizar />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
