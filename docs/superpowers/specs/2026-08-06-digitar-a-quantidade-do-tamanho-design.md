@@ -45,9 +45,14 @@ decidido:
 - `0` zera aquele tamanho — é assim que se tira uma linha inteira sem trinta toques no
   menos.
 
-**Sem teto de quantidade.** O representante não enxerga estoque (decisão antiga do
-projeto), então qualquer limite aqui seria um número inventado, travando um pedido que a
-fábrica talvez aceitasse.
+**Sem teto de negócio.** O representante não enxerga estoque (decisão antiga do projeto),
+então um limite de peças aqui seria número inventado, travando um pedido que a fábrica
+talvez aceitasse.
+
+Existe, isso sim, uma **guarda contra acidente**: o campo para em 99.999. Cinco dígitos
+já é mais do que qualquer pedido real, e seis é dedo preso na tecla — sem a guarda, um
+`1111111` entra no carrinho e quebra o total do pedido inteiro. Não é o mesmo que um teto
+comercial, e por isso não vira aviso na tela.
 
 ### Onde o número cai
 

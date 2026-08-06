@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { X, Minus, ImageIcon, Check } from 'lucide-react';
+import { X, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
+import { QuadradoDoTamanho } from './QuadradoDoTamanho.js';
 import { ordenarGrade } from './grade.js';
 import { cn, formatBRL } from '@/lib/utils';
 
@@ -77,6 +78,13 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
 
   const bump = (size: string, delta: number) =>
     setQty((q) => ({ ...q, [key(size)]: Math.max(0, (q[key(size)] ?? 0) + delta) }));
+
+  /**
+   * Substitui a quantidade, em vez de somar — é o que o campo de "segurar para
+   * digitar" faz. Trinta peças do M eram trinta toques; aqui é um número.
+   */
+  const definir = (size: string, valor: number) =>
+    setQty((q) => ({ ...q, [key(size)]: Math.max(0, valor) }));
 
   // Total da peça inteira, somando TODAS as cores — é o que vai para o carrinho.
   const totalPecas = Object.values(qty).reduce((s, n) => s + n, 0);
@@ -250,49 +258,25 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               Esta cor não tem grade de tamanhos cadastrada.
             </p>
           ) : (
-            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
-              {variants.map((v) => {
-                const q = qty[key(v.size)] ?? 0;
-                return (
-                  <div key={v.id} className="flex flex-col items-stretch">
-                    {/* A peça inteira é o alvo: toca e soma 1. É como o
-                        representante anota no papel — "P:2 M:4" — em vez de
-                        caçar um "+" de 9px por linha. */}
-                    <button
-                      type="button"
-                      onClick={() => bump(v.size, 1)}
-                      disabled={!v.in_stock}
-                      aria-label={`Adicionar tamanho ${v.size}`}
-                      className={cn(
-                        'flex aspect-square flex-col items-center justify-center rounded-lg border transition-colors',
-                        !v.in_stock
-                          ? 'cursor-not-allowed border-dashed border-border bg-transparent text-subtle'
-                          : q > 0
-                            ? 'border-foreground bg-foreground text-background'
-                            : 'border-input bg-card text-foreground hover:border-foreground',
-                      )}
-                    >
-                      <span className={cn('text-sm font-semibold', !v.in_stock && 'line-through')}>{v.size}</span>
-                      {v.in_stock ? (
-                        q > 0 && <span className="tnum text-lg font-bold leading-none">{q}</span>
-                      ) : (
-                        <span className="text-[9px] uppercase tracking-wide">esgot.</span>
-                      )}
-                    </button>
-                    {q > 0 && (
-                      <button
-                        type="button"
-                        onClick={() => bump(v.size, -1)}
-                        aria-label={`Remover uma peça do tamanho ${v.size}`}
-                        className="mt-1 flex h-7 items-center justify-center rounded text-xs font-medium text-subtle hover:bg-muted hover:text-foreground"
-                      >
-                        <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+            <>
+              <div className="grid grid-cols-4 gap-2 sm:grid-cols-5">
+                {variants.map((v) => (
+                  <QuadradoDoTamanho
+                    key={v.id}
+                    size={v.size}
+                    quantidade={qty[key(v.size)] ?? 0}
+                    emEstoque={v.in_stock}
+                    onSomar={(delta) => bump(v.size, delta)}
+                    onDefinir={(valor) => definir(v.size, valor)}
+                  />
+                ))}
+              </div>
+              {/* Gesto sem legenda é gesto que ninguém acha. Uma linha, e o
+                  representante descobre que não precisa tocar trinta vezes. */}
+              <p className="mt-2.5 text-center text-[11px] leading-tight text-subtle">
+                Toque para somar 1 · segure para digitar a quantidade
+              </p>
+            </>
           )}
         </div>
 
