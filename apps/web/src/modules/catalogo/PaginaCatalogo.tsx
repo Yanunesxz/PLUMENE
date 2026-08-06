@@ -43,21 +43,28 @@ export const SEGMENTOS: { key: Segmento; label: string }[] = [
 // Peças que só existem na linha feminina — nelas a fábrica não escreve o gênero
 // no nome porque é óbvio ("CAMISOLA DE ALÇA", "SHORT DOLL REGATA MALHA").
 // Tecido NÃO serve de pista: há pijama de liganete masculino no catálogo.
-const PECA_FEMININA = /camisol|short ?doll|camis[ãa]o|robe|baby ?doll|gestante|vestido|cropped/;
-
-export const segmentoDoProduto = (p: Pick<ProductWithPrice, 'name'>): Segmento | null => {
+/**
+ * A fábrica só escreve o gênero no nome quando a peça é MASCULINA — a linha
+ * feminina é o padrão da casa, e o óbvio não se escreve. Por isso o silêncio
+ * vale como feminino, em vez de deixar a peça fora dos quatro filtros.
+ *
+ * Isso não é dedução de escrivaninha: as 21 peças que antes ficavam no limbo
+ * ("PIJAMA REGATA LIGANETE", "PIJAMA AMERICANO LISO", "PIJAMA REGATA RENDA"…)
+ * foram conferidas uma a uma na foto do catálogo. Vinte sao femininas adultas
+ * e a vigésima primeira é a CONJUNTO SHORT TEEN, juvenil feminina. Nenhuma
+ * masculina — toda peça masculina da base traz "MASC" no nome.
+ *
+ * O dia em que a fábrica mandar um pijama masculino sem escrever "MASC", ele
+ * cai no filtro feminino. É o preço de não deixar 21 referências invisíveis,
+ * e o teste de segmento é onde esse caso deve ser fixado.
+ */
+export const segmentoDoProduto = (p: Pick<ProductWithPrice, 'name'>): Segmento => {
   const nome = p.name.toLowerCase();
   const infantil = /infantil|juvenil|infanto|teen/.test(nome);
-  // "fem." / "feminino" e "masc." / "masculino" — sempre no início da palavra.
-  const feminino = /\bfem/.test(nome);
-  const masculino = /\bmasc/.test(nome);
-  if (feminino !== masculino) {
-    if (infantil) return masculino ? 'infantil_masculino' : 'infantil_feminino';
-    return masculino ? 'masculino' : 'feminino';
-  }
-  // Sem gênero escrito (ou família com os dois): só o tipo de peça decide.
-  if (PECA_FEMININA.test(nome)) return infantil ? 'infantil_feminino' : 'feminino';
-  return null;
+  // "masc." / "masculino" — sempre no início da palavra, para "mescla" não colar.
+  const masculino = /\bmasc/.test(nome) && !/\bfem/.test(nome);
+  if (masculino) return infantil ? 'infantil_masculino' : 'masculino';
+  return infantil ? 'infantil_feminino' : 'feminino';
 };
 
 export function PaginaCatalogo() {
@@ -171,7 +178,10 @@ export function PaginaCatalogo() {
     return (allProducts ?? [])
       .filter((p) => p.active)
       .filter((p) => !isPlumene(p.sku))
-      .filter((p) => !!p.image_url)
+      // Sem foto o produto CONTINUA no catálogo (o card mostra o SKU no lugar da
+      // imagem). Esconder custava caro: os lançamentos chegam do ERP antes da
+      // foto, e era assim que PIJAMA FAMÍLIA MASCULINO e outras 13 referências
+      // sumiam do filtro sem deixar rastro.
       .filter((p) => brand === ALL || p.brand === brand)
       .filter((p) => !segmento || segmentoDoProduto(p) === segmento)
       .filter(
