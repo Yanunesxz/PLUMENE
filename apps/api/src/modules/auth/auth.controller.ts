@@ -1,6 +1,12 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { AuthPayload, User } from '@csb/shared';
-import { findUserByEmail, buildAuthPayload, getTokenConfig, upgradePasswordHash } from './auth.service.js';
+import {
+  findUserByEmail,
+  buildAuthPayload,
+  getTokenConfig,
+  upgradePasswordHash,
+  registrarAcesso,
+} from './auth.service.js';
 import { verifyPassword, hashPassword } from '../../lib/password.js';
 import { parseBody } from '../../lib/validation.js';
 import { loginSchema, refreshTokenSchema } from './auth.schema.js';
@@ -30,6 +36,9 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
     }
   }
 
+  // Sem `await`: o carimbo não pode atrasar a entrada de ninguém.
+  void registrarAcesso(user.id);
+
   const payload = buildAuthPayload(user);
   const config = getTokenConfig();
   const token = request.server.jwt.sign(payload, { expiresIn: config.expiresIn });
@@ -56,6 +65,10 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
         // pedido montado offline, quando não há token para o servidor resolver.
         customer_id: user.customer_id ?? null,
         rep_id: user.rep_id ?? null,
+        // O web esconde botão pelas teclas; sem elas na resposta, o gerente veria
+        // botão que a API recusa.
+        permissions: user.permissions ?? null,
+        last_login_at: user.last_login_at ?? null,
       },
     },
   });
@@ -92,7 +105,30 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
     const config = getTokenConfig();
     const token = request.server.jwt.sign(payload, { expiresIn: config.expiresIn });
 
-    await reply.send({ data: { token } });
+    // O usuário volta junto do token: quando o admin mexe nas teclas de alguém,
+    // o servidor passa a negar na hora do refresh, mas a tela continuaria
+    // mostrando os botões antigos até a pessoa deslogar. Campo novo — cliente
+    // antigo que só lê `token` continua funcionando.
+    const u = userData as User;
+    await reply.send({
+      data: {
+        token,
+        user: {
+          id: u.id,
+          company_id: u.company_id,
+          name: u.name,
+          email: u.email,
+          role: u.role,
+          active: u.active,
+          price_table_id: u.price_table_id ?? null,
+          commission_rate: u.commission_rate ?? null,
+          customer_id: u.customer_id ?? null,
+          rep_id: u.rep_id ?? null,
+          permissions: u.permissions ?? null,
+          last_login_at: u.last_login_at ?? null,
+        },
+      },
+    });
   } catch {
     await reply.status(401).send({
       error: 'Refresh token inválido ou expirado',

@@ -32,7 +32,30 @@ export function buildAuthPayload(user: User): AuthPayload {
     // Eram nulos para todo mundo até aqui — a loja simplesmente não entrava.
     customer_id: user.customer_id ?? null,
     rep_id: user.rep_id ?? null,
+    // Teclas do gerente viajam no token para o guard não consultar o banco a
+    // cada requisição. Nulo é significativo: quer dizer "padrão do papel".
+    // O preço é o mesmo do bloqueio: mudança de tecla vale em até 1h.
+    permissions: user.permissions ?? null,
   };
+}
+
+/**
+ * Carimba o último acesso.
+ *
+ * Nunca segura o login e nunca o derruba: se a coluna ainda não existe (migração
+ * 022 não aplicada) o supabase-js devolve erro em vez de lançar, e aqui isso é
+ * exatamente o comportamento desejado — quem está entrando não tem nada a ver
+ * com o estado do schema.
+ */
+export async function registrarAcesso(userId: string): Promise<void> {
+  try {
+    await supabase
+      .from('users')
+      .update({ last_login_at: new Date().toISOString() })
+      .eq('id', userId);
+  } catch {
+    /* silêncio proposital: ver comentário acima */
+  }
 }
 
 export async function upgradePasswordHash(userId: string, newHash: string): Promise<void> {
