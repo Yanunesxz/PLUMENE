@@ -1,4 +1,5 @@
 import type { AuthRole, UserRole } from '../constants/userRole.js';
+import type { PermissaoGerente } from '../constants/permissoes.js';
 
 export interface Company {
   id: string;
@@ -31,6 +32,13 @@ export interface User {
   customer_id?: string | null;
   /** Loja: o representante que convidou e que recebe os pedidos dela. */
   rep_id?: string | null;
+  /**
+   * Teclas do gerente. Nulo = padrão do papel (ver `temPermissao`). Só o papel
+   * `manager` usa isto: admin tem tudo, rep e loja são delimitados pelo papel.
+   */
+  permissions?: PermissaoGerente[] | null;
+  /** Último login bem-sucedido. Nulo em quem nunca entrou. */
+  last_login_at?: string | null;
 }
 
 export interface AuthPayload {
@@ -53,6 +61,8 @@ export interface AuthPayload {
    * Para admin/manager/rep é nulo — o dono é o próprio `sub`.
    */
   rep_id?: string | null;
+  /** Teclas do gerente, para o guard não precisar ir ao banco a cada requisição. */
+  permissions?: PermissaoGerente[] | null;
 }
 
 // (commission_rate em User e AuthPayload são usados pela área do representante)
@@ -114,6 +124,46 @@ export interface UpdateRepRequest {
   erp_rep_id?: string | null;
   /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
   password?: string;
+}
+
+// ─── Controle de logins (admin) ───────────────────────────────────────────────
+// Papéis que o admin cria por aqui. Representante nasce em `/reps` (precisa de
+// CPF, tabela, comissão e código ERP) e loja nasce por convite — ter dois
+// lugares criando a mesma coisa é como um deles fica esquecido.
+export type PapelGerenciavel = Extract<UserRole, 'admin' | 'manager'>;
+
+/** Um login na tela do admin. Nunca carrega hash de senha. */
+export interface UsuarioListItem {
+  id: string;
+  name: string;
+  email: string;
+  role: UserRole;
+  active: boolean;
+  last_login_at: string | null;
+  /** Só faz sentido em gerente. Nulo = padrão do papel. */
+  permissions: PermissaoGerente[] | null;
+  created_at: string;
+}
+
+export interface CriarUsuarioRequest {
+  name: string;
+  email: string;
+  password: string;
+  role: PapelGerenciavel;
+  /** Omitido em gerente = padrão do papel. Ignorado quando o papel é admin. */
+  permissions?: PermissaoGerente[];
+}
+
+/** Edição — só o que veio no corpo muda. */
+export interface AtualizarUsuarioRequest {
+  name?: string;
+  email?: string;
+  /** Preenchida, redefine a senha. Ausente ou vazia, mantém a atual. */
+  password?: string;
+  active?: boolean;
+  /** Troca de papel só entre admin e gerente. */
+  role?: PapelGerenciavel;
+  permissions?: PermissaoGerente[] | null;
 }
 
 export interface LoginRequest {

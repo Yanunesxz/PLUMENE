@@ -7,5 +7,6 @@ export * from './types/user.js';
 export * from './constants/bonus.js';
 export * from './constants/commission.js';
 export * from './constants/orderStatus.js';
+export * from './constants/permissoes.js';
 export * from './constants/userRole.js';
 export * from './pricing/priceTier.js';
