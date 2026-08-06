@@ -23,6 +23,7 @@ import { syncRouter } from './modules/sync/sync.router.js';
 import { partnerRouter } from './modules/partner/partner.router.js';
 import { companyRouter } from './modules/company/company.router.js';
 import { accessRouter } from './modules/access/access.router.js';
+import { usersRouter } from './modules/users/users.router.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -111,6 +112,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await server.register(partnerRouter);
   await server.register(companyRouter);
   await server.register(accessRouter);
+  await server.register(usersRouter);
 
   return server;
 }
