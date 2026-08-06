@@ -1,8 +1,20 @@
 import { useState, type ReactNode } from 'react';
-import { Smartphone, Share, Plus, Check, MoreVertical, Download } from 'lucide-react';
+import {
+  Smartphone,
+  Share,
+  Plus,
+  Check,
+  MoreVertical,
+  Download,
+  CheckCircle2,
+  Copy,
+  MessageCircle,
+  Monitor,
+} from 'lucide-react';
 import { useInstalarApp } from '../../hooks/useInstalarApp.js';
 import { pedirInstalacao } from '../../lib/instalarApp.js';
 import { Button } from './Button.js';
+import { cn } from '../../lib/utils.js';
 
 /**
  * Convite para deixar o sistema como aplicativo na tela inicial.
@@ -15,23 +27,30 @@ import { Button } from './Button.js';
  * Firefox não têm essa API, então recebem o caminho do menu — um botão que não
  * faz nada seria pior do que nenhum botão.
  *
- * Quando o navegador não oferece o convite e não é nenhum caso conhecido, o
- * cartão ensina o caminho do menu em vez de desaparecer. Sumir era o pior dos
- * mundos: o Chrome não reoferece a instalação num perfil onde o app já foi
- * instalado uma vez, e o representante que troca de aparelho ficava sem
- * nenhuma pista de como colocar o atalho no novo.
+ * **O cartão nunca some.** Ele já sumiu duas vezes, por motivos diferentes, e
+ * as duas foram vistas como "o botão foi tirado":
  *
- * Some só quando já está instalado NESTE aparelho: aí oferecer o que a pessoa
- * já tem é ruído permanente numa tela que ela abre todo dia.
+ *   1. quando o navegador não mandava o convite (ícone reprovado, ou app já
+ *      instalado naquele perfil — o Chrome não oferece duas vezes);
+ *   2. quando o app já estava instalado NESTE aparelho, caso em que ele voltava
+ *      `null` de propósito.
+ *
+ * O (1) virou tutorial pelo menu. O (2) virou este estado "instalado": some o
+ * convite, fica o caminho para colocar o app nos OUTROS aparelhos — que é
+ * justamente o que a pessoa procura quando abre o app do computador querendo o
+ * ícone no celular. Um cartão que desaparece não ensina nada; ele só deixa a
+ * impressão de que a função foi embora.
  */
 export function CartaoInstalar() {
   const estado = useInstalarApp();
-  const [comoFazer, setComoFazer] = useState(false);
+  const [painel, setPainel] = useState<'nenhum' | 'aqui' | 'outro'>('nenhum');
   const [instalando, setInstalando] = useState(false);
 
-  if (estado === 'instalado') return null;
-
+  const instalado = estado === 'instalado';
   const automatico = estado === 'pronto';
+
+  const alternar = (qual: 'aqui' | 'outro') =>
+    setPainel((atual) => (atual === qual ? 'nenhum' : qual));
 
   const instalar = async () => {
     setInstalando(true);
@@ -43,33 +62,80 @@ export function CartaoInstalar() {
   };
 
   return (
-    <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+    <div
+      className={cn(
+        'rounded-xl border p-4',
+        instalado ? 'border-border bg-card shadow-sm' : 'border-primary/30 bg-primary-soft',
+      )}
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
-          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-card text-primary-soft-foreground">
-            <Smartphone className="h-5 w-5" strokeWidth={2} />
+          <span
+            className={cn(
+              'flex h-11 w-11 shrink-0 items-center justify-center rounded-full',
+              instalado
+                ? 'bg-positive-soft text-positive-soft-foreground'
+                : 'bg-card text-primary-soft-foreground',
+            )}
+          >
+            {instalado ? (
+              <CheckCircle2 className="h-5 w-5" strokeWidth={2} />
+            ) : (
+              <Smartphone className="h-5 w-5" strokeWidth={2} />
+            )}
           </span>
           <div className="min-w-0">
-            <p className="text-[15px] font-semibold text-foreground">Deixe na tela inicial</p>
+            <p className="text-[15px] font-semibold text-foreground">
+              {instalado ? 'Já está na sua tela inicial' : 'Deixe na tela inicial'}
+            </p>
             <p className="text-xs text-muted-foreground">
-              Abre como aplicativo, em tela cheia, e funciona sem internet.
+              {instalado
+                ? 'Neste aparelho, pronto. Dá para colocar no celular e no computador também.'
+                : 'Abre como aplicativo, em tela cheia, e funciona sem internet.'}
             </p>
           </div>
         </div>
 
-        {automatico ? (
+        {instalado ? (
+          <Button size="md" variant="outline" className="shrink-0" onClick={() => alternar('outro')}>
+            <Smartphone className="h-4 w-4" strokeWidth={2.5} />
+            {painel === 'outro' ? 'Fechar' : 'Outro aparelho'}
+          </Button>
+        ) : automatico ? (
           <Button size="md" className="shrink-0" disabled={instalando} onClick={() => void instalar()}>
             <Plus className="h-4 w-4" strokeWidth={2.5} />
             {instalando ? 'Instalando…' : 'Adicionar'}
           </Button>
         ) : (
-          <Button size="md" variant="outline" className="shrink-0" onClick={() => setComoFazer((v) => !v)}>
-            {comoFazer ? 'Fechar' : 'Como fazer'}
+          <Button size="md" variant="outline" className="shrink-0" onClick={() => alternar('aqui')}>
+            {painel === 'aqui' ? 'Fechar' : 'Como fazer'}
           </Button>
         )}
       </div>
 
-      {comoFazer ? (
+      {/*
+        O atalho quase nunca é para o aparelho em que a pessoa está: ela abre no
+        computador e quer o ícone no celular. Sem esta saída, a única forma era
+        digitar o endereço na mão no outro aparelho.
+      */}
+      {instalado ? null : (
+        <button
+          type="button"
+          onClick={() => alternar('outro')}
+          className="mt-3 text-xs font-semibold text-primary-soft-foreground underline underline-offset-2"
+        >
+          {painel === 'outro' ? 'Fechar' : 'Quero em outro aparelho (celular, computador)'}
+        </button>
+      )}
+
+      {/*
+        `!instalado` cobre um caso curto mas real: a pessoa abre o tutorial,
+        instala pelo menu do navegador e o `appinstalled` chega com o painel
+        aberto. Sem isto o passo a passo ficaria embaixo de um cartão que acabou
+        de dizer "já está instalado" — e sem botão para fechar, porque o "Como
+        fazer" já não está mais na tela.
+      */}
+      {painel === 'aqui' && !instalado ? (
         <div className="mt-4 border-t border-primary/20 pt-3">
           {estado === 'manual-apple' ? (
             <PassosApple />
@@ -80,7 +146,103 @@ export function CartaoInstalar() {
           )}
         </div>
       ) : null}
+
+      {painel === 'outro' ? (
+        <div className={cn('mt-4 border-t pt-3', instalado ? 'border-border' : 'border-primary/20')}>
+          <OutroAparelho />
+        </div>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Colocar o app num aparelho diferente deste.
+ *
+ * Aqui a detecção de navegador não vale nada — o destino é outro aparelho, que
+ * pode ser qualquer coisa. Por isso os três caminhos aparecem juntos, curtos, em
+ * vez de um só adivinhado errado.
+ */
+function OutroAparelho() {
+  const [copiado, setCopiado] = useState(false);
+  const endereco = typeof window === 'undefined' ? '' : window.location.origin;
+
+  const mensagem =
+    'Abra este endereço no aparelho onde você quer o aplicativo da Corpo Sensual, ' +
+    'entre na sua conta e toque em «Deixe na tela inicial», na Minha área:\n\n' +
+    endereco;
+
+  const copiar = async () => {
+    try {
+      await navigator.clipboard.writeText(endereco);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2500);
+    } catch {
+      // Cópia bloqueada (permissão negada, contexto sem HTTPS): seleciona o
+      // texto para copiar à mão. O endereço continua na tela.
+      (document.getElementById('endereco-do-app') as HTMLInputElement | null)?.select();
+    }
+  };
+
+  return (
+    <>
+      <p className="text-sm text-foreground">
+        Abra este endereço no outro aparelho e entre na sua conta. O convite aparece na{' '}
+        <strong>Minha área</strong>.
+      </p>
+
+      <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        <input
+          id="endereco-do-app"
+          aria-label="Endereço do sistema"
+          readOnly
+          value={endereco}
+          onFocus={(e) => e.currentTarget.select()}
+          className="h-11 min-w-0 flex-1 rounded-lg border border-input bg-card px-3 text-sm text-foreground"
+        />
+        <Button size="md" variant="outline" className="shrink-0" onClick={() => void copiar()}>
+          {copiado ? (
+            <Check className="h-4 w-4" strokeWidth={2.5} />
+          ) : (
+            <Copy className="h-4 w-4" strokeWidth={2.5} />
+          )}
+          {copiado ? 'Copiado' : 'Copiar'}
+        </Button>
+        <a
+          href={`https://wa.me/?text=${encodeURIComponent(mensagem)}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+        >
+          <MessageCircle className="h-4 w-4" strokeWidth={2.5} />
+          Mandar no WhatsApp
+        </a>
+      </div>
+
+      <ul className="mt-3 space-y-1.5 text-xs leading-relaxed text-muted-foreground">
+        <li className="flex items-start gap-2">
+          <Smartphone className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+          <span>
+            <strong className="text-foreground">Android:</strong> abra no Chrome — o botão
+            «Adicionar» instala com um toque.
+          </span>
+        </li>
+        <li className="flex items-start gap-2">
+          <Share className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+          <span>
+            <strong className="text-foreground">iPhone e iPad:</strong> abra no Safari, toque em
+            Compartilhar e escolha «Adicionar à Tela de Início».
+          </span>
+        </li>
+        <li className="flex items-start gap-2">
+          <Monitor className="mt-0.5 h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+          <span>
+            <strong className="text-foreground">Computador:</strong> no Chrome ou Edge, o botão
+            «Adicionar» instala; ou use o ícone de instalar na barra de endereço.
+          </span>
+        </li>
+      </ul>
+    </>
   );
 }
 

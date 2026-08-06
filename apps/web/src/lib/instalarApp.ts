@@ -14,7 +14,9 @@ interface EventoDeInstalacao extends Event {
 }
 
 /**
- * - `instalado`: já está rodando como app, não há o que oferecer.
+ * - `instalado`: já está rodando como app NESTE aparelho. Não há convite a
+ *   fazer aqui, mas o cartão continua na tela: é dele que sai o caminho para
+ *   colocar o app nos outros aparelhos.
  * - `pronto`: o navegador liberou o convite — um toque instala. É o caso do
  *   Chrome, Edge, Samsung Internet e Opera, no Android e no computador.
  * - `manual-apple`: iPhone/iPad. A Apple **não implementa** a API de instalação
