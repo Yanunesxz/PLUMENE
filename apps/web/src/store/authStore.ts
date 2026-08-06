@@ -8,7 +8,8 @@ interface AuthState {
   user: Omit<User, 'created_at'> | null;
   isAuthenticated: boolean;
   login: (token: string, refresh_token: string, user: Omit<User, 'created_at'>) => void;
-  setToken: (token: string) => void;
+  /** O usuário é opcional: só o refresh manda um, e quando manda ele é mais novo. */
+  setToken: (token: string, user?: Omit<User, 'created_at'>) => void;
   logout: () => void;
   hasRole: (...roles: AuthRole[]) => boolean;
 }
@@ -24,7 +25,7 @@ export const useAuthStore = create<AuthState>()(
       login: (token, refresh_token, user) =>
         set({ token, refresh_token, user, isAuthenticated: true }),
 
-      setToken: (token) => set({ token }),
+      setToken: (token, user) => set((estado) => ({ token, user: user ?? estado.user })),
 
       logout: () =>
         set({ token: null, refresh_token: null, user: null, isAuthenticated: false }),

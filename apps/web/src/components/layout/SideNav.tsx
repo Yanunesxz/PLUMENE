@@ -12,7 +12,7 @@ export function SideNav() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
-  const items = navItemsForRole(user?.role);
+  const items = navItemsForRole(user?.role, user?.permissions ?? null);
   const esperando = usePedidosEsperando();
   const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
 

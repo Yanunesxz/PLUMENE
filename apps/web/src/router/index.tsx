@@ -23,6 +23,7 @@ const PaginaRepresentantes = lazy(() => import('../modules/representantes/Pagina
 const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
 const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
+const PaginaLogins = lazy(() => import('../modules/logins/PaginaLogins.js').then((m) => ({ default: m.PaginaLogins })));
 const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLoja.js').then((m) => ({ default: m.PaginaMinhaAreaLoja })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
@@ -98,18 +99,25 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           },
           {
             path: 'representantes',
-            element: <PrivateRoute roles={['manager', 'admin']} />,
+            element: <PrivateRoute roles={['manager', 'admin']} permissao="gerenciar_representantes" />,
             children: [{ index: true, element: <AoCarregar><PaginaRepresentantes /></AoCarregar> }],
           },
           {
             path: 'comissoes',
-            element: <PrivateRoute roles={['manager', 'admin']} />,
+            element: <PrivateRoute roles={['manager', 'admin']} permissao="ver_comissoes" />,
             children: [{ index: true, element: <AoCarregar><PaginaComissoes /></AoCarregar> }],
           },
+          // Era `roles={['admin']}`: o admin continua entrando sempre (tecla não
+          // se aplica a ele) e o gerente só entra se o admin ligar a dele.
           {
             path: 'importar',
-            element: <PrivateRoute roles={['admin']} />,
+            element: <PrivateRoute roles={['manager', 'admin']} permissao="importar_produtos" />,
             children: [{ index: true, element: <AoCarregar><PaginaImportar /></AoCarregar> }],
+          },
+          {
+            path: 'logins',
+            element: <PrivateRoute roles={['admin']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaLogins /></AoCarregar> }],
           },
         ],
       },

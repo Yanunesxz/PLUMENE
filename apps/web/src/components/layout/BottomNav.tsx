@@ -6,7 +6,7 @@ import { cn } from '../../lib/utils.js';
 
 export function BottomNav() {
   const { user } = useAuthStore();
-  const items = navItemsForRole(user?.role);
+  const items = navItemsForRole(user?.role, user?.permissions ?? null);
   const esperando = usePedidosEsperando();
   // Com 5+ itens (gerente/admin) o espaço por item encolhe: fonte menor e
   // rótulo curto quando existir, para os textos nunca se encostarem.

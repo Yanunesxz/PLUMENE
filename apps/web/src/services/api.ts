@@ -1,4 +1,5 @@
 import { useAuthStore } from '../store/authStore.js';
+import type { User } from '@csb/shared';
 
 const API_BASE = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://localhost:3001';
 
@@ -21,8 +22,13 @@ async function refreshAccessToken(): Promise<string | null> {
       logout();
       return null;
     }
-    const body = (await res.json()) as { data: { token: string } };
-    setToken(body.data.token);
+    // O refresh devolve o usuário junto: é assim que uma tecla mexida pelo admin
+    // chega na tela sem obrigar a pessoa a deslogar. Opcional porque o app
+    // instalado no celular pode estar numa versão anterior a este campo.
+    const body = (await res.json()) as {
+      data: { token: string; user?: Omit<User, 'created_at'> };
+    };
+    setToken(body.data.token, body.data.user);
     return body.data.token;
   } catch {
     return null;

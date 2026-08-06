@@ -1,6 +1,7 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge, UploadCloud, KeyRound, Store } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge, UploadCloud, KeyRound, Store, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import type { UserRole } from '@csb/shared';
+import { temPermissao } from '@csb/shared';
+import type { UserRole, PermissaoGerente } from '@csb/shared';
 
 export interface NavItem {
   to: string;
@@ -16,6 +17,8 @@ export interface NavItem {
    * precisar abrir a tela para conferir.
    */
   fila?: 'triagem' | 'aprovacao';
+  /** Tecla do gerente que abre esta tela. Sem isto, todo gerente vê o item. */
+  permissao?: PermissaoGerente;
 }
 
 const repItems: NavItem[] = [
@@ -38,19 +41,28 @@ const managerItems: NavItem[] = [
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
-  { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
-  { to: '/comissoes', label: 'Comissões', icon: Wallet },
+  { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact, permissao: 'gerenciar_representantes' },
+  { to: '/comissoes', label: 'Comissões', icon: Wallet, permissao: 'ver_comissoes' },
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
+  // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
+  // não se aplica a ele. O gerente só vê se o admin ligar a dele.
+  { to: '/importar', label: 'Importar produtos', short: 'Importar', icon: UploadCloud, permissao: 'importar_produtos' },
 ];
 
+// Controle de logins não tem tecla: é do admin e ponto.
 const adminItems: NavItem[] = [
   ...managerItems,
-  { to: '/importar', label: 'Importar produtos', short: 'Importar', icon: UploadCloud },
+  { to: '/logins', label: 'Logins', icon: ShieldCheck },
 ];
 
-export function navItemsForRole(role: UserRole | undefined): NavItem[] {
-  if (role === 'admin') return adminItems;
-  if (role === 'manager') return managerItems;
+export function navItemsForRole(
+  role: UserRole | undefined,
+  permissions?: PermissaoGerente[] | null,
+): NavItem[] {
+  const daFabrica = role === 'admin' ? adminItems : role === 'manager' ? managerItems : null;
+  if (daFabrica && role) {
+    return daFabrica.filter((i) => !i.permissao || temPermissao(role, permissions ?? null, i.permissao));
+  }
   if (role === 'store') return storeItems;
   return repItems;
 }
