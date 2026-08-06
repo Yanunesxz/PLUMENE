@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { authenticate, requireRole } from '../../middleware/auth.js';
+import { authenticate, requireRole, requirePermission } from '../../middleware/auth.js';
 import { listProducts, listCatalogPriceTables } from './catalog.controller.js';
 import { importProductsHandler } from './import.controller.js';
 import { uploadPhotoHandler } from './photos.controller.js';
@@ -13,17 +13,20 @@ export async function catalogRouter(fastify: FastifyInstance): Promise<void> {
     { preHandler: [authenticate, requireRole(['manager', 'admin'])] },
     listCatalogPriceTables,
   );
-  // Importação de catálogo da própria empresa (multi-fábrica) — só admin.
-  fastify.post(
-    '/products/import',
-    { preHandler: [authenticate, requireRole(['admin'])] },
-    importProductsHandler,
-  );
-  // Upload de foto por produto (binário cru no corpo, ?sku= na query) — só admin.
-  // O limite real é do content-type parser (3 MB); a validação de 2 MB devolve 413.
-  fastify.post(
-    '/products/fotos',
-    { preHandler: [authenticate, requireRole(['admin'])] },
-    uploadPhotoHandler,
-  );
+  // Importação de catálogo da própria empresa (multi-fábrica) e upload de foto
+  // por produto (binário cru no corpo, ?sku= na query). Eram exclusivas do
+  // admin, e continuam assim por padrão: `importar_produtos` nasce desligada no
+  // gerente. Ele só chega aqui se o admin ligar a dele — que é o ponto.
+  // O limite real da foto é do content-type parser (3 MB); a validação de 2 MB
+  // devolve 413.
+  const podeImportar = {
+    preHandler: [
+      authenticate,
+      requireRole(['manager', 'admin']),
+      requirePermission('importar_produtos'),
+    ],
+  };
+
+  fastify.post('/products/import', podeImportar, importProductsHandler);
+  fastify.post('/products/fotos', podeImportar, uploadPhotoHandler);
 }

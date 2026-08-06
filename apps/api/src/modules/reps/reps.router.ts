@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { authenticate, requireRole } from '../../middleware/auth.js';
+import { authenticate, requireRole, requirePermission } from '../../middleware/auth.js';
 import {
   listRepsHandler,
   createRepHandler,
@@ -15,15 +15,26 @@ import {
 export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   const guard = { preHandler: [authenticate, requireRole(['manager', 'admin'])] };
 
+  // Escrever no cadastro de representante (e na meta dele) exige a tecla. LER
+  // não exige, e isso é deliberado: a tela de Comissões consome `GET /reps` e
+  // `GET /price-tables`, e guardá-las quebraria uma tela que funciona.
+  const podeGerenciar = {
+    preHandler: [
+      authenticate,
+      requireRole(['manager', 'admin']),
+      requirePermission('gerenciar_representantes'),
+    ],
+  };
+
   fastify.get('/reps', guard, listRepsHandler);
-  fastify.post('/reps', guard, createRepHandler);
-  fastify.patch('/reps/:id', guard, updateRepHandler);
-  fastify.delete('/reps/:id', guard, deleteRepHandler);
+  fastify.post('/reps', podeGerenciar, createRepHandler);
+  fastify.patch('/reps/:id', podeGerenciar, updateRepHandler);
+  fastify.delete('/reps/:id', podeGerenciar, deleteRepHandler);
   fastify.get('/price-tables', guard, listPriceTablesHandler);
 
   // Meta de bonificação: quem cadastra é o gerente, por representante e por mês.
   fastify.get('/reps/:id/meta', guard, listarMetasHandler);
-  fastify.put('/reps/:id/meta', guard, salvarMetaHandler);
+  fastify.put('/reps/:id/meta', podeGerenciar, salvarMetaHandler);
 
   // A do próprio representante. Sem id na URL de propósito: o token diz de quem
   // é a meta, então não existe pedir a do colega.

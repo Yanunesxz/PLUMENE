@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { authenticate, requireRole } from '../../middleware/auth.js';
+import { authenticate, requireRole, requirePermission } from '../../middleware/auth.js';
 import {
   listOrders,
   getOrder,
@@ -15,16 +15,33 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   const daFabricaOuLoja = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'store'])] };
   // Mexer no ciclo do pedido é de quem vende. Quem compra não muda status nem
   // apaga: sem isto, uma loja poderia aprovar o próprio pedido.
-  const daFabrica = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] };
+  //
+  // Decidir e excluir andam juntos na mesma tecla: são as duas formas de tirar
+  // um pedido do caminho de alguém. A tecla não atinge o representante — a
+  // triagem dele usa esta mesma rota, e `temPermissao` deixa passar quem não é
+  // gerente justamente por isso.
+  const decideOPedido = {
+    preHandler: [
+      authenticate,
+      requireRole(['rep', 'manager', 'admin']),
+      requirePermission('aprovar_pedidos'),
+    ],
+  };
 
   fastify.get('/orders', daFabricaOuLoja, listOrders);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
-  fastify.delete('/orders/:id', daFabrica, deleteOrderHandler);
-  fastify.patch('/orders/:id/status', daFabrica, updateStatusHandler);
+  fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
+  fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
   fastify.patch(
     '/orders/:id/invoice',
-    { preHandler: [authenticate, requireRole(['manager', 'admin'])] },
+    {
+      preHandler: [
+        authenticate,
+        requireRole(['manager', 'admin']),
+        requirePermission('faturar_pedidos'),
+      ],
+    },
     setInvoicedHandler,
   );
 }
