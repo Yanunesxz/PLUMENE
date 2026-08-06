@@ -77,10 +77,18 @@ apps/api/src/
 │       ├── 012_rep_carteira_e_numero.sql → código ERP do rep + nº do pedido
 │       ├── 013_protecoes.sql          → travas contra dado impossível + auditoria
 │       ├── 014_acesso_loja.sql        → papel 'store', convites e vitrine
-│       └── 015_triagem_do_representante.sql → status 'pending_rep' + users.rep_id
+│       ├── 015_triagem_do_representante.sql → status 'pending_rep' + users.rep_id
+│       ├── 016_backfill_dono_da_loja.sql → preenche o rep dono das lojas antigas
+│       ├── 017_pedido_offline_unico.sql → trava o pedido duplicado vindo do offline
+│       ├── 018_tabelas_por_representante.sql → rep_price_tables (conjunto por rep)
+│       ├── 019_cores_do_catalogo.sql  → nome da cor por produto
+│       ├── 020_cor_par_do_catalogo.sql → a bolinha é o PAR (blusa + calça)
+│       ├── 021_meta_de_bonus_por_representante.sql → faixas de bônus por mês
+│       └── 022_controle_de_logins.sql → permissions do gerente + last_login_at
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
+│                           + requirePermission('faturar_pedidos') — teclas do gerente
 │
 ├── lib/
 │   └── password.ts       → hashPassword (bcrypt) + verifyPassword (aceita sha256 legado)
@@ -92,6 +100,8 @@ apps/api/src/
 │   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep)
 │   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
 │   ├── orders/           → GET/POST /orders, /orders/:id, /status, /invoice
+│   ├── users/            → /usuarios — o admin controla TODOS os logins e as
+│   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
 │   └── sync/             → POST /sync (fila offline) + controle de sync do ERP
 │
