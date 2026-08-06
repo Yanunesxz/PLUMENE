@@ -9,11 +9,14 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
+import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
 
 export function PaginaPainel() {
   const { token, user } = useAuthStore();
+  // Gerente sem a tecla vê o pedido na fila, mas não os botões de decidir.
+  const podeAprovar = usePermissao('aprovar_pedidos');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const allOrders = useLiveQuery(() => db.orders.toArray(), []);
@@ -132,7 +135,7 @@ export function PaginaPainel() {
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {metrics.pending.map((order) => {
-              const decisao = decisaoDoPedido(user?.role, order.status);
+              const decisao = decisaoDoPedido(user?.role, order.status, podeAprovar);
               if (!decisao) return null;
               return (
                 <CartaoDecisao

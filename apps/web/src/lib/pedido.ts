@@ -52,12 +52,21 @@ export interface Decisao {
   explicacao: string;
 }
 
-export function decisaoDoPedido(papel: AuthRole | undefined, status: OrderStatus): Decisao | null {
+/**
+ * `podeAprovar` vem da tecla `aprovar_pedidos` do gerente. Padrão `true` para os
+ * chamadores que não têm o que perguntar — rep e loja não têm teclas, e quem
+ * decide se eles decidem continua sendo o papel.
+ */
+export function decisaoDoPedido(
+  papel: AuthRole | undefined,
+  status: OrderStatus,
+  podeAprovar = true,
+): Decisao | null {
   const daFabrica = papel === 'manager' || papel === 'admin';
 
   // Triagem: o pedido chegou da loja ou de um link. O gerente também passa por
   // aqui — se o representante sumir, o pedido não fica preso.
-  if (status === 'pending_rep' && (papel === 'rep' || daFabrica)) {
+  if (status === 'pending_rep' && (papel === 'rep' || daFabrica) && podeAprovar) {
     return {
       aceitar: 'pending_approval',
       rotuloAceitar: 'Mandar para a fábrica',
@@ -66,7 +75,7 @@ export function decisaoDoPedido(papel: AuthRole | undefined, status: OrderStatus
     };
   }
 
-  if (status === 'pending_approval' && daFabrica) {
+  if (status === 'pending_approval' && daFabrica && podeAprovar) {
     return {
       aceitar: 'approved',
       rotuloAceitar: 'Aprovar',

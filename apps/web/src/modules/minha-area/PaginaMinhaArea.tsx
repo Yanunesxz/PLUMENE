@@ -26,6 +26,7 @@ import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
+import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
 import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
 import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
@@ -43,6 +44,8 @@ const suporteWhatsappUrl = (nome: string) =>
 export function PaginaMinhaArea() {
   const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
+  // Só estreita o gerente: para o representante a tecla não existe e vem `true`.
+  const podeAprovar = usePermissao('aprovar_pedidos');
   // Faixas de bônus deste representante neste mês — quem cadastra é o gerente.
   const faixasDoMes = useMinhaMeta();
   const orders = useLiveQuery(() => db.orders.toArray(), []);
@@ -161,7 +164,7 @@ export function PaginaMinhaArea() {
           </p>
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {triagem.map((order) => {
-              const decisao = decisaoDoPedido(user?.role, order.status);
+              const decisao = decisaoDoPedido(user?.role, order.status, podeAprovar);
               if (!decisao) return null;
               return (
                 <CartaoDecisao

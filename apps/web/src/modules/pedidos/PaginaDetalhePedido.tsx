@@ -13,6 +13,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, STATUS_VARIANTE } from '../../lib/pedido.js';
+import { usePermissao } from '../../hooks/usePermissao.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -21,7 +22,11 @@ export function PaginaDetalhePedido() {
   const navigate = useNavigate();
   const { token, user } = useAuthStore();
   const isOnline = useOnlineStatus();
-  const canInvoice = user?.role === 'manager' || user?.role === 'admin';
+  // As teclas do gerente: sem elas o botão some, em vez de aparecer e responder
+  // "acesso negado" no toque. Quem protege de verdade é a API.
+  const podeFaturar = usePermissao('faturar_pedidos');
+  const podeAprovar = usePermissao('aprovar_pedidos');
+  const canInvoice = (user?.role === 'manager' || user?.role === 'admin') && podeFaturar;
   // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
   // dois), então os botões não aparecem em vez de responder 403 no toque.
   const ehLoja = user?.role === 'store';
@@ -37,7 +42,7 @@ export function PaginaDetalhePedido() {
 
   // Quem abre um pedido parado quer decidir ali mesmo — obrigar a voltar para
   // uma lista para apertar o botão é o tipo de caminho que ninguém descobre.
-  const decisao = order ? decisaoDoPedido(user?.role, order.status) : null;
+  const decisao = order ? decisaoDoPedido(user?.role, order.status, podeAprovar) : null;
 
   const handleDecisao = async (status: OrderStatus) => {
     if (!id || !order) return;
@@ -292,7 +297,7 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
-          {!order.invoiced && !ehLoja && (
+          {!order.invoiced && !ehLoja && podeAprovar && (
             <Button
               variant="outline"
               size="lg"
