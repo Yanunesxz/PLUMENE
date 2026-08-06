@@ -136,9 +136,14 @@ export function PaginaNovoPedido() {
     }
   };
 
-  // Mesma visibilidade do catálogo: sem Plumene (2xxx) e sem produtos sem foto
-  // (refs que foram tiradas do catálogo não devem aparecer na busca de pedido).
-  const availableProducts = activeProducts.filter((p) => !/^2/.test(p.sku) && !!p.image_url);
+  // Mesma visibilidade do catálogo: só produtos com foto (refs que foram tiradas
+  // do catálogo não devem aparecer na busca de pedido).
+  //
+  // Havia aqui um `!/^2/.test(p.sku)` para excluir a Plumene. Saiu junto com o
+  // do catálogo: os 2xxx da Plumene já estão inativos, e o prefixo escondia 4
+  // referências ativas da própria casa — o rep via a peça e não conseguia
+  // lançá-la no pedido. Ver o comentário em PaginaCatalogo.tsx.
+  const availableProducts = activeProducts.filter((p) => !!p.image_url);
 
   return (
     <div className="mx-auto max-w-2xl p-4 md:p-6">

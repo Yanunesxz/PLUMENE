@@ -23,8 +23,22 @@ interface PriceTableOption {
 
 type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
-// Plumene é outra marca (códigos 2xxx/22xxx) — não entra neste catálogo.
-const isPlumene = (sku: string) => /^2/.test(sku);
+/**
+ * NÃO volte a esconder produto por prefixo de código.
+ *
+ * Existia aqui um `isPlumene = (sku) => /^2/.test(sku)`: a Plumene é outra
+ * marca, e os códigos dela começam com 2. Só que a Corpo Sensual também lança
+ * nos 2xxx — e a peneira levava junto 4 referências ATIVAS e com foto (2130
+ * PIJAMA ABERTO BORDADO MANGA MASC., 2131, 2134 e 2226). Buscar "2131" no
+ * catálogo devolvia "nenhum produto encontrado", e a leitura natural disso é
+ * que a peça não foi cadastrada.
+ *
+ * Quem separa as marcas é o `active`, já filtrado abaixo: as 87 referências
+ * Plumene da base estão todas inativas no ERP. `brand` não serve (é RPM na
+ * base inteira) e `group_name` também não (lá é o TIPO da peça, e os grupos se
+ * repetem nas duas marcas). Se um dia a Plumene voltar a vender, ela precisa
+ * de uma marcação de verdade — não de um prefixo que também é da casa.
+ */
 
 // ─── Segmento (público da peça) ──────────────────────────────────────────────
 // O ERP não tem esse campo: quem diz é o próprio nome do produto, como no
@@ -177,7 +191,6 @@ export function PaginaCatalogo() {
     };
     return (allProducts ?? [])
       .filter((p) => p.active)
-      .filter((p) => !isPlumene(p.sku))
       // Sem foto o produto CONTINUA no catálogo (o card mostra o SKU no lugar da
       // imagem). Esconder custava caro: os lançamentos chegam do ERP antes da
       // foto, e era assim que PIJAMA FAMÍLIA MASCULINO e outras 13 referências

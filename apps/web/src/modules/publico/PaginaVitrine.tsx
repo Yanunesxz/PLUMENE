@@ -25,7 +25,8 @@ interface Linha {
   color_name?: string | null;
 }
 
-const ehPlumene = (sku: string) => /^2/.test(sku);
+// Não filtre por prefixo de código: os 2xxx não são só da Plumene, e o prefixo
+// escondia 4 referências ativas da Corpo Sensual. Ver PaginaCatalogo.tsx.
 
 /** Quanto falta para o link expirar, em texto curto. */
 function faltam(ate: string): string {
@@ -87,7 +88,7 @@ export function PaginaVitrine() {
   const visiveis = useMemo(() => {
     const q = busca.trim().toLowerCase();
     return produtos
-      .filter((p) => p.active && !ehPlumene(p.sku) && !!p.image_url)
+      .filter((p) => p.active && !!p.image_url)
       .filter((p) => !q || p.name.toLowerCase().includes(q) || p.sku.toLowerCase().includes(q))
       .sort((a, b) => a.sku.localeCompare(b.sku, 'pt-BR', { numeric: true }));
   }, [produtos, busca]);
