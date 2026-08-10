@@ -84,7 +84,8 @@ apps/api/src/
 │       ├── 019_cores_do_catalogo.sql  → nome da cor por produto
 │       ├── 020_cor_par_do_catalogo.sql → a bolinha é o PAR (blusa + calça)
 │       ├── 021_meta_de_bonus_por_representante.sql → faixas de bônus por mês
-│       └── 022_controle_de_logins.sql → permissions do gerente + last_login_at
+│       ├── 022_controle_de_logins.sql → permissions do gerente + last_login_at
+│       └── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -173,8 +174,17 @@ apps/web/
     ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido
     ├── lib/
     │   ├── utils.ts      → cn (classes) + formatBRL (R$)
-    │   └── pedido.ts     → nome do comprador, origem, cor do status e
-    │                       `decisaoDoPedido` (que decisão cada papel pode tomar)
+    │   ├── pedido.ts     → nome do comprador, origem, cor do status e
+    │   │                   `decisaoDoPedido` (que decisão cada papel pode tomar)
+    │   ├── exportOrders.ts → gera a planilha do Control (32 linhas por arquivo,
+    │   │                   o excedente vai num .zip) e entrega por download ou
+    │   │                   pela folha de compartilhamento do iPhone
+    │   └── planilha/     → o formulário oficial da fábrica
+    │       ├── colunas.ts      → tamanho → coluna, e o SISTEMA de grade que
+    │       │                     impede uma linha de misturar "XG" com "48"
+    │       ├── linhas.ts       → itens do pedido → linhas (uma por ref × grade)
+    │       └── modeloOficial.ts → preenche o .xlsx oficial por dentro do zip,
+    │                             sem reescrever nada além das células da grade
     └── styles/globals.css → Tailwind + TOKENS de cor (claro e escuro).
                               Nenhuma tela escreve cor crua: use `primary`,
                               `positive`, `warn`, `danger`, `subtle`, `sunken`.
