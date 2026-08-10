@@ -68,13 +68,13 @@ describe('tamanho → coluna', () => {
 });
 
 describe('referência como a planilha escreve', () => {
-  it('tira o zero da frente e o E do fim', () => {
-    // A Plan2 tem "130" (numero, R$ 43,90) e "0130E" (texto, R$ 53,90). O preço
-    // do sistema é 43,90 — vale a primeira. E o Control respondeu
-    // "NÃO ENCONTRADO!!!" quando o arquivo saiu com 0130E.
-    expect(refDaPlanilha('0130')).toBe('130');
-    expect(refDaPlanilha('130')).toBe('130');
-    expect(refDaPlanilha('0130E')).toBe('130');
+  it('completa com zero à esquerda e tira o E', () => {
+    // A Plan2 tem "130" (numero, R$ 43,90) e "0130E" (texto, R$ 53,90), e o
+    // preço do sistema é 43,90 — as linhas com "E" são outra lista. O Control
+    // recusou "0130E" com "NÃO ENCONTRADO!!!" e cadastra a peça como "0130".
+    expect(refDaPlanilha('0130')).toBe('0130');
+    expect(refDaPlanilha('130')).toBe('0130');
+    expect(refDaPlanilha('0130E')).toBe('0130');
     expect(refDaPlanilha('4131')).toBe('4131');
   });
 
@@ -95,7 +95,7 @@ describe('linhas do pedido', () => {
     // O caso do Yan: "0130 quero 3M e 3 plus" tem de virar duas linhas.
     const { linhas } = montarLinhas([item('0130', 'M', 3), item('0130', '52', 3)]);
     expect(linhas).toHaveLength(2);
-    expect(linhas.map((l) => l.ref)).toEqual(['130', '130']);
+    expect(linhas.map((l) => l.ref)).toEqual(['0130', '0130']);
     expect(linhas.map((l) => l.sistema)).toEqual(['letras', 'numerica']);
   });
 
@@ -150,7 +150,7 @@ describe('preenchimento do modelo oficial', () => {
     new TextDecoder().decode(unzipSync(arquivo)['xl/worksheets/sheet1.xml']!);
 
   it('escreve a referência na primeira linha da grade', () => {
-    expect(sheet1(folhaComUmaLinha().arquivo)).toContain('<c r="A13" s="56"><v>130</v></c>');
+    expect(sheet1(folhaComUmaLinha().arquivo)).toContain('<t>0130</t>');
   });
 
   it('põe a quantidade na coluna do tamanho', () => {
@@ -187,6 +187,13 @@ describe('preenchimento do modelo oficial', () => {
     const { linhas } = montarLinhas([item('9999', 'M', 1)]);
     const { refsDesconhecidas } = preencherModelo(modelo(), { linhas });
     expect(refsDesconhecidas).toEqual(['9999']);
+  });
+
+  it('não confunde forma diferente com referência inexistente', () => {
+    // Escrevemos "0130", a Plan2 guarda "130" e "0130E". São a mesma peça, e o
+    // aviso só existe para a referência que a fábrica não tem de forma nenhuma.
+    const { linhas } = montarLinhas([item('0130', 'M', 1)]);
+    expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
   });
 
   it('não reclama de referência que existe na Plan2', () => {

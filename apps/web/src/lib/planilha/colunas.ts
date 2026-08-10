@@ -82,23 +82,36 @@ export function celulaDoTamanho(size: string): CelulaDoTamanho | null {
 }
 
 /**
- * A referência como a planilha a escreve: o número puro, sem zero à esquerda e
- * sem "E" — o SKU "0130" vira "130".
- *
- * A Plan2 lista a mesma peça duas vezes, com preços diferentes: "130" (número)
- * a R$ 43,90 e "0130E" (texto) a R$ 53,90. É a primeira que vale. Conferido
- * contra o banco em 10/08/2026: os preços da Tabela 01 do sistema são 43,90 no
- * 0130, 28,50 no 0703, 34,90 no 0705 e 37,90 no 0706 — exatamente as linhas SEM
- * o "E". As linhas com "E" sao outra lista de preço, que o sistema não usa.
- *
- * O Control confirmou pelo avesso: importando "0130E" ele respondeu
- * "NÃO ENCONTRADO!!!" para todas as linhas.
- *
- * Quem não é número (um SKU tipo "PIJ001") passa intocado — o VLOOKUP devolve
- * "-" e `preencherModelo` avisa antes de o arquivo sair.
+ * O miolo da referência, para comparar formas diferentes da mesma peça: sem o
+ * "E" do fim e sem os zeros da frente. "130", "0130" e "0130E" viram "130".
  */
-export function refDaPlanilha(sku: string): string {
-  const cru = sku.trim().toUpperCase();
+export function nucleoDaRef(valor: string): string {
+  const cru = valor.trim().toUpperCase();
   const nucleo = cru.replace(/E$/, '').replace(/^0+/, '');
   return /^\d+$/.test(nucleo) ? nucleo : cru;
+}
+
+/**
+ * A referência como o Control a conhece: quatro dígitos com zero à esquerda e
+ * SEM o "E" — "130" e "0130E" viram "0130".
+ *
+ * O formato saiu de duas evidências. A primeira, do preço: a Plan2 lista a mesma
+ * peça como "130" a R$ 43,90 e "0130E" a R$ 53,90, e os preços do sistema batem
+ * com a primeira (Tabela 01, conferida no banco: 43,90 no 0130, 28,50 no 0703,
+ * 34,90 no 0705, 37,90 no 0706). As linhas com "E" são outra lista de preço, que
+ * o sistema não usa. A segunda, do próprio Control: importando "0130E" ele
+ * respondeu "NÃO ENCONTRADO!!!" em todas as linhas.
+ *
+ * É `0130` e não `130` porque é assim que o Control cadastra o produto — e é
+ * também como o `sku` chega do ERP. Por isso a célula vai como TEXTO: escrita
+ * como número, o Excel comeria o zero da frente.
+ *
+ * Consequência aceita: `0130` não existe na Plan2 (lá é "130", numérico), então
+ * o VLOOKUP da coluna UNIT não resolve. Não é problema no arquivo entregue —
+ * `preencherModelo` grava o preço do sistema no valor da célula, e é esse que o
+ * Control lê. Só reaparece como "-" se alguém abrir no Excel e forçar recálculo.
+ */
+export function refDaPlanilha(sku: string): string {
+  const nucleo = nucleoDaRef(sku);
+  return /^\d+$/.test(nucleo) ? nucleo.padStart(4, '0') : nucleo;
 }

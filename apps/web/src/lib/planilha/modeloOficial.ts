@@ -1,4 +1,5 @@
 import { unzipSync, zipSync } from 'fflate';
+import { nucleoDaRef } from './colunas.js';
 import type { LinhaDaPlanilha } from './linhas.js';
 
 /**
@@ -110,9 +111,12 @@ function lerTextos(xml: string): string[] {
 }
 
 /**
- * As referências que a Plan2 conhece. Se a referência do pedido não estiver
- * nesta lista, o VLOOKUP devolveria "-" e o pedido chegaria ao Control sem
- * preço — melhor avisar antes de o arquivo sair.
+ * As referências que a Plan2 conhece, guardadas pelo miolo (sem zeros à frente,
+ * sem "E"). É preciso normalizar porque a Plan2 escreve a mesma peça de dois
+ * jeitos — "130" e "0130E" — e nós escrevemos um terceiro, "0130".
+ *
+ * O que isto pega é a referência que a fábrica não tem em NENHUMA forma: essa
+ * sim chegaria ao Control como produto inexistente.
  */
 function referenciasConhecidas(sheet2: string, textos: readonly string[]): Set<string> {
   const conhecidas = new Set<string>();
@@ -122,7 +126,7 @@ function referenciasConhecidas(sheet2: string, textos: readonly string[]): Set<s
     const bruto = interno.match(/<v>([\s\S]*?)<\/v>/)?.[1];
     if (bruto == null) continue;
     const valor = / t="s"/.test(atributos) ? (textos[Number(bruto)] ?? '') : bruto;
-    conhecidas.add(desescaparXml(valor).trim().toUpperCase());
+    conhecidas.add(nucleoDaRef(desescaparXml(valor)));
   }
   return conhecidas;
 }
@@ -162,15 +166,9 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   dados.linhas.forEach((linha, indice) => {
     const numeroDaLinha = PRIMEIRA_LINHA + indice;
-    // A referência entra como NÚMERO quando é numérica: na Plan2 ela está numa
-    // célula numérica, e o VLOOKUP do Excel não casa texto com número — escrever
-    // "130" como texto faria o UNIT virar "-".
-    patches.set(
-      `A${numeroDaLinha}`,
-      /^\d+$/.test(linha.ref)
-        ? { tipo: 'numero', valor: Number(linha.ref) }
-        : { tipo: 'texto', valor: linha.ref },
-    );
+    // Sempre TEXTO: a referência é "0130", e como número o zero da frente
+    // sumiria. Ver refDaPlanilha sobre por que é essa a forma que o Control lê.
+    patches.set(`A${numeroDaLinha}`, { tipo: 'texto', valor: linha.ref });
 
     for (const [coluna, quantidade] of Object.entries(linha.quantidades)) {
       patches.set(`${coluna}${numeroDaLinha}`, { tipo: 'numero', valor: quantidade });
@@ -186,7 +184,7 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
     totalPecas += linha.pecas;
     valorParcial += total;
 
-    if (conhecidas && !conhecidas.has(linha.ref)) refsDesconhecidas.push(linha.ref);
+    if (conhecidas && !conhecidas.has(nucleoDaRef(linha.ref))) refsDesconhecidas.push(linha.ref);
   });
 
   patches.set(CELULA_TOTAL_PECAS, { tipo: 'cache', valor: totalPecas });
