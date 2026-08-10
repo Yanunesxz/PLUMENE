@@ -11,7 +11,8 @@ import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { exportOrdersToXlsx } from '../../lib/exportOrders.js';
+import { exportarPedidosParaControl, type NumeroDaTabela } from '../../lib/exportOrders.js';
+import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { nomeDoComprador, origemParaExibir, STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type {
@@ -20,9 +21,23 @@ import type {
   ApiResponse,
   OrderStatus,
   OrderWithItems,
+  PriceTable,
   RepListItem,
   ProductWithPrice,
 } from '@csb/shared';
+
+/**
+ * Qual das três planilhas oficiais da fábrica corresponde a esta tabela.
+ *
+ * O `erp_code` é a resposta boa quando existe; o nome é o plano B, e olhando
+ * dígito isolado para "Tabela 2027" não virar tabela 2.
+ */
+function numeroDaTabela(tabela: PriceTable): NumeroDaTabela | null {
+  const codigo = (tabela.erp_code ?? '').trim();
+  if (/^[123]$/.test(codigo)) return Number(codigo) as NumeroDaTabela;
+  const doNome = tabela.name.match(/(?:^|\D)([123])(?:\D|$)/)?.[1];
+  return doNome ? (Number(doNome) as NumeroDaTabela) : null;
+}
 
 const ALL_REPS = '__all__';
 
@@ -64,6 +79,10 @@ export function PaginaPedidos() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [exporting, setExporting] = useState(false);
+  // O que o operador precisa conferir antes de lançar no Control. Fica na tela
+  // até ele fechar: um toast de 3s não dá tempo de ler uma lista de referências.
+  const [avisosDaExportacao, setAvisosDaExportacao] = useState<string[]>([]);
+  const { tabelas } = useMinhasTabelas();
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -80,6 +99,33 @@ export function PaginaPedidos() {
     for (const p of products ?? []) m.set(p.id, p.sku);
     return m;
   }, [products]);
+
+  // variant_id → tamanho. A planilha põe a quantidade na COLUNA do tamanho, então
+  // sem isto o item não tem onde cair.
+  const tamanhoDaVariante = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of products ?? []) {
+      for (const v of p.variants ?? []) m.set(v.id, v.size);
+    }
+    return m;
+  }, [products]);
+
+  // Quem precifica o pedido é o CADASTRO do cliente — a mesma regra que o
+  // servidor usa ao criar o pedido (ver orders.controller: tabelaDaLoja).
+  const tabelaDoCliente = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const c of customers ?? []) m.set(c.id, c.price_table_id ?? null);
+    return m;
+  }, [customers]);
+
+  const numeroPorTabela = useMemo(() => {
+    const m = new Map<string, NumeroDaTabela>();
+    for (const t of tabelas) {
+      const numero = numeroDaTabela(t);
+      if (numero) m.set(t.id, numero);
+    }
+    return m;
+  }, [tabelas]);
 
   useEffect(() => {
     if (!token) return;
@@ -147,15 +193,32 @@ export function PaginaPedidos() {
   async function handleExport() {
     if (!token || selected.size === 0) return;
     setExporting(true);
+    setAvisosDaExportacao([]);
     try {
       const detailed = await Promise.all(
         Array.from(selected).map((id) =>
           api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token).then((res) => res.data),
         ),
       );
-      await exportOrdersToXlsx(detailed, customerName, productSku);
-      setSelectMode(false);
-      setSelected(new Set());
+      const resultado = await exportarPedidosParaControl(detailed, {
+        skuDoProduto: productSku,
+        tamanhoDaVariante,
+        tabelaDoPedido: (pedido) => {
+          const daLoja = pedido.customer_id ? tabelaDoCliente.get(pedido.customer_id) : null;
+          return daLoja ? (numeroPorTabela.get(daLoja) ?? null) : null;
+        },
+      });
+      setAvisosDaExportacao(resultado.avisos);
+      // Com aviso na tela, sair do modo de seleção esconderia o que ele precisa
+      // ler junto com os pedidos que escolheu.
+      if (resultado.avisos.length === 0 && !resultado.cancelado) {
+        setSelectMode(false);
+        setSelected(new Set());
+      }
+    } catch (err) {
+      setAvisosDaExportacao([
+        err instanceof Error ? `Não deu para gerar a planilha: ${err.message}` : 'Não deu para gerar a planilha.',
+      ]);
     } finally {
       setExporting(false);
     }
@@ -196,6 +259,29 @@ export function PaginaPedidos() {
             <FileSpreadsheet className="h-4 w-4" strokeWidth={2.5} />
             {exporting ? 'Gerando…' : 'Gerar planilha (.xlsx)'}
           </Button>
+        </div>
+      )}
+
+      {avisosDaExportacao.length > 0 && (
+        <div className="mb-4 rounded-xl border border-danger/30 bg-danger/5 p-3">
+          <div className="mb-2 flex items-start justify-between gap-3">
+            <p className="text-sm font-semibold text-foreground">
+              Confira antes de lançar no Control
+            </p>
+            <button
+              type="button"
+              onClick={() => setAvisosDaExportacao([])}
+              aria-label="Fechar avisos da exportação"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
+          <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+            {avisosDaExportacao.map((aviso) => (
+              <li key={aviso}>{aviso}</li>
+            ))}
+          </ul>
         </div>
       )}
 

@@ -107,6 +107,24 @@ export default defineConfig({
             },
           },
           {
+            // MODELO DA PLANILHA OFICIAL — os três .xlsx que a exportação
+            // preenche. Somam ~154 KB e mudam quando a fábrica publica a
+            // planilha do ano, o que acontece uma vez por coleção.
+            //
+            // Ficam fora do precache de propósito: quem só tira pedido no
+            // celular nunca exporta, e não é para descer 154 KB no 3G dele por
+            // causa de uma tela que ele não abre. CacheFirst resolve o resto —
+            // a primeira exportação baixa, e da segunda em diante funciona
+            // offline, que é quando o representante precisa.
+            urlPattern: /\/modelos\/pedido-cs-[123]\.xlsx$/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'modelos-de-planilha',
+              expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 180 },
+              cacheableResponse: { statuses: [0, 200] },
+            },
+          },
+          {
             // Resto do Supabase (o que não é foto): dado pode mudar, então a
             // rede continua vindo primeiro, com o cache como rede de segurança.
             urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
