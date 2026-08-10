@@ -11,7 +11,8 @@ import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { exportarPedidosParaControl, type NumeroDaTabela } from '../../lib/exportOrders.js';
+import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
+import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { nomeDoComprador, origemParaExibir, STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
@@ -21,23 +22,9 @@ import type {
   ApiResponse,
   OrderStatus,
   OrderWithItems,
-  PriceTable,
   RepListItem,
   ProductWithPrice,
 } from '@csb/shared';
-
-/**
- * Qual das três planilhas oficiais da fábrica corresponde a esta tabela.
- *
- * O `erp_code` é a resposta boa quando existe; o nome é o plano B, e olhando
- * dígito isolado para "Tabela 2027" não virar tabela 2.
- */
-function numeroDaTabela(tabela: PriceTable): NumeroDaTabela | null {
-  const codigo = (tabela.erp_code ?? '').trim();
-  if (/^[123]$/.test(codigo)) return Number(codigo) as NumeroDaTabela;
-  const doNome = tabela.name.match(/(?:^|\D)([123])(?:\D|$)/)?.[1];
-  return doNome ? (Number(doNome) as NumeroDaTabela) : null;
-}
 
 const ALL_REPS = '__all__';
 
@@ -67,7 +54,7 @@ function filtrosDeStatus(ehLoja: boolean): { value: OrderStatus | 'all'; label: 
 }
 
 export function PaginaPedidos() {
-  const { token, hasRole } = useAuthStore();
+  const { token, hasRole, user } = useAuthStore();
   const isManager = hasRole('manager', 'admin');
   const ehLoja = hasRole('store');
   const STATUS_FILTERS = useMemo(() => filtrosDeStatus(ehLoja), [ehLoja]);
@@ -117,6 +104,18 @@ export function PaginaPedidos() {
     for (const c of customers ?? []) m.set(c.id, c.price_table_id ?? null);
     return m;
   }, [customers]);
+
+  // A metade que o cliente não responde: 536 dos 1.000 clientes não têm tabela
+  // própria e são precificados pela do representante. Sem esta segunda volta, a
+  // maioria dos pedidos sairia "tabela não identificada".
+  const tabelaDoRep = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const r of reps ?? []) m.set(r.id, r.price_table_id);
+    // O representante comum não carrega /reps (é rota de gerente) — a tabela
+    // dele vem do próprio login.
+    if (user?.id) m.set(user.id, user.price_table_id ?? null);
+    return m;
+  }, [reps, user]);
 
   const numeroPorTabela = useMemo(() => {
     const m = new Map<string, NumeroDaTabela>();
@@ -205,7 +204,8 @@ export function PaginaPedidos() {
         tamanhoDaVariante,
         tabelaDoPedido: (pedido) => {
           const daLoja = pedido.customer_id ? tabelaDoCliente.get(pedido.customer_id) : null;
-          return daLoja ? (numeroPorTabela.get(daLoja) ?? null) : null;
+          const id = daLoja ?? tabelaDoRep.get(pedido.rep_id) ?? null;
+          return id ? (numeroPorTabela.get(id) ?? null) : null;
         },
       });
       setAvisosDaExportacao(resultado.avisos);

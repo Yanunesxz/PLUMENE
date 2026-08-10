@@ -1,7 +1,10 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
 import { preencherModelo } from './planilha/modeloOficial.js';
+import type { NumeroDaTabela } from './planilha/tabela.js';
 import type { OrderWithItems } from '@csb/shared';
+
+export type { NumeroDaTabela };
 
 /**
  * Exporta pedido no formulário oficial da fábrica, do jeito que o Control importa.
@@ -19,9 +22,6 @@ import type { OrderWithItems } from '@csb/shared';
  * Nada disso conversa com o ERP ainda. A planilha é a ponte enquanto não há
  * integração direta.
  */
-
-/** Qual das três tabelas de preço da fábrica. É o que escolhe o modelo. */
-export type NumeroDaTabela = 1 | 2 | 3;
 
 export interface ContextoDaExportacao {
   /** product_id → SKU do produto. */
