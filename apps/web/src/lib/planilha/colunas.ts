@@ -81,12 +81,16 @@ export function celulaDoTamanho(size: string): CelulaDoTamanho | null {
   return null;
 }
 
+/** O que o Control acrescenta ao código quando a peça é da grade plus. */
+export const SUFIXO_PLUS = ' PLUS';
+
 /**
  * O miolo da referência, para comparar formas diferentes da mesma peça: sem o
- * "E" do fim e sem os zeros da frente. "130", "0130" e "0130E" viram "130".
+ * sufixo PLUS, sem o "E" do fim e sem os zeros da frente. "130", "0130",
+ * "0130E" e "0130 PLUS" viram todos "130".
  */
 export function nucleoDaRef(valor: string): string {
-  const cru = valor.trim().toUpperCase();
+  const cru = valor.trim().toUpperCase().replace(/\s*PLUS$/, '');
   const nucleo = cru.replace(/E$/, '').replace(/^0+/, '');
   return /^\d+$/.test(nucleo) ? nucleo : cru;
 }

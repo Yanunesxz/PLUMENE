@@ -1,4 +1,4 @@
-import { celulaDoTamanho, refDaPlanilha, type SistemaDeGrade } from './colunas.js';
+import { celulaDoTamanho, refDaPlanilha, SUFIXO_PLUS, type SistemaDeGrade } from './colunas.js';
 
 /**
  * De itens do pedido para linhas da planilha.
@@ -56,7 +56,16 @@ export function montarLinhas(itens: readonly ItemParaPlanilha[]): MontagemDeLinh
       continue;
     }
 
-    const ref = refDaPlanilha(item.sku);
+    // No Control a grade plus é OUTRO produto, não outro tamanho do mesmo: o
+    // cadastro tem "0130" com PP→EG e "0130 PLUS" com 48→54. Foi isso que
+    // derrubou a linha do 50 na primeira importação que funcionou — o produto
+    // 0130 não tem tamanho 50, quem tem é o 0130 PLUS.
+    //
+    // A grade `numerica` é sempre a plus aqui: o catálogo não tem numeração
+    // adulta 36→46: os únicos números grandes são os 48/50/52/54 das quatro
+    // referências plus size.
+    const base = refDaPlanilha(item.sku);
+    const ref = celula.sistema === 'numerica' ? `${base}${SUFIXO_PLUS}` : base;
     const chave = `${ref}::${celula.sistema}`;
     const linha = porChave.get(chave) ?? {
       ref,

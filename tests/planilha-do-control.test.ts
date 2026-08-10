@@ -92,11 +92,18 @@ describe('linhas do pedido', () => {
   });
 
   it('gasta DUAS linhas quando a referência pega letras e plus', () => {
-    // O caso do Yan: "0130 quero 3M e 3 plus" tem de virar duas linhas.
+    // O caso do Yan: "0130 quero 3M e 3 plus" tem de virar duas linhas. E no
+    // Control a de baixo é outro PRODUTO — "0130 PLUS", como está no cadastro
+    // dele: "0130" tem PP→EG, "0130 PLUS" tem 48→54.
     const { linhas } = montarLinhas([item('0130', 'M', 3), item('0130', '52', 3)]);
     expect(linhas).toHaveLength(2);
-    expect(linhas.map((l) => l.ref)).toEqual(['0130', '0130']);
+    expect(linhas.map((l) => l.ref)).toEqual(['0130', '0130 PLUS']);
     expect(linhas.map((l) => l.sistema)).toEqual(['letras', 'numerica']);
+  });
+
+  it('não põe PLUS no infantil nem no juvenil', () => {
+    const { linhas } = montarLinhas([item('0080', '6', 1), item('0080', '12', 1)]);
+    expect(linhas.map((l) => l.ref)).toEqual(['0080', '0080']);
   });
 
   it('soma 44 e 46 na coluna única "44/46"', () => {
@@ -193,6 +200,12 @@ describe('preenchimento do modelo oficial', () => {
     // Escrevemos "0130", a Plan2 guarda "130" e "0130E". São a mesma peça, e o
     // aviso só existe para a referência que a fábrica não tem de forma nenhuma.
     const { linhas } = montarLinhas([item('0130', 'M', 1)]);
+    expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
+  });
+
+  it('não acusa a linha plus, que na Plan2 é a mesma peça', () => {
+    const { linhas } = montarLinhas([item('0130', '52', 1)]);
+    expect(linhas[0]?.ref).toBe('0130 PLUS');
     expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
   });
 
