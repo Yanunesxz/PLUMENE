@@ -68,11 +68,14 @@ describe('tamanho → coluna', () => {
 });
 
 describe('referência como a planilha escreve', () => {
-  it('completa com zero e põe o E', () => {
-    expect(refDaPlanilha('130')).toBe('0130E');
-    expect(refDaPlanilha('0130')).toBe('0130E');
-    expect(refDaPlanilha('0130E')).toBe('0130E');
-    expect(refDaPlanilha('4131')).toBe('4131E');
+  it('tira o zero da frente e o E do fim', () => {
+    // A Plan2 tem "130" (numero, R$ 43,90) e "0130E" (texto, R$ 53,90). O preço
+    // do sistema é 43,90 — vale a primeira. E o Control respondeu
+    // "NÃO ENCONTRADO!!!" quando o arquivo saiu com 0130E.
+    expect(refDaPlanilha('0130')).toBe('130');
+    expect(refDaPlanilha('130')).toBe('130');
+    expect(refDaPlanilha('0130E')).toBe('130');
+    expect(refDaPlanilha('4131')).toBe('4131');
   });
 
   it('não inventa nada quando o SKU não é numérico', () => {
@@ -92,7 +95,7 @@ describe('linhas do pedido', () => {
     // O caso do Yan: "0130 quero 3M e 3 plus" tem de virar duas linhas.
     const { linhas } = montarLinhas([item('0130', 'M', 3), item('0130', '52', 3)]);
     expect(linhas).toHaveLength(2);
-    expect(linhas.map((l) => l.ref)).toEqual(['0130E', '0130E']);
+    expect(linhas.map((l) => l.ref)).toEqual(['130', '130']);
     expect(linhas.map((l) => l.sistema)).toEqual(['letras', 'numerica']);
   });
 
@@ -147,7 +150,7 @@ describe('preenchimento do modelo oficial', () => {
     new TextDecoder().decode(unzipSync(arquivo)['xl/worksheets/sheet1.xml']!);
 
   it('escreve a referência na primeira linha da grade', () => {
-    expect(sheet1(folhaComUmaLinha().arquivo)).toContain('<t>0130E</t>');
+    expect(sheet1(folhaComUmaLinha().arquivo)).toContain('<c r="A13" s="56"><v>130</v></c>');
   });
 
   it('põe a quantidade na coluna do tamanho', () => {
@@ -183,7 +186,7 @@ describe('preenchimento do modelo oficial', () => {
   it('avisa quando a referência não existe na Plan2', () => {
     const { linhas } = montarLinhas([item('9999', 'M', 1)]);
     const { refsDesconhecidas } = preencherModelo(modelo(), { linhas });
-    expect(refsDesconhecidas).toEqual(['9999E']);
+    expect(refsDesconhecidas).toEqual(['9999']);
   });
 
   it('não reclama de referência que existe na Plan2', () => {

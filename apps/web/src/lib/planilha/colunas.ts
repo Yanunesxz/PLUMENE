@@ -82,17 +82,23 @@ export function celulaDoTamanho(size: string): CelulaDoTamanho | null {
 }
 
 /**
- * A referência como a planilha a escreve: quatro dígitos com zero à esquerda e um
- * "E" no fim — "130" e "0130" viram "0130E".
+ * A referência como a planilha a escreve: o número puro, sem zero à esquerda e
+ * sem "E" — o SKU "0130" vira "130".
  *
- * A Plan2 lista a mesma peça nas duas formas, com preços diferentes ("130" custa
- * R$ 43,90 e "0130E", R$ 53,90), e é a forma com E que o Yan usa. Quem não é
- * número (um SKU tipo "PIJ001") passa intocado — o VLOOKUP vai devolver "-" e
- * `refConhecida` avisa antes de o arquivo sair.
+ * A Plan2 lista a mesma peça duas vezes, com preços diferentes: "130" (número)
+ * a R$ 43,90 e "0130E" (texto) a R$ 53,90. É a primeira que vale. Conferido
+ * contra o banco em 10/08/2026: os preços da Tabela 01 do sistema são 43,90 no
+ * 0130, 28,50 no 0703, 34,90 no 0705 e 37,90 no 0706 — exatamente as linhas SEM
+ * o "E". As linhas com "E" sao outra lista de preço, que o sistema não usa.
+ *
+ * O Control confirmou pelo avesso: importando "0130E" ele respondeu
+ * "NÃO ENCONTRADO!!!" para todas as linhas.
+ *
+ * Quem não é número (um SKU tipo "PIJ001") passa intocado — o VLOOKUP devolve
+ * "-" e `preencherModelo` avisa antes de o arquivo sair.
  */
 export function refDaPlanilha(sku: string): string {
   const cru = sku.trim().toUpperCase();
   const nucleo = cru.replace(/E$/, '').replace(/^0+/, '');
-  if (!/^\d+$/.test(nucleo)) return cru;
-  return `${nucleo.padStart(4, '0')}E`;
+  return /^\d+$/.test(nucleo) ? nucleo : cru;
 }

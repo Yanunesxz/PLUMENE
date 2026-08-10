@@ -162,7 +162,15 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   dados.linhas.forEach((linha, indice) => {
     const numeroDaLinha = PRIMEIRA_LINHA + indice;
-    patches.set(`A${numeroDaLinha}`, { tipo: 'texto', valor: linha.ref });
+    // A referência entra como NÚMERO quando é numérica: na Plan2 ela está numa
+    // célula numérica, e o VLOOKUP do Excel não casa texto com número — escrever
+    // "130" como texto faria o UNIT virar "-".
+    patches.set(
+      `A${numeroDaLinha}`,
+      /^\d+$/.test(linha.ref)
+        ? { tipo: 'numero', valor: Number(linha.ref) }
+        : { tipo: 'texto', valor: linha.ref },
+    );
 
     for (const [coluna, quantidade] of Object.entries(linha.quantidades)) {
       patches.set(`${coluna}${numeroDaLinha}`, { tipo: 'numero', valor: quantidade });
