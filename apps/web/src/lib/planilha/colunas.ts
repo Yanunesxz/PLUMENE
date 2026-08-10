@@ -85,6 +85,20 @@ export function celulaDoTamanho(size: string): CelulaDoTamanho | null {
 export const SUFIXO_PLUS = ' PLUS';
 
 /**
+ * Tamanhos que ficam de fora da planilha SEM virar aviso.
+ *
+ * "LD" não é tamanho de venda — o Yan foi explícito em 10/08/2026: tudo que
+ * tiver a ver com LD deve ser ignorado. São 9 variantes no catálogo. Todo outro
+ * tamanho sem coluna continua sendo reportado, porque aí é peça que alguém
+ * pediu e não entrou.
+ */
+const IGNORADOS = new Set(['LD']);
+
+export function tamanhoIgnorado(size: string): boolean {
+  return IGNORADOS.has(size.trim().toUpperCase());
+}
+
+/**
  * O miolo da referência, para comparar formas diferentes da mesma peça: sem o
  * sufixo PLUS, sem o "E" do fim e sem os zeros da frente. "130", "0130",
  * "0130E" e "0130 PLUS" viram todos "130".

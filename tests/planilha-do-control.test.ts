@@ -2,7 +2,11 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { unzipSync } from 'fflate';
-import { celulaDoTamanho, refDaPlanilha } from '../apps/web/src/lib/planilha/colunas.js';
+import {
+  celulaDoTamanho,
+  refDaPlanilha,
+  tamanhoIgnorado,
+} from '../apps/web/src/lib/planilha/colunas.js';
 import {
   montarLinhas,
   dividirEmFolhas,
@@ -65,6 +69,13 @@ describe('tamanho → coluna', () => {
     expect(celulaDoTamanho('U')).toBeNull();
     expect(celulaDoTamanho('LD')).toBeNull();
   });
+
+  it('marca LD como ignorado, e só ele', () => {
+    expect(tamanhoIgnorado('LD')).toBe(true);
+    expect(tamanhoIgnorado('ld')).toBe(true);
+    expect(tamanhoIgnorado('U')).toBe(false);
+    expect(tamanhoIgnorado('M')).toBe(false);
+  });
 });
 
 describe('referência como a planilha escreve', () => {
@@ -116,6 +127,13 @@ describe('linhas do pedido', () => {
     const { linhas, foraDaGrade } = montarLinhas([item('0130', 'U', 4)]);
     expect(linhas).toHaveLength(0);
     expect(foraDaGrade).toEqual([{ sku: '0130', size: 'U', quantity: 4 }]);
+  });
+
+  it('LD sai da planilha sem virar aviso', () => {
+    const { linhas, foraDaGrade } = montarLinhas([item('0130', 'LD', 4), item('0130', 'M', 2)]);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]?.quantidades).toEqual({ N: 2 });
+    expect(foraDaGrade).toEqual([]);
   });
 
   it('ignora quantidade zero', () => {

@@ -1,4 +1,10 @@
-import { celulaDoTamanho, refDaPlanilha, SUFIXO_PLUS, type SistemaDeGrade } from './colunas.js';
+import {
+  celulaDoTamanho,
+  refDaPlanilha,
+  tamanhoIgnorado,
+  SUFIXO_PLUS,
+  type SistemaDeGrade,
+} from './colunas.js';
 
 /**
  * De itens do pedido para linhas da planilha.
@@ -49,6 +55,8 @@ export function montarLinhas(itens: readonly ItemParaPlanilha[]): MontagemDeLinh
 
   for (const item of itens) {
     if (item.quantity <= 0) continue;
+    // Sai sem aviso, de propósito — ver IGNORADOS em colunas.ts.
+    if (tamanhoIgnorado(item.size)) continue;
 
     const celula = celulaDoTamanho(item.size);
     if (!celula) {
