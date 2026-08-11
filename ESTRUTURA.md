@@ -86,7 +86,8 @@ apps/api/src/
 │       ├── 021_meta_de_bonus_por_representante.sql → faixas de bônus por mês
 │       ├── 022_controle_de_logins.sql → permissions do gerente + last_login_at
 │       ├── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
-│       └── 024_remove_comissao.sql → DROP da coluna commission_rate (destrutiva)
+│       ├── 024_remove_comissao.sql → DROP da coluna commission_rate (destrutiva)
+│       └── 025_tabela_do_pedido.sql → orders.price_table_id (a tabela DO pedido)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -142,7 +143,7 @@ apps/web/
     │   ├── catalogo/PaginaCatalogo     → catálogo, busca, ordenar, + (abre tamanho)
     │   ├── pedidos/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
-    │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
+    │   │   ├── PaginaNovoPedido        → montar pedido (cliente, tabela + itens por tamanho)
     │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
     │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]

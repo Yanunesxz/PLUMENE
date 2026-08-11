@@ -9,6 +9,8 @@ import {
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
+import { repPodeUsarTabela } from '../reps/reps.service.js';
+import { priceTableBelongsToCompany } from '../catalog/catalog.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
@@ -53,6 +55,32 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   // tem uma (809 dos 1.353 estão nessa situação).
   if (role === 'rep' && body.customer_id) {
     tabela = (await tabelaDaLoja(body.customer_id, sub)) ?? tabela;
+  }
+
+  // O representante com duas ou mais tabelas escolhe qual vale NESTE pedido —
+  // é como ele separa, para o mesmo cliente, o pedido de uma tabela do de
+  // outra. A escolha só vale para este pedido: o cadastro do cliente não muda,
+  // e o próximo pedido volta a sugerir a tabela dele.
+  //
+  // Escolher é opcional de propósito. Obrigar em todo pedido puniria quem tem
+  // duas tabelas mas usa sempre a do cliente — e é o servidor que decide o
+  // preço de qualquer forma.
+  if (body.price_table_id && (role === 'rep' || role === 'manager' || role === 'admin')) {
+    const permitida =
+      role === 'rep'
+        ? await repPodeUsarTabela(company_id, sub, body.price_table_id)
+        : await priceTableBelongsToCompany(body.price_table_id, company_id);
+    if (!permitida) {
+      // Sem dizer se a tabela existe: a tela nem oferece a opção, então chegar
+      // aqui é chamada direta à API.
+      await reply.status(403).send({
+        error: 'Tabela de preço indisponível para você',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    }
+    tabela = body.price_table_id;
   }
 
   if (role === 'store') {

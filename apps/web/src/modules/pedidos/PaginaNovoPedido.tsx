@@ -11,6 +11,8 @@ import { addToSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/interface/Button.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
+import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
+import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -54,6 +56,90 @@ export function PaginaNovoPedido() {
     if (preselectedCustomerId) setCustomerId(preselectedCustomerId);
   }, [preselectedCustomerId]);
 
+  // ─── Tabela deste pedido ───────────────────────────────────────────────────
+  // O representante com duas ou mais escolhe qual vale aqui: é assim que ele
+  // separa, para o mesmo cliente, o pedido de uma tabela do de outra. A loja
+  // não escolhe nada — compra na tabela do cadastro dela.
+  const { tabelas } = useMinhasTabelas();
+  const podeEscolherTabela = !ehLoja && tabelas.length >= 2;
+  const [tabelaId, setTabelaId] = useState('');
+  const [trocandoTabela, setTrocandoTabela] = useState(false);
+
+  /** A que o cadastro manda: a do cliente, ou a do próprio rep quando ele não tem. */
+  const tabelaSugerida = useMemo(() => {
+    const doCliente = selectedCustomer?.price_table_id ?? null;
+    if (doCliente && tabelas.some((t) => t.id === doCliente)) return doCliente;
+    return user?.price_table_id ?? tabelas[0]?.id ?? '';
+  }, [selectedCustomer, tabelas, user]);
+
+  // Trocar de cliente reposiciona a escolha na tabela dele. Manter a escolha
+  // anterior seria carregar a tabela do cliente passado para o próximo, que é o
+  // erro silencioso que este recurso existe para evitar.
+  useEffect(() => {
+    if (podeEscolherTabela) setTabelaId(tabelaSugerida);
+  }, [podeEscolherTabela, tabelaSugerida]);
+
+  const nomeDaTabela = (id: string) => tabelas.find((t) => t.id === id)?.name ?? null;
+
+  /**
+   * O aviso que o Yan pediu: escolheu tabela diferente da do cadastro do
+   * cliente. Não impede nada — só não deixa passar batido.
+   */
+  const avisoDeDivergencia = (() => {
+    const doCliente = selectedCustomer?.price_table_id;
+    if (!podeEscolherTabela || !doCliente || !tabelaId || tabelaId === doCliente) return undefined;
+    const nome = nomeDaTabela(doCliente);
+    return nome
+      ? `O cadastro deste cliente é ${nome}. Este pedido vai sair em outra tabela.`
+      : 'Este cliente está cadastrado em outra tabela. Este pedido vai sair na que você escolheu.';
+  })();
+
+  /**
+   * Trocar a tabela recalcula o carrinho.
+   *
+   * Sem isto o representante veria o preço da tabela antiga na tela e receberia
+   * o da nova no total — o servidor reprecifica de qualquer jeito. Produto sem
+   * preço na tabela escolhida sai do carrinho: mantê-lo faria o pedido inteiro
+   * ser recusado com "preço não encontrado", sem dizer qual item.
+   */
+  const escolherTabela = async (id: string) => {
+    setTabelaId(id);
+    if (!token || items.length === 0) return;
+    setTrocandoTabela(true);
+    try {
+      const res = await api.getLista<ApiResponse<ProductWithPrice[]>>(
+        `/products?price_table_id=${encodeURIComponent(id)}`,
+        token,
+      );
+      await db.products.bulkPut(res.data);
+      const precoPor = new Map(res.data.map((p) => [p.id, p.price]));
+      const semPreco: string[] = [];
+      for (const item of items) {
+        const preco = precoPor.get(item.product_id);
+        if (preco == null) {
+          semPreco.push(item.sku);
+          removeItem(item.product_id, item.size, item.color_code);
+          continue;
+        }
+        if (preco !== item.unit_price) {
+          setUnitPrice(item.product_id, item.size, preco, item.color_code);
+        }
+      }
+      setToast(
+        semPreco.length > 0
+          ? {
+              message: `Preços atualizados. Sem preço nesta tabela e removido(s): ${semPreco.join(', ')}.`,
+              type: 'error',
+            }
+          : { message: 'Preços do carrinho atualizados para a tabela escolhida.', type: 'success' },
+      );
+    } catch {
+      setToast({ message: 'Não deu para buscar os preços desta tabela. Tente de novo.', type: 'error' });
+    } finally {
+      setTrocandoTabela(false);
+    }
+  };
+
   // Abre o seletor de tamanho para o produto escolhido na busca.
   const addItem = (product_id: string) => {
     const product = activeProducts.find((p) => p.id === product_id);
@@ -73,7 +159,9 @@ export function PaginaNovoPedido() {
 
   // O que ainda falta para poder enviar o pedido (cliente é o mais esquecido:
   // a pessoa chega com produtos no carrinho vindo do catálogo e não seleciona cliente).
-  const missingReason = !customerId && !ehLoja
+  const missingReason = trocandoTabela
+    ? 'Recalculando os preços na tabela escolhida…'
+    : !customerId && !ehLoja
     ? 'Selecione o cliente para enviar o pedido.'
     : items.length === 0
       ? 'Adicione ao menos um produto para enviar o pedido.'
@@ -93,6 +181,9 @@ export function PaginaNovoPedido() {
     const local_id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const payload: CreateOrderRequest = {
       ...(ehLoja ? {} : { customer_id: customerId }),
+      // Só quem escolhe manda. Ausente, o servidor precifica pela tabela do
+      // cliente, exatamente como antes deste recurso existir.
+      ...(podeEscolherTabela && tabelaId ? { price_table_id: tabelaId } : {}),
       // O ERP recebe o item como sortido; a cor escolhida viaja na observação,
       // logo abaixo do que o representante digitou.
       notes: juntarObservacao(notes, observacaoDeCores(items)),
@@ -188,6 +279,16 @@ export function PaginaNovoPedido() {
               </p>
             ) : null}
           </div>
+        )}
+
+        {podeEscolherTabela && (
+          <SeletorDeTabela
+            tabelas={tabelas}
+            valor={tabelaId}
+            onEscolher={(id) => void escolherTabela(id)}
+            contexto="pedido"
+            aviso={avisoDeDivergencia}
+          />
         )}
 
         <div className="space-y-1.5">

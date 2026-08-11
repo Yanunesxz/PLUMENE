@@ -109,6 +109,8 @@ describe('banco ainda sem a migração 015', () => {
       // query, outra ao entregar o resultado), então cada resposta que importa
       // vem depois de uma de folga.
       orders: [
+        { data: [{ id: 'sonda' }], error: null }, // sondagem de orders.price_table_id (025)
+        { data: null, error: null }, // folga
         { data: [{ id: 'sonda' }], error: null }, // sondagem das colunas de origem
         { data: null, error: null }, // folga
         recusaDoCheck, // a gravação com `pending_rep` esbarra no CHECK antigo

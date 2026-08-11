@@ -20,6 +20,11 @@ export interface Order {
   rep_id: string;
   /** Nulo em pedido de vitrine: não há cliente cadastrado por trás. */
   customer_id: string | null;
+  /**
+   * Tabela que precificou ESTE pedido (migração 025). Nulo nos anteriores a ela
+   * — aí quem lê deduz pelo cadastro do cliente, como era antes.
+   */
+  price_table_id?: string | null;
   status: OrderStatus;
   /** Quem montou: representante, loja logada ou vitrine. */
   source?: OrderSource;
@@ -48,6 +53,12 @@ export interface OrderWithItems extends Order {
 export interface CreateOrderRequest {
   /** Ignorado para loja (usa o cliente dela) e ausente na vitrine. */
   customer_id?: string | undefined;
+  /**
+   * Tabela escolhida para ESTE pedido. Só o representante com duas ou mais
+   * manda: ausente, o preço sai pela tabela do cliente, como sempre saiu.
+   * O servidor recusa tabela fora do conjunto de quem pede.
+   */
+  price_table_id?: string | undefined;
   notes?: string | undefined;
   local_id?: string | undefined;
   /**

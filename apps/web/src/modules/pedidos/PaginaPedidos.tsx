@@ -203,8 +203,11 @@ export function PaginaPedidos() {
         skuDoProduto: productSku,
         tamanhoDaVariante,
         tabelaDoPedido: (pedido) => {
+          // A do próprio pedido primeiro (migração 025). É a única que não é
+          // palpite: o cliente pode ter trocado de tabela depois, e o rep pode
+          // ter escolhido outra só para aquele pedido.
           const daLoja = pedido.customer_id ? tabelaDoCliente.get(pedido.customer_id) : null;
-          const id = daLoja ?? tabelaDoRep.get(pedido.rep_id) ?? null;
+          const id = pedido.price_table_id ?? daLoja ?? tabelaDoRep.get(pedido.rep_id) ?? null;
           return id ? (numeroPorTabela.get(id) ?? null) : null;
         },
       });

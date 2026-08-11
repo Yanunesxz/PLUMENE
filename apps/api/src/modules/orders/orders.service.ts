@@ -89,6 +89,16 @@ async function detectarColunasDeOrigem(): Promise<boolean> {
   return temColunasDeOrigem;
 }
 
+/** `orders.price_table_id` vem da migração 025 — mesmo cuidado da 014 acima. */
+let temColunaDaTabela: boolean | null = null;
+
+async function detectarColunaDaTabela(): Promise<boolean> {
+  if (temColunaDaTabela !== null) return temColunaDaTabela;
+  const { error } = await supabase.from('orders').select('price_table_id').limit(1);
+  temColunaDaTabela = !error;
+  return temColunaDaTabela;
+}
+
 /**
  * `pending_rep` (triagem do representante) vem da migração 015, que altera o
  * CHECK de `orders.status`. CHECK não dá para detectar com um SELECT como se faz
@@ -216,6 +226,12 @@ export async function createOrder(
         ? 'pending_rep'
         : 'pending_approval';
 
+  // Qual tabela precificou ESTE pedido. Sem isso, quem lê depois só consegue
+  // deduzir pelo cadastro do cliente — e a dedução erra quando o cliente troca
+  // de tabela, ou quando o representante escolheu outra só para este pedido.
+  const tabelaGravada =
+    price_table_id && (await detectarColunaDaTabela()) ? { price_table_id } : {};
+
   const camposDeOrigem = (await detectarColunasDeOrigem())
     ? {
         source: origem.source,
@@ -237,6 +253,7 @@ export async function createOrder(
         local_id: body.local_id ?? null,
         created_by: origem.created_by ?? rep_id,
         ...camposDeOrigem,
+        ...tabelaGravada,
       })
       .select()
       .single();
