@@ -28,9 +28,9 @@ export interface Order {
   guest_whatsapp?: string | null;
   total: number | null;
   notes: string | null;
-  /** Faturado (boleto/NF emitido) — base da comissão. */
+  /** Faturado (boleto/NF emitido). */
   invoiced?: boolean;
-  /** Mês em que foi faturado (define quando a comissão entra). */
+  /** Quando foi faturado — é o que põe o pedido no mês certo dos relatórios. */
   invoiced_at?: string | null;
   local_id: string | null;
   synced_at: string | null;

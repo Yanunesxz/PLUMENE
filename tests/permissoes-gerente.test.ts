@@ -159,7 +159,7 @@ describe('tecla gerenciar_representantes', () => {
     expect(res.statusCode).toBe(403);
   });
 
-  it('a LISTA continua aberta ao gerente sem a tecla — a tela de comissões vive dela', async () => {
+  it('a LISTA continua aberta ao gerente sem a tecla — outras telas vivem dela', async () => {
     expect((await chamar('GET', '/reps', TOKEN.semNada)).statusCode).toBe(200);
     expect((await chamar('GET', '/price-tables', TOKEN.semNada)).statusCode).toBe(200);
   });

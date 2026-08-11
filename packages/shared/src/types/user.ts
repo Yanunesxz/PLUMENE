@@ -20,8 +20,6 @@ export interface User {
   legal_name?: string | null;
   phone?: string | null;
   price_table_id?: string | null;
-  /** Percentual de comissão do representante (ex.: 10 = 10%). */
-  commission_rate?: number | null;
   /**
    * Código do representante no ERP (ex.: "00779"). É o que casa com
    * `customers.rep_erp_id` e define a carteira dele. Sem isto, o rep só vê os
@@ -50,8 +48,6 @@ export interface AuthPayload {
   name: string;
   /** Tabela de preço do representante logado (usada para precificar o catálogo). */
   price_table_id?: string | null;
-  /** Percentual de comissão do representante (ex.: 10 = 10%). */
-  commission_rate?: number | null;
   /** Código ERP do representante — resolve a carteira de clientes. */
   erp_rep_id?: string | null;
   /** Loja: o cliente que este login representa. */
@@ -64,8 +60,6 @@ export interface AuthPayload {
   /** Teclas do gerente, para o guard não precisar ir ao banco a cada requisição. */
   permissions?: PermissaoGerente[] | null;
 }
-
-// (commission_rate em User e AuthPayload são usados pela área do representante)
 
 /** Representante na listagem (gerente/admin), com o nome da tabela resolvido. */
 export interface RepListItem {
@@ -85,7 +79,6 @@ export interface RepListItem {
    * nenhuma rota revela a existência das outras.
    */
   price_table_ids: string[];
-  commission_rate: number;
   /** Código do rep no ERP — define a carteira de clientes que ele enxerga. */
   erp_rep_id: string | null;
   created_at: string;
@@ -103,8 +96,6 @@ export interface CreateRepRequest {
   price_table_ids?: string[];
   legal_name?: string | null;
   phone?: string | null;
-  /** Percentual de comissão (ex.: 10 = 10%). Padrão 10 se omitido. */
-  commission_rate?: number;
   /** Código do rep no ERP (ex.: "00779"). Sem ele, o rep não recebe carteira. */
   erp_rep_id?: string | null;
 }
@@ -120,7 +111,6 @@ export interface UpdateRepRequest {
   legal_name?: string | null;
   phone?: string | null;
   active?: boolean;
-  commission_rate?: number;
   erp_rep_id?: string | null;
   /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
   password?: string;
@@ -128,8 +118,8 @@ export interface UpdateRepRequest {
 
 // ─── Controle de logins (admin) ───────────────────────────────────────────────
 // Papéis que o admin cria por aqui. Representante nasce em `/reps` (precisa de
-// CPF, tabela, comissão e código ERP) e loja nasce por convite — ter dois
-// lugares criando a mesma coisa é como um deles fica esquecido.
+// CPF, tabela e código ERP) e loja nasce por convite — ter dois lugares
+// criando a mesma coisa é como um deles fica esquecido.
 export type PapelGerenciavel = Extract<UserRole, 'admin' | 'manager'>;
 
 /** Um login na tela do admin. Nunca carrega hash de senha. */

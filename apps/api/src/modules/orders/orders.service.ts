@@ -12,7 +12,7 @@ export async function getOrders(
 ): Promise<Order[]> {
   // Paginado: o PostgREST corta em 1.000 linhas SEM avisar. Passando disso, o
   // gerente veria a lista mais antiga sumir da tela — e as somas do painel
-  // (vendas do mês, comissão, ticket) sairiam erradas sem nada indicar erro.
+  // (vendas do mês, faturamento, ticket) sairiam erradas sem nada indicar erro.
   return buscarTudo<Order>((de, ate) => {
     let query = supabase
       .from('orders')

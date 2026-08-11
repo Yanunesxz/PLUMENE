@@ -115,7 +115,7 @@ export function CartaoDeLogin({
           to="/representantes"
           className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
         >
-          Cadastro completo (tabela, comissão, meta)
+          Cadastro completo (tabela, meta)
           <ArrowRight className="h-3 w-3" />
         </Link>
       )}

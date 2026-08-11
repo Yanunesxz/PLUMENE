@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, type FormEvent } from 'react';
-import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Percent, Search, Target } from 'lucide-react';
+import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Search, Target } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
 import { Input } from '../../components/interface/Input.js';
@@ -26,7 +26,6 @@ const EMPTY = {
   phone: '',
   price_table_id: '',
   password: '',
-  commission_rate: '10',
   erp_rep_id: '',
   active: true,
   /** Tabelas que ele pode atribuir a um cliente. Sempre contém price_table_id. */
@@ -110,7 +109,6 @@ export function PaginaRepresentantes() {
       phone: rep.phone ?? '',
       price_table_id: rep.price_table_id ?? '',
       password: '',
-      commission_rate: String(rep.commission_rate ?? 10),
       erp_rep_id: rep.erp_rep_id ?? '',
       active: rep.active,
       // Rep antigo (antes da 018) chega sem conjunto: cai na tabela única dele.
@@ -150,7 +148,7 @@ export function PaginaRepresentantes() {
         type: 'success',
       });
     } catch (err) {
-      // Rep com pedidos não pode ser apagado (histórico de comissões) — oferece inativar.
+      // Rep com pedidos não pode ser apagado (histórico de vendas) — oferece inativar.
       if ((err as Error & { code?: string }).code === 'HAS_ORDERS') {
         const inativar = window.confirm(
           `${err instanceof Error ? err.message : 'Este representante tem pedidos e não pode ser excluído.'}\n\n` +
@@ -196,7 +194,6 @@ export function PaginaRepresentantes() {
           price_table_ids: form.price_table_ids,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
-          commission_rate: Number(form.commission_rate) || 10,
           erp_rep_id: form.erp_rep_id || null,
           active: form.active,
           ...(form.password ? { password: form.password } : {}),
@@ -222,7 +219,6 @@ export function PaginaRepresentantes() {
           password: form.password,
           legal_name: form.legal_name || null,
           phone: form.phone || null,
-          commission_rate: Number(form.commission_rate) || 10,
           erp_rep_id: form.erp_rep_id || null,
         };
         const res = await api.post<ApiResponse<RepListItem> & { aviso?: string }>(
@@ -384,18 +380,6 @@ export function PaginaRepresentantes() {
                 autoComplete="new-password"
               />
             </Field>
-            <Field label="Comissão (%)" required>
-              <Input
-                type="number"
-                min={0}
-                max={100}
-                step={0.5}
-                value={form.commission_rate}
-                onChange={set('commission_rate')}
-                placeholder="10"
-                inputMode="decimal"
-              />
-            </Field>
             {isEditing && (
               <Field label="Status">
                 <label className="flex h-10 items-center gap-2 text-sm text-foreground">
@@ -526,9 +510,6 @@ export function PaginaRepresentantes() {
                   ) : (
                     <span className="italic">Sem tabela</span>
                   )}
-                </p>
-                <p className="flex items-center gap-1.5">
-                  <Percent className="h-3.5 w-3.5 shrink-0" /> Comissão: {rep.commission_rate}%
                 </p>
                 </div>
               </div>

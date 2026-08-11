@@ -40,7 +40,7 @@ packages/shared/src/
 ├── index.ts              → barrel: re-exporta tudo
 ├── types/                → interfaces de dados (o "formato" de cada coisa)
 │   ├── api.ts            → ApiResponse (envelope { data })
-│   ├── user.ts           → User, AuthPayload, Login*, RepListItem, Create/UpdateRepRequest, commission_rate
+│   ├── user.ts           → User, AuthPayload, Login*, RepListItem, Create/UpdateRepRequest
 │   ├── customer.ts       → Customer, CustomerWithPriceTable, PriceTable, CreateCustomerRequest
 │   ├── product.ts        → Product, ProductVariant (tamanho), ProductWithPrice, CatalogProduct
 │   └── order.ts          → Order, OrderItem, OrderWithItems, CreateOrderRequest, tipos de sync
@@ -85,7 +85,8 @@ apps/api/src/
 │       ├── 020_cor_par_do_catalogo.sql → a bolinha é o PAR (blusa + calça)
 │       ├── 021_meta_de_bonus_por_representante.sql → faixas de bônus por mês
 │       ├── 022_controle_de_logins.sql → permissions do gerente + last_login_at
-│       └── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
+│       ├── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
+│       └── 024_remove_comissao.sql → DROP da coluna commission_rate (destrutiva)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -144,8 +145,7 @@ apps/web/
     │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
     │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
     │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
-    │   ├── representantes/PaginaRepresentantes → reps (CRUD, comissão) [gerente/admin]
-    │   ├── comissoes/PaginaComissoes   → comissões por rep / todos [gerente/admin]
+    │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]
     │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
     │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (triagem, faturado, sync)
     │   ├── loja/PaginaMinhaAreaLoja    → "Minha área" da loja (histórico, repetir) [store]

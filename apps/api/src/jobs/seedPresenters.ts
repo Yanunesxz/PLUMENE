@@ -7,7 +7,6 @@ import { supabase } from '../config/supabase.js';
 // (o servidor recalcula o preço pela tabela do representante).
 
 const PASSWORD = 'rep123';
-const COMMISSION_RATE = 10; // %
 
 const reps = [
   { email: 'representante1@csb.com', name: 'Representante 1' },
@@ -79,7 +78,6 @@ async function run() {
       role: 'rep',
       active: true,
       price_table_id,
-      commission_rate: COMMISSION_RATE,
     });
 
     if (error) console.error(`❌ ${email}: ${error.message}`);

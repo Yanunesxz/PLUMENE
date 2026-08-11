@@ -5,7 +5,7 @@ import { supabase } from '../config/supabase.js';
 // 1) Remove pedidos vazios (sem itens) de toda a empresa.
 // 2) Cria 3 pedidos por representante ativo, total entre R$14.000 e R$30.000,
 //    com pijamas e quantidades variados, precificados pela tabela de cada rep.
-//    Variação de status; os aprovados ficam faturados no mês atual (para Comissões).
+//    Variação de status; os aprovados ficam faturados no mês atual.
 
 const MIN_TOTAL = 14000;
 const MAX_TOTAL = 30000;

@@ -4,7 +4,7 @@ Plataforma comercial **B2B** para os representantes de vendas da Corpo Sensual �
 confecção de moda íntima (pijamas, camisolas e lingerie). O sistema digitaliza a
 tirada de pedidos: o representante consulta o catálogo, monta o pedido do cliente e
 acompanha tudo pelo celular ou computador, enquanto a gerência aprova pedidos e
-acompanha as comissões.
+acompanha o faturamento.
 
 ## O problema que resolve
 
@@ -15,14 +15,13 @@ Antes, os representantes anotavam os pedidos à mão (papel ou planilha), o que 
 - dificuldade da gerência em acompanhar as vendas em tempo real.
 
 A plataforma unifica esse processo: os pedidos são registrados de forma padronizada,
-com **preços calculados automaticamente** pela tabela de cada representante, e as
-**comissões são consolidadas** sozinhas.
+com **preços calculados automaticamente** pela tabela de cada representante.
 
 ## Quem usa (perfis)
 
 - **Representante** — consulta o catálogo, cadastra clientes, monta/acompanha pedidos
   e **decide quais pedidos das lojas seguem para a fábrica**.
-- **Gerente** — acompanha todos os pedidos, aprova ou recusa, e visualiza as comissões.
+- **Gerente** — acompanha todos os pedidos, aprova ou recusa, e marca o que foi faturado.
 - **Administrador** — cadastra e gerencia os representantes e as configurações.
 - **Loja** — o cliente comprando por conta própria: vê o catálogo com a tabela de
   preço dela, monta o pedido e acompanha o próprio histórico. Não aprova nada.
@@ -42,7 +41,7 @@ com **preços calculados automaticamente** pela tabela de cada representante, e 
   mostrar preço a quem ainda não é cliente sem abrir conta.
 - **Fluxo do pedido** — do rascunho ao envio. O que a loja monta passa antes pelo
   representante, que decide se vai para a fábrica; o gerente dá a palavra final.
-- **Comissões** por representante e por mês, sobre o valor faturado.
+- **Metas e bônus** por representante e por mês.
 - **Funciona offline** — o pedido é salvo no aparelho e **sincroniza sozinho** quando
   a internet volta (essencial para o vendedor em campo).
 - **Exportação de pedidos** em planilha (`.xlsx`).
@@ -72,4 +71,4 @@ O código é versionado no **GitHub** e está publicado em nuvem: o front-end na
 
 Este sistema é uma camada moderna que **convive com o ERP** da empresa: o ERP continua
 responsável pelo estoque real, faturamento e emissão fiscal. A plataforma cuida da
-força de vendas — catálogo, pedidos, clientes e comissões.
+força de vendas — catálogo, pedidos e clientes.

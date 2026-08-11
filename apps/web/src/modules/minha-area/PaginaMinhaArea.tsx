@@ -86,8 +86,6 @@ export function PaginaMinhaArea() {
       .catch(() => {});
   }, [token]);
 
-  const rate = (user?.commission_rate ?? 0) / 100;
-
   const m = useMemo(() => {
     const list = orders ?? [];
     const now = new Date();
@@ -108,15 +106,14 @@ export function PaginaMinhaArea() {
         .filter((o) => thisMonth(o.created_at) && contaParaAMeta(o.status))
         .reduce((s, o) => s + (o.total ?? 0), 0),
       faturadoMes,
-      comissaoMes: faturadoMes * rate,
-      comissaoTotal: faturadoTotal * rate,
+      faturadoTotal,
       pedidosMes: list.filter((o) => thisMonth(o.created_at)).length,
       totalPedidos: list.length,
       ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
       taxaAprovacao: list.length ? Math.round((approved.length / list.length) * 100) : 0,
       vendasTotais: list.reduce((s, o) => s + (o.total ?? 0), 0),
     };
-  }, [orders, rate]);
+  }, [orders]);
 
   const clientes = customers?.length ?? 0;
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
@@ -142,9 +139,7 @@ export function PaginaMinhaArea() {
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">
           Olá, {firstName}
         </h1>
-        <p className="text-sm text-muted-foreground">
-          Seu desempenho · comissão de {user?.commission_rate ?? 0}%
-        </p>
+        <p className="text-sm text-muted-foreground">Seu desempenho</p>
       </div>
 
       {triagem.length > 0 && (
@@ -183,7 +178,7 @@ export function PaginaMinhaArea() {
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={Receipt} tint="brand" value={formatBRL(m.faturadoMes)} label="Faturado no mês" />
-        <MetricCard icon={Wallet} tint="green" value={formatBRL(m.comissaoMes)} label="Comissão a receber" />
+        <MetricCard icon={Wallet} tint="green" value={formatBRL(m.faturadoTotal)} label="Faturado total" />
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
@@ -243,7 +238,7 @@ export function PaginaMinhaArea() {
           Desempenho
         </h2>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <Row icon={Wallet} label="Comissão total acumulada" value={formatBRL(m.comissaoTotal)} highlight />
+          <Row icon={Wallet} label="Faturado acumulado" value={formatBRL(m.faturadoTotal)} highlight />
           <Row icon={TrendingUp} label="Vendas totais (todos os pedidos)" value={formatBRL(m.vendasTotais)} />
           <Row icon={Target} label="Ticket médio (pedidos aprovados)" value={formatBRL(m.ticket)} />
           <Row icon={Percent} label="Taxa de aprovação" value={`${m.taxaAprovacao}%`} />

@@ -29,8 +29,18 @@ BEGIN
       CHECK (price >= 0) NOT VALID;
   END IF;
 
-  -- Comissão fora de 0–100 (um "10" digitado como "1000" viraria um rombo)
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'chk_users_comissao_percentual') THEN
+  -- Comissão fora de 0–100 (um "10" digitado como "1000" viraria um rombo).
+  --
+  -- A coluna deixou de existir na migração 024, que tirou comissão do sistema.
+  -- A checagem de existência foi acrescentada depois, para esta migração
+  -- continuar reexecutável em ordem num banco novo: sem ela, rodar a 013 depois
+  -- da 024 estoura em "column commission_rate does not exist".
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+     WHERE table_name = 'users' AND column_name = 'commission_rate'
+  ) AND NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'chk_users_comissao_percentual'
+  ) THEN
     ALTER TABLE users
       ADD CONSTRAINT chk_users_comissao_percentual
       CHECK (commission_rate >= 0 AND commission_rate <= 100) NOT VALID;

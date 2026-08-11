@@ -20,7 +20,6 @@ import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 // PaginaImportar sozinha carrega a biblioteca de planilhas.
 const PaginaPainel = lazy(() => import('../modules/painel/PaginaPainel.js').then((m) => ({ default: m.PaginaPainel })));
 const PaginaRepresentantes = lazy(() => import('../modules/representantes/PaginaRepresentantes.js').then((m) => ({ default: m.PaginaRepresentantes })));
-const PaginaComissoes = lazy(() => import('../modules/comissoes/PaginaComissoes.js').then((m) => ({ default: m.PaginaComissoes })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
 const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
 const PaginaLogins = lazy(() => import('../modules/logins/PaginaLogins.js').then((m) => ({ default: m.PaginaLogins })));
@@ -101,11 +100,6 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'representantes',
             element: <PrivateRoute roles={['manager', 'admin']} permissao="gerenciar_representantes" />,
             children: [{ index: true, element: <AoCarregar><PaginaRepresentantes /></AoCarregar> }],
-          },
-          {
-            path: 'comissoes',
-            element: <PrivateRoute roles={['manager', 'admin']} permissao="ver_comissoes" />,
-            children: [{ index: true, element: <AoCarregar><PaginaComissoes /></AoCarregar> }],
           },
           // Era `roles={['admin']}`: o admin continua entrando sempre (tecla não
           // se aplica a ele) e o gerente só entra se o admin ligar a dele.

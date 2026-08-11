@@ -23,7 +23,7 @@ export default defineConfig({
       // Com 'autoUpdate' o service worker novo assumia o controle no meio da
       // sessão (skipWaiting + clientsClaim) enquanto a aba continuava rodando o
       // JavaScript velho. Ao abrir uma tela que só baixa quando é pedida
-      // (painel, comissões, importar), o pedaço antigo já não existia no
+      // (painel, importar), o pedaço antigo já não existia no
       // servidor: erro de carregamento, tela branca — e a saída que sobrava
       // para o representante era limpar o cache na mão.
       //

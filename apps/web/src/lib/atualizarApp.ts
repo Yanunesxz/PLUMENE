@@ -151,7 +151,7 @@ export function observarAtualizacao(): void {
 
   // Rede de segurança: pedaço de tela que não baixa.
   //
-  // Painel, comissões e importar só descem quando são abertos. Se a publicação
+  // Painel e importar só descem quando são abertos. Se a publicação
   // trocou os arquivos com o app aberto, o endereço que esta aba conhece já não
   // existe no servidor — e o que a pessoa vê é uma tela branca. Recarregar
   // resolve, porque na recarga vem o índice novo. Uma vez por sessão: se

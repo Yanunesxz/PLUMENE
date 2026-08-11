@@ -16,7 +16,7 @@ export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   const guard = { preHandler: [authenticate, requireRole(['manager', 'admin'])] };
 
   // Escrever no cadastro de representante (e na meta dele) exige a tecla. LER
-  // não exige, e isso é deliberado: a tela de Comissões consome `GET /reps` e
+  // não exige, e isso é deliberado: outras telas consomem `GET /reps` e
   // `GET /price-tables`, e guardá-las quebraria uma tela que funciona.
   const podeGerenciar = {
     preHandler: [

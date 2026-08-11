@@ -103,7 +103,7 @@ export async function deleteRepHandler(request: FastifyRequest, reply: FastifyRe
     }
     if (result.reason === 'has_orders') {
       await reply.status(409).send({
-        error: `Este representante tem ${result.orders} pedido(s) e não pode ser excluído — o histórico de vendas e comissões depende dele. Inative o acesso em vez de excluir.`,
+        error: `Este representante tem ${result.orders} pedido(s) e não pode ser excluído — o histórico de vendas depende dele. Inative o acesso em vez de excluir.`,
         code: 'HAS_ORDERS',
         statusCode: 409,
       });

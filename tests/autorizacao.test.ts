@@ -26,7 +26,7 @@ function assinar(payload: Record<string, unknown>, segredo = SEGREDO, validoPor 
   return `${cabecalho}.${corpo}.${assinatura}`;
 }
 
-const base = { email: 'x@csb.com', company_id: EMPRESA, name: 'Teste', commission_rate: 10 };
+const base = { email: 'x@csb.com', company_id: EMPRESA, name: 'Teste' };
 const TOKEN = {
   rep: assinar({ ...base, sub: 'rep-1', role: 'rep', price_table_id: 'tabela-do-rep' }),
   gerente: assinar({ ...base, sub: 'ger-1', role: 'manager', price_table_id: null }),

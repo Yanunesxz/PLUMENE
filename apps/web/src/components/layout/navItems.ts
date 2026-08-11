@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Wallet, Gauge, UploadCloud, KeyRound, Store, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -29,7 +29,7 @@ const repItems: NavItem[] = [
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
 ];
 
-// A loja compra e acompanha. Nada de carteira, comissão ou aprovação.
+// A loja compra e acompanha. Nada de carteira nem aprovação.
 const storeItems: NavItem[] = [
   { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Store },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
@@ -42,7 +42,6 @@ const managerItems: NavItem[] = [
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact, permissao: 'gerenciar_representantes' },
-  { to: '/comissoes', label: 'Comissões', icon: Wallet, permissao: 'ver_comissoes' },
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
   // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
   // não se aplica a ele. O gerente só vê se o admin ligar a dele.

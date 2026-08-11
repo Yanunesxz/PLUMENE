@@ -17,7 +17,6 @@ describe('temPermissao', () => {
     expect(temPermissao('manager', null, 'aprovar_pedidos')).toBe(true);
     expect(temPermissao('manager', undefined, 'faturar_pedidos')).toBe(true);
     expect(temPermissao('manager', null, 'gerenciar_representantes')).toBe(true);
-    expect(temPermissao('manager', null, 'ver_comissoes')).toBe(true);
     // Importar era exclusiva do admin: o gerente legado NÃO ganha isso de graça.
     expect(temPermissao('manager', null, 'importar_produtos')).toBe(false);
   });
@@ -41,7 +40,7 @@ describe('temPermissao', () => {
 
   it('o padrão do papel é exatamente o que o gerente faz hoje', () => {
     expect([...PERMISSOES_PADRAO_GERENTE].sort()).toEqual(
-      ['aprovar_pedidos', 'faturar_pedidos', 'gerenciar_representantes', 'ver_comissoes'].sort(),
+      ['aprovar_pedidos', 'faturar_pedidos', 'gerenciar_representantes'].sort(),
     );
   });
 });

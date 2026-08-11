@@ -2,7 +2,6 @@ import { supabase } from '../../config/supabase.js';
 import { hashPassword } from '../../lib/password.js';
 import { priceTableBelongsToCompany } from '../catalog/catalog.service.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
-import { DEFAULT_COMMISSION_RATE } from '@csb/shared';
 
 // O embed price_tables(name) pode vir como objeto (1:1) ou array, dependendo da
 // inferência do supabase — normalizamos para o nome (ou null).
@@ -21,7 +20,6 @@ interface RepRow {
   phone: string | null;
   active: boolean;
   price_table_id: string | null;
-  commission_rate: number | null;
   erp_rep_id?: string | null;
   created_at: string;
   price_tables: EmbeddedTable;
@@ -33,7 +31,7 @@ interface RepRow {
 // INTEIRA (PGRST201) em vez de escolher um, e a tela de representantes ficava
 // vazia com "0 cadastrados" enquanto o cadastro novo falhava ao reler o registro.
 const REP_BASE =
-  'id, name, email, cpf, legal_name, phone, active, price_table_id, commission_rate, created_at, price_tables!users_price_table_id_fkey(name)';
+  'id, name, email, cpf, legal_name, phone, active, price_table_id, created_at, price_tables!users_price_table_id_fkey(name)';
 
 // users.erp_rep_id vem da migração 012, que pode não estar aplicada ainda.
 // Pedir uma coluna inexistente faz o PostgREST recusar a query INTEIRA — a tela
@@ -140,7 +138,6 @@ function toRepListItem(row: RepRow, conjunto?: string[]): RepListItem {
     price_table_id: padrao,
     price_table_name: tableName(row.price_tables),
     price_table_ids: ids,
-    commission_rate: row.commission_rate ?? DEFAULT_COMMISSION_RATE,
     erp_rep_id: row.erp_rep_id ?? null,
     created_at: row.created_at,
   };
@@ -287,7 +284,6 @@ export async function createRep(
       legal_name: body.legal_name?.trim() || null,
       phone: body.phone?.trim() || null,
       price_table_id: padrao,
-      commission_rate: body.commission_rate ?? DEFAULT_COMMISSION_RATE,
       ...((await detectarErpRepId()) ? { erp_rep_id: body.erp_rep_id?.trim() || null } : {}),
     })
     .select(await repSelect())
@@ -317,7 +313,7 @@ export type DeleteRepResult =
 
 /**
  * Exclui um representante. Só é permitido quando ele NÃO tem pedidos —
- * pedidos referenciam o rep (histórico/comissões) e o banco bloqueia via FK.
+ * pedidos referenciam o rep (histórico) e o banco bloqueia via FK.
  * Clientes da carteira dele ficam sem representante (FK ON DELETE SET NULL).
  */
 export async function deleteRep(company_id: string, id: string): Promise<DeleteRepResult> {
@@ -378,7 +374,6 @@ export async function updateRep(
   if (body.cpf !== undefined) update.cpf = body.cpf.trim() || null;
   if (body.legal_name !== undefined) update.legal_name = body.legal_name?.trim() || null;
   if (body.phone !== undefined) update.phone = body.phone?.trim() || null;
-  if (body.commission_rate !== undefined) update.commission_rate = body.commission_rate;
 
   // Conjunto e padrão andam juntos: mexer em um sem olhar o outro é o que
   // produziria um rep cuja tabela de catálogo ele não tem permissão de usar.

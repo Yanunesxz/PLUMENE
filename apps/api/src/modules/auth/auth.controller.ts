@@ -60,7 +60,6 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
         role: user.role,
         active: user.active,
         price_table_id: user.price_table_id ?? null,
-        commission_rate: user.commission_rate ?? null,
         // A loja precisa do próprio customer_id no aparelho: é ele que vai no
         // pedido montado offline, quando não há token para o servidor resolver.
         customer_id: user.customer_id ?? null,
@@ -121,7 +120,6 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
           role: u.role,
           active: u.active,
           price_table_id: u.price_table_id ?? null,
-          commission_rate: u.commission_rate ?? null,
           customer_id: u.customer_id ?? null,
           rep_id: u.rep_id ?? null,
           permissions: u.permissions ?? null,

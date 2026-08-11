@@ -236,7 +236,6 @@ export async function aceitarConviteHandler(request: FastifyRequest, reply: Fast
         role: payload.role,
         active: true,
         price_table_id: payload.price_table_id ?? null,
-        commission_rate: null,
         customer_id: payload.customer_id ?? null,
         rep_id: payload.rep_id ?? null,
       },
