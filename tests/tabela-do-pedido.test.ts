@@ -4,28 +4,23 @@ import type { FastifyInstance } from 'fastify';
 import { criarSupabaseFake } from './supabaseFake.js';
 
 /**
- * O representante escolhe a tabela DO PEDIDO.
+ * O pedido registra em que tabela foi precificado.
  *
- * Quem tem duas ou mais tabelas precisa separar, para o mesmo cliente, o pedido
- * de uma tabela do de outra — e o Control importa uma planilha por tabela, então
- * misturar não é opção. Antes disto o preço vinha sempre do cadastro do cliente
- * e não havia como desviar.
+ * Ninguém escolhe: a tabela é a do cadastro do cliente, caindo para a do
+ * representante quando o cliente não tem uma. O que a migração 025 acrescenta é
+ * GRAVAR essa tabela no pedido, em vez de deixá-la implícita no preço dos itens.
  *
- * O que estes testes trancam:
- *
- * • escolher vale — o preço sai pela tabela escolhida, não pela do cadastro;
- * • escolher tabela de fora do conjunto é 403, mesmo com token válido. A tela
- *   nem oferece a opção, então chegar lá é chamada direta à API;
- * • não escolher continua caindo na tabela do cliente. Obrigar a escolha em
- *   todo pedido puniria quem tem duas tabelas e usa sempre a do cadastro.
+ * Sem o registro, quem lê depois só consegue deduzir pelo cadastro do cliente —
+ * e a dedução erra quando o cliente troca de tabela: o pedido antigo passa a
+ * "pertencer" a uma tabela que não o precificou. A exportação para o Control
+ * escolhe o modelo de planilha por esse campo, então errar aí significa mandar
+ * para a fábrica um pedido com o preço de outra região.
  */
 
 const EMPRESA = 'empresa-1';
 const SEGREDO = 'segredo-de-teste-nao-usar-em-producao'; // igual ao tests/setup.ts
 const TABELA_DO_REP = 'tabela-01';
 const TABELA_DO_CLIENTE = 'tabela-02';
-const TABELA_ESCOLHIDA = 'tabela-03';
-const TABELA_DE_OUTRO = 'tabela-de-outra-regiao';
 
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
 
@@ -49,37 +44,18 @@ const TOKEN_REP = assinar({
   price_table_id: TABELA_DO_REP,
 });
 
-/**
- * A SIMONE de produção: três tabelas no conjunto, cliente cadastrado na 02.
- * `rep_price_tables` responde o conjunto dela; a tabela de outra região existe
- * na empresa mas não é dela — é o caso que precisa dar 403.
- */
-async function subir() {
+/** `tabelaDoCliente = null` reproduz os 536 clientes sem tabela cadastrada. */
+async function subir(tabelaDoCliente: string | null) {
   const fake = criarSupabaseFake({
     customers: [
-      { data: { price_table_id: TABELA_DO_CLIENTE }, error: null },
+      { data: { price_table_id: tabelaDoCliente }, error: null },
       { data: { id: 'c1', blocked: false }, error: null },
     ],
     users: { data: { price_table_id: TABELA_DO_REP }, error: null },
-    price_tables: {
-      data: [
-        { id: TABELA_DO_REP, name: 'TABELA 01 - 2027' },
-        { id: TABELA_DO_CLIENTE, name: 'TABELA 02 - 2027' },
-        { id: TABELA_ESCOLHIDA, name: 'TABELA 03 - 2027' },
-        { id: TABELA_DE_OUTRO, name: 'TABELA DE OUTRA REGIAO' },
-      ],
-      error: null,
-    },
-    rep_price_tables: {
-      data: [
-        { user_id: 'rep-1', price_table_id: TABELA_DO_REP },
-        { user_id: 'rep-1', price_table_id: TABELA_DO_CLIENTE },
-        { user_id: 'rep-1', price_table_id: TABELA_ESCOLHIDA },
-      ],
-      error: null,
-    },
     product_prices: { data: [{ product_id: 'p1', price: 42 }], error: null },
     orders: [
+      // Sondagem de `orders.price_table_id` (025) e das colunas de origem (014),
+      // cada uma consumindo a resposta e uma de folga.
       { data: [{ id: 'sonda' }], error: null },
       { data: null, error: null },
       { data: [{ id: 'sonda' }], error: null },
@@ -97,93 +73,93 @@ async function subir() {
   return { app, fake };
 }
 
-/** Com qual tabela o servidor foi buscar o preço dos itens. */
-function tabelaConsultada(fake: ReturnType<typeof criarSupabaseFake>): unknown {
-  return fake.filtrosDe('product_prices', 'eq').find((f) => f.args[0] === 'price_table_id')?.args[1];
+/** O que foi gravado na coluna `price_table_id` do pedido. */
+function tabelaGravada(fake: ReturnType<typeof criarSupabaseFake>): unknown {
+  const insercoes = fake.gravacoes.filter((g) => g.tabela === 'orders' && g.operacao === 'insert');
+  return (insercoes.at(-1)?.valores as { price_table_id?: string } | undefined)?.price_table_id;
 }
 
-const pedido = (price_table_id?: string) => ({
+const PEDIDO = {
   customer_id: 'c1',
   submit: true,
-  ...(price_table_id ? { price_table_id } : {}),
   items: [{ product_id: 'p1', quantity: 2, unit_price: 999 }],
-});
+};
 
-describe('representante escolhe a tabela do pedido', () => {
+describe('cliente com tabela própria', () => {
   let app: FastifyInstance;
   let fake: ReturnType<typeof criarSupabaseFake>;
 
   beforeAll(async () => {
     vi.resetModules();
-    ({ app, fake } = await subir());
+    ({ app, fake } = await subir(TABELA_DO_CLIENTE));
   });
 
   afterAll(async () => {
     await app?.close();
   });
 
-  it('precifica pela tabela escolhida, não pela do cadastro do cliente', async () => {
+  it('grava no pedido a tabela do CLIENTE, que é a que precificou', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/orders',
       headers: { authorization: `Bearer ${TOKEN_REP}` },
-      payload: pedido(TABELA_ESCOLHIDA),
+      payload: PEDIDO,
     });
 
     expect(res.statusCode).toBe(201);
-    expect(tabelaConsultada(fake)).toBe(TABELA_ESCOLHIDA);
-    expect(tabelaConsultada(fake)).not.toBe(TABELA_DO_CLIENTE);
+    expect(tabelaGravada(fake)).toBe(TABELA_DO_CLIENTE);
+    expect(tabelaGravada(fake)).not.toBe(TABELA_DO_REP);
   });
 });
 
-describe('tabela de fora do conjunto', () => {
-  let app: FastifyInstance;
-
-  beforeAll(async () => {
-    vi.resetModules();
-    ({ app } = await subir());
-  });
-
-  afterAll(async () => {
-    await app?.close();
-  });
-
-  it('é recusada com 403, mesmo com token válido', async () => {
-    const res = await app.inject({
-      method: 'POST',
-      url: '/orders',
-      headers: { authorization: `Bearer ${TOKEN_REP}` },
-      payload: pedido(TABELA_DE_OUTRO),
-    });
-
-    expect(res.statusCode).toBe(403);
-    // Sem dizer se a tabela existe: quem chegou aqui não passou pela tela.
-    expect(res.json().error).not.toContain('OUTRA REGIAO');
-  });
-});
-
-describe('pedido sem escolha', () => {
+describe('cliente sem tabela cadastrada', () => {
   let app: FastifyInstance;
   let fake: ReturnType<typeof criarSupabaseFake>;
 
   beforeAll(async () => {
     vi.resetModules();
-    ({ app, fake } = await subir());
+    ({ app, fake } = await subir(null));
   });
 
   afterAll(async () => {
     await app?.close();
   });
 
-  it('continua caindo na tabela do cliente — nada muda para quem não escolhe', async () => {
+  it('grava a do representante — a mesma que precificou o pedido', async () => {
     const res = await app.inject({
       method: 'POST',
       url: '/orders',
       headers: { authorization: `Bearer ${TOKEN_REP}` },
-      payload: pedido(),
+      payload: PEDIDO,
     });
 
     expect(res.statusCode).toBe(201);
-    expect(tabelaConsultada(fake)).toBe(TABELA_DO_CLIENTE);
+    expect(tabelaGravada(fake)).toBe(TABELA_DO_REP);
+  });
+});
+
+describe('escolha de tabela vinda do corpo', () => {
+  let app: FastifyInstance;
+  let fake: ReturnType<typeof criarSupabaseFake>;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    ({ app, fake } = await subir(TABELA_DO_CLIENTE));
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('é ignorada: quem manda no preço é o cadastro, não o corpo do pedido', async () => {
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { ...PEDIDO, price_table_id: 'tabela-de-outra-regiao' },
+    });
+
+    expect(res.statusCode).toBe(201);
+    expect(tabelaGravada(fake)).toBe(TABELA_DO_CLIENTE);
   });
 });

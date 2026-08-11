@@ -143,7 +143,7 @@ apps/web/
     │   ├── catalogo/PaginaCatalogo     → catálogo, busca, ordenar, + (abre tamanho)
     │   ├── pedidos/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
-    │   │   ├── PaginaNovoPedido        → montar pedido (cliente, tabela + itens por tamanho)
+    │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
     │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
     │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]

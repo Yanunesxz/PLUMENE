@@ -1,7 +1,6 @@
 import type { OfflineSyncOrder, SyncResult } from '@csb/shared';
 import { createOrder, type OrigemPedido } from '../orders/orders.service.js';
 import { createOrderSchema } from '../orders/orders.schema.js';
-import { repPodeUsarTabela } from '../reps/reps.service.js';
 
 export async function processSyncQueue(
   company_id: string,
@@ -24,16 +23,6 @@ export async function processSyncQueue(
     }
 
     try {
-      // A tabela escolhida no aparelho vale também aqui — senão o pedido feito
-      // sem sinal sairia numa tabela e o mesmo pedido feito online sairia em
-      // outra. Revalidada contra o conjunto de quem sincroniza: a fila fica no
-      // aparelho e é a única parte do corpo que o servidor nunca viu.
-      const escolhida = validation.data.price_table_id;
-      const tabela =
-        escolhida && (await repPodeUsarTabela(company_id, rep_id, escolhida))
-          ? escolhida
-          : price_table_id;
-
       // Tudo que está na fila offline é pedido FECHADO por quem montou — ele
       // apertou enviar sem sinal. Entra na fila (do gerente, se veio do
       // representante; da triagem, se veio da loja), nunca como rascunho.
@@ -42,7 +31,7 @@ export async function processSyncQueue(
       await createOrder(
         company_id,
         rep_id,
-        tabela,
+        price_table_id,
         { ...validation.data, submit: true },
         origem,
       );

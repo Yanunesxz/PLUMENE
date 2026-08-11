@@ -5,10 +5,6 @@ export const createOrderSchema = z.object({
   // representante manda; a loja tem o dela no token; a vitrine não tem nenhum.
   // Quem exige a presença é o `createOrder`, conforme a origem.
   customer_id: z.string().min(1).optional(),
-  // Tabela escolhida para este pedido. O schema só garante o formato — quem
-  // confere se ela é do conjunto de quem pede é o controller, com o
-  // `company_id` do TOKEN. Confiar no corpo aqui seria a brecha.
-  price_table_id: z.string().min(1).optional(),
   notes: z.string().optional(),
   local_id: z.string().optional(),
   // Pedido fechado pelo representante entra direto na fila de aprovação.

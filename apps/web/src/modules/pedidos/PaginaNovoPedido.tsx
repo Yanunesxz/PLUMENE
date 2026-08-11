@@ -11,7 +11,7 @@ import { addToSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/interface/Button.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
-import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
+import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
@@ -56,89 +56,114 @@ export function PaginaNovoPedido() {
     if (preselectedCustomerId) setCustomerId(preselectedCustomerId);
   }, [preselectedCustomerId]);
 
-  // ─── Tabela deste pedido ───────────────────────────────────────────────────
-  // O representante com duas ou mais escolhe qual vale aqui: é assim que ele
-  // separa, para o mesmo cliente, o pedido de uma tabela do de outra. A loja
-  // não escolhe nada — compra na tabela do cadastro dela.
-  const { tabelas } = useMinhasTabelas();
-  const podeEscolherTabela = !ehLoja && tabelas.length >= 2;
-  const [tabelaId, setTabelaId] = useState('');
-  const [trocandoTabela, setTrocandoTabela] = useState(false);
+  // ─── A tabela vem do cadastro do cliente ───────────────────────────────────
+  // Ninguém escolhe aqui: quem manda no preço é o cadastro. O que a tela faz é
+  // não deixar o representante ver um preço e o servidor cobrar outro.
+  const { nomeDe } = useMinhasTabelas();
 
-  /** A que o cadastro manda: a do cliente, ou a do próprio rep quando ele não tem. */
-  const tabelaSugerida = useMemo(() => {
-    const doCliente = selectedCustomer?.price_table_id ?? null;
-    if (doCliente && tabelas.some((t) => t.id === doCliente)) return doCliente;
-    return user?.price_table_id ?? tabelas[0]?.id ?? '';
-  }, [selectedCustomer, tabelas, user]);
+  /** A tabela que precifica ESTE pedido: a do cliente, caindo para a do rep. */
+  const tabelaDoPedido = ehLoja
+    ? null
+    : (selectedCustomer?.price_table_id ?? user?.price_table_id ?? null);
 
-  // Trocar de cliente reposiciona a escolha na tabela dele. Manter a escolha
-  // anterior seria carregar a tabela do cliente passado para o próximo, que é o
-  // erro silencioso que este recurso existe para evitar.
-  useEffect(() => {
-    if (podeEscolherTabela) setTabelaId(tabelaSugerida);
-  }, [podeEscolherTabela, tabelaSugerida]);
-
-  const nomeDaTabela = (id: string) => tabelas.find((t) => t.id === id)?.name ?? null;
+  /** Em qual tabela os preços que estão na tela foram buscados. */
+  const [tabelaAplicada, setTabelaAplicada] = useState<string | null>(null);
+  const [reprecificando, setReprecificando] = useState(false);
 
   /**
-   * O aviso que o Yan pediu: escolheu tabela diferente da do cadastro do
-   * cliente. Não impede nada — só não deixa passar batido.
+   * Trocar de cliente reprecifica o carrinho na tabela DELE.
+   *
+   * O catálogo é baixado na tabela do próprio representante. Sem isto, quem
+   * atende clientes de tabelas diferentes montava o pedido vendo o preço de uma
+   * e recebia o total de outra — o servidor sempre precificou pelo cadastro do
+   * cliente. Produto sem preço na tabela dele sai do carrinho: mantê-lo faria o
+   * pedido inteiro ser recusado com "preço não encontrado", sem dizer qual item.
+   *
+   * Tabela fora do conjunto do representante devolve 403 de propósito (ele não
+   * pode ver o preço da região vizinha). Aí os preços ficam como estão e a
+   * confirmação, no fim, avisa que não dá para conferir.
    */
-  const avisoDeDivergencia = (() => {
-    const doCliente = selectedCustomer?.price_table_id;
-    if (!podeEscolherTabela || !doCliente || !tabelaId || tabelaId === doCliente) return undefined;
-    const nome = nomeDaTabela(doCliente);
-    return nome
-      ? `O cadastro deste cliente é ${nome}. Este pedido vai sair em outra tabela.`
-      : 'Este cliente está cadastrado em outra tabela. Este pedido vai sair na que você escolheu.';
+  useEffect(() => {
+    if (!token || !tabelaDoPedido || tabelaDoPedido === tabelaAplicada) return;
+    let vivo = true;
+    setReprecificando(true);
+    void api
+      .getLista<ApiResponse<ProductWithPrice[]>>(
+        `/products?price_table_id=${encodeURIComponent(tabelaDoPedido)}`,
+        token,
+      )
+      .then(async (res) => {
+        if (!vivo) return;
+        await db.products.bulkPut(res.data);
+        const precoPor = new Map(res.data.map((p) => [p.id, p.price]));
+        const semPreco: string[] = [];
+        let mudou = 0;
+        for (const item of useCartStore.getState().items) {
+          const preco = precoPor.get(item.product_id);
+          if (preco == null) {
+            semPreco.push(item.sku);
+            removeItem(item.product_id, item.size, item.color_code);
+            continue;
+          }
+          if (preco !== item.unit_price) {
+            setUnitPrice(item.product_id, item.size, preco, item.color_code);
+            mudou++;
+          }
+        }
+        setTabelaAplicada(tabelaDoPedido);
+        if (semPreco.length > 0) {
+          setToast({
+            message: `Sem preço na tabela deste cliente e removido(s): ${semPreco.join(', ')}.`,
+            type: 'error',
+          });
+        } else if (mudou > 0) {
+          setToast({ message: 'Preços ajustados para a tabela deste cliente.', type: 'info' });
+        }
+      })
+      .catch(() => {
+        // 403 (tabela de outra região) ou offline: não mexe nos preços.
+        if (vivo) setTabelaAplicada(null);
+      })
+      .finally(() => {
+        if (vivo) setReprecificando(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [token, tabelaDoPedido, tabelaAplicada, removeItem, setUnitPrice]);
+
+  /**
+   * O que a confirmação vai dizer antes de enviar. `null` = não há o que
+   * confirmar (loja, ou tabela de outra região que ele não pode ver).
+   */
+  const confirmacaoDaTabela = (() => {
+    if (ehLoja || !customerId) return null;
+    const doCliente = selectedCustomer?.price_table_id ?? null;
+
+    if (!doCliente) {
+      const minha = nomeDe(user?.price_table_id);
+      return {
+        titulo: 'Este cliente não tem tabela cadastrada.',
+        detalhe: minha
+          ? `O pedido vai sair na sua tabela, ${minha}. Se não for essa, corrija o cadastro do cliente antes de enviar.`
+          : 'O pedido vai sair na sua tabela. Se não for essa, corrija o cadastro do cliente antes de enviar.',
+        tabela: minha ?? '',
+        rotuloConfirmar: 'Enviar assim mesmo',
+      };
+    }
+
+    const nome = nomeDe(doCliente);
+    if (!nome) return null; // Tabela fora do conjunto dele: não há nome a mostrar.
+
+    return {
+      titulo: `Este cliente está cadastrado na ${nome}. Está correta?`,
+      detalhe: 'É esta tabela que define o preço do pedido. Se estiver errada, corrija o cadastro do cliente antes de enviar.',
+      tabela: nome,
+      rotuloConfirmar: undefined,
+    };
   })();
 
-  /**
-   * Trocar a tabela recalcula o carrinho.
-   *
-   * Sem isto o representante veria o preço da tabela antiga na tela e receberia
-   * o da nova no total — o servidor reprecifica de qualquer jeito. Produto sem
-   * preço na tabela escolhida sai do carrinho: mantê-lo faria o pedido inteiro
-   * ser recusado com "preço não encontrado", sem dizer qual item.
-   */
-  const escolherTabela = async (id: string) => {
-    setTabelaId(id);
-    if (!token || items.length === 0) return;
-    setTrocandoTabela(true);
-    try {
-      const res = await api.getLista<ApiResponse<ProductWithPrice[]>>(
-        `/products?price_table_id=${encodeURIComponent(id)}`,
-        token,
-      );
-      await db.products.bulkPut(res.data);
-      const precoPor = new Map(res.data.map((p) => [p.id, p.price]));
-      const semPreco: string[] = [];
-      for (const item of items) {
-        const preco = precoPor.get(item.product_id);
-        if (preco == null) {
-          semPreco.push(item.sku);
-          removeItem(item.product_id, item.size, item.color_code);
-          continue;
-        }
-        if (preco !== item.unit_price) {
-          setUnitPrice(item.product_id, item.size, preco, item.color_code);
-        }
-      }
-      setToast(
-        semPreco.length > 0
-          ? {
-              message: `Preços atualizados. Sem preço nesta tabela e removido(s): ${semPreco.join(', ')}.`,
-              type: 'error',
-            }
-          : { message: 'Preços do carrinho atualizados para a tabela escolhida.', type: 'success' },
-      );
-    } catch {
-      setToast({ message: 'Não deu para buscar os preços desta tabela. Tente de novo.', type: 'error' });
-    } finally {
-      setTrocandoTabela(false);
-    }
-  };
+  const [confirmando, setConfirmando] = useState(false);
 
   // Abre o seletor de tamanho para o produto escolhido na busca.
   const addItem = (product_id: string) => {
@@ -159,19 +184,35 @@ export function PaginaNovoPedido() {
 
   // O que ainda falta para poder enviar o pedido (cliente é o mais esquecido:
   // a pessoa chega com produtos no carrinho vindo do catálogo e não seleciona cliente).
-  const missingReason = trocandoTabela
-    ? 'Recalculando os preços na tabela escolhida…'
+  const missingReason = reprecificando
+    ? 'Ajustando os preços para a tabela deste cliente…'
     : !customerId && !ehLoja
-    ? 'Selecione o cliente para enviar o pedido.'
-    : items.length === 0
+      ? 'Selecione o cliente para enviar o pedido.'
+      : items.length === 0
       ? 'Adicione ao menos um produto para enviar o pedido.'
       : selectedCustomer?.blocked
         ? 'Este cliente está bloqueado. Escolha outro para continuar.'
         : null;
 
-  const handleSubmit = async (e: FormEvent) => {
+  /**
+   * O botão não envia direto: abre a confirmação da tabela.
+   *
+   * Cadastro errado só aparece na fatura, e aí o pedido já foi para a fábrica.
+   * Ler o nome da tabela antes de enviar é o único momento barato de pegar isso.
+   */
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if ((!customerId && !ehLoja) || items.length === 0 || !user) return;
+    if (confirmacaoDaTabela) {
+      setConfirmando(true);
+      return;
+    }
+    void enviarPedido();
+  };
+
+  const enviarPedido = async () => {
+    if ((!customerId && !ehLoja) || items.length === 0 || !user) return;
+    setConfirmando(false);
     setSubmitting(true);
 
     // Offline a loja não tem quem carimbe o cliente por ela: vai o customer_id
@@ -181,9 +222,6 @@ export function PaginaNovoPedido() {
     const local_id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
     const payload: CreateOrderRequest = {
       ...(ehLoja ? {} : { customer_id: customerId }),
-      // Só quem escolhe manda. Ausente, o servidor precifica pela tabela do
-      // cliente, exatamente como antes deste recurso existir.
-      ...(podeEscolherTabela && tabelaId ? { price_table_id: tabelaId } : {}),
       // O ERP recebe o item como sortido; a cor escolhida viaja na observação,
       // logo abaixo do que o representante digitou.
       notes: juntarObservacao(notes, observacaoDeCores(items)),
@@ -252,7 +290,7 @@ export function PaginaNovoPedido() {
         </div>
       )}
 
-      <form onSubmit={(e) => void handleSubmit(e)} className="space-y-5">
+      <form onSubmit={handleSubmit} className="space-y-5">
         {!ehLoja && (
           <div className="space-y-1.5">
             <label htmlFor="customer" className="text-sm font-medium text-foreground">
@@ -279,16 +317,6 @@ export function PaginaNovoPedido() {
               </p>
             ) : null}
           </div>
-        )}
-
-        {podeEscolherTabela && (
-          <SeletorDeTabela
-            tabelas={tabelas}
-            valor={tabelaId}
-            onEscolher={(id) => void escolherTabela(id)}
-            contexto="pedido"
-            aviso={avisoDeDivergencia}
-          />
         )}
 
         <div className="space-y-1.5">
@@ -465,6 +493,18 @@ export function PaginaNovoPedido() {
               }),
             )
           }
+        />
+      )}
+
+      {confirmando && confirmacaoDaTabela && (
+        <ConfirmarTabela
+          titulo={confirmacaoDaTabela.titulo}
+          detalhe={confirmacaoDaTabela.detalhe}
+          tabela={confirmacaoDaTabela.tabela}
+          rotuloConfirmar={confirmacaoDaTabela.rotuloConfirmar ?? `Sim, enviar`}
+          ocupado={submitting}
+          onConfirmar={() => void enviarPedido()}
+          onCancelar={() => setConfirmando(false)}
         />
       )}
 
