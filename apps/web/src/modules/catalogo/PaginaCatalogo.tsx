@@ -11,15 +11,12 @@ import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { CartaoProduto } from '../../components/comercial/CartaoProduto.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
+import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
 
 const ALL = '__all__';
 
-interface PriceTableOption {
-  id: string;
-  name: string;
-}
 
 type SortKey = 'code' | 'name' | 'price_desc' | 'price_asc';
 
@@ -86,9 +83,6 @@ export function PaginaCatalogo() {
   const navigate = useNavigate();
   // Representante não vê o estoque atual da fábrica.
   const canSeeStock = user?.role === 'manager' || user?.role === 'admin';
-  // Só o gerente/admin escolhe a tabela de preço. O representante usa sempre a
-  // tabela que o gerente atribuiu a ele (não pode trocar).
-  const canChoosePriceTable = user?.role === 'manager' || user?.role === 'admin';
   const cartItems = useCartStore((s) => s.items);
   const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
@@ -100,16 +94,21 @@ export function PaginaCatalogo() {
   const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
 
   // ── Consulta de preços por tabela ───────────────────────────────────────────
-  // O rep pode VER o catálogo em outra tabela de preço. É só consulta: o carrinho
-  // e o pedido continuam na tabela do próprio rep (o servidor precifica por ela).
+  // Simular o catálogo em outra tabela: "quanto sai esta peça na 2?". É só
+  // consulta — o carrinho e o pedido continuam pelo cadastro do cliente, que é
+  // quem precifica de verdade.
+  //
+  // A lista vem de `/price-tables/minhas`, que já entrega o conjunto de quem
+  // pede: o representante recebe só as tabelas dele, gerente e admin recebem
+  // todas. Com uma tabela só o seletor não aparece — e isso é a regra, não
+  // economia de tela: ele não pode descobrir que existem outras.
   const defaultTableId = user?.price_table_id ?? '';
-  const [tables, setTables] = useState<PriceTableOption[]>([]);
+  const { tabelas: tables } = useMinhasTabelas();
   const [viewTableId, setViewTableId] = useState<string>(defaultTableId);
   // Overlay: mapa produto→preço da tabela consultada (null = usar a tabela do rep).
   const [overlayPrices, setOverlayPrices] = useState<Map<string, number | null> | null>(null);
   const isConsulting = viewTableId !== '' && viewTableId !== defaultTableId;
   const viewTableName = tables.find((t) => t.id === viewTableId)?.name ?? null;
-  const defaultTableName = tables.find((t) => t.id === defaultTableId)?.name ?? null;
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
   const cartTotal = cartItems.reduce((t, i) => t + i.quantity * i.unit_price, 0);
@@ -128,17 +127,6 @@ export function PaginaCatalogo() {
       })
       .finally(() => setLoading(false));
   }, [token]);
-
-  // Carrega as tabelas de preço só para quem pode escolher (gerente/admin).
-  useEffect(() => {
-    if (!token || !canChoosePriceTable) return;
-    api
-      .get<ApiResponse<PriceTableOption[]>>('/catalog/price-tables', token)
-      .then((res) => setTables(res.data))
-      .catch(() => {
-        /* sem conexão: seguimos só com a tabela do rep */
-      });
-  }, [token, canChoosePriceTable]);
 
   // Ao escolher uma tabela diferente da do rep, busca os preços dela e monta o
   // overlay. Esses preços NÃO vão para o Dexie nem para o carrinho — são só exibição.
@@ -272,7 +260,7 @@ export function PaginaCatalogo() {
           <option value="price_desc">Ordenar: Maior preço</option>
           <option value="price_asc">Ordenar: Menor preço</option>
         </Select>
-        {canChoosePriceTable && tables.length > 1 && (
+        {tables.length > 1 && (
           <Select
             aria-label="Ver preços da tabela"
             value={viewTableId}
@@ -291,9 +279,8 @@ export function PaginaCatalogo() {
 
       {isConsulting && (
         <div className="mb-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
-          Consultando preços de <strong>{viewTableName}</strong>. É só referência — seus
-          pedidos são faturados pela{' '}
-          {defaultTableName ? <strong>{defaultTableName}</strong> : 'sua tabela'}.
+          Simulando preços de <strong>{viewTableName}</strong>. É só referência: o preço do
+          pedido vem da tabela cadastrada no cliente, não desta.
         </div>
       )}
 
