@@ -189,6 +189,139 @@ curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
   diferentes (provável falha no controle interno).
 - A chave de API é secreta — não coloque em código-fonte compartilhado.
 
+---
+
+# Cadastros — o ERP ALIMENTA o app (v1)
+
+A mão inversa dos pedidos: aqui o **seu ERP envia** clientes e representantes
+atualizados, e o app grava. Você lê do seu banco e faz `POST`; o app nunca toca
+no seu sistema. Mesma chave `X-API-Key`, mesma URL base.
+
+**Fluxo recomendado:** a cada ~10 minutos, envie os clientes e os representantes
+(em lotes de até 500). É upsert por **código do ERP**: quem já existe é
+atualizado, quem não existe é criado. Nada é apagado.
+
+## Regras gerais
+
+- **Tolerante:** um registro incompleto é aceito; só é recusado o que não dá para
+  usar (sem código ou sem nome). A resposta lista o que foi ignorado e por quê.
+- **Máximo 500–1000 por requisição.** Acima de 1000 → `400`. Divida em lotes.
+- **Datas e números** no padrão JSON. CNPJ/telefone podem vir com ou sem
+  pontuação.
+- **Desativar** um cliente é mandar `bloqueado: "S"` (ou `ativo: "N"` no rep). O
+  app **nunca apaga** — cliente tem histórico de pedidos preso a ele.
+
+## POST /partner/v1/clientes
+
+Corpo: `{ "clientes": [ ... ] }` (ou a lista pura).
+
+| Campo | Tipo | Precisa? | Observação |
+|---|---|---|---|
+| `codigo` | texto | **Sim** | Código do cliente no ERP. A chave do upsert |
+| `razao_social` | texto | **Sim** | — |
+| `nome_fantasia` | texto | Não | — |
+| `cnpj_cpf` | texto | Recomendado | 11 (CPF) ou 14 (CNPJ) dígitos |
+| `representante` | texto | **Sim, na prática** | Código do rep. Sem ele, o cliente fica sem dono |
+| `tabela_preco` | texto | Recomendado | Código da tabela no ERP. Ver nota abaixo |
+| `endereco` | objeto | Recomendado | `{ logradouro, numero, complemento, bairro, cidade, uf, cep }` — o app junta numa linha. Pode mandar como texto pronto também |
+| `bloqueado` | `"S"`/`"N"` | Não | `S` = cliente não fecha pedido |
+| `limite_credito` | número | Não | — |
+| `whatsapp` | texto | Não | Com DDD |
+| `email` | texto | Não | — |
+
+**Nota da tabela de preço:** o vínculo é pelo **código** do ERP. Hoje as tabelas
+no app estão sem esse código preenchido — enquanto isso, o cliente entra sem
+tabela e usa a do representante. Para o vínculo funcionar, o código do ERP de
+cada tabela precisa ser preenchido no app (uma vez). A resposta avisa quais
+códigos de tabela não foram encontrados.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/clientes
+X-API-Key: SUA_CHAVE
+Content-Type: application/json
+
+{
+  "clientes": [
+    {
+      "codigo": "01234",
+      "razao_social": "LOJA DA MARIA LTDA",
+      "nome_fantasia": "Moda Maria",
+      "cnpj_cpf": "12.345.678/0001-90",
+      "representante": "00779",
+      "tabela_preco": "01",
+      "endereco": {
+        "logradouro": "Rua das Flores", "numero": "123",
+        "bairro": "Centro", "cidade": "Juiz de Fora", "uf": "MG",
+        "cep": "36000-000"
+      },
+      "bloqueado": "N",
+      "whatsapp": "32988887777"
+    }
+  ]
+}
+```
+
+**Resposta 200:**
+
+```json
+{
+  "ok": true,
+  "recebidos": 1,
+  "criados": 1,
+  "atualizados": 0,
+  "ignorados": [],
+  "avisos": [],
+  "servidor_hora": "2026-08-11T20:13:15.006Z"
+}
+```
+
+`ignorados` traz `{ "codigo": "...", "motivo": "..." }` para cada registro
+recusado. `avisos` traz o que passou mas merece conferência (tabela não achada).
+
+## POST /partner/v1/representantes
+
+Corpo: `{ "representantes": [ ... ] }`.
+
+| Campo | Tipo | Precisa? | Observação |
+|---|---|---|---|
+| `codigo` | texto | **Sim** | Código do rep no ERP. É o que liga os clientes a ele |
+| `nome` | texto | **Sim** | — |
+| `razao_social` | texto | Não | — |
+| `email` | texto | Recomendado | Vira o login dele (minúsculo) |
+| `ativo` | `"S"`/`"N"` | Não | — |
+
+**Importante — login não nasce por aqui.** Este endpoint **atualiza** os
+representantes que já têm login no app (nome, e-mail, ativo). Um rep que existe no
+ERP mas ainda não tem acesso no app **não é criado** — ele volta na resposta em
+`novos`, para o administrador criar o acesso à mão (conta precisa de senha, e
+senha não nasce de um POST). Isso não trava nada: o cliente já liga ao rep pelo
+código, mesmo antes de o rep ter login.
+
+**Resposta 200** (além dos campos comuns): `"novos": [ { "codigo": "...",
+"nome": "..." } ]`.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400 INVALID_BODY` | O corpo não é uma lista nem `{ "clientes": [...] }` |
+| `400 BATCH_TOO_LARGE` | Mais de 1000 registros num POST |
+| `401 PARTNER_UNAUTHORIZED` | Chave ausente ou errada |
+| `503 PARTNER_API_DISABLED` | A chave ainda não foi configurada no servidor |
+
+## Boas práticas (cadastros)
+
+- Envie a cada ~10 min. Não precisa mandar tudo sempre — mandar só o que mudou
+  (por `DATA_UPDATE`) deixa o lote pequeno.
+- Leia a resposta: `ignorados` e `avisos` mostram o que precisa de ajuste no
+  cadastro do ERP.
+- Preencha o código do ERP das tabelas de preço no app uma vez, senão os clientes
+  entram sem tabela.
+
+---
+
 ## Dúvidas / suporte
 
 Falar com Yan (responsável pelo sistema de pedidos).
