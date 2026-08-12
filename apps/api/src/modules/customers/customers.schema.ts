@@ -17,11 +17,12 @@ export const createCustomerSchema = z.object({
   // venda. O que estiver preenchido, porém, é validado: dado sujo é pior que dado
   // ausente, porque parece certo.
   name: z.string().trim().min(2, 'Nome / razão social é obrigatório'),
-  // CNPJ (14) ou CPF (11) — o cliente pode ser PJ ou PF.
-  cnpj: opcionalCom(
-    (v) => [11, 14].includes(somenteDigitos(v).length),
-    'Informe um CNPJ (14 dígitos) ou CPF (11 dígitos), ou deixe em branco',
-  ),
+  // Obrigatório. CPF (11) ou CNPJ (14) — o cliente pode ser PF ou PJ.
+  cnpj: z
+    .string()
+    .trim()
+    .min(1, 'CPF / CNPJ é obrigatório')
+    .refine((v) => [11, 14].includes(somenteDigitos(v).length), 'Informe um CPF (11 dígitos) ou CNPJ (14 dígitos)'),
   whatsapp: opcionalCom((v) => {
     const n = somenteDigitos(v).length;
     return n >= 10 && n <= 11;

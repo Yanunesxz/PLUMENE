@@ -94,16 +94,17 @@ export function PaginaClientes() {
       setError('Informe o nome / razão social do cliente.');
       return;
     }
-    // Só o nome é obrigatório: cliente cadastrado no app não vai para o Control,
-    // então não faz sentido exigir aqui o padrão fiscal que só o Control precisa.
-    // O resto é opcional — mas o que ESTIVER preenchido tem que estar certo, para
-    // um dígito a menos no CNPJ não virar dado sujo.
-    if (form.cnpj.trim()) {
-      const cnpjLen = digitos(form.cnpj).length;
-      if (cnpjLen !== 11 && cnpjLen !== 14) {
-        setError('CPF tem 11 dígitos e CNPJ 14. Deixe em branco se não tiver agora.');
-        return;
-      }
+    // Obrigatórios: nome e CPF/CNPJ. O resto é opcional — cliente cadastrado no
+    // app não vai para o Control, então WhatsApp, e-mail e endereço não travam a
+    // venda. Mas o que estiver preenchido continua validado.
+    const cnpjLen = digitos(form.cnpj).length;
+    if (cnpjLen === 0) {
+      setError('Informe o CPF ou CNPJ do cliente.');
+      return;
+    }
+    if (cnpjLen !== 11 && cnpjLen !== 14) {
+      setError('CPF tem 11 dígitos e CNPJ 14.');
+      return;
     }
     if (form.whatsapp.trim()) {
       const zapLen = digitos(form.whatsapp).length;
@@ -184,7 +185,9 @@ export function PaginaClientes() {
               <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Opcional" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">CPF / CNPJ</label>
+              <label className="text-sm font-medium text-foreground">
+                CPF / CNPJ <span className="text-danger">*</span>
+              </label>
               <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="00.000.000/0000-00" inputMode="numeric" />
             </div>
             <div className="space-y-1.5">
