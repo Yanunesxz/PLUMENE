@@ -94,26 +94,26 @@ export function PaginaClientes() {
       setError('Informe o nome / razão social do cliente.');
       return;
     }
-    const cnpjLen = digitos(form.cnpj).length;
-    if (cnpjLen === 0) {
-      setError('Informe o CNPJ ou CPF do cliente.');
-      return;
+    // Só o nome é obrigatório: cliente cadastrado no app não vai para o Control,
+    // então não faz sentido exigir aqui o padrão fiscal que só o Control precisa.
+    // O resto é opcional — mas o que ESTIVER preenchido tem que estar certo, para
+    // um dígito a menos no CNPJ não virar dado sujo.
+    if (form.cnpj.trim()) {
+      const cnpjLen = digitos(form.cnpj).length;
+      if (cnpjLen !== 11 && cnpjLen !== 14) {
+        setError('CPF tem 11 dígitos e CNPJ 14. Deixe em branco se não tiver agora.');
+        return;
+      }
     }
-    if (cnpjLen !== 11 && cnpjLen !== 14) {
-      setError('CNPJ deve ter 14 dígitos (ou CPF com 11).');
-      return;
+    if (form.whatsapp.trim()) {
+      const zapLen = digitos(form.whatsapp).length;
+      if (zapLen < 10 || zapLen > 11) {
+        setError('WhatsApp precisa do DDD (10 ou 11 dígitos). Deixe em branco se não tiver.');
+        return;
+      }
     }
-    const zapLen = digitos(form.whatsapp).length;
-    if (zapLen < 10 || zapLen > 11) {
-      setError('Informe o WhatsApp com DDD (10 ou 11 dígitos).');
-      return;
-    }
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) {
-      setError('Informe um e-mail válido.');
-      return;
-    }
-    if (form.address.trim().length < 5) {
-      setError('Informe o endereço do cliente.');
+    if (form.email.trim() && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(form.email.trim())) {
+      setError('E-mail inválido. Deixe em branco se não tiver.');
       return;
     }
     if (precisaEscolher && !tabelaEscolhida) {
@@ -184,27 +184,19 @@ export function PaginaClientes() {
               <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Opcional" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
-                CNPJ / CPF <span className="text-danger">*</span>
-              </label>
+              <label className="text-sm font-medium text-foreground">CPF / CNPJ</label>
               <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="00.000.000/0000-00" inputMode="numeric" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
-                WhatsApp <span className="text-danger">*</span>
-              </label>
+              <label className="text-sm font-medium text-foreground">WhatsApp</label>
               <Input value={form.whatsapp} onChange={setF('whatsapp')} placeholder="(00) 00000-0000" inputMode="tel" />
             </div>
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-foreground">
-                E-mail <span className="text-danger">*</span>
-              </label>
+              <label className="text-sm font-medium text-foreground">E-mail</label>
               <Input type="email" value={form.email} onChange={setF('email')} placeholder="cliente@email.com" autoComplete="off" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-sm font-medium text-foreground">
-                Endereço <span className="text-danger">*</span>
-              </label>
+              <label className="text-sm font-medium text-foreground">Endereço</label>
               <Input value={form.address} onChange={setF('address')} placeholder="Rua, número, bairro, cidade - UF" />
             </div>
             <div className="sm:col-span-2">
