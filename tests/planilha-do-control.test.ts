@@ -105,11 +105,30 @@ describe('linhas do pedido', () => {
   it('gasta DUAS linhas quando a referência pega letras e plus', () => {
     // O caso do Yan: "0130 quero 3M e 3 plus" tem de virar duas linhas. E no
     // Control a de baixo é outro PRODUTO — "0130 PLUS", como está no cadastro
-    // dele: "0130" tem PP→EG, "0130 PLUS" tem 48→54.
+    // dele: "0130" tem PP→GG, "0130 PLUS" tem 48→54.
     const { linhas } = montarLinhas([item('0130', 'M', 3), item('0130', '52', 3)]);
     expect(linhas).toHaveLength(2);
     expect(linhas.map((l) => l.ref)).toEqual(['0130', '0130 PLUS']);
     expect(linhas.map((l) => l.sistema)).toEqual(['letras', 'numerica']);
+  });
+
+  it('manda o tamanho grande em letra (XG/EG) para a linha PLUS, não só o 48', () => {
+    // O que o Control recusava: "2130" com XG junto do base. A coluna Q é o "48"
+    // do "2130 PLUS", outro produto — então o XG tem de sair em linha própria,
+    // igual ao 48. Sem isso o 2130 saía numa linha só e o Control derrubava.
+    const { linhas } = montarLinhas([item('2130', 'M', 3), item('2130', 'XG', 4)]);
+    expect(linhas).toHaveLength(2);
+    expect(linhas.map((l) => l.ref)).toEqual(['2130', '2130 PLUS']);
+    expect(linhas[1]?.quantidades).toEqual({ Q: 4 });
+    expect(linhas[1]?.pecas).toBe(4);
+  });
+
+  it('junta 48 e XG do mesmo produto na MESMA linha PLUS', () => {
+    // 48 e XG caem os dois na coluna Q e são o mesmo produto plus: uma linha só.
+    const { linhas } = montarLinhas([item('0130', 'XG', 2), item('0130', '48', 1)]);
+    expect(linhas).toHaveLength(1);
+    expect(linhas[0]?.ref).toBe('0130 PLUS');
+    expect(linhas[0]?.quantidades).toEqual({ Q: 3 });
   });
 
   it('não põe PLUS no infantil nem no juvenil', () => {

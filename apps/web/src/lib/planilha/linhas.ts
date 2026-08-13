@@ -3,6 +3,7 @@ import {
   refDaPlanilha,
   tamanhoIgnorado,
   SUFIXO_PLUS,
+  COLUNAS_PLUS,
   type SistemaDeGrade,
 } from './colunas.js';
 
@@ -65,19 +66,24 @@ export function montarLinhas(itens: readonly ItemParaPlanilha[]): MontagemDeLinh
     }
 
     // No Control a grade plus é OUTRO produto, não outro tamanho do mesmo: o
-    // cadastro tem "0130" com PP→EG e "0130 PLUS" com 48→54. Foi isso que
+    // cadastro tem "0130" com PP→GG e "0130 PLUS" com 48→54. Foi isso que
     // derrubou a linha do 50 na primeira importação que funcionou — o produto
     // 0130 não tem tamanho 50, quem tem é o 0130 PLUS.
     //
-    // A grade `numerica` é sempre a plus aqui: o catálogo não tem numeração
-    // adulta 36→46: os únicos números grandes são os 48/50/52/54 das quatro
-    // referências plus size.
+    // O que decide a linha plus é a COLUNA, não o sistema. Qualquer peça que
+    // cai na faixa Q→T é do produto plus — venha ela como 48 (numérica) ou como
+    // XG/EG (letras). Mandar só o 48 para a linha plus e deixar o XG junto do
+    // base era o bug: o Control recusava a linha do "2130" com XG, porque o 2130
+    // não tem esse tamanho — quem tem é o "2130 PLUS". A linha plus é sempre
+    // numérica (48→54), que é como o Control lê as colunas Q→T.
     const base = refDaPlanilha(item.sku);
-    const ref = celula.sistema === 'numerica' ? `${base}${SUFIXO_PLUS}` : base;
-    const chave = `${ref}::${celula.sistema}`;
+    const ehPlus = COLUNAS_PLUS.has(celula.coluna);
+    const ref = ehPlus ? `${base}${SUFIXO_PLUS}` : base;
+    const sistema: SistemaDeGrade = ehPlus ? 'numerica' : celula.sistema;
+    const chave = `${ref}::${sistema}`;
     const linha = porChave.get(chave) ?? {
       ref,
-      sistema: celula.sistema,
+      sistema,
       quantidades: {},
       pecas: 0,
       unit_price: item.unit_price,

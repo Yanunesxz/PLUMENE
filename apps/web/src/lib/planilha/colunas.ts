@@ -85,6 +85,16 @@ export function celulaDoTamanho(size: string): CelulaDoTamanho | null {
 export const SUFIXO_PLUS = ' PLUS';
 
 /**
+ * A faixa "PLUS" do formulário: as colunas Q→T (48/50/52/54, e os XG→XG4 /
+ * EG→EGGG que caem nelas). Toda quantidade que cai aqui é de OUTRO produto no
+ * Control — o "0130 PLUS", cadastrado à parte do "0130" — e por isso vai numa
+ * linha própria, nunca junto do base. Vale para o tamanho que chega como número
+ * (48) e para o que chega como letra (XG): os dois são o mesmo corpo, a mesma
+ * coluna, o mesmo produto plus.
+ */
+export const COLUNAS_PLUS: ReadonlySet<string> = new Set(['Q', 'R', 'S', 'T']);
+
+/**
  * Tamanhos que ficam de fora da planilha SEM virar aviso.
  *
  * "LD" não é tamanho de venda — o Yan foi explícito em 10/08/2026: tudo que
