@@ -322,4 +322,17 @@ describe('preenchimento do modelo oficial', () => {
     expect(xml).not.toMatch(/<c r="B2"[^>]*t="inlineStr">/);
     expect(xml).not.toMatch(/<c r="A45"[^>]*t="inlineStr">/);
   });
+
+  it('renomeia os rótulos da faixa PLUS para os nomes do Control: EG/EGG/EGGG', () => {
+    // A importação de 13/08/2026: o Control tentou "48" e "XG" para o
+    // "0128 PLUS" e recusou — o cadastro dele chama o tamanho de "EG". Só as
+    // 4 refs numéricas usam o 48→54 da linha 12, que segue intacta.
+    const xml = sheet1(folhaComUmaLinha().arquivo);
+    expect(xml).toMatch(/<c r="Q11"[^>]*t="inlineStr"><is><t>EG<\/t>/);
+    expect(xml).toMatch(/<c r="R11"[^>]*t="inlineStr"><is><t>EGG<\/t>/);
+    expect(xml).toMatch(/<c r="S11"[^>]*t="inlineStr"><is><t>EGGG<\/t>/);
+    // T11 (XG4) e a linha numérica (Q12 = "48") ficam como estão no modelo.
+    expect(xml).not.toMatch(/<c r="T11"[^>]*t="inlineStr">/);
+    expect(xml).not.toMatch(/<c r="Q12"[^>]*t="inlineStr">/);
+  });
 });

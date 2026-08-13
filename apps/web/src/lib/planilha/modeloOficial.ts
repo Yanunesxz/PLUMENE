@@ -74,6 +74,23 @@ const CELULA_OBSERVACAO = 'A45';
  */
 const CELULA_COND_PGTO = 'C8';
 
+/**
+ * Os rótulos da faixa PLUS (linha 11, colunas Q→S) saem RENOMEADOS no arquivo:
+ * o formulário imprime XG/XG2/XG3, mas o Control chama esses tamanhos de
+ * EG/EGG/EGGG. Foi a importação real de 13/08/2026 que provou: na linha do
+ * "0128 PLUS" o Control tentou "48" e "XG" — os dois rótulos empilhados na
+ * coluna Q — e recusou com "NÃO ENCONTRADO", porque o cadastro do produto tem
+ * o tamanho "EG". Renomeado, ele acha: as 4 refs numéricas (0130, 0703, 0705,
+ * 0706) casam com o "48" da linha 12, que fica intacta, e todas as outras
+ * casam com o EG/EGG/EGGG daqui. T11 (XG4) fica como está: nenhum produto do
+ * Control tem uma quarta forma "E" conhecida.
+ */
+const ROTULOS_PLUS: ReadonlyArray<readonly [string, string]> = [
+  ['Q11', 'EG'],
+  ['R11', 'EGG'],
+  ['S11', 'EGGG'],
+];
+
 const PLANILHA_DO_PEDIDO = 'xl/worksheets/sheet1.xml';
 const PLANILHA_DOS_PRECOS = 'xl/worksheets/sheet2.xml';
 const TEXTOS = 'xl/sharedStrings.xml';
@@ -330,6 +347,12 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   if (dados.observacao) {
     patches.set(CELULA_OBSERVACAO, { tipo: 'texto', valor: dados.observacao });
+  }
+
+  // Em todo arquivo, sempre: o rótulo certo não atrapalha quem casa pela linha
+  // 12 (as 4 refs numéricas) e destrava todo o resto. Ver ROTULOS_PLUS.
+  for (const [celula, rotulo] of ROTULOS_PLUS) {
+    patches.set(celula, { tipo: 'texto', valor: rotulo });
   }
 
   const preenchida = aplicarPatches(textoDecodificado.decode(sheet1), patches);
