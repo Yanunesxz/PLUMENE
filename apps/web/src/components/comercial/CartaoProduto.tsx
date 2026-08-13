@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ImageIcon, Plus, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
-import { ordenarGrade } from './grade.js';
+import { faixasDePreco, ordenarGrade } from './grade.js';
 
 interface CartaoProdutoProps {
   product: ProductWithPrice;
@@ -45,6 +45,7 @@ export function CartaoProduto({
   const faltando = grade.filter((v) => !v.in_stock);
   const outOfStock = temGrade && faltando.length === grade.length;
   const available = grade.reduce((sum, v) => sum + (v.available ?? 0), 0);
+  const faixas = faixasDePreco(product);
 
   return (
     <div
@@ -137,12 +138,29 @@ export function CartaoProduto({
         <p className="line-clamp-2 text-[13px] leading-snug text-muted-foreground">{product.name}</p>
 
         <div className="flex items-center justify-between gap-2 pt-0.5">
-          {product.price != null ? (
+          {/* Uma faixa → só o preço, como sempre foi. Duas → o rótulo da faixa
+              ao lado de cada preço, do jeito que a tabela da fábrica apresenta:
+              "P AO GG  R$ 41,90" e "48 AO 54  R$ 52,90". Sem o rótulo, os dois
+              valores no card seriam dois números sem explicação. */}
+          {faixas.length === 0 ? (
+            <p className="text-xs text-subtle">Sob consulta</p>
+          ) : faixas.length === 1 ? (
             <p className="tnum text-[15px] font-semibold tracking-tight text-foreground">
-              {formatBRL(product.price)}
+              {formatBRL(faixas[0]!.preco)}
             </p>
           ) : (
-            <p className="text-xs text-subtle">Sob consulta</p>
+            <div className="flex flex-col gap-0.5">
+              {faixas.map((f) => (
+                <div key={f.rotulo} className="flex items-baseline gap-2">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-subtle">
+                    {f.rotulo}
+                  </span>
+                  <span className="tnum text-[15px] font-semibold tracking-tight text-foreground">
+                    {formatBRL(f.preco)}
+                  </span>
+                </div>
+              ))}
+            </div>
           )}
 
           {hasColors && (

@@ -3,7 +3,8 @@ import { X, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
 import { QuadradoDoTamanho } from './QuadradoDoTamanho.js';
-import { ordenarGrade } from './grade.js';
+import { faixasDePreco, ordenarGrade } from './grade.js';
+import { precoDoTamanho } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
 
 export interface PickedSize {
@@ -88,7 +89,13 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
 
   // Total da peça inteira, somando TODAS as cores — é o que vai para o carrinho.
   const totalPecas = Object.values(qty).reduce((s, n) => s + n, 0);
-  const totalValue = totalPecas * (active.price ?? 0);
+  // Somado tamanho a tamanho, e não `peças × preço`: o EG e a grade plus custam
+  // mais caro, então multiplicar tudo pelo preço normal daria um total menor do
+  // que a fábrica vai faturar. A chave é `produto|cor|tamanho`.
+  const totalValue = Object.entries(qty).reduce((soma, [chave, n]) => {
+    const size = chave.split('|')[2] ?? '';
+    return soma + n * (precoDoTamanho(size, active.price, active.price_larger) ?? 0);
+  }, 0);
 
   /** Quantas peças já marcadas numa cor — para o selo na bolinha. */
   const qtdDaCor = (codigo: string) =>
@@ -138,9 +145,20 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                 <span className="tnum font-mono text-[11px] font-semibold tracking-wide text-subtle">
                   {active.sku}
                 </span>
-                {active.price != null && (
-                  <span className="tnum text-sm font-semibold text-foreground">{formatBRL(active.price)}</span>
-                )}
+                {/* As duas faixas, quando existem: aqui é onde o representante
+                    escolhe o tamanho, então é aqui que ele precisa ver que o EG
+                    sai mais caro — antes de marcar a quantidade. */}
+                {faixasDePreco(active).map((f, i, todas) => (
+                  <span key={f.rotulo} className="tnum text-sm font-semibold text-foreground">
+                    {todas.length > 1 && (
+                      <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-subtle">
+                        {f.rotulo}
+                      </span>
+                    )}
+                    {formatBRL(f.preco)}
+                    {i < todas.length - 1 && <span className="ml-2 text-subtle">·</span>}
+                  </span>
+                ))}
               </p>
             </div>
           </div>

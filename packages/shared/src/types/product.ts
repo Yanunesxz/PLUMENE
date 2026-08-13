@@ -59,6 +59,12 @@ export interface ProductPrice {
   variant_id: string | null;
   price_table_id: string;
   price: number;
+  /**
+   * Preço da FAIXA MAIOR (EG/XG/48-54) — a segunda linha da tabela oficial.
+   * `null` = a referência tem preço único (é o caso dos infantis e juvenis).
+   * Ver `pricing/faixaDeTamanho.ts` para quais tamanhos caem nesta faixa.
+   */
+  price_larger: number | null;
   updated_at: string;
 }
 
@@ -100,6 +106,12 @@ export interface ProductWithPrice
   > {
   /** Preço na tabela consultada. `null` = sem preço nessa tabela. */
   price: number | null;
+  /**
+   * Preço da faixa maior (EG/XG/48-54) na tabela consultada. `null` = a peça
+   * tem preço único para toda a grade. Use `precoDoTamanho` para resolver o
+   * preço de um tamanho — não escolha entre os dois na mão.
+   */
+  price_larger: number | null;
   variants?: CatalogVariant[];
   /** Cores do catálogo impresso (migração 019). Vazio = peça sem cor definida. */
   colors?: CatalogColor[];

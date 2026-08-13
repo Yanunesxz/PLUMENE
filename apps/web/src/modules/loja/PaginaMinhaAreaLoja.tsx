@@ -30,6 +30,7 @@ import { cn, formatBRL } from '../../lib/utils.js';
 import { STATUS_VARIANTE } from '../../lib/pedido.js';
 import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { ApiResponse, MinhaAreaLoja, PecaComprada, ProductWithPrice } from '@csb/shared';
+import { precoDoTamanho } from '@csb/shared';
 
 /**
  * A última resposta boa fica no aparelho.
@@ -147,7 +148,7 @@ export function PaginaMinhaAreaLoja() {
           product_name: produto.name,
           sku: produto.sku,
           quantity: item.quantity,
-          unit_price: produto.price,
+          unit_price: precoDoTamanho(tamanho, produto.price, produto.price_larger) ?? produto.price,
         });
         adicionados += 1;
       }

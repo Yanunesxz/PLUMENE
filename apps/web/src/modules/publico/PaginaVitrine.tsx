@@ -12,6 +12,7 @@ import { api } from '../../services/api.js';
 import { formatBRL } from '../../lib/utils.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { ApiResponse, ProductWithPrice, SessaoVitrine } from '@csb/shared';
+import { precoDoTamanho } from '@csb/shared';
 
 interface Linha {
   product_id: string;
@@ -353,7 +354,7 @@ export function PaginaVitrine() {
                     sku: escolhido.sku,
                     nome: escolhido.name,
                     quantidade: e.quantity,
-                    preco: escolhido.price ?? 0,
+                    preco: precoDoTamanho(e.size, escolhido.price, escolhido.price_larger) ?? 0,
                     color_code: e.color_code ?? null,
                     color_name: e.color_name ?? null,
                   });

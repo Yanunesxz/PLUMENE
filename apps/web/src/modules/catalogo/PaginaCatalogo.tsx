@@ -14,6 +14,7 @@ import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
+import { precoDoTamanho } from '@csb/shared';
 
 const ALL = '__all__';
 
@@ -386,7 +387,10 @@ export function PaginaCatalogo() {
                 product_name: chosen.name,
                 sku: chosen.sku,
                 quantity: l.quantity,
-                unit_price: chosen.price ?? 0,
+                // O EG e a grade plus custam mais na tabela da fábrica. A API
+                // recalcula tudo no envio; isto é para a tela e o total baterem
+                // com o que vai ser cobrado.
+                unit_price: precoDoTamanho(l.size, chosen.price, chosen.price_larger) ?? 0,
               }),
             )
           }

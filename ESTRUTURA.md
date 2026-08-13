@@ -48,6 +48,9 @@ packages/shared/src/
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
 └── pricing/
+    ├── faixaDeTamanho.ts → EG/XG/48-54 custam mais: qual tamanho é "faixa maior"
+    │                       e qual preço cobrar. Usado pela API (grava o pedido)
+    │                       E pelo app (mostra a tela) — precisa ser o MESMO.
     └── priceTier.ts      → (LEGADO/abandonado) regra de preço por total do pedido
 ```
 
@@ -87,7 +90,8 @@ apps/api/src/
 │       ├── 022_controle_de_logins.sql → permissions do gerente + last_login_at
 │       ├── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
 │       ├── 024_remove_comissao.sql → DROP da coluna commission_rate (destrutiva)
-│       └── 025_tabela_do_pedido.sql → orders.price_table_id (a tabela DO pedido)
+│       ├── 025_tabela_do_pedido.sql → orders.price_table_id (a tabela DO pedido)
+│       └── 026_preco_da_faixa_maior.sql → product_prices.price_larger (EG/XG/48-54)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -200,6 +204,10 @@ apps/web/
 
 ```
 _tools/
+├── tabelas-2027/
+│   ├── extrair.py      → lê os 3 PDFs oficiais → tabelas-2027.json (as 2 faixas)
+│   ├── carregar.mjs    → substitui as tabelas de preço pelas do PDF
+│   └── carregar-faixa-maior.mjs → preenche price_larger (exige a migração 026)
 ├── erp-sync/
 │   ├── sync.py    → Firebird → Supabase. Modos: full, products, prices, customers,
 │   │                stock, reconcile (liga/desliga ativo), prices-audit (diagnóstico)

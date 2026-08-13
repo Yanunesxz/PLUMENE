@@ -2,7 +2,7 @@ import { supabase } from '../../config/supabase.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
-import { ORDER_STATUS_FLOW } from '@csb/shared';
+import { ORDER_STATUS_FLOW, precoDoTamanho } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
 
 export async function getOrders(
@@ -55,22 +55,71 @@ export async function getOrderById(
   return order as OrderWithItems;
 }
 
+interface PrecoDoProduto {
+  price: number;
+  price_larger: number | null;
+}
+
+/**
+ * `product_prices.price_larger` vem da migração 026 — mesmo cuidado das outras
+ * detecções deste arquivo. Sem a coluna, a faixa maior fica null e todo tamanho
+ * paga o preço normal: é o comportamento anterior à migração, não um erro.
+ */
+let temColunaDaFaixaMaior: boolean | null = null;
+
+async function detectarColunaDaFaixaMaior(): Promise<boolean> {
+  if (temColunaDaFaixaMaior !== null) return temColunaDaFaixaMaior;
+  const { error } = await supabase.from('product_prices').select('price_larger').limit(1);
+  temColunaDaFaixaMaior = !error;
+  return temColunaDaFaixaMaior;
+}
+
 // Preço dos produtos na tabela de preço do representante. É a fonte autoritativa:
 // o unit_price que vem do cliente nunca é usado para gravar/totalizar o pedido.
 async function getPriceMap(
   price_table_id: string | null,
   productIds: string[],
-): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
+): Promise<Map<string, PrecoDoProduto>> {
+  const map = new Map<string, PrecoDoProduto>();
   if (!price_table_id || productIds.length === 0) return map;
+
+  const colunas = (await detectarColunaDaFaixaMaior())
+    ? 'product_id, price, price_larger'
+    : 'product_id, price';
 
   const { data } = await supabase
     .from('product_prices')
-    .select('product_id, price')
+    .select(colunas)
     .eq('price_table_id', price_table_id)
     .in('product_id', productIds);
 
-  for (const pp of data ?? []) map.set(pp.product_id as string, pp.price as number);
+  for (const pp of (data ?? []) as unknown as Array<{
+    product_id: string;
+    price: number;
+    price_larger?: number | null;
+  }>) {
+    map.set(pp.product_id, { price: pp.price, price_larger: pp.price_larger ?? null });
+  }
+  return map;
+}
+
+/**
+ * O tamanho de cada variante pedida — é ele que decide a faixa de preço.
+ *
+ * Vem do banco, nunca do corpo da requisição: o tamanho escolhe entre o preço
+ * normal e o da faixa maior, então aceitá-lo do cliente seria deixar quem monta
+ * o pedido escolher quanto vai pagar pelo EG.
+ */
+async function getSizeMap(variantIds: string[]): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  if (variantIds.length === 0) return map;
+
+  const { data } = await supabase
+    .from('product_variants')
+    .select('id, size')
+    .in('id', variantIds);
+
+  for (const v of data ?? []) map.set(v.id as string, v.size as string);
   return map;
 }
 
@@ -194,11 +243,27 @@ export async function createOrder(
   // não tiver preço definido nessa tabela, o pedido é recusado (não confiamos
   // num preço vindo do cliente).
   const productIds = [...new Set(body.items.map((item) => item.product_id))];
-  const priceMap = await getPriceMap(price_table_id, productIds);
+  const variantIds = [...new Set(body.items.map((i) => i.variant_id).filter((v): v is string => !!v))];
+  const [priceMap, sizeMap] = await Promise.all([
+    getPriceMap(price_table_id, productIds),
+    getSizeMap(variantIds),
+  ]);
 
   const items = body.items.map((item) => {
-    const unit_price = priceMap.get(item.product_id);
-    if (unit_price === undefined) {
+    const preco = priceMap.get(item.product_id);
+    if (preco === undefined) {
+      throw new Error('PRICE_NOT_FOUND');
+    }
+    // O EG (e a grade plus 48-54) custa mais caro na tabela da fábrica. Quem
+    // decide é o tamanho da variante, lido do banco — ver `precoDoTamanho`.
+    // Item sem variante cai na faixa normal: é o pedido antigo/offline que não
+    // gravou o tamanho, e cobrar o preço maior por suposição seria pior.
+    const unit_price = precoDoTamanho(
+      item.variant_id ? sizeMap.get(item.variant_id) : null,
+      preco.price,
+      preco.price_larger,
+    );
+    if (unit_price == null) {
       throw new Error('PRICE_NOT_FOUND');
     }
     return {

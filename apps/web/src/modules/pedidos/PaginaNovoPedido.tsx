@@ -18,6 +18,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
+import { precoDoTamanho } from '@csb/shared';
 
 export function PaginaNovoPedido() {
   const navigate = useNavigate();
@@ -487,7 +488,10 @@ export function PaginaNovoPedido() {
                 product_name: chosen.name,
                 sku: chosen.sku,
                 quantity: l.quantity,
-                unit_price: chosen.price ?? 0,
+                // O EG e a grade plus custam mais na tabela da fábrica. A API
+                // recalcula tudo no envio; isto é para a tela e o total baterem
+                // com o que vai ser cobrado.
+                unit_price: precoDoTamanho(l.size, chosen.price, chosen.price_larger) ?? 0,
                 color_code: l.color_code ?? null,
                 color_name: l.color_name ?? null,
               }),

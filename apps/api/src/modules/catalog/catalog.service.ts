@@ -30,6 +30,22 @@ export async function priceTableBelongsToCompany(
   return !!data;
 }
 
+/**
+ * `product_prices.price_larger` vem da migração 026. Como o código sobe para a
+ * Vercel/Railway antes de alguém rodar o SQL no Supabase, pedir a coluna cedo
+ * demais derrubaria o catálogo inteiro — e catálogo vazio é o representante sem
+ * poder vender. Enquanto a coluna não existe, o preço da faixa maior fica null e
+ * todo mundo paga o preço normal, que é exatamente o comportamento de hoje.
+ */
+let temColunaDaFaixaMaior: boolean | null = null;
+
+async function temFaixaMaior(): Promise<boolean> {
+  if (temColunaDaFaixaMaior !== null) return temColunaDaFaixaMaior;
+  const { error } = await supabase.from('product_prices').select('price_larger').limit(1);
+  temColunaDaFaixaMaior = !error;
+  return temColunaDaFaixaMaior;
+}
+
 export interface CatalogOptions {
   price_table_id?: string | undefined;
   /**
@@ -161,30 +177,39 @@ export async function getProducts(
     /* sem a 019 o catálogo continua funcionando, só sem bolinha de cor */
   }
 
-  const priceMap = new Map<string, number>();
+  const priceMap = new Map<string, { price: number; price_larger: number | null }>();
   if (price_table_id) {
+    const colunas = (await temFaixaMaior()) ? 'product_id, price, price_larger' : 'product_id, price';
     // Uma linha por produto nesta tabela, então hoje cabe folgado — mas paginado
     // pelo mesmo motivo: o dia em que o catálogo passar de 1.000 itens, o preço
     // sumiria em silêncio e metade do catálogo abriria vazia.
-    const prices = await buscarPorIds<{ product_id: string; price: number }>(
-      productIds,
-      (lote, de, ate) =>
-        supabase
-          .from('product_prices')
-          .select('product_id, price')
-          .eq('price_table_id', price_table_id)
-          .in('product_id', lote)
-          .range(de, ate),
+    const prices = await buscarPorIds<{
+      product_id: string;
+      price: number;
+      price_larger?: number | null;
+    }>(productIds, (lote, de, ate) =>
+      supabase
+        .from('product_prices')
+        .select(colunas)
+        .eq('price_table_id', price_table_id)
+        .in('product_id', lote)
+        .range(de, ate),
     );
-    for (const pp of prices) priceMap.set(pp.product_id, pp.price);
+    for (const pp of prices) {
+      priceMap.set(pp.product_id, { price: pp.price, price_larger: pp.price_larger ?? null });
+    }
   }
 
-  const withPrice = products.map((p) => ({
-    ...p,
-    price: priceMap.get(p.id as string) ?? null,
-    variants: variantsByProduct.get(p.id as string) ?? [],
-    colors: coresPorProduto.get(p.id as string) ?? [],
-  })) as ProductWithPrice[];
+  const withPrice = products.map((p) => {
+    const preco = priceMap.get(p.id as string);
+    return {
+      ...p,
+      price: preco?.price ?? null,
+      price_larger: preco?.price_larger ?? null,
+      variants: variantsByProduct.get(p.id as string) ?? [],
+      colors: coresPorProduto.get(p.id as string) ?? [],
+    };
+  }) as ProductWithPrice[];
 
   return onlyPriced ? withPrice.filter((p) => p.price != null) : withPrice;
 }
