@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<title>Meu pedido — Corpo Sensual (simulação)</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --page:    #efe9e6;
+    --card:    #ffffff;
+    --ink:     #2a2224;
+    --soft:    #7c6f71;
+    --line:    #e7ded9;
+    --wine:    #6d2740;
+    --wine-sf: #f4e9ec;
+    --gold:    #a98b5a;
+    --ok:      #2f6d4f;
+    --ok-sf:   #e7f0ea;
+    --ph1:     #f2eae5;
+    --ph2:     #e6d8d0;
+    --serif: "Bodoni Moda", Georgia, "Times New Roman", serif;
+    --sans:  "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --page:#17110f; --card:#211a18; --ink:#efe6e2; --soft:#a99a94; --line:#332826;
+      --wine:#d98aa2; --wine-sf:#2c1a20; --gold:#c8a86e; --ok:#7cc79c; --ok-sf:#16271e;
+      --ph1:#2a211e; --ph2:#372b27;
+    }
+  }
+  :root[data-theme="dark"] {
+    --page:#17110f; --card:#211a18; --ink:#efe6e2; --soft:#a99a94; --line:#332826;
+    --wine:#d98aa2; --wine-sf:#2c1a20; --gold:#c8a86e; --ok:#7cc79c; --ok-sf:#16271e;
+    --ph1:#2a211e; --ph2:#372b27;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--page); color: var(--ink); font-family: var(--sans); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 0 18px 120px; }
+
+  header { text-align: center; padding: 30px 0 22px; }
+  .brand { font-family: var(--serif); font-size: 27px; letter-spacing: .05em; margin: 0; font-weight: 500; }
+  .brand span { display: block; font-family: var(--sans); font-size: 9.5px; letter-spacing: .4em; text-transform: uppercase; color: var(--gold); margin-top: 7px; font-weight: 600; }
+
+  /* Cabeçalho do pedido */
+  .resumo { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 24px 26px; }
+  .resumo .top { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 10px; }
+  .resumo h1 { font-family: var(--serif); font-size: 26px; margin: 0; font-weight: 500; letter-spacing: .01em; }
+  .badge { font-size: 12px; font-weight: 700; padding: 5px 13px; border-radius: 999px; background: var(--ok-sf); color: var(--ok); white-space: nowrap; }
+  .sub { color: var(--soft); font-size: 14px; margin: 6px 0 0; }
+
+  /* Passos do status */
+  .passos { display: flex; gap: 0; margin-top: 22px; }
+  .passo { flex: 1; text-align: center; position: relative; }
+  .passo .dot { width: 12px; height: 12px; border-radius: 50%; background: var(--line); margin: 0 auto 8px; position: relative; z-index: 1; }
+  .passo::before { content: ""; position: absolute; top: 5px; left: -50%; width: 100%; height: 2px; background: var(--line); }
+  .passo:first-child::before { display: none; }
+  .passo .lbl { font-size: 11px; color: var(--soft); letter-spacing: .02em; }
+  .passo.feito .dot { background: var(--ok); }
+  .passo.feito::before { background: var(--ok); }
+  .passo.atual .dot { background: var(--wine); box-shadow: 0 0 0 4px var(--wine-sf); }
+  .passo.atual .lbl { color: var(--wine); font-weight: 700; }
+
+  .titulo-secao { font-family: var(--serif); font-size: 18px; margin: 34px 4px 14px; font-weight: 500; letter-spacing: .01em; }
+  .titulo-secao span { color: var(--soft); font-family: var(--sans); font-size: 13px; }
+
+  /* Grade de produtos */
+  .grade { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  @media (max-width: 720px) { .grade { grid-template-columns: repeat(2, 1fr); gap: 12px; } }
+  @media (max-width: 440px) { .grade { grid-template-columns: 1fr; } }
+
+  .produto { background: var(--card); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; }
+  .foto { aspect-ratio: 3 / 4; background: linear-gradient(150deg, var(--ph1), var(--ph2)); display: flex; align-items: center; justify-content: center; color: color-mix(in srgb, var(--soft) 55%, transparent); position: relative; }
+  .foto .ref-tag { position: absolute; top: 10px; left: 10px; background: var(--card); color: var(--ink); font-size: 12px; font-weight: 700; padding: 3px 9px; border-radius: 5px; letter-spacing: .03em; box-shadow: 0 1px 4px rgba(0,0,0,.08); }
+  .info { padding: 13px 14px 15px; display: flex; flex-direction: column; gap: 9px; flex: 1; }
+  .nome { font-size: 13.5px; line-height: 1.35; color: var(--ink); font-weight: 600; }
+  .grelha { display: flex; flex-wrap: wrap; gap: 5px; }
+  .chip { font-size: 11.5px; font-weight: 600; background: var(--wine-sf); color: var(--wine); padding: 3px 8px; border-radius: 5px; font-variant-numeric: tabular-nums; }
+  .linha-preco { margin-top: auto; display: flex; align-items: baseline; justify-content: space-between; padding-top: 8px; border-top: 1px solid var(--line); }
+  .linha-preco .q { font-size: 12px; color: var(--soft); }
+  .linha-preco .v { font-size: 15px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .unit { font-size: 11px; color: var(--soft); }
+
+  /* Total */
+  .total-bar { position: sticky; bottom: 0; margin-top: 26px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 16px 22px; display: flex; align-items: center; justify-content: space-between; gap: 14px; box-shadow: 0 -2px 20px rgba(0,0,0,.05); flex-wrap: wrap; }
+  .total-bar .esq .r { font-size: 12px; color: var(--soft); letter-spacing: .04em; text-transform: uppercase; }
+  .total-bar .esq .v { font-family: var(--serif); font-size: 26px; font-weight: 500; }
+  .total-bar .pecas { font-size: 13px; color: var(--soft); }
+  .btn-pdf { text-decoration: none; background: var(--ink); color: var(--page); font-size: 13.5px; font-weight: 600; padding: 12px 20px; border-radius: 6px; display: inline-flex; align-items: center; gap: 8px; }
+
+  footer { text-align: center; margin-top: 30px; color: var(--soft); font-size: 12.5px; line-height: 1.6; }
+  footer .rep { color: var(--ink); font-weight: 600; }
+  .aviso { text-align: center; font-size: 11.5px; color: var(--soft); margin: 8px 0 0; }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <p class="brand">Corpo Sensual<span>Representantes</span></p>
+  </header>
+
+  <div class="resumo">
+    <div class="top">
+      <h1>Pedido #14561</h1>
+      <span class="badge">Aguardando aprovação</span>
+    </div>
+    <p class="sub">Feito em 12 de agosto de 2026 · Loja da Maria</p>
+
+    <div class="passos">
+      <div class="passo feito"><div class="dot"></div><div class="lbl">Enviado</div></div>
+      <div class="passo atual"><div class="dot"></div><div class="lbl">Em análise</div></div>
+      <div class="passo"><div class="dot"></div><div class="lbl">Aprovado</div></div>
+      <div class="passo"><div class="dot"></div><div class="lbl">Faturado</div></div>
+    </div>
+  </div>
+
+  <h2 class="titulo-secao">As peças que você escolheu <span>· 6 referências</span></h2>
+
+  <div class="grade">
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0130</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Pijama Aberto Bordado</div>
+        <div class="grelha"><span class="chip">M · 3</span><span class="chip">52 · 2</span></div>
+        <div class="linha-preco"><span class="q">5 peças · <span class="unit">R$ 43,90/un</span></span><span class="v">R$ 219,50</span></div>
+      </div>
+    </div>
+
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0706</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Camisola Renda Liganete</div>
+        <div class="grelha"><span class="chip">G · 4</span></div>
+        <div class="linha-preco"><span class="q">4 peças · <span class="unit">R$ 37,90/un</span></span><span class="v">R$ 151,60</span></div>
+      </div>
+    </div>
+
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0080</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Short Doll com Renda</div>
+        <div class="grelha"><span class="chip">P · 2</span><span class="chip">M · 2</span><span class="chip">GG · 1</span></div>
+        <div class="linha-preco"><span class="q">5 peças · <span class="unit">R$ 38,90/un</span></span><span class="v">R$ 194,50</span></div>
+      </div>
+    </div>
+
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0083</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Camisola Aberta Regata Liganete</div>
+        <div class="grelha"><span class="chip">M · 3</span><span class="chip">G · 3</span></div>
+        <div class="linha-preco"><span class="q">6 peças · <span class="unit">R$ 36,50/un</span></span><span class="v">R$ 219,00</span></div>
+      </div>
+    </div>
+
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0072</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Camisola Renda Liganete</div>
+        <div class="grelha"><span class="chip">P · 1</span><span class="chip">M · 4</span></div>
+        <div class="linha-preco"><span class="q">5 peças · <span class="unit">R$ 36,90/un</span></span><span class="v">R$ 184,50</span></div>
+      </div>
+    </div>
+
+    <div class="produto">
+      <div class="foto"><span class="ref-tag">0070</span><svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="1.7"/><path d="m21 15-5-5L5 21"/></svg></div>
+      <div class="info">
+        <div class="nome">Short Doll Renda Liganete</div>
+        <div class="grelha"><span class="chip">M · 2</span><span class="chip">G · 2</span><span class="chip">GG · 2</span></div>
+        <div class="linha-preco"><span class="q">6 peças · <span class="unit">R$ 38,90/un</span></span><span class="v">R$ 233,40</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="total-bar">
+    <div class="esq">
+      <div class="r">Total do pedido</div>
+      <div class="v">R$ 1.202,50</div>
+    </div>
+    <div class="pecas">31 peças em 6 referências</div>
+    <a class="btn-pdf" href="#"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>Baixar PDF</a>
+  </div>
+
+  <footer>
+    <p>Pedido feito com <span class="rep">Silvio Augusto</span>, seu representante Corpo Sensual.</p>
+    <p class="aviso">Este link fica disponível por 7 dias após o faturamento do pedido.</p>
+  </footer>
+</div>
+</body>
+</html>
