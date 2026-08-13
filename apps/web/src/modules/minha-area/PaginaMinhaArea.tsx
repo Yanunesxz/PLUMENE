@@ -26,6 +26,7 @@ import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
+import { valorDaVenda } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
 import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
@@ -95,10 +96,13 @@ export function PaginaMinhaArea() {
     };
     const invoiced = list.filter((o) => o.invoiced && o.invoiced_at);
     const approved = list.filter((o) => o.status === 'approved');
+    // Pelo valor da NOTA quando o ERP informa: o financeiro corta o que faltou
+    // no estoque, e mostrar o total do pedido faria o representante contar
+    // dinheiro que a fábrica não faturou.
     const faturadoMes = invoiced
       .filter((o) => thisMonth(o.invoiced_at as string))
-      .reduce((s, o) => s + (o.total ?? 0), 0);
-    const faturadoTotal = invoiced.reduce((s, o) => s + (o.total ?? 0), 0);
+      .reduce((s, o) => s + valorDaVenda(o), 0);
+    const faturadoTotal = invoiced.reduce((s, o) => s + valorDaVenda(o), 0);
     return {
       // A bonificação conta o que ele ENVIOU no mês, não o que a fábrica já
       // faturou — são coisas diferentes, e o aviso da fábrica é explícito.

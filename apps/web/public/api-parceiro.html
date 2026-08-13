@@ -796,6 +796,12 @@
           <span><code>POST /partner/v1/pedidos/{id}/confirmar</code> informando o número
           gerado. O pedido sai da fila e nunca mais aparece.</span>
         </li>
+        <li>
+          <b>Informar o faturamento</b>
+          <span><code>POST /partner/v1/faturamento</code> quando a nota sair. É o que
+          faz o lojista ver <b>“Aprovado”</b> e o que conta como venda no painel —
+          até aí, o pedido é só uma intenção.</span>
+        </li>
       </ol>
 
       <div class="note">
@@ -1036,6 +1042,107 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                   <td><span class="st er">400</span></td>
                   <td>Faltou o campo <code>pedido_erp</code>.</td>
                   <td class="t-mut">Corrigir a chamada.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/faturamento</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Informa o que foi faturado. É a etapa que <strong>fecha o ciclo</strong>,
+            e a mais visível para o lojista: confirmar a importação só diz que o
+            pedido entrou no ERP — enquanto não é faturado, ele segue sendo uma
+            intenção, porque o financeiro ainda vai cortar o que faltou no estoque
+            e acertar o preço.
+          </p>
+          <p>
+            Só depois desta chamada o lojista vê <strong>“Aprovado”</strong>, e só
+            o que passa por aqui conta como <strong>venda</strong> no painel da
+            fábrica.
+          </p>
+
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"faturamento"</span>: [
+    { <span class="k">"pedido_erp"</span>: <span class="s">"PED-00123"</span>, <span class="k">"faturado_em"</span>: <span class="s">"2026-08-13T14:02:00Z"</span>, <span class="k">"valor_faturado"</span>: <span class="n">870.50</span> },
+    { <span class="k">"pedido_erp"</span>: <span class="s">"PED-00124"</span> }
+  ]
+}</code></pre>
+          </div>
+
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Campo</th><th>Obrigatório</th><th>Significado</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>pedido_erp</code></td>
+                  <td>sim*</td>
+                  <td>O número do pedido no seu ERP — o mesmo que você mandou na confirmação.</td>
+                </tr>
+                <tr>
+                  <td><code>id</code></td>
+                  <td>sim*</td>
+                  <td>Alternativa ao <code>pedido_erp</code>: o id que veio na fila.</td>
+                </tr>
+                <tr>
+                  <td><code>faturado</code></td>
+                  <td>não</td>
+                  <td><code>false</code> cancela um faturamento informado antes. Ausente = <code>true</code>.</td>
+                </tr>
+                <tr>
+                  <td><code>faturado_em</code></td>
+                  <td>não</td>
+                  <td>ISO da emissão da nota. Ausente = agora.</td>
+                </tr>
+                <tr>
+                  <td><code>valor_faturado</code></td>
+                  <td>não</td>
+                  <td>O valor que a nota fechou. É normal ser <em>menor</em> que o
+                      pedido: o que faltou no estoque não é faturado. Ausente =
+                      mantém o valor do pedido.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="t-mut">
+            * Informe <strong>um</strong> dos dois; <code>pedido_erp</code> é o preferido.
+            Valor zero ou negativo é recusado — nota cancelada se diz com
+            <code>"faturado": false</code>, não zerando o valor.
+          </p>
+
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Resposta</th><th>Significado</th><th>O que fazer</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><span class="st ok">200</span> <code>ignorados: []</code></td>
+                  <td>Todos gravados.</td>
+                  <td class="t-mut">Nada — repetir o envio é seguro.</td>
+                </tr>
+                <tr>
+                  <td><span class="st ok">200</span> com <code>ignorados</code></td>
+                  <td>Parte gravou; cada recusa vem com o motivo.</td>
+                  <td class="t-mut">Corrigir só os da lista e reenviar.</td>
+                </tr>
+                <tr>
+                  <td><span class="st er">400</span></td>
+                  <td>Corpo fora do formato, ou lote acima de 1000.</td>
+                  <td class="t-mut">Dividir em lotes e corrigir a chamada.</td>
                 </tr>
               </tbody>
             </table>

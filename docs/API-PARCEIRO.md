@@ -29,6 +29,7 @@ a cada X minutos:
   2. para cada pedido:
        grava no ERP (gera o número interno, ex.: SX16680)
   3. POST /partner/v1/pedidos/{id}/confirmar  { "pedido_erp": "SX16680" }
+  4. POST /partner/v1/faturamento             { "faturamento": [...] }  ← fecha o ciclo
        → o pedido sai da fila e nunca mais aparece
 ```
 
@@ -167,6 +168,55 @@ Content-Type: application/json
 
 ---
 
+## 4. Informar o faturamento
+
+Esta é a etapa que **fecha o ciclo**, e é a mais visível para o lojista.
+
+Confirmar a importação (passo 3) só diz que o pedido entrou no ERP. Enquanto ele
+não é faturado, continua sendo uma intenção: o financeiro ainda vai cortar o que
+faltou no estoque e acertar o preço. Por isso:
+
+- o lojista só vê **"Aprovado"** depois que o faturamento é informado aqui;
+- o painel da fábrica só conta como **venda** o que passou por aqui.
+
+```
+POST /partner/v1/faturamento
+Content-Type: application/json
+
+{
+  "faturamento": [
+    { "pedido_erp": "SX16680", "faturado_em": "2026-08-13T14:02:00Z", "valor_faturado": 870.50 },
+    { "pedido_erp": "SX16681" }
+  ]
+}
+```
+
+| Campo | Obrigatório | Significado |
+|---|---|---|
+| `pedido_erp` | sim¹ | O número do pedido no seu ERP (o mesmo do passo 3) |
+| `id` | sim¹ | Alternativa ao `pedido_erp`: o id que veio na fila |
+| `faturado` | não | `false` cancela um faturamento informado antes. Ausente = `true` |
+| `faturado_em` | não | ISO da emissão da nota. Ausente = agora |
+| `valor_faturado` | não | O valor que a nota fechou. Ausente = mantém o valor do pedido |
+
+¹ Informe **um** dos dois. `pedido_erp` é o preferido.
+
+**Sobre o `valor_faturado`:** é normal ele ser menor que o total do pedido — o
+que faltou no estoque não é faturado. Mandando esse campo, a fábrica passa a ver
+o número real em vez do valor pedido. Zero ou negativo é recusado: nota
+cancelada se diz com `"faturado": false`, não com valor zerado.
+
+```json
+{ "ok": true, "recebidos": 2, "atualizados": 2, "ignorados": [] }
+```
+
+Repetir o mesmo envio é seguro. Um registro com problema não derruba o lote:
+ele volta em `ignorados` com o motivo, e o resto grava.
+
+Máximo de 1000 pedidos por requisição.
+
+---
+
 ## Exemplo completo (linha de comando)
 
 ```bash
@@ -178,6 +228,11 @@ curl -H "X-API-Key: SUA_CHAVE" \
 curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
   -d "{\"pedido_erp\":\"SX16680\"}" \
   https://setorxweb-production.up.railway.app/partner/v1/pedidos/ID_DO_PEDIDO/confirmar
+
+# informar o faturamento
+curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
+  -d "{\"faturamento\":[{\"pedido_erp\":\"SX16680\",\"valor_faturado\":870.50}]}" \
+  https://setorxweb-production.up.railway.app/partner/v1/faturamento
 ```
 
 ## Boas práticas

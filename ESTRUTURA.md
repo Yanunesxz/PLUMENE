@@ -91,7 +91,8 @@ apps/api/src/
 │       ├── 023_grade_plus_size.sql → 48/50/52/54 nas 4 refs que têm plus size
 │       ├── 024_remove_comissao.sql → DROP da coluna commission_rate (destrutiva)
 │       ├── 025_tabela_do_pedido.sql → orders.price_table_id (a tabela DO pedido)
-│       └── 026_preco_da_faixa_maior.sql → product_prices.price_larger (EG/XG/48-54)
+│       ├── 026_preco_da_faixa_maior.sql → product_prices.price_larger (EG/XG/48-54)
+│       └── 027_valor_faturado.sql → orders.invoiced_total (o valor da NOTA)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

@@ -7,6 +7,7 @@ import {
   type ClienteParceiro,
   type RepresentanteParceiro,
 } from './partner.sync.service.js';
+import { receberFaturamento, type FaturamentoParceiro } from './partner.faturamento.service.js';
 
 /**
  * Máximo por requisição. Mantém o corpo bem abaixo do limite de 1 MB do Fastify;
@@ -110,6 +111,41 @@ export async function partnerConfirmOrderHandler(
     case 'ok':
       await reply.send({ ok: true, ja_confirmado: result.ja_confirmado });
   }
+}
+
+/**
+ * POST /partner/v1/faturamento — o ERP informa o que faturou
+ *
+ * É o que promove o pedido a "Aprovado" aos olhos do lojista e o que conta
+ * como venda no painel. Ver partner.faturamento.service.ts.
+ */
+export async function partnerFaturamentoHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const partner = await requirePartner(request, reply);
+  if (!partner) return;
+
+  const lista = extrairLista<FaturamentoParceiro>(request.body, 'faturamento');
+  if (!lista) {
+    await reply.status(400).send({
+      error: 'Envie { "faturamento": [...] } ou uma lista no corpo',
+      code: 'INVALID_BODY',
+      statusCode: 400,
+    });
+    return;
+  }
+  if (lista.length > MAX_POR_LOTE) {
+    await reply.status(400).send({
+      error: `Máximo ${MAX_POR_LOTE} pedidos por requisição — divida em lotes`,
+      code: 'BATCH_TOO_LARGE',
+      statusCode: 400,
+    });
+    return;
+  }
+
+  const resultado = await receberFaturamento(partner.company_id, lista);
+  await reply.send({ ok: true, ...resultado, servidor_hora: new Date().toISOString() });
 }
 
 /** POST /partner/v1/clientes — o ERP empurra clientes atualizados */

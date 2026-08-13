@@ -67,6 +67,23 @@ export function rotuloDoCliente(pedido: SituacaoDoPedido): string {
 }
 
 /**
+ * Quanto este pedido vale COMO VENDA.
+ *
+ * O valor do pedido é o que o lojista aceitou; o valor faturado é o que a nota
+ * fechou depois de o financeiro cortar o que faltou no estoque. Venda é o
+ * segundo — e é sempre o segundo, quando ele existe.
+ *
+ * Enquanto o ERP não informar (`invoiced_total` nulo), vale o total do pedido:
+ * é a melhor estimativa que temos, e é o comportamento anterior à migração 027.
+ */
+export function valorDaVenda(pedido: {
+  total?: number | null;
+  invoiced_total?: number | null;
+}): number {
+  return pedido.invoiced_total ?? pedido.total ?? 0;
+}
+
+/**
  * Quem vê o status interno e quem vê os três degraus.
  *
  * Gerente e administrador tocam o fluxo por dentro e precisam distinguir "na

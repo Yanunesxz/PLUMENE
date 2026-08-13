@@ -12,6 +12,7 @@ import { decisaoDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
 import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
+import { valorDaVenda } from '@csb/shared';
 
 export function PaginaPainel() {
   const { token, user } = useAuthStore();
@@ -62,7 +63,7 @@ export function PaginaPainel() {
     const topMap = new Map<string, number>();
     for (const o of faturados) {
       if (!o.customer_id) continue;
-      topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + (o.total ?? 0));
+      topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + valorDaVenda(o));
     }
     const topClientes = [...topMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
@@ -71,12 +72,12 @@ export function PaginaPainel() {
       // nota saiu. Pedido de julho faturado em agosto é venda de agosto.
       vendasMes: faturados
         .filter((o) => isThisMonth(o.invoiced_at ?? o.created_at))
-        .reduce((s, o) => s + (o.total ?? 0), 0),
+        .reduce((s, o) => s + valorDaVenda(o), 0),
       pedidosMes: orders.filter((o) => isThisMonth(o.created_at)).length,
       pendingCount: pending.length,
       pendingTotal: pending.reduce((s, o) => s + (o.total ?? 0), 0),
       ticket: faturados.length
-        ? faturados.reduce((s, o) => s + (o.total ?? 0), 0) / faturados.length
+        ? faturados.reduce((s, o) => s + valorDaVenda(o), 0) / faturados.length
         : 0,
       pending,
       comOsReps,

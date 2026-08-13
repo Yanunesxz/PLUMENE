@@ -37,6 +37,18 @@ export interface Order {
   invoiced?: boolean;
   /** Quando foi faturado — é o que põe o pedido no mês certo dos relatórios. */
   invoiced_at?: string | null;
+  /**
+   * O valor que a nota fechou, informado pelo ERP (migração 027). Costuma ser
+   * MENOR que `total`: o que faltou no estoque não é faturado. `null` = o ERP
+   * ainda não informou; nesse caso vale o `total`. Use `valorDaVenda`.
+   */
+  invoiced_total?: number | null;
+  /**
+   * Entrega confirmada. Sem fonte ainda — nem o gerente marca, nem o ERP
+   * informa. Está no contrato para o degrau "Entregue" acender no dia em que
+   * existir, sem mexer nas telas de novo.
+   */
+  delivered?: boolean | null;
   local_id: string | null;
   synced_at: string | null;
   erp_order_id: string | null;
