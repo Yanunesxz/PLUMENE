@@ -52,3 +52,24 @@ export const setInvoicedSchema = z.object({
 export const setDiscountSchema = z.object({
   desconto: z.number().min(0).max(100).multipleOf(0.01),
 });
+
+/**
+ * A troca das peças de um pedido em aberto. Só (produto × variante ×
+ * quantidade): preço não entra no corpo de propósito — o servidor reprecifica
+ * tudo pela tabela do pedido, como no create.
+ *
+ * Lista vazia é recusada: pedido sem peça não é edição, é cancelamento — e
+ * cancelar tem caminho próprio (recusar ou excluir), que deixa rastro certo.
+ */
+export const setOrderItemsSchema = z.object({
+  items: z
+    .array(
+      z.object({
+        product_id: z.string().min(1),
+        variant_id: z.string().min(1).optional(),
+        quantity: z.number().int().min(1),
+      }),
+    )
+    .min(1)
+    .max(500),
+});

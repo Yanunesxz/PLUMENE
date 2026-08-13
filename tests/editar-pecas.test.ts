@@ -1,0 +1,274 @@
+import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
+import crypto from 'node:crypto';
+import type { FastifyInstance } from 'fastify';
+import { criarSupabaseFake } from './supabaseFake.js';
+
+/**
+ * Editar as peças de um pedido em aberto (PATCH /orders/:id/items).
+ *
+ * A loja monta o pedido dela, mas quem conhece o cliente é o representante:
+ * na triagem ele tira a peça que sabe que não vende e põe a que o lojista
+ * esqueceu. O gerente faz o mesmo ajuste na fila dele, antes de aprovar.
+ *
+ * O que estes testes trancam:
+ *   1. o corpo NÃO leva preço — o servidor reprecifica pela tabela do pedido,
+ *      inclusive a faixa maior do EG/48-54;
+ *   2. o desconto do pedido continua valendo no total novo;
+ *   3. representante não mexe em pedido dos outros, nem em pedido que já foi
+ *      para a fábrica;
+ *   4. a loja não edita nada — quem compra não altera o próprio pedido depois
+ *      de mandar.
+ */
+
+const EMPRESA = 'empresa-1';
+const SEGREDO = 'segredo-de-teste-nao-usar-em-producao'; // igual ao tests/setup.ts
+const TABELA = 'tabela-1';
+
+const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+
+function assinar(payload: Record<string, unknown>): string {
+  const cabecalho = b64({ alg: 'HS256', typ: 'JWT' });
+  const agora = Math.floor(Date.now() / 1000);
+  const corpo = b64({ ...payload, iat: agora, exp: agora + 3600 });
+  const assinatura = crypto
+    .createHmac('sha256', SEGREDO)
+    .update(`${cabecalho}.${corpo}`)
+    .digest('base64url');
+  return `${cabecalho}.${corpo}.${assinatura}`;
+}
+
+const TOKEN_REP = assinar({
+  sub: 'rep-1',
+  email: 'rep@csb.com',
+  company_id: EMPRESA,
+  name: 'SIMONE',
+  role: 'rep',
+  price_table_id: TABELA,
+});
+
+const TOKEN_LOJA = assinar({
+  sub: 'loja-1',
+  email: 'loja@csb.com',
+  company_id: EMPRESA,
+  name: 'LOJA',
+  role: 'store',
+  customer_id: 'c1',
+});
+
+const PEDIDO_NA_TRIAGEM = {
+  id: 'o1',
+  rep_id: 'rep-1',
+  customer_id: 'c1',
+  status: 'pending_rep',
+  invoiced: false,
+  price_table_id: TABELA,
+  discount_percent: 10,
+  total: 100,
+};
+
+async function subir(respostas: Record<string, unknown>) {
+  const fake = criarSupabaseFake(respostas as never);
+  vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+  const { buildApp } = await import('../apps/api/src/app.js');
+  const app = await buildApp();
+  await app.ready();
+  return { app, fake };
+}
+
+describe('o representante ajusta as peças da triagem', () => {
+  let app: FastifyInstance;
+  let fake: ReturnType<typeof criarSupabaseFake>;
+  let statusCode = 0;
+
+  beforeAll(async () => {
+    vi.resetModules();
+    ({ app, fake } = await subir({
+      orders: [
+        { data: PEDIDO_NA_TRIAGEM, error: null },
+        { data: { id: 'o1' }, error: null }, // update do total
+        { data: { ...PEDIDO_NA_TRIAGEM, total: 218.25, items: [] }, error: null },
+      ],
+      product_prices: [
+        // 1ª consulta: o detector da migração 026.
+        { data: [{ price_larger: null }], error: null },
+        { data: [{ product_id: 'p1', price: 41.9, price_larger: 52.9 }], error: null },
+      ],
+      product_variants: {
+        data: [
+          { id: 'v-gg', size: 'GG' },
+          { id: 'v-48', size: '48' },
+        ],
+        error: null,
+      },
+      order_items: [
+        { data: [{ id: 'i-velho', order_id: 'o1' }], error: null }, // itens antigos
+        { data: null, error: null }, // delete
+        { data: null, error: null }, // insert
+      ],
+    }));
+
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: {
+        items: [
+          { product_id: 'p1', variant_id: 'v-gg', quantity: 2 },
+          { product_id: 'p1', variant_id: 'v-48', quantity: 3 },
+        ],
+      },
+    });
+    statusCode = res.statusCode;
+  });
+
+  afterAll(async () => {
+    await app?.close();
+  });
+
+  it('aceita a edição', () => {
+    expect(statusCode).toBe(200);
+  });
+
+  it('reprecifica pela tabela — o GG no preço normal, o 48 na faixa maior', () => {
+    const inseridos = (fake.ultimaGravacao('order_items', 'insert')?.valores ?? []) as Array<{
+      variant_id: string;
+      unit_price: number;
+      total: number;
+    }>;
+    expect(inseridos.find((i) => i.variant_id === 'v-gg')?.unit_price).toBe(41.9);
+    expect(inseridos.find((i) => i.variant_id === 'v-48')?.unit_price).toBe(52.9);
+  });
+
+  it('mantém o desconto do pedido no total novo', () => {
+    // (2×41,90 + 3×52,90) = 242,50 · com 10% = 218,25
+    const upd = fake.ultimaGravacao('orders', 'update')?.valores as { total: number };
+    expect(upd.total).toBeCloseTo(218.25, 2);
+  });
+
+  it('lê o tamanho do banco, nunca do corpo da requisição', () => {
+    const consultas = fake.filtrosDe('product_variants', 'in');
+    expect(consultas.length).toBeGreaterThan(0);
+    expect(consultas[0]?.args[1]).toEqual(['v-gg', 'v-48']);
+  });
+});
+
+describe('quem não pode', () => {
+  afterAll(() => {
+    vi.doUnmock('../apps/api/src/config/supabase.js');
+  });
+
+  it('representante não mexe em pedido dos outros', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, rep_id: 'rep-2' }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [{ product_id: 'p1', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('pedido que já saiu para a fábrica não muda pela mão do representante', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval' }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [{ product_id: 'p1', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it('a loja não edita o pedido depois de mandar', async () => {
+    vi.resetModules();
+    const { app } = await subir({ orders: { data: PEDIDO_NA_TRIAGEM, error: null } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_LOJA}` },
+      payload: { items: [{ product_id: 'p1', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('pedido sem peça nenhuma é recusado — cancelar tem caminho próprio', async () => {
+    vi.resetModules();
+    const { app } = await subir({ orders: { data: PEDIDO_NA_TRIAGEM, error: null } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [] },
+    });
+    expect(res.statusCode).toBe(400);
+    await app.close();
+  });
+
+  it('peça sem preço na tabela derruba a edição inteira, com motivo', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: PEDIDO_NA_TRIAGEM, error: null },
+      product_prices: [
+        { data: [{ price_larger: null }], error: null },
+        { data: [], error: null },
+      ],
+      product_variants: { data: [], error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [{ product_id: 'p-sem-preco', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(422);
+    await app.close();
+  });
+});
+
+describe('o desconto virou exclusivo do representante', () => {
+  afterAll(() => {
+    vi.doUnmock('../apps/api/src/config/supabase.js');
+  });
+
+  it('a loja não dá desconto', async () => {
+    vi.resetModules();
+    const { app } = await subir({ orders: { data: PEDIDO_NA_TRIAGEM, error: null } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/desconto',
+      headers: { authorization: `Bearer ${TOKEN_LOJA}` },
+      payload: { desconto: 10 },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+
+  it('o gerente também não — a % é a palavra do representante', async () => {
+    vi.resetModules();
+    const TOKEN_GERENTE = assinar({
+      sub: 'ger-1',
+      email: 'gerente@csb.com',
+      company_id: EMPRESA,
+      name: 'GERENTE',
+      role: 'manager',
+    });
+    const { app } = await subir({ orders: { data: PEDIDO_NA_TRIAGEM, error: null } });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/desconto',
+      headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      payload: { desconto: 10 },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});

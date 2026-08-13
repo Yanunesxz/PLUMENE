@@ -7,6 +7,7 @@ import {
   updateStatusHandler,
   setInvoicedHandler,
   setDiscountHandler,
+  setItemsHandler,
   deleteOrderHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
@@ -48,13 +49,19 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
   fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
-  // O desconto é do representante: ele fecha o negócio na frente do lojista.
-  // Gerente e admin entram junto porque assumem o pedido quando o rep some.
+  // O desconto é SÓ do representante — decisão do Yan (13/08/2026): é ele quem
+  // fecha o negócio na frente do lojista, e a % é a palavra dele. O gerente
+  // decide sobre o pedido que recebeu, não sobre o preço combinado.
   fastify.patch(
     '/orders/:id/desconto',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] },
+    { preHandler: [authenticate, requireRole(['rep'])] },
     setDiscountHandler,
   );
+  // Mexer nas peças antes de mandar: o representante ajusta o que a loja pediu
+  // (tira o que sabe que não vende, põe o que o lojista esqueceu) e o gerente
+  // faz o ajuste fino na fila dele. A mesma tecla da decisão vale aqui —
+  // editar peça é parte de decidir o pedido.
+  fastify.patch('/orders/:id/items', decideOPedido, setItemsHandler);
   fastify.patch(
     '/orders/:id/invoice',
     {

@@ -6,6 +6,7 @@ import {
   updateOrderStatus,
   setOrderInvoiced,
   setOrderDiscount,
+  setOrderItems,
   deleteOrder,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
@@ -19,6 +20,7 @@ import {
   updateOrderStatusSchema,
   setInvoicedSchema,
   setDiscountSchema,
+  setOrderItemsSchema,
 } from './orders.schema.js';
 
 /**
@@ -239,6 +241,52 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
         error: 'O desconto ainda não está disponível — falta aplicar a migração 029',
         code: 'DESCONTO_INDISPONIVEL',
         statusCode: 503,
+      });
+      return;
+    default:
+      await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+  }
+}
+
+export async function setItemsHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, role } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(setOrderItemsSchema, request.body, reply);
+  if (!body) return;
+
+  const result = await setOrderItems(id, company_id, sub, role, body.items);
+  if (result.ok) {
+    await reply.send({ data: result.order });
+    return;
+  }
+
+  switch (result.reason) {
+    case 'forbidden':
+      await reply.status(403).send({
+        error: 'Você só pode alterar as peças dos seus próprios pedidos',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    case 'tarde_demais':
+      await reply.status(409).send({
+        error: 'Este pedido já saiu do seu alcance — as peças não podem mais mudar por aqui',
+        code: 'ORDER_JA_ENVIADO',
+        statusCode: 409,
+      });
+      return;
+    case 'price_not_found':
+      await reply.status(422).send({
+        error: 'Há peças sem preço na tabela deste pedido',
+        code: 'PRICE_NOT_FOUND',
+        statusCode: 422,
+      });
+      return;
+    case 'save_failed':
+      await reply.status(500).send({
+        error: 'Não foi possível salvar as peças — tente de novo',
+        code: 'SAVE_FAILED',
+        statusCode: 500,
       });
       return;
     default:

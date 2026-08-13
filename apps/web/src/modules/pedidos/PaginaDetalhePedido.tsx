@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
@@ -15,7 +15,17 @@ import { cn, formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
+import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
+import { precoDoTamanho } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
+
+/** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
+interface LinhaEdit {
+  product_id: string;
+  variant_id: string | null;
+  quantity: number;
+  unit_price: number;
+}
 
 export function PaginaDetalhePedido() {
   const { id } = useParams<{ id: string }>();
@@ -52,15 +62,15 @@ export function PaginaDetalhePedido() {
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
 
   /**
-   * O desconto é do representante e só vale antes de mandar para a fábrica.
-   * Gerente e admin entram junto porque assumem o pedido quando o rep some —
-   * é a mesma regra da triagem.
+   * O desconto é SÓ do representante, e só antes de mandar para a fábrica: a %
+   * é a palavra que ele deu ao lojista. O gerente decide sobre o pedido que
+   * recebeu — mexer no preço combinado não é papel dele (a rota também nega).
    */
   const podeDarDesconto =
     !!order &&
     !order.invoiced &&
     (order.status === 'draft' || order.status === 'pending_rep') &&
-    (user?.role === 'rep' || user?.role === 'manager' || user?.role === 'admin');
+    user?.role === 'rep';
 
   /** Soma dos itens, sem desconto — é o "Valor Parcial" do formulário. */
   const bruto = (order?.items ?? []).reduce((s, i) => s + (i.total ?? 0), 0);
@@ -92,6 +102,106 @@ export function PaginaDetalhePedido() {
     }
   };
 
+  // ─── Edição das peças ──────────────────────────────────────────────────────
+  const [editando, setEditando] = useState(false);
+  const [linhasEdit, setLinhasEdit] = useState<LinhaEdit[]>([]);
+  const [buscaPeca, setBuscaPeca] = useState('');
+  const [pickerEdit, setPickerEdit] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
+  const [salvandoPecas, setSalvandoPecas] = useState(false);
+
+  /**
+   * Quem mexe nas peças: o representante enquanto o pedido está com ele
+   * (rascunho ou triagem — é onde ele tira o que sabe que não vende e põe o que
+   * o lojista esqueceu), e o gerente na fila dele, antes de aprovar. Online
+   * porque, como decidir, editar vale para outras pessoas — não entra na fila
+   * offline.
+   */
+  const podeEditarPecas =
+    !!order &&
+    !order.invoiced &&
+    isOnline &&
+    (user?.role === 'rep'
+      ? order.status === 'draft' || order.status === 'pending_rep'
+      : (user?.role === 'manager' || user?.role === 'admin') &&
+        (order.status === 'pending_rep' || order.status === 'pending_approval'));
+
+  const iniciarEdicao = () => {
+    if (!order) return;
+    setLinhasEdit(
+      order.items.map((i) => ({
+        product_id: i.product_id,
+        variant_id: i.variant_id,
+        quantity: i.quantity,
+        unit_price: i.unit_price,
+      })),
+    );
+    setBuscaPeca('');
+    setEditando(true);
+  };
+
+  const mudarQtd = (idx: number, delta: number) =>
+    setLinhasEdit((ls) =>
+      ls.map((l, i) => (i === idx ? { ...l, quantity: Math.max(1, l.quantity + delta) } : l)),
+    );
+
+  const removerLinha = (idx: number) => setLinhasEdit((ls) => ls.filter((_, i) => i !== idx));
+
+  /** As peças que o seletor devolveu entram somando na linha que já existe. */
+  const adicionarPecas = (chosen: ProductWithPrice, lines: PickedSize[]) => {
+    setLinhasEdit((ls) => {
+      const novas = [...ls];
+      for (const l of lines) {
+        const preco = precoDoTamanho(l.size, chosen.price, chosen.price_larger) ?? 0;
+        const idx = novas.findIndex(
+          (n) => n.product_id === chosen.id && n.variant_id === l.variant_id,
+        );
+        if (idx >= 0) {
+          novas[idx] = { ...novas[idx]!, quantity: novas[idx]!.quantity + l.quantity };
+        } else {
+          novas.push({
+            product_id: chosen.id,
+            variant_id: l.variant_id,
+            quantity: l.quantity,
+            unit_price: preco,
+          });
+        }
+      }
+      return novas;
+    });
+    setBuscaPeca('');
+  };
+
+  const salvarPecas = async () => {
+    if (!id || !order || !token || linhasEdit.length === 0 || salvandoPecas) return;
+    setSalvandoPecas(true);
+    try {
+      // Só (produto × variante × quantidade) — o servidor reprecifica tudo pela
+      // tabela do pedido e reaplica o desconto. Preço daqui é ilustração.
+      const res = await api.patch<ApiResponse<OrderWithItems>>(
+        `/orders/${id}/items`,
+        {
+          items: linhasEdit.map((l) => ({
+            product_id: l.product_id,
+            variant_id: l.variant_id ?? undefined,
+            quantity: l.quantity,
+          })),
+        },
+        token,
+      );
+      setOrder(res.data);
+      void db.orders.update(id, { total: res.data.total ?? 0 });
+      setEditando(false);
+      setToast({ message: 'Peças do pedido atualizadas.', type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível salvar as peças.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoPecas(false);
+    }
+  };
+
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
   const condicoes = useCondicoesDePagamento();
@@ -114,6 +224,30 @@ export function PaginaDetalhePedido() {
     for (const p of products ?? []) for (const v of p.variants ?? []) m.set(v.id, v.size);
     return m;
   }, [products]);
+  // A busca do "adicionar peça": referência ou nome, a partir de 2 letras.
+  const resultadosBusca = useMemo(() => {
+    const q = buscaPeca.trim().toLowerCase();
+    if (q.length < 2) return [];
+    return (products ?? [])
+      .filter(
+        (p) => p.active && (p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)),
+      )
+      .slice(0, 6);
+  }, [buscaPeca, products]);
+
+  const abrirPickerEdit = (p: ProductWithPrice) => {
+    const group = p.variant_group
+      ? (products ?? []).filter((x) => x.variant_group === p.variant_group && x.active)
+      : [p];
+    setPickerEdit({ product: p, group });
+  };
+
+  // Prévia do total na edição, com o desconto do pedido mantido. O número final
+  // é o do servidor, que reprecifica pela tabela do pedido ao salvar.
+  const totalEditPrevia =
+    linhasEdit.reduce((s, l) => s + l.quantity * l.unit_price, 0) *
+    (1 - (order?.discount_percent ?? 0) / 100);
+
   const custName = useMemo(() => {
     const m = new Map<string, string>();
     for (const c of customers ?? []) m.set(c.id, c.name);
@@ -367,10 +501,145 @@ export function PaginaDetalhePedido() {
           <div className="rounded-xl border border-border bg-card shadow-sm">
             <div className="flex items-center justify-between border-b border-border px-4 py-3">
               <h2 className="text-sm font-semibold text-foreground">Itens</h2>
-              <span className="text-xs text-muted-foreground">{order.items.length}</span>
+              <span className="flex items-center gap-3">
+                {podeEditarPecas && !editando && (
+                  <button
+                    type="button"
+                    onClick={iniciarEdicao}
+                    className="inline-flex items-center gap-1 text-xs font-medium text-primary transition-colors hover:opacity-80"
+                  >
+                    <Pencil className="h-3.5 w-3.5" /> Editar peças
+                  </button>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  {editando ? linhasEdit.length : order.items.length}
+                </span>
+              </span>
             </div>
 
-            {order.items.length === 0 ? (
+            {editando ? (
+              <>
+                <div className="border-b border-border px-4 py-3">
+                  <input
+                    value={buscaPeca}
+                    onChange={(e) => setBuscaPeca(e.target.value)}
+                    placeholder="Adicionar peça — referência ou nome"
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-subtle"
+                  />
+                  {resultadosBusca.length > 0 && (
+                    <ul className="mt-2 overflow-hidden rounded-lg border border-border">
+                      {resultadosBusca.map((p) => (
+                        <li key={p.id}>
+                          <button
+                            type="button"
+                            onClick={() => abrirPickerEdit(p)}
+                            className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-sunken"
+                          >
+                            <span className="tnum shrink-0 font-mono text-[11px] font-semibold text-subtle">
+                              {p.sku}
+                            </span>
+                            <span className="min-w-0 truncate text-foreground">{p.name}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <ul className="divide-y divide-border">
+                  {linhasEdit.map((l, idx) => {
+                    const p = prodMap.get(l.product_id);
+                    const tam = l.variant_id ? variantSize.get(l.variant_id) : undefined;
+                    return (
+                      <li
+                        key={`${l.product_id}|${l.variant_id ?? '-'}`}
+                        className="flex items-center gap-2 px-4 py-3"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-medium text-foreground">
+                            {p?.name ?? 'Produto'}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {p?.sku ? `${p.sku} · ` : ''}
+                            {tam ? `Tam ${tam} · ` : ''}
+                            {formatBRL(l.unit_price)}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            type="button"
+                            aria-label="Tirar uma peça"
+                            disabled={l.quantity <= 1}
+                            onClick={() => mudarQtd(idx, -1)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-sunken disabled:opacity-40"
+                          >
+                            <Minus className="h-3.5 w-3.5" />
+                          </button>
+                          <span className="tnum w-8 text-center text-sm font-semibold text-foreground">
+                            {l.quantity}
+                          </span>
+                          <button
+                            type="button"
+                            aria-label="Somar uma peça"
+                            onClick={() => mudarQtd(idx, 1)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg border border-border text-foreground transition-colors hover:bg-sunken"
+                          >
+                            <Plus className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                        <button
+                          type="button"
+                          aria-label="Tirar esta peça do pedido"
+                          onClick={() => removerLinha(idx)}
+                          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-danger-soft-foreground transition-colors hover:bg-danger-soft"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                  {linhasEdit.length === 0 && (
+                    <li className="px-4 py-6 text-center text-sm text-muted-foreground">
+                      Sem peças. Para cancelar o pedido, use recusar ou excluir.
+                    </li>
+                  )}
+                </ul>
+
+                <div className="space-y-2 border-t border-border px-4 py-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">
+                      Prévia
+                      {(order.discount_percent ?? 0) > 0
+                        ? ` (com ${order.discount_percent}% de desconto)`
+                        : ''}
+                    </span>
+                    <span className="text-xl font-bold text-foreground">
+                      {formatBRL(totalEditPrevia)}
+                    </span>
+                  </div>
+                  <p className="text-[11px] leading-tight text-subtle">
+                    Ao salvar, os preços saem da tabela do pedido — é o valor do servidor que vale.
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      className="flex-1"
+                      disabled={salvandoPecas}
+                      onClick={() => setEditando(false)}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      className="flex-1"
+                      disabled={salvandoPecas || linhasEdit.length === 0}
+                      onClick={() => void salvarPecas()}
+                    >
+                      {salvandoPecas ? 'Salvando…' : 'Salvar peças'}
+                    </Button>
+                  </div>
+                </div>
+              </>
+            ) : order.items.length === 0 ? (
               <div className="flex flex-col items-center gap-2 px-4 py-8 text-center">
                 {!isOnline && <WifiOff className="h-5 w-5 text-muted-foreground" />}
                 <p className="text-sm text-muted-foreground">
@@ -402,10 +671,12 @@ export function PaginaDetalhePedido() {
               </ul>
             )}
 
-            <div className="flex items-center justify-between border-t border-border px-4 py-3">
-              <span className="text-sm text-muted-foreground">Total</span>
-              <span className="text-xl font-bold text-foreground">{formatBRL(order.total ?? 0)}</span>
-            </div>
+            {!editando && (
+              <div className="flex items-center justify-between border-t border-border px-4 py-3">
+                <span className="text-sm text-muted-foreground">Total</span>
+                <span className="text-xl font-bold text-foreground">{formatBRL(order.total ?? 0)}</span>
+              </div>
+            )}
           </div>
 
           {order.notes && (
@@ -428,6 +699,15 @@ export function PaginaDetalhePedido() {
             </Button>
           )}
         </div>
+      )}
+
+      {pickerEdit && (
+        <SeletorTamanho
+          product={pickerEdit.product}
+          colorGroup={pickerEdit.group.length > 1 ? pickerEdit.group : undefined}
+          onClose={() => setPickerEdit(null)}
+          onConfirm={(chosen, lines) => adicionarPecas(chosen, lines)}
+        />
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

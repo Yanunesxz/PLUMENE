@@ -481,6 +481,157 @@ export async function setOrderDiscount(
   return { ok: true, order: data as Order };
 }
 
+/**
+ * Enquanto está com o representante (rascunho ou triagem), o pedido é dele para
+ * mexer. Na fila do gerente, é o gerente quem ajusta — o representante não
+ * altera um pedido que já está na mesa de outra pessoa, e vice-versa.
+ */
+const PECAS_EDITAVEIS_PELO_REP = new Set<Order['status']>(['draft', 'pending_rep']);
+const PECAS_EDITAVEIS_PELA_FABRICA = new Set<Order['status']>(['pending_rep', 'pending_approval']);
+
+export interface ItemEditado {
+  product_id: string;
+  variant_id?: string | undefined;
+  quantity: number;
+}
+
+export type EditarPecasResult =
+  | { ok: true; order: OrderWithItems }
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'price_not_found' | 'save_failed' };
+
+/**
+ * Troca as peças de um pedido que ainda não foi para a fábrica.
+ *
+ * É a triagem de verdade: a loja monta o pedido dela, mas quem conhece o
+ * cliente é o representante — ele tira a peça que sabe que não vai vender e
+ * acrescenta a que o lojista esqueceu. O gerente faz o mesmo ajuste fino na
+ * fila dele, antes de aprovar.
+ *
+ * O corpo traz só (produto × variante × quantidade). Preço NUNCA vem do
+ * aparelho: cada linha é reprecificada pela tabela do pedido, com a mesma
+ * régua do `createOrder` — inclusive a faixa maior do EG/48-54. E o desconto
+ * do pedido continua valendo: o total sai da soma nova × (1 − desconto).
+ */
+export async function setOrderItems(
+  id: string,
+  company_id: string,
+  user_id: string,
+  role: AuthRole,
+  itens: ItemEditado[],
+): Promise<EditarPecasResult> {
+  // `select('*')` de propósito: traz `price_table_id` (025) e `discount_percent`
+  // (029) quando existem, sem quebrar quando a migração ainda não rodou.
+  const { data: order } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!order) return { ok: false, reason: 'not_found' };
+  const o = order as Order;
+
+  if (o.invoiced) return { ok: false, reason: 'tarde_demais' };
+  if (role === 'rep') {
+    if (o.rep_id !== user_id) return { ok: false, reason: 'forbidden' };
+    if (!PECAS_EDITAVEIS_PELO_REP.has(o.status)) return { ok: false, reason: 'tarde_demais' };
+  } else if (!PECAS_EDITAVEIS_PELA_FABRICA.has(o.status)) {
+    return { ok: false, reason: 'tarde_demais' };
+  }
+
+  // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
+  // do cadastro do cliente, senão a do representante dono.
+  let tabela: string | null = o.price_table_id ?? null;
+  if (!tabela && o.customer_id) {
+    const { data: cli } = await supabase
+      .from('customers')
+      .select('price_table_id')
+      .eq('id', o.customer_id)
+      .maybeSingle();
+    tabela = (cli as { price_table_id: string | null } | null)?.price_table_id ?? null;
+  }
+  if (!tabela) {
+    const { data: rep } = await supabase
+      .from('users')
+      .select('price_table_id')
+      .eq('id', o.rep_id)
+      .maybeSingle();
+    tabela = (rep as { price_table_id: string | null } | null)?.price_table_id ?? null;
+  }
+
+  const productIds = [...new Set(itens.map((i) => i.product_id))];
+  const variantIds = [...new Set(itens.map((i) => i.variant_id).filter((v): v is string => !!v))];
+  const [priceMap, sizeMap] = await Promise.all([
+    getPriceMap(tabela, productIds),
+    getSizeMap(variantIds),
+  ]);
+
+  let novos: Array<{
+    order_id: string;
+    product_id: string;
+    variant_id: string | null;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
+  try {
+    novos = itens.map((item) => {
+      const preco = priceMap.get(item.product_id);
+      if (preco === undefined) throw new Error('PRICE_NOT_FOUND');
+      const unit_price = precoDoTamanho(
+        item.variant_id ? sizeMap.get(item.variant_id) : null,
+        preco.price,
+        preco.price_larger,
+      );
+      if (unit_price == null) throw new Error('PRICE_NOT_FOUND');
+      return {
+        order_id: id,
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? null,
+        quantity: item.quantity,
+        unit_price,
+        total: Number((item.quantity * unit_price).toFixed(2)),
+      };
+    });
+  } catch {
+    return { ok: false, reason: 'price_not_found' };
+  }
+
+  const bruto = novos.reduce((s, n) => s + n.total, 0);
+  const pct = Number(o.discount_percent ?? 0);
+  const total = Number((bruto * (1 - pct / 100)).toFixed(2));
+
+  // Troca de fato: guarda os antigos, apaga, insere os novos. Se a inserção
+  // falhar no meio, repõe os antigos — e um pedido que porventura fique com o
+  // total antigo e itens novos diverge para MENOS, que é a direção visível
+  // (mesma escolha do corrigir-pedidos: divergência que aparece, não que cobra).
+  const { data: antigos } = await supabase.from('order_items').select('*').eq('order_id', id);
+  const { error: eDel } = await supabase.from('order_items').delete().eq('order_id', id);
+  if (eDel) return { ok: false, reason: 'save_failed' };
+
+  const { error: eIns } = await supabase.from('order_items').insert(novos);
+  if (eIns) {
+    if (antigos && antigos.length > 0) await supabase.from('order_items').insert(antigos);
+    return { ok: false, reason: 'save_failed' };
+  }
+
+  const { error: eUpd } = await supabase
+    .from('orders')
+    .update({ total, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id);
+  if (eUpd) return { ok: false, reason: 'save_failed' };
+
+  const { data: atualizado } = await supabase
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  return { ok: true, order: (atualizado ?? { ...o, total, items: novos }) as OrderWithItems };
+}
+
 export async function setOrderInvoiced(
   id: string,
   company_id: string,
