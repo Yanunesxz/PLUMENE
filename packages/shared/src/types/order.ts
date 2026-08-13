@@ -50,6 +50,41 @@ export interface OrderWithItems extends Order {
   items: OrderItem[];
 }
 
+// ─── Pedido na página pública (link do e-mail) ───────────────────────────────
+/** Uma referência do pedido, com a grade de tamanhos que o cliente comprou. */
+export interface ItemPedidoPublico {
+  /** Referência (SKU) do produto. */
+  ref: string;
+  nome: string;
+  /** Foto do catálogo. Nulo = sem foto vinculada. */
+  foto: string | null;
+  /** Cada tamanho pedido e sua quantidade (ex.: [{ tamanho: 'M', quantidade: 3 }]). */
+  tamanhos: Array<{ tamanho: string; quantidade: number }>;
+  pecas: number;
+  unit_price: number;
+  total: number;
+}
+
+/**
+ * O que a página pública do pedido recebe. Sem login: quem tem o link (do
+ * e-mail) vê. Um subconjunto seguro — nada de custo da fábrica, id interno etc.
+ */
+export interface PedidoPublico {
+  numero: string;
+  /** ISO da criação. */
+  data: string;
+  status: OrderStatus;
+  /** Passo para a barra de progresso da página. */
+  passo: 'enviado' | 'aprovado' | 'entregue' | 'recusado';
+  cliente: string;
+  representante: string;
+  total: number;
+  totalPecas: number;
+  produtos: ItemPedidoPublico[];
+  /** `true` = o link já passou dos 7 dias após o faturamento. */
+  expirado: boolean;
+}
+
 export interface CreateOrderRequest {
   /** Ignorado para loja (usa o cliente dela) e ausente na vitrine. */
   customer_id?: string | undefined;

@@ -12,6 +12,7 @@ import { PaginaClientes } from '../modules/clientes/PaginaClientes.js';
 import { PaginaCliente } from '../modules/clientes/PaginaCliente.js';
 import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
 import { PaginaConvite } from '../modules/publico/PaginaConvite.js';
+import { PaginaPedidoPublico } from '../modules/publico/PaginaPedidoPublico.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
 import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 
@@ -60,6 +61,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   // Públicas: fora do PrivateRoute de propósito — quem abre estes links ainda
   // não tem (ou nunca terá) conta.
   { path: '/convite/:token', element: <PaginaConvite /> },
+  { path: '/pedido/:token', element: <PaginaPedidoPublico /> },
   {
     path: '/vitrine/:token',
     element: (

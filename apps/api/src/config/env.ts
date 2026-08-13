@@ -34,4 +34,14 @@ export const env = {
   ERP_SYNC_INTERVAL_MIN: parseInt(process.env['ERP_SYNC_INTERVAL_MIN'] ?? '5', 10),
   /** Habilitar sync automático (padrão: false em dev) */
   ERP_SYNC_ENABLED: process.env['ERP_SYNC_ENABLED'] === 'true',
+
+  // ── E-mail (confirmação de pedido) ───────────────────────────────────────────
+  /** Conta Gmail que envia (ex.: pedidos.corposensual@gmail.com). Vazio = envio desligado. */
+  EMAIL_USER: process.env['EMAIL_USER'] ?? '',
+  /** Senha de APP do Gmail (16 letras, gerada na conta Google — não é a senha normal). */
+  EMAIL_APP_PASSWORD: process.env['EMAIL_APP_PASSWORD'] ?? '',
+  /** Nome que aparece como remetente. */
+  EMAIL_FROM_NAME: process.env['EMAIL_FROM_NAME'] ?? 'Corpo Sensual',
+  /** Base pública do app, para montar o link do pedido no e-mail. */
+  APP_PUBLIC_URL: process.env['APP_PUBLIC_URL'] ?? 'https://setorx-web-web.vercel.app',
 } as const;

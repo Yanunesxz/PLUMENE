@@ -9,6 +9,7 @@ import {
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
+import { getPedidoPublico } from './publicOrder.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
@@ -29,6 +30,19 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
     return;
   }
   await reply.send({ data: order });
+}
+
+/** GET /public/pedido/:token — a página pública do pedido (link do e-mail). Sem login. */
+export async function pedidoPublicoHandler(
+  request: FastifyRequest<{ Params: { token: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const pedido = await getPedidoPublico(request.params.token);
+  if (!pedido) {
+    await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+    return;
+  }
+  await reply.send({ data: pedido });
 }
 
 export async function createOrderHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

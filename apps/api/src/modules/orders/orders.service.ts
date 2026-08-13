@@ -1,5 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { buscarTudo } from '../../lib/paginacao.js';
+import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
 import { ORDER_STATUS_FLOW } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
@@ -288,7 +289,16 @@ export async function createOrder(
     return null;
   }
 
-  return getOrderById(orderId, company_id);
+  const pedidoCompleto = await getOrderById(orderId, company_id);
+
+  // Pedido fechado (não rascunho) manda a confirmação para o cliente e o rep.
+  // Em segundo plano: e-mail é acessório e nunca pode segurar nem derrubar o
+  // pedido. Rascunho não dispara — ainda está em montagem.
+  if (pedidoCompleto && pedidoCompleto.status !== 'draft') {
+    void enviarConfirmacaoDoPedido(pedidoCompleto);
+  }
+
+  return pedidoCompleto;
 }
 
 export type DeleteOrderResult =

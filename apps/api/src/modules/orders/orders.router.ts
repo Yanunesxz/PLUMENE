@@ -7,6 +7,7 @@ import {
   updateStatusHandler,
   setInvoicedHandler,
   deleteOrderHandler,
+  pedidoPublicoHandler,
 } from './orders.controller.js';
 
 export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
@@ -27,6 +28,14 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
       requirePermission('aprovar_pedidos'),
     ],
   };
+
+  // Página pública do pedido (o link do e-mail). Sem login — a segurança é o
+  // token assinado. Rate-limit apertado, como as outras rotas /public.
+  fastify.get(
+    '/public/pedido/:token',
+    { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
+    pedidoPublicoHandler,
+  );
 
   fastify.get('/orders', daFabricaOuLoja, listOrders);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
