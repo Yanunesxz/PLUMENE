@@ -1,8 +1,10 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
-import { preencherModelo } from './planilha/modeloOficial.js';
+import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.js';
 import type { NumeroDaTabela } from './planilha/tabela.js';
 import type { OrderWithItems } from '@csb/shared';
+
+export type { ClienteDaFolha };
 
 export type { NumeroDaTabela };
 
@@ -30,6 +32,11 @@ export interface ContextoDaExportacao {
   tamanhoDaVariante: Map<string, string>;
   /** A tabela que precifica o pedido. `null` quando não deu para descobrir. */
   tabelaDoPedido: (pedido: OrderWithItems) => NumeroDaTabela | null;
+  /**
+   * O cabeçalho de quem comprou (razão social, CNPJ, endereço…). `null` ou
+   * ausente = cabeçalho em branco, que era o comportamento até 13/08/2026.
+   */
+  clienteDoPedido?: (pedido: OrderWithItems) => ClienteDaFolha | null;
 }
 
 export interface ResultadoDaExportacao {
@@ -115,10 +122,29 @@ async function gerarArquivosDoPedido(
   const modelo = await carregarModelo(tabela);
   const folhas = dividirEmFolhas(linhas);
 
+  // O cabeçalho do formulário, como no modelo que a fábrica preenche à mão.
+  // Pedido de vitrine não tem cadastro: sai o nome e o WhatsApp do visitante.
+  const cliente =
+    contexto.clienteDoPedido?.(pedido) ??
+    (pedido.guest_name
+      ? { razaoSocial: pedido.guest_name, whatsapp: pedido.guest_whatsapp ?? undefined }
+      : null);
+  const dataDoPedido = new Date(pedido.created_at).toLocaleDateString('pt-BR');
+
   return folhas.map((folha, indice) => {
+    // O rodapé marca a página ("PÁGINA 01.") e leva os recados do pedido — as
+    // observações digitadas e as cores escolhidas. Só na primeira página, como
+    // no modelo da fábrica; as demais levam só o número.
+    const pagina = `PÁGINA ${String(indice + 1).padStart(2, '0')}.`;
+    const observacao =
+      indice === 0 && pedido.notes?.trim() ? `${pagina} ${pedido.notes.trim()}` : pagina;
+
     const { arquivo, refsDesconhecidas } = preencherModelo(modelo, {
       linhas: folha,
       numeroDoPedido: numero,
+      data: dataDoPedido,
+      cliente: cliente ?? undefined,
+      observacao,
       // A API já manda a condição resolvida no pedido (embed da 028). Em todas
       // as folhas: cada arquivo do zip é um formulário completo.
       condicaoDePagamento: pedido.payment_condition?.description,

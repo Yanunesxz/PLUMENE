@@ -1,6 +1,7 @@
 import {
   celulaDoTamanho,
   refDaPlanilha,
+  nucleoDaRef,
   tamanhoIgnorado,
   SUFIXO_PLUS,
   COLUNAS_PLUS,
@@ -96,7 +97,26 @@ export function montarLinhas(itens: readonly ItemParaPlanilha[]): MontagemDeLinh
     porChave.set(chave, linha);
   }
 
-  return { linhas: [...porChave.values()], foraDaGrade };
+  // O formulário da fábrica lista o par JUNTO: "0130" e, logo abaixo, a linha
+  // plus. O Map guarda na ordem em que cada linha apareceu — o que jogava todos
+  // os PLUS para o fim do arquivo quando o pedido é montado produto a produto.
+  // Reordena: grupos pela primeira aparição da referência (base ou plus, o que
+  // vier antes), e dentro do grupo o base na frente do PLUS. A ordenação é
+  // estável, então linhas do mesmo grupo que não são par (0080 infantil +
+  // 0080 juvenil) ficam como entraram.
+  const ordemDoGrupo = new Map<string, number>();
+  for (const linha of porChave.values()) {
+    const grupo = nucleoDaRef(linha.ref);
+    if (!ordemDoGrupo.has(grupo)) ordemDoGrupo.set(grupo, ordemDoGrupo.size);
+  }
+  const linhas = [...porChave.values()].sort((a, b) => {
+    const ga = ordemDoGrupo.get(nucleoDaRef(a.ref)) ?? 0;
+    const gb = ordemDoGrupo.get(nucleoDaRef(b.ref)) ?? 0;
+    if (ga !== gb) return ga - gb;
+    return Number(a.ref.endsWith(SUFIXO_PLUS)) - Number(b.ref.endsWith(SUFIXO_PLUS));
+  });
+
+  return { linhas, foraDaGrade };
 }
 
 /**

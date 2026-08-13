@@ -131,6 +131,19 @@ describe('linhas do pedido', () => {
     expect(linhas[0]?.quantidades).toEqual({ Q: 3 });
   });
 
+  it('lista o par junto: base e logo abaixo a linha PLUS, como no modelo da fábrica', () => {
+    // O modelo preenchido intercala: 0130, 0130E, 2130, 2130E… O pedido montado
+    // produto a produto jogava todos os PLUS para o fim do arquivo — e a
+    // paginação saía diferente da que a fábrica espera conferir.
+    const { linhas } = montarLinhas([
+      item('0130', 'M', 3),
+      item('2130', 'M', 3),
+      item('0130', '48', 2),
+      item('2130', 'XG', 4),
+    ]);
+    expect(linhas.map((l) => l.ref)).toEqual(['0130', '0130 PLUS', '2130', '2130 PLUS']);
+  });
+
   it('não põe PLUS no infantil nem no juvenil', () => {
     const { linhas } = montarLinhas([item('0080', '6', 1), item('0080', '12', 1)]);
     expect(linhas.map((l) => l.ref)).toEqual(['0080', '0080']);
@@ -266,5 +279,47 @@ describe('preenchimento do modelo oficial', () => {
   it('sem condição escolhida, o COND PGTO fica em branco como sempre foi', () => {
     const xml = sheet1(folhaComUmaLinha().arquivo);
     expect(xml).not.toMatch(/<c r="C8"[^>]*t="inlineStr">/);
+  });
+
+  it('preenche o cabeçalho: data, razão social, endereço, CNPJ, e-mail e WhatsApp', () => {
+    const { linhas } = montarLinhas([item('0130', 'M', 3)]);
+    const { arquivo } = preencherModelo(modelo(), {
+      linhas,
+      data: '13/08/2026',
+      cliente: {
+        razaoSocial: 'DUO FACE ECOMMERCE LTDA',
+        nomeFantasia: 'DUO FACE',
+        endereco: 'R VOL DELMIRO SAMPAIO',
+        cnpj: '52.594.226/0001-61',
+        email: 'duoface@gmail.com',
+        whatsapp: '(11) 1734-0709',
+      },
+    });
+    const xml = sheet1(arquivo);
+    expect(xml).toMatch(/<c r="B2"[^>]*t="inlineStr"><is><t>13\/08\/2026<\/t>/);
+    expect(xml).toMatch(/<c r="C3"[^>]*t="inlineStr"><is><t>DUO FACE ECOMMERCE LTDA<\/t>/);
+    expect(xml).toMatch(/<c r="N2"[^>]*t="inlineStr"><is><t>DUO FACE<\/t>/);
+    expect(xml).toMatch(/<c r="C4"[^>]*t="inlineStr"><is><t>R VOL DELMIRO SAMPAIO<\/t>/);
+    expect(xml).toMatch(/<c r="C7"[^>]*t="inlineStr"><is><t>52\.594\.226\/0001-61<\/t>/);
+    expect(xml).toMatch(/<c r="W7"[^>]*t="inlineStr"><is><t>duoface@gmail\.com<\/t>/);
+    expect(xml).toMatch(/<c r="S6"[^>]*t="inlineStr"><is><t>\(11\) 1734-0709<\/t>/);
+  });
+
+  it('escreve a observação com a marca da página no bloco do rodapé (A45)', () => {
+    const { linhas } = montarLinhas([item('0130', 'M', 3)]);
+    const { arquivo } = preencherModelo(modelo(), {
+      linhas,
+      observacao: 'PÁGINA 01. FATURAR EM 2 REMESSAS',
+    });
+    expect(sheet1(arquivo)).toMatch(
+      /<c r="A45"[^>]*t="inlineStr"><is><t>PÁGINA 01\. FATURAR EM 2 REMESSAS<\/t>/,
+    );
+  });
+
+  it('cabeçalho ausente não escreve nada — o formulário sai em branco como antes', () => {
+    const xml = sheet1(folhaComUmaLinha().arquivo);
+    expect(xml).not.toMatch(/<c r="C3"[^>]*t="inlineStr">/);
+    expect(xml).not.toMatch(/<c r="B2"[^>]*t="inlineStr">/);
+    expect(xml).not.toMatch(/<c r="A45"[^>]*t="inlineStr">/);
   });
 });

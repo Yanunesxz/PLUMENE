@@ -36,6 +36,36 @@ const CELULA_TOTAL = 'AB48';
  * ali apagaria o texto impresso do formulário.
  */
 const CELULA_NUMERO_DO_PEDIDO = 'AB2';
+
+/**
+ * O cabeçalho do formulário, célula a célula. Cada rótulo impresso ("DATA :",
+ * "RAZÃO SOCIAL:"…) tem ao lado uma área mesclada de valor — escrever é sempre
+ * na PRIMEIRA célula da área mesclada, nunca no rótulo. Mapeado do modelo
+ * oficial (linhas 2 a 8 do sheet1.xml, conferidas uma a uma):
+ *
+ *   B2  = DATA (mescla B2:E2)          N2 = Nome Fantasia (N2:Z2)
+ *   C3  = RAZÃO SOCIAL (C3:AB3)        C4 = ENDEREÇO (C4:AB4)
+ *   S6  = WhatsApp (S6:W6)             C7 = CNPJ/CPF (C7:L7)
+ *   W7  = E-mail (W7:AB7)              C8 = COND PGTO (C8:M8)
+ *
+ * CIDADE, Bairro, UF, CEP, TEL, Contato e Inscrição Estadual ficam em branco:
+ * o cadastro do app guarda o endereço como texto único (vai inteiro no
+ * ENDEREÇO) e não tem esses campos separados — o Control completa pelo
+ * cadastro dele quando importa.
+ */
+const CELULA_DATA = 'B2';
+const CELULA_NOME_FANTASIA = 'N2';
+const CELULA_RAZAO_SOCIAL = 'C3';
+const CELULA_ENDERECO = 'C4';
+const CELULA_WHATSAPP = 'S6';
+const CELULA_CNPJ = 'C7';
+const CELULA_EMAIL = 'W7';
+
+/**
+ * O bloco de observações do rodapé (mescla A45:V49) — é onde o formulário da
+ * fábrica traz "PÁGINA 01." e os recados do pedido (remessas, boletos, cores).
+ */
+const CELULA_OBSERVACAO = 'A45';
 /**
  * O valor do COND PGTO mora em C8 (mesclada C8:M8) — A8 é o rótulo, e escrever
  * nele apagaria o "COND PGTO" impresso. Conferido no modelo oficial: a linha 8
@@ -164,10 +194,24 @@ export interface FolhaPreenchida {
   refsDesconhecidas: string[];
 }
 
+/** O que o formulário mostra de quem comprou. Todo campo ausente fica em branco. */
+export interface ClienteDaFolha {
+  razaoSocial?: string | undefined;
+  nomeFantasia?: string | undefined;
+  endereco?: string | undefined;
+  whatsapp?: string | undefined;
+  cnpj?: string | undefined;
+  email?: string | undefined;
+}
+
 export interface DadosDaFolha {
   linhas: readonly LinhaDaPlanilha[];
-  /** Vai na célula "Nº PED". Representante e cliente ficam em branco. */
+  /** Vai na célula "Nº PED". */
   numeroDoPedido?: string | undefined;
+  /** A data do pedido, já formatada ("13/08/2026") — vai no DATA. */
+  data?: string | undefined;
+  /** O cabeçalho de quem comprou (razão social, CNPJ, endereço…). */
+  cliente?: ClienteDaFolha | undefined;
   /**
    * A descrição da condição escolhida ("30/60/90 DIAS") — vai no COND PGTO.
    * Ausente = célula fica em branco e a fábrica preenche, como sempre foi.
@@ -182,6 +226,11 @@ export interface DadosDaFolha {
    * lugar só.
    */
   descontoPercentual?: number | undefined;
+  /**
+   * O bloco de observações do rodapé ("PÁGINA 01." + recados do pedido).
+   * É onde as cores escolhidas e instruções de remessa chegam à fábrica.
+   */
+  observacao?: string | undefined;
 }
 
 /**
@@ -257,6 +306,30 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   if (dados.condicaoDePagamento) {
     patches.set(CELULA_COND_PGTO, { tipo: 'texto', valor: dados.condicaoDePagamento });
+  }
+
+  if (dados.data) {
+    patches.set(CELULA_DATA, { tipo: 'texto', valor: dados.data });
+  }
+
+  const cliente = dados.cliente;
+  if (cliente) {
+    const campos: Array<[string, string | undefined]> = [
+      [CELULA_RAZAO_SOCIAL, cliente.razaoSocial],
+      [CELULA_NOME_FANTASIA, cliente.nomeFantasia],
+      [CELULA_ENDERECO, cliente.endereco],
+      [CELULA_WHATSAPP, cliente.whatsapp],
+      [CELULA_CNPJ, cliente.cnpj],
+      [CELULA_EMAIL, cliente.email],
+    ];
+    for (const [celula, valor] of campos) {
+      const texto = valor?.trim();
+      if (texto) patches.set(celula, { tipo: 'texto', valor: texto });
+    }
+  }
+
+  if (dados.observacao) {
+    patches.set(CELULA_OBSERVACAO, { tipo: 'texto', valor: dados.observacao });
   }
 
   const preenchida = aplicarPatches(textoDecodificado.decode(sheet1), patches);

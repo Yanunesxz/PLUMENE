@@ -17,6 +17,7 @@ import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { nomeDoComprador, origemParaExibir, seloDoPedido } from '../../lib/pedido.js';
 import type {
   Order,
+  Customer,
   CustomerListItem,
   ApiResponse,
   OrderStatus,
@@ -198,6 +199,27 @@ export function PaginaPedidos() {
           api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token).then((res) => res.data),
         ),
       );
+
+      // O cabeçalho do formulário pede o que o cache offline não guarda
+      // (endereço, e-mail — cortados do CustomerListItem por peso). Busca o
+      // cadastro completo de cada cliente exportado; falhou, sai só com o que o
+      // cache tem (razão social, CNPJ, WhatsApp) — nunca trava a exportação.
+      const idsDosClientes = [
+        ...new Set(detailed.map((p) => p.customer_id).filter((id): id is string => !!id)),
+      ];
+      const cadastroCompleto = new Map<string, Customer>();
+      await Promise.all(
+        idsDosClientes.map(async (id) => {
+          try {
+            const r = await api.get<ApiResponse<Customer>>(`/customers/${id}`, token);
+            cadastroCompleto.set(id, r.data);
+          } catch {
+            /* segue com o cache */
+          }
+        }),
+      );
+      const cachePorId = new Map((customers ?? []).map((c) => [c.id, c]));
+
       const resultado = await exportarPedidosParaControl(detailed, {
         skuDoProduto: productSku,
         tamanhoDaVariante,
@@ -208,6 +230,20 @@ export function PaginaPedidos() {
           const daLoja = pedido.customer_id ? tabelaDoCliente.get(pedido.customer_id) : null;
           const id = pedido.price_table_id ?? daLoja ?? tabelaDoRep.get(pedido.rep_id) ?? null;
           return id ? (numeroPorTabela.get(id) ?? null) : null;
+        },
+        clienteDoPedido: (pedido) => {
+          if (!pedido.customer_id) return null;
+          const completo = cadastroCompleto.get(pedido.customer_id);
+          const doCache = cachePorId.get(pedido.customer_id);
+          if (!completo && !doCache) return null;
+          return {
+            razaoSocial: completo?.name ?? doCache?.name,
+            nomeFantasia: completo?.trade_name ?? doCache?.trade_name ?? undefined,
+            cnpj: completo?.cnpj ?? doCache?.cnpj ?? undefined,
+            whatsapp: completo?.whatsapp ?? doCache?.whatsapp ?? undefined,
+            endereco: completo?.address ?? undefined,
+            email: completo?.email ?? undefined,
+          };
         },
       });
       setAvisosDaExportacao(resultado.avisos);
