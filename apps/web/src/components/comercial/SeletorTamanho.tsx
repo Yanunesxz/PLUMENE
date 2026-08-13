@@ -3,8 +3,8 @@ import { X, ImageIcon, Check } from 'lucide-react';
 import type { ProductWithPrice } from '@csb/shared';
 import { Button } from '../interface/Button.js';
 import { QuadradoDoTamanho } from './QuadradoDoTamanho.js';
-import { faixasDePreco, ordenarGrade } from './grade.js';
-import { precoDoTamanho } from '@csb/shared';
+import { compararTamanho, ordenarGrade } from './grade.js';
+import { faixaDoTamanho, precoDoTamanho } from '@csb/shared';
 import { cn, formatBRL } from '@/lib/utils';
 
 export interface PickedSize {
@@ -97,6 +97,23 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
     return soma + n * (precoDoTamanho(size, active.price, active.price_larger) ?? 0);
   }, 0);
 
+  /**
+   * Quais tamanhos da faixa maior o cliente marcou — em TODAS as cores, como o
+   * total. É o que dispara o aviso: o EG e a grade plus (48-54) custam mais na
+   * tabela da fábrica, e ele precisa saber disso antes de fechar, não depois.
+   */
+  const extrasMarcados = [
+    ...new Set(
+      Object.entries(qty)
+        .filter(([, n]) => n > 0)
+        .map(([chave]) => chave.split('|')[2] ?? '')
+        .filter((size) => faixaDoTamanho(size) === 'maior'),
+    ),
+  ].sort(compararTamanho);
+
+  /** O preço do tamanho extra. `null` quando a peça tem preço único. */
+  const precoExtra = active.price_larger;
+
   /** Quantas peças já marcadas numa cor — para o selo na bolinha. */
   const qtdDaCor = (codigo: string) =>
     variants.reduce((s, v) => s + (qty[`${active.id}|${codigo}|${v.size}`] ?? 0), 0);
@@ -145,20 +162,13 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
                 <span className="tnum font-mono text-[11px] font-semibold tracking-wide text-subtle">
                   {active.sku}
                 </span>
-                {/* As duas faixas, quando existem: aqui é onde o representante
-                    escolhe o tamanho, então é aqui que ele precisa ver que o EG
-                    sai mais caro — antes de marcar a quantidade. */}
-                {faixasDePreco(active).map((f, i, todas) => (
-                  <span key={f.rotulo} className="tnum text-sm font-semibold text-foreground">
-                    {todas.length > 1 && (
-                      <span className="mr-1 text-[10px] font-medium uppercase tracking-wide text-subtle">
-                        {f.rotulo}
-                      </span>
-                    )}
-                    {formatBRL(f.preco)}
-                    {i < todas.length - 1 && <span className="ml-2 text-subtle">·</span>}
+                {/* O preço do tamanho normal. O do extra não vem para cá: ele
+                    aparece embaixo, quando a pessoa marca um. */}
+                {active.price != null && (
+                  <span className="tnum text-sm font-semibold text-foreground">
+                    {formatBRL(active.price)}
                   </span>
-                ))}
+                )}
               </p>
             </div>
           </div>
@@ -294,6 +304,26 @@ export function SeletorTamanho({ product, colorGroup, onClose, onConfirm }: Sele
               <p className="mt-2.5 text-center text-[11px] leading-tight text-subtle">
                 Toque para somar 1 · segure para digitar a quantidade
               </p>
+
+              {/* O aviso do tamanho extra só aparece depois que a pessoa marca
+                  um — antes disso não há o que avisar, e um aviso permanente em
+                  toda peça vira decoração que ninguém lê. */}
+              {extrasMarcados.length > 0 && (
+                <div className="mt-3 rounded-lg bg-sunken px-3 py-2.5">
+                  <p className="text-[12px] font-medium leading-snug text-foreground">
+                    {extrasMarcados.join(', ')}
+                    {precoExtra != null ? (
+                      <>
+                        {' · '}
+                        <span className="tnum">{formatBRL(precoExtra)}</span> cada
+                      </>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-tight text-muted-foreground">
+                    Preços dos tamanhos extras podem mudar.
+                  </p>
+                </div>
+              )}
             </>
           )}
         </div>

@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeAll, afterAll } from 'vitest';
 import crypto from 'node:crypto';
 import type { FastifyInstance } from 'fastify';
 import { faixaDoTamanho, precoDoTamanho } from '@csb/shared';
-import { faixasDePreco } from '../apps/web/src/components/comercial/grade.js';
 import { criarSupabaseFake } from './supabaseFake.js';
-import type { ProductWithPrice } from '@csb/shared';
 
 /**
  * O preço da FAIXA MAIOR (EG / XG / 48-54).
@@ -81,68 +79,6 @@ describe('o preço de um tamanho', () => {
 
   it('devolve null quando o produto não tem preço na tabela', () => {
     expect(precoDoTamanho('EG', null, null)).toBeNull();
-  });
-});
-
-describe('as faixas como o card mostra', () => {
-  const produto = (over: Partial<ProductWithPrice>): ProductWithPrice =>
-    ({
-      id: 'p1',
-      sku: '0706',
-      name: 'Pijama De Manga Feminino',
-      collection: null,
-      brand: null,
-      image_url: null,
-      variant_group: null,
-      color_name: null,
-      color_hex: null,
-      active: true,
-      price: 41.9,
-      price_larger: null,
-      variants: [],
-      ...over,
-    }) as ProductWithPrice;
-
-  const grade = (sizes: string[]) => sizes.map((size) => ({ id: size, size, in_stock: true }));
-
-  it('mostra as duas faixas com o rótulo da tabela da fábrica', () => {
-    const f = faixasDePreco(
-      produto({ price_larger: 52.9, variants: grade(['P', 'M', 'G', 'GG', '48', '50', '52', '54']) }),
-    );
-    expect(f).toEqual([
-      { rotulo: 'P AO GG', preco: 41.9 },
-      { rotulo: '48 AO 54', preco: 52.9 },
-    ]);
-  });
-
-  it('rotula um tamanho sozinho com o próprio nome, sem "AO"', () => {
-    const f = faixasDePreco(
-      produto({ price_larger: 23.9, variants: grade(['PP', 'P', 'M', 'G', 'GG', 'EG']) }),
-    );
-    expect(f[1]).toEqual({ rotulo: 'EG', preco: 23.9 });
-  });
-
-  it('devolve UMA faixa quando a peça tem preço único — sem rótulo inútil no card', () => {
-    const f = faixasDePreco(produto({ variants: grade(['2', '4', '6', '8']) }));
-    expect(f).toHaveLength(1);
-    expect(f[0]!.preco).toBe(41.9);
-  });
-
-  it('ignora o LD, que não é tamanho de venda', () => {
-    const f = faixasDePreco(
-      produto({ price_larger: 52.9, variants: grade(['P', 'M', 'G', 'GG', 'LD', '48', '54']) }),
-    );
-    expect(f[0]!.rotulo).toBe('P AO GG');
-    expect(f[1]!.rotulo).toBe('48 AO 54');
-  });
-
-  it('não inventa faixa maior quando o produto tem EG mas não tem preço maior', () => {
-    const f = faixasDePreco(produto({ variants: grade(['P', 'GG', 'EG']) }));
-    expect(f).toHaveLength(1);
-  });
-
-  it('não mostra preço nenhum quando a peça não está na tabela', () => {
-    expect(faixasDePreco(produto({ price: null }))).toEqual([]);
   });
 });
 
