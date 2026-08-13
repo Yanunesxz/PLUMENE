@@ -34,6 +34,13 @@ const CELULA_TOTAL = 'AB48';
  * ali apagaria o texto impresso do formulário.
  */
 const CELULA_NUMERO_DO_PEDIDO = 'AB2';
+/**
+ * O valor do COND PGTO mora em C8 (mesclada C8:M8) — A8 é o rótulo, e escrever
+ * nele apagaria o "COND PGTO" impresso. Conferido no modelo oficial: a linha 8
+ * é "COND PGTO | FORMA PGTO | Data da Entrega", cada rótulo com sua área
+ * mesclada de valor ao lado.
+ */
+const CELULA_COND_PGTO = 'C8';
 
 const PLANILHA_DO_PEDIDO = 'xl/worksheets/sheet1.xml';
 const PLANILHA_DOS_PRECOS = 'xl/worksheets/sheet2.xml';
@@ -141,6 +148,11 @@ export interface DadosDaFolha {
   linhas: readonly LinhaDaPlanilha[];
   /** Vai na célula "Nº PED". Representante e cliente ficam em branco. */
   numeroDoPedido?: string | undefined;
+  /**
+   * A descrição da condição escolhida ("30/60/90 DIAS") — vai no COND PGTO.
+   * Ausente = célula fica em branco e a fábrica preenche, como sempre foi.
+   */
+  condicaoDePagamento?: string | undefined;
 }
 
 /**
@@ -196,6 +208,10 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   if (dados.numeroDoPedido) {
     patches.set(CELULA_NUMERO_DO_PEDIDO, { tipo: 'texto', valor: dados.numeroDoPedido });
+  }
+
+  if (dados.condicaoDePagamento) {
+    patches.set(CELULA_COND_PGTO, { tipo: 'texto', valor: dados.condicaoDePagamento });
   }
 
   const preenchida = aplicarPatches(textoDecodificado.decode(sheet1), patches);

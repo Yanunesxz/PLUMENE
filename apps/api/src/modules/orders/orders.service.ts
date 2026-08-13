@@ -1,6 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
+import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
 import { ORDER_STATUS_FLOW, precoDoTamanho } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
@@ -38,9 +39,16 @@ export async function getOrderById(
   rep_id?: string,
   customer_id?: string | null,
 ): Promise<OrderWithItems | null> {
+  // A condição de pagamento volta já resolvida (código + descrição): é o que a
+  // tela mostra, o e-mail escreve e a planilha põe no COND PGTO. O embed só
+  // entra com a migração 028 aplicada — sem ela, o select falharia inteiro.
+  const colunas = (await detectarColunaDaCondicao())
+    ? '*, items:order_items(*), payment_condition:payment_conditions(code, description)'
+    : '*, items:order_items(*)';
+
   let query = supabase
     .from('orders')
-    .select('*, items:order_items(*)')
+    .select(colunas)
     .eq('id', id)
     .eq('company_id', company_id);
 
@@ -52,7 +60,9 @@ export async function getOrderById(
   const { data: order, error } = await query.single();
 
   if (error || !order) return null;
-  return order as OrderWithItems;
+  // `as unknown`: o select dinâmico (com/sem embed) tira do supabase-js a
+  // inferência do shape — mesmo caso do getPriceMap logo abaixo.
+  return order as unknown as OrderWithItems;
 }
 
 interface PrecoDoProduto {
@@ -298,6 +308,13 @@ export async function createOrder(
   const tabelaGravada =
     price_table_id && (await detectarColunaDaTabela()) ? { price_table_id } : {};
 
+  // A condição de pagamento que o rep (ou a loja) escolheu. Validada: precisa
+  // ser desta empresa e estar ativa. Inválida ou com a 028 pendente, o pedido
+  // segue SEM ela — condição é acessória, e recusar a venda por causa dela
+  // seria o dano maior. O COND PGTO da planilha sai em branco, como sempre foi.
+  const condicaoEscolhida = await condicaoValida(body.payment_condition_id, company_id);
+  const condicaoGravada = condicaoEscolhida ? { payment_condition_id: condicaoEscolhida } : {};
+
   const camposDeOrigem = (await detectarColunasDeOrigem())
     ? {
         source: origem.source,
@@ -320,6 +337,7 @@ export async function createOrder(
         created_by: origem.created_by ?? rep_id,
         ...camposDeOrigem,
         ...tabelaGravada,
+        ...condicaoGravada,
       })
       .select()
       .single();

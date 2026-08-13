@@ -13,6 +13,9 @@ export const createOrderSchema = z.object({
   // Vitrine: quem está pedindo, já que não há cadastro por trás.
   guest_name: z.string().max(160).optional(),
   guest_whatsapp: z.string().max(30).optional(),
+  // Condição de pagamento escolhida (rep ou loja). Opcional: sem ela o pedido
+  // sai como sempre saiu, com o COND PGTO da planilha em branco.
+  payment_condition_id: z.string().uuid().optional(),
   items: z
     .array(
       z.object({

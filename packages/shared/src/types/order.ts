@@ -25,6 +25,18 @@ export interface Order {
    * — aí quem lê deduz pelo cadastro do cliente, como era antes.
    */
   price_table_id?: string | null;
+  /**
+   * Condição de pagamento escolhida (migração 028). NULL = ninguém escolheu —
+   * a planilha do Control sai com COND PGTO em branco e a fábrica preenche,
+   * como sempre foi.
+   */
+  payment_condition_id?: string | null;
+  /**
+   * A condição já resolvida (código + descrição), embutida pela API quando a
+   * migração 028 está aplicada. É o que as telas mostram e o que a planilha
+   * escreve — ninguém precisa refazer a busca.
+   */
+  payment_condition?: { code: number; description: string } | null;
   status: OrderStatus;
   /** Quem montou: representante, loja logada ou vitrine. */
   source?: OrderSource;
@@ -93,6 +105,8 @@ export interface PedidoPublico {
   total: number;
   totalPecas: number;
   produtos: ItemPedidoPublico[];
+  /** Descrição da condição de pagamento ("30/60/90 DIAS"). Nulo = não escolhida. */
+  condicaoDePagamento?: string | null;
   /** `true` = o link já passou dos 7 dias após o faturamento. */
   expirado: boolean;
 }
@@ -110,6 +124,11 @@ export interface CreateOrderRequest {
   /** Vitrine: quem está pedindo. Obrigatórios nesse caminho, ignorados nos outros. */
   guest_name?: string | undefined;
   guest_whatsapp?: string | undefined;
+  /**
+   * Condição de pagamento escolhida por quem montou (rep ou loja). Opcional:
+   * sem ela o pedido sai como sempre saiu, com o COND PGTO em branco.
+   */
+  payment_condition_id?: string | undefined;
   items: Array<{
     product_id: string;
     variant_id?: string | undefined;

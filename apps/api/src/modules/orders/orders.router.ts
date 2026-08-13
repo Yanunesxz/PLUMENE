@@ -8,6 +8,7 @@ import {
   setInvoicedHandler,
   deleteOrderHandler,
   pedidoPublicoHandler,
+  listPaymentConditions,
 } from './orders.controller.js';
 
 export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
@@ -36,6 +37,10 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     pedidoPublicoHandler,
   );
+
+  // A lista que o seletor de condição de pagamento usa — rep e loja escolhem
+  // no pedido, então a loja também lê (mesmo conjunto de papéis dos pedidos).
+  fastify.get('/payment-conditions', daFabricaOuLoja, listPaymentConditions);
 
   fastify.get('/orders', daFabricaOuLoja, listOrders);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);

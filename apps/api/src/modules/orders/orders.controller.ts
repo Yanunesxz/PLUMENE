@@ -10,9 +10,24 @@ import {
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { getPedidoPublico } from './publicOrder.service.js';
+import { getCondicoesDePagamento } from './paymentConditions.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
+
+/**
+ * GET /payment-conditions — as condições de pagamento que rep e loja escolhem
+ * no pedido. Lista vazia enquanto a migração 028 não rodar: o seletor some da
+ * tela em vez de quebrar o pedido.
+ */
+export async function listPaymentConditions(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id } = request.user;
+  const condicoes = await getCondicoesDePagamento(company_id);
+  await reply.send({ data: condicoes });
+}
 
 export async function listOrders(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, customer_id } = request.user;

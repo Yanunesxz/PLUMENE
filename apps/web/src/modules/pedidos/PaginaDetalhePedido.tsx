@@ -14,6 +14,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
+import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
 export function PaginaDetalhePedido() {
@@ -50,6 +51,15 @@ export function PaginaDetalhePedido() {
 
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
+  const condicoes = useCondicoesDePagamento();
+
+  // A condição de pagamento: a API manda resolvida; offline, o cache do Dexie
+  // resolve pelo id. Sem nenhuma das duas, a linha não aparece.
+  const condicaoDoPedido =
+    order?.payment_condition?.description ??
+    (order?.payment_condition_id
+      ? (condicoes.find((c) => c.id === order.payment_condition_id)?.description ?? null)
+      : null);
 
   const prodMap = useMemo(() => {
     const m = new Map<string, ProductWithPrice>();
@@ -194,6 +204,13 @@ export function PaginaDetalhePedido() {
                 year: 'numeric',
               })}
             </p>
+
+            {condicaoDoPedido && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                Cond. de pagamento:{' '}
+                <span className="font-medium text-foreground">{condicaoDoPedido}</span>
+              </p>
+            )}
 
             <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>
               <span className="flex items-center gap-2">

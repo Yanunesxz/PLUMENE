@@ -249,4 +249,22 @@ describe('preenchimento do modelo oficial', () => {
   it('não reclama de referência que existe na Plan2', () => {
     expect(folhaComUmaLinha().refsDesconhecidas).toEqual([]);
   });
+
+  it('escreve a condição de pagamento no COND PGTO (C8)', () => {
+    const { linhas } = montarLinhas([item('0130', 'M', 3)]);
+    const { arquivo } = preencherModelo(modelo(), {
+      linhas,
+      condicaoDePagamento: '30/60/90 DIAS',
+    });
+    const xml = sheet1(arquivo);
+    // Em C8 (a área de valor ao lado do rótulo A8), como texto, estilo intacto.
+    expect(xml).toMatch(/<c r="C8"[^>]*t="inlineStr"><is><t>30\/60\/90 DIAS<\/t><\/is><\/c>/);
+    // O rótulo "COND PGTO" (A8) continua onde está.
+    expect(xml).toMatch(/<c r="A8"[^>]*t="s">/);
+  });
+
+  it('sem condição escolhida, o COND PGTO fica em branco como sempre foi', () => {
+    const xml = sheet1(folhaComUmaLinha().arquivo);
+    expect(xml).not.toMatch(/<c r="C8"[^>]*t="inlineStr">/);
+  });
 });

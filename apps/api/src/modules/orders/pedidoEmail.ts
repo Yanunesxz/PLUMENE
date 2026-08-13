@@ -29,10 +29,15 @@ function corpoHtml(opts: {
   status: string;
   pecas: number;
   total: number;
+  /** Descrição da condição de pagamento ("30/60/90 DIAS"). Nulo = sem linha. */
+  condicao: string | null;
   link: string;
   rodape: string;
 }): string {
-  const { saudacao, intro, numero, data, status, pecas, total, link, rodape } = opts;
+  const { saudacao, intro, numero, data, status, pecas, total, condicao, link, rodape } = opts;
+  const linhaCondicao = condicao
+    ? `<tr><td style="color:#7c6f71;padding:4px 0;">Cond. de pagamento</td><td style="text-align:right;">${condicao}</td></tr>`
+    : '';
   return `<!doctype html><html><body style="margin:0;background:#efe9e6;font-family:Segoe UI,Arial,sans-serif;color:#2a2224;">
   <div style="max-width:520px;margin:0 auto;padding:24px 16px 40px;">
     <div style="background:#fff;border:1px solid #e7ded9;border-radius:6px;overflow:hidden;">
@@ -49,7 +54,7 @@ function corpoHtml(opts: {
         <table style="width:100%;font-size:14px;border-collapse:collapse;">
           <tr><td style="color:#7c6f71;padding:4px 0;">Pedido</td><td style="text-align:right;font-weight:700;">#${numero}</td></tr>
           <tr><td style="color:#7c6f71;padding:4px 0;">Data</td><td style="text-align:right;">${data}</td></tr>
-          <tr><td style="color:#7c6f71;padding:4px 0;">Peças</td><td style="text-align:right;">${pecas}</td></tr>
+          <tr><td style="color:#7c6f71;padding:4px 0;">Peças</td><td style="text-align:right;">${pecas}</td></tr>${linhaCondicao}
           <tr><td style="color:#7c6f71;padding:10px 0 0;border-top:1px solid #efe6e1;font-weight:700;">Total</td><td style="text-align:right;padding-top:10px;border-top:1px solid #efe6e1;font-family:Georgia,serif;font-size:18px;font-weight:700;">${brl(total)}</td></tr>
         </table>
       </div>
@@ -75,6 +80,8 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
     const status = statusCliente(order.status);
     const pecas = order.items.reduce((s, i) => s + i.quantity, 0);
     const total = order.total ?? order.items.reduce((s, i) => s + i.total, 0);
+    // Já vem resolvida pelo getOrderById (embed da 028). Sem escolha, sem linha.
+    const condicao = order.payment_condition?.description ?? null;
 
     // Cliente e representante em paralelo.
     const [cli, rep] = await Promise.all([
@@ -88,7 +95,7 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
     const nomeCliente = cliente?.name ?? order.guest_name ?? 'cliente';
     const nomeRep = representante?.name ?? 'seu representante';
 
-    const base = { numero, data, status, pecas, total, link };
+    const base = { numero, data, status, pecas, total, condicao, link };
 
     // Para o CLIENTE
     if (cliente?.email) {

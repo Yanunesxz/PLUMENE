@@ -1,11 +1,13 @@
 import Dexie, { type Table } from 'dexie';
-import type { ProductWithPrice, CustomerListItem, Order, OrderItem } from '@csb/shared';
+import type { ProductWithPrice, CustomerListItem, Order, OrderItem, PaymentCondition } from '@csb/shared';
 
 export interface SyncQueueItem {
   id?: number;
   local_id: string;
   customer_id: string;
   notes?: string | undefined;
+  /** Condição de pagamento escolhida offline — viaja com o pedido no /sync. */
+  payment_condition_id?: string | undefined;
   items: Array<{ product_id: string; variant_id?: string | undefined; quantity: number; unit_price: number }>;
   created_at: string;
   updated_at: string;
@@ -24,6 +26,8 @@ class AppDatabase extends Dexie {
   orders!: Table<LocalOrder, string>;
   order_items!: Table<OrderItem, string>;
   sync_queue!: Table<SyncQueueItem, number>;
+  /** As condições de pagamento do Control — o seletor do pedido funciona offline. */
+  payment_conditions!: Table<PaymentCondition, string>;
 
   constructor() {
     super('csb_offline');
@@ -47,6 +51,13 @@ class AppDatabase extends Dexie {
         customers: 'id, name, cnpj, blocked',
       })
       .upgrade((tx) => tx.table('products').clear());
+
+    // v3: as condições de pagamento do Control ficam em cache — o representante
+    // escolhe a condição no pedido mesmo sem sinal, com a lista da última vez
+    // que esteve online. `code` indexado: é a ordem do Control na tela.
+    this.version(3).stores({
+      payment_conditions: 'id, code',
+    });
   }
 }
 
@@ -68,6 +79,7 @@ export async function resetOfflineIfUserChanged(userId: string): Promise<void> {
     db.orders.clear(),
     db.order_items.clear(),
     db.sync_queue.clear(),
+    db.payment_conditions.clear(),
   ]);
   localStorage.setItem(CACHE_OWNER_KEY, userId);
 }

@@ -7,6 +7,7 @@
  */
 import { supabase } from '../../config/supabase.js';
 import { pedidoDoToken } from './publicToken.js';
+import { detectarColunaDaCondicao } from './paymentConditions.service.js';
 import { statusDoCliente } from '@csb/shared';
 import type { PedidoPublico, ItemPedidoPublico, Order } from '@csb/shared';
 
@@ -31,16 +32,18 @@ export async function getPedidoPublico(token: string): Promise<PedidoPublico | n
   const id = pedidoDoToken(token);
   if (!id) return null;
 
-  const { data, error } = await supabase
-    .from('orders')
-    .select(
-      '*, items:order_items(quantity, unit_price, total, product_id, produto:products(sku, name, image_url), variante:product_variants(size))',
-    )
-    .eq('id', id)
-    .maybeSingle();
+  // O embed da condição de pagamento só entra com a migração 028 aplicada —
+  // sem ela o select falharia inteiro e o link do e-mail morreria junto.
+  const itens =
+    'items:order_items(quantity, unit_price, total, product_id, produto:products(sku, name, image_url), variante:product_variants(size))';
+  const colunas = (await detectarColunaDaCondicao())
+    ? `*, ${itens}, payment_condition:payment_conditions(description)`
+    : `*, ${itens}`;
+
+  const { data, error } = await supabase.from('orders').select(colunas).eq('id', id).maybeSingle();
   if (error || !data) return null;
 
-  const order = data as Order & { items: ItemRow[]; guest_name?: string | null };
+  const order = data as unknown as Order & { items: ItemRow[]; guest_name?: string | null };
 
   const expirado =
     !!order.invoiced &&
@@ -90,6 +93,7 @@ export async function getPedidoPublico(token: string): Promise<PedidoPublico | n
     total: order.total ?? [...porProduto.values()].reduce((s, p) => s + p.total, 0),
     totalPecas,
     produtos: [...porProduto.values()],
+    condicaoDePagamento: order.payment_condition?.description ?? null,
     expirado,
   };
 }

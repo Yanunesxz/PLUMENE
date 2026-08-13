@@ -119,6 +119,9 @@ async function gerarArquivosDoPedido(
     const { arquivo, refsDesconhecidas } = preencherModelo(modelo, {
       linhas: folha,
       numeroDoPedido: numero,
+      // A API já manda a condição resolvida no pedido (embed da 028). Em todas
+      // as folhas: cada arquivo do zip é um formulário completo.
+      condicaoDePagamento: pedido.payment_condition?.description,
     });
 
     for (const ref of refsDesconhecidas) {

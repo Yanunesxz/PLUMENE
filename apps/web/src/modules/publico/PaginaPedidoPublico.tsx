@@ -85,7 +85,10 @@ function Conteudo({ p }: { p: PedidoPublico }) {
           <h1>Pedido #{p.numero}</h1>
           <span className={`badge ${p.passo === 'recusado' ? 'ruim' : ''}`}>{badge}</span>
         </div>
-        <p className="sub">Feito em {dataBR(p.data)} · {p.cliente}</p>
+        <p className="sub">
+          Feito em {dataBR(p.data)} · {p.cliente}
+          {p.condicaoDePagamento ? <> · Pagamento: {p.condicaoDePagamento}</> : null}
+        </p>
         <div className="passos">
           {passos(p.passo).map((s) => (
             <div key={s.lbl} className={`passo ${s.cls}`}>

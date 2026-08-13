@@ -13,6 +13,7 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
+import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -42,11 +43,15 @@ export function PaginaNovoPedido() {
   const ehLoja = user?.role === 'store';
   const [customerId, setCustomerId] = useState(preselectedCustomerId);
   const [notes, setNotes] = useState('');
+  // Condição de pagamento do Control ("30/60/90 DIAS"). Opcional: sem escolha,
+  // o COND PGTO da planilha sai em branco e a fábrica preenche, como sempre.
+  const [condicaoId, setCondicaoId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
+  const condicoes = useCondicoesDePagamento();
   // Booleano não é chave indexável no IndexedDB — lemos tudo e filtramos em memória.
   const allProducts = useLiveQuery(() => db.products.toArray(), []);
   const activeProducts = useMemo(() => (allProducts ?? []).filter((p) => p.active), [allProducts]);
@@ -268,6 +273,9 @@ export function PaginaNovoPedido() {
       // O ERP recebe o item como sortido; a cor escolhida viaja na observação,
       // logo abaixo do que o representante digitou.
       notes: juntarObservacao(notes, observacaoDeCores(items)),
+      // A condição escolhida (rep ou loja). Vai para o pedido, o e-mail e o
+      // COND PGTO da planilha do Control.
+      ...(condicaoId ? { payment_condition_id: condicaoId } : {}),
       local_id,
       // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
       // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
@@ -293,6 +301,7 @@ export function PaginaNovoPedido() {
           local_id,
           customer_id: clienteDoPedido,
           notes: notes || undefined,
+          payment_condition_id: condicaoId || undefined,
           items: payload.items,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -359,6 +368,32 @@ export function PaginaNovoPedido() {
                 Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
               </p>
             ) : null}
+          </div>
+        )}
+
+        {condicoes.length > 0 && (
+          <div className="space-y-1.5">
+            <label htmlFor="payment-condition" className="text-sm font-medium text-foreground">
+              Condição de pagamento
+            </label>
+            <SearchSelect
+              id="payment-condition"
+              value={condicaoId}
+              onSelect={setCondicaoId}
+              placeholder="Buscar condição (ex.: 30/60/90)…"
+              searchPlaceholder="Digite os prazos ou o código…"
+              emptyText="Nenhuma condição encontrada"
+              options={condicoes.map((c) => ({
+                value: c.id,
+                label: c.description,
+                sublabel: `Código ${c.code}`,
+              }))}
+            />
+            <p className="text-xs text-muted-foreground">
+              {condicaoId
+                ? 'Vai no pedido, no e-mail e na planilha da fábrica.'
+                : 'Opcional. Sem escolha, a fábrica define no lançamento.'}
+            </p>
           </div>
         )}
 
