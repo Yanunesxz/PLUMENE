@@ -96,11 +96,17 @@ export function PaginaNovoPedido() {
       .then(async (res) => {
         if (!vivo) return;
         await db.products.bulkPut(res.data);
-        const precoPor = new Map(res.data.map((p) => [p.id, p.price]));
+        // Guarda as DUAS faixas: reprecificar pelo `price` puro rebaixaria todo
+        // EG e toda peça da grade plus ao preço do tamanho normal — desfazendo,
+        // em silêncio, o preço que o servidor vai cobrar no envio.
+        const precoPor = new Map(res.data.map((p) => [p.id, p]));
         const semPreco: string[] = [];
         let mudou = 0;
         for (const item of useCartStore.getState().items) {
-          const preco = precoPor.get(item.product_id);
+          const doCatalogo = precoPor.get(item.product_id);
+          const preco = doCatalogo
+            ? precoDoTamanho(item.size, doCatalogo.price, doCatalogo.price_larger)
+            : null;
           if (preco == null) {
             semPreco.push(item.sku);
             removeItem(item.product_id, item.size, item.color_code);
@@ -132,6 +138,42 @@ export function PaginaNovoPedido() {
       vivo = false;
     };
   }, [token, tabelaDoPedido, tabelaAplicada, removeItem, setUnitPrice]);
+
+  /**
+   * Conserta o carrinho que ficou parado no aparelho com preço velho.
+   *
+   * O carrinho guarda o `unit_price` de quando a peça foi adicionada e é
+   * persistido — um pedido montado semana passada abre hoje com os preços
+   * daquele dia. Quando a tabela da fábrica muda no meio (foi o que aconteceu
+   * com o preço do EG e da grade plus), o representante vê um total e o servidor
+   * cobra outro, porque ele recalcula tudo no envio.
+   *
+   * Confere contra o catálogo que está em cache — que é o mesmo de onde as peças
+   * foram adicionadas — e ajusta só a linha que divergiu. A reprecificação por
+   * tabela, acima, continua mandando quando o cliente tem tabela própria.
+   */
+  useEffect(() => {
+    if (!allProducts || allProducts.length === 0) return;
+    const porId = new Map(allProducts.map((p) => [p.id, p]));
+    let corrigidas = 0;
+    for (const item of useCartStore.getState().items) {
+      const doCatalogo = porId.get(item.product_id);
+      if (!doCatalogo) continue;
+      const preco = precoDoTamanho(item.size, doCatalogo.price, doCatalogo.price_larger);
+      if (preco == null || preco === item.unit_price) continue;
+      setUnitPrice(item.product_id, item.size, preco, item.color_code);
+      corrigidas++;
+    }
+    if (corrigidas > 0) {
+      setToast({
+        message:
+          corrigidas === 1
+            ? 'Um item do pedido estava com preço desatualizado e foi corrigido.'
+            : `${corrigidas} itens do pedido estavam com preço desatualizado e foram corrigidos.`,
+        type: 'info',
+      });
+    }
+  }, [allProducts, setUnitPrice]);
 
   /**
    * O que a confirmação vai dizer antes de enviar. `null` = não há o que
