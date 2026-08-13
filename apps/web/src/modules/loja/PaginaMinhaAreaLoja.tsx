@@ -27,8 +27,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { STATUS_VARIANTE } from '../../lib/pedido.js';
-import { ORDER_STATUS_LABELS } from '@csb/shared';
+import { seloDoPedido } from '../../lib/pedido.js';
 import type { ApiResponse, MinhaAreaLoja, PecaComprada, ProductWithPrice } from '@csb/shared';
 import { precoDoTamanho } from '@csb/shared';
 
@@ -300,8 +299,8 @@ export function PaginaMinhaAreaLoja() {
                       <span className="font-mono text-xs text-muted-foreground">
                         #{pedido.order_number ?? pedido.id.slice(0, 8)}
                       </span>
-                      <Badge variant={STATUS_VARIANTE[pedido.status]}>
-                        {ORDER_STATUS_LABELS[pedido.status]}
+                      <Badge variant={seloDoPedido(pedido, 'store').variante}>
+                        {seloDoPedido(pedido, 'store').texto}
                       </Badge>
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">

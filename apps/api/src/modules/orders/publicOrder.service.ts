@@ -7,16 +7,16 @@
  */
 import { supabase } from '../../config/supabase.js';
 import { pedidoDoToken } from './publicToken.js';
+import { statusDoCliente } from '@csb/shared';
 import type { PedidoPublico, ItemPedidoPublico, Order } from '@csb/shared';
 
 /** Sete dias depois do faturamento o link para de funcionar (privacidade). */
 const VALIDADE_MS = 7 * 24 * 60 * 60 * 1000;
 
-function passoDoStatus(status: Order['status']): PedidoPublico['passo'] {
-  if (status === 'rejected') return 'recusado';
-  if (status === 'approved' || status === 'sent_erp') return 'aprovado';
-  return 'enviado';
-}
+// O degrau vem de `statusDoCliente` (shared) — a MESMA função que as telas do
+// representante e da loja usam. Antes daqui, `approved`/`sent_erp` já viravam
+// "Aprovado" para quem comprou; hoje quem promove é o FATURAMENTO, porque é o
+// financeiro que fecha o valor. Ver constants/statusDoCliente.ts.
 
 interface ItemRow {
   quantity: number;
@@ -84,7 +84,7 @@ export async function getPedidoPublico(token: string): Promise<PedidoPublico | n
     numero: String(order.order_number ?? order.id.slice(0, 8)),
     data: order.created_at,
     status: order.status,
-    passo: passoDoStatus(order.status),
+    passo: statusDoCliente(order),
     cliente: (cli.data as { name: string } | null)?.name ?? order.guest_name ?? 'Cliente',
     representante: (rep.data as { name: string } | null)?.name ?? 'Representante',
     total: order.total ?? [...porProduto.values()].reduce((s, p) => s + p.total, 0),

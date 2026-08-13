@@ -19,9 +19,8 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
-import { STATUS_VARIANTE } from '../../lib/pedido.js';
+import { seloDoPedido } from '../../lib/pedido.js';
 import { formatBRL } from '../../lib/utils.js';
-import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { ApiResponse, CustomerDetail } from '@csb/shared';
 
 /**
@@ -36,7 +35,7 @@ import type { ApiResponse, CustomerDetail } from '@csb/shared';
 export function PaginaCliente() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const { tabelas, nomeDe } = useMinhasTabelas();
 
   const [cliente, setCliente] = useState<CustomerDetail | null>(null);
@@ -181,7 +180,9 @@ export function PaginaCliente() {
                     <span className="tnum text-sm font-medium text-foreground">
                       {p.order_number ? `#${p.order_number}` : 'Rascunho'}
                     </span>
-                    <Badge variant={STATUS_VARIANTE[p.status]}>{ORDER_STATUS_LABELS[p.status]}</Badge>
+                    <Badge variant={seloDoPedido(p, user?.role).variante}>
+                      {seloDoPedido(p, user?.role).texto}
+                    </Badge>
                   </div>
                   <p className="tnum mt-0.5 text-xs text-subtle">
                     {new Date(p.created_at).toLocaleDateString('pt-BR', {

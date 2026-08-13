@@ -47,7 +47,11 @@ export function PaginaPainel() {
       const d = new Date(iso);
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     };
-    const approved = orders.filter((o) => o.status === 'approved');
+    // Venda é o que a fábrica FATUROU, não o que o gerente aprovou. Aprovar só
+    // libera o pedido para o ERP; quem fecha o valor é o financeiro, que corta
+    // item em falta e corrige preço antes da nota. Somar por `approved` inflava
+    // o número com pedido que ainda ia encolher.
+    const faturados = orders.filter((o) => o.invoiced);
     const pending = orders.filter((o) => o.status === 'pending_approval');
     // Pedido que a loja montou e que ainda espera o representante triar. Não é
     // fila do gerente, mas fica visível: sem isso, um representante ausente
@@ -56,18 +60,24 @@ export function PaginaPainel() {
 
     // Pedido de vitrine não entra no ranking: não há cliente por trás dele.
     const topMap = new Map<string, number>();
-    for (const o of approved) {
+    for (const o of faturados) {
       if (!o.customer_id) continue;
       topMap.set(o.customer_id, (topMap.get(o.customer_id) ?? 0) + (o.total ?? 0));
     }
     const topClientes = [...topMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5);
 
     return {
-      vendasMes: approved.filter((o) => isThisMonth(o.created_at)).reduce((s, o) => s + (o.total ?? 0), 0),
+      // Pelo `invoiced_at`, não pelo `created_at`: o que conta no mês é quando a
+      // nota saiu. Pedido de julho faturado em agosto é venda de agosto.
+      vendasMes: faturados
+        .filter((o) => isThisMonth(o.invoiced_at ?? o.created_at))
+        .reduce((s, o) => s + (o.total ?? 0), 0),
       pedidosMes: orders.filter((o) => isThisMonth(o.created_at)).length,
       pendingCount: pending.length,
       pendingTotal: pending.reduce((s, o) => s + (o.total ?? 0), 0),
-      ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
+      ticket: faturados.length
+        ? faturados.reduce((s, o) => s + (o.total ?? 0), 0) / faturados.length
+        : 0,
       pending,
       comOsReps,
       topClientes,

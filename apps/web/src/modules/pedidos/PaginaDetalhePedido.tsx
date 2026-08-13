@@ -12,9 +12,8 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, STATUS_VARIANTE } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
-import { ORDER_STATUS_LABELS } from '@csb/shared';
 import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
 export function PaginaDetalhePedido() {
@@ -168,7 +167,9 @@ export function PaginaDetalhePedido() {
                   </span>
                 )}
               </span>
-              <Badge variant={STATUS_VARIANTE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+              <Badge variant={seloDoPedido(order, user?.role).variante}>
+                {seloDoPedido(order, user?.role).texto}
+              </Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
               <p className="min-w-0 truncate text-lg font-bold text-foreground">

@@ -6,6 +6,7 @@ export * from './types/product.js';
 export * from './types/user.js';
 export * from './constants/bonus.js';
 export * from './constants/orderStatus.js';
+export * from './constants/statusDoCliente.js';
 export * from './constants/permissoes.js';
 export * from './constants/userRole.js';
 export * from './pricing/faixaDeTamanho.js';

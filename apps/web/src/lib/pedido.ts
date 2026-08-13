@@ -1,4 +1,10 @@
-import type { AuthRole, Order, OrderSource, OrderStatus } from '@csb/shared';
+import type { AuthRole, Order, OrderSource, OrderStatus, StatusDoCliente } from '@csb/shared';
+import {
+  ORDER_STATUS_LABELS,
+  STATUS_DO_CLIENTE_LABELS,
+  statusDoCliente,
+  usaStatusInterno,
+} from '@csb/shared';
 
 /**
  * Quem está comprando, em uma linha.
@@ -35,6 +41,41 @@ export const STATUS_VARIANTE: Record<OrderStatus, 'gray' | 'yellow' | 'green' | 
   sent_erp: 'brand',
   error_erp: 'red',
 };
+
+const VARIANTE_DO_CLIENTE: Record<StatusDoCliente, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
+  enviado: 'yellow',
+  aprovado: 'green',
+  entregue: 'green',
+  recusado: 'red',
+};
+
+export interface SeloDoPedido {
+  texto: string;
+  variante: 'gray' | 'yellow' | 'green' | 'red' | 'brand';
+}
+
+/**
+ * O selo de status que ESTE papel deve ver.
+ *
+ * Gerente e administrador veem o estado interno, que é o que eles operam.
+ * Representante e loja veem os três degraus de fora — para eles "Aguardando
+ * Aprovação" e "Enviado ao ERP" são vocabulário da fábrica, não notícia sobre
+ * a mercadoria. E o "Aprovado" deles é o FATURADO, não o status `approved`:
+ * quem fecha o valor é o financeiro. Ver `constants/statusDoCliente.ts`.
+ *
+ * Toda tela que desenha status passa por aqui — se cada uma decidisse sozinha,
+ * o mesmo pedido apareceria de um jeito na lista e de outro no detalhe.
+ */
+export function seloDoPedido(
+  pedido: Pick<Order, 'status'> & { invoiced?: boolean | null; delivered?: boolean | null },
+  papel: AuthRole | undefined,
+): SeloDoPedido {
+  if (usaStatusInterno(papel)) {
+    return { texto: ORDER_STATUS_LABELS[pedido.status], variante: STATUS_VARIANTE[pedido.status] };
+  }
+  const degrau = statusDoCliente(pedido);
+  return { texto: STATUS_DO_CLIENTE_LABELS[degrau], variante: VARIANTE_DO_CLIENTE[degrau] };
+}
 
 /**
  * A decisão que ESTE usuário pode tomar sobre ESTE pedido — ou nenhuma.

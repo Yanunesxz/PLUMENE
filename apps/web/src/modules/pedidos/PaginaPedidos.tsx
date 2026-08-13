@@ -14,8 +14,7 @@ import { cn, formatBRL } from '../../lib/utils.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
 import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
-import { nomeDoComprador, origemParaExibir, STATUS_VARIANTE } from '../../lib/pedido.js';
-import { ORDER_STATUS_LABELS } from '@csb/shared';
+import { nomeDoComprador, origemParaExibir, seloDoPedido } from '../../lib/pedido.js';
 import type {
   Order,
   CustomerListItem,
@@ -372,7 +371,9 @@ export function PaginaPedidos() {
                       </span>
                     )}
                   </span>
-                  <Badge variant={STATUS_VARIANTE[order.status]}>{ORDER_STATUS_LABELS[order.status]}</Badge>
+                  <Badge variant={seloDoPedido(order, user?.role).variante}>
+                    {seloDoPedido(order, user?.role).texto}
+                  </Badge>
                 </div>
                 {/* Na loja, o comprador é sempre ela mesma — repetir o próprio
                     nome em todo cartão só ocupa espaço. */}
