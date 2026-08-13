@@ -44,6 +44,13 @@ export interface Order {
   guest_name?: string | null;
   guest_whatsapp?: string | null;
   total: number | null;
+  /**
+   * Desconto que o representante deu no pedido inteiro, em % (migração 029).
+   * Já está aplicado no `total`; os `unit_price` dos itens seguem sendo o preço
+   * de tabela, porque é assim que o formulário do Control espera — ele tem
+   * campo próprio para o desconto (DESC %).
+   */
+  discount_percent?: number | null;
   notes: string | null;
   /** Faturado (boleto/NF emitido). */
   invoiced?: boolean;

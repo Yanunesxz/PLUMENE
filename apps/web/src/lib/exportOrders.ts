@@ -122,6 +122,10 @@ async function gerarArquivosDoPedido(
       // A API já manda a condição resolvida no pedido (embed da 028). Em todas
       // as folhas: cada arquivo do zip é um formulário completo.
       condicaoDePagamento: pedido.payment_condition?.description,
+      // O desconto que o representante deu vai no campo DESC % do formulário —
+      // a fábrica precisa VER que houve desconto, e não recebê-lo diluído no
+      // preço unitário. Em cada folha, porque cada uma fecha o próprio total.
+      descontoPercentual: pedido.discount_percent ?? 0,
     });
 
     for (const ref of refsDesconhecidas) {

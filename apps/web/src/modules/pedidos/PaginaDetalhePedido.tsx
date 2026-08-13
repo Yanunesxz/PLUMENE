@@ -11,7 +11,7 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
-import { formatBRL } from '../../lib/utils.js';
+import { cn, formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
@@ -47,6 +47,49 @@ export function PaginaDetalhePedido() {
   const handleDecisao = async (status: OrderStatus) => {
     if (!id || !order) return;
     if (await decidir(id, status)) setOrder({ ...order, status });
+  };
+
+  const [salvandoDesconto, setSalvandoDesconto] = useState(false);
+
+  /**
+   * O desconto é do representante e só vale antes de mandar para a fábrica.
+   * Gerente e admin entram junto porque assumem o pedido quando o rep some —
+   * é a mesma regra da triagem.
+   */
+  const podeDarDesconto =
+    !!order &&
+    !order.invoiced &&
+    (order.status === 'draft' || order.status === 'pending_rep') &&
+    (user?.role === 'rep' || user?.role === 'manager' || user?.role === 'admin');
+
+  /** Soma dos itens, sem desconto — é o "Valor Parcial" do formulário. */
+  const bruto = (order?.items ?? []).reduce((s, i) => s + (i.total ?? 0), 0);
+
+  const aplicarDesconto = async (percentual: number) => {
+    if (!id || !order || salvandoDesconto) return;
+    setSalvandoDesconto(true);
+    try {
+      // O servidor refaz a conta a partir dos itens e devolve o pedido inteiro:
+      // aplicar o percentual na tela sobre o total já descontado acumularia
+      // desconto a cada troca (10% depois 10% viraria 19%).
+      const res = await api.patch<ApiResponse<OrderWithItems>>(
+        `/orders/${id}/desconto`,
+        { desconto: percentual },
+        token!,
+      );
+      setOrder({ ...order, ...res.data });
+      setToast({
+        message: percentual > 0 ? `Desconto de ${percentual}% aplicado.` : 'Desconto removido.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível aplicar o desconto.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoDesconto(false);
+    }
   };
 
   const products = useLiveQuery(() => db.products.toArray(), []);
@@ -237,6 +280,63 @@ export function PaginaDetalhePedido() {
               )}
             </div>
           </div>
+
+          {/* O desconto fica ACIMA da decisão, e só enquanto o pedido está com
+              o representante: é a última coisa que ele ajusta antes de mandar.
+              Depois que sai, o gerente decide sobre o valor que viu. */}
+          {podeDarDesconto && (
+            <div className="rounded-xl border border-border bg-card p-4">
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <p className="text-sm font-medium text-foreground">Desconto no pedido</p>
+                {(order.discount_percent ?? 0) > 0 && (
+                  <span className="tnum text-xs font-medium text-positive">
+                    −{formatBRL(bruto - (order.total ?? 0))}
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {[0, 5, 10, 15, 20].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    disabled={salvandoDesconto}
+                    onClick={() => void aplicarDesconto(pct)}
+                    className={cn(
+                      'tnum min-w-[52px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50',
+                      (order.discount_percent ?? 0) === pct
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-foreground hover:bg-sunken',
+                    )}
+                  >
+                    {pct === 0 ? 'Sem' : `${pct}%`}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  inputMode="decimal"
+                  placeholder="Outro"
+                  disabled={salvandoDesconto}
+                  defaultValue={
+                    [0, 5, 10, 15, 20].includes(order.discount_percent ?? 0)
+                      ? ''
+                      : (order.discount_percent ?? 0)
+                  }
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    if (e.target.value !== '' && v >= 0 && v <= 100) void aplicarDesconto(v);
+                  }}
+                  className="tnum w-[76px] rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+                  aria-label="Outro percentual de desconto"
+                />
+              </div>
+              <p className="mt-2 text-[11px] leading-tight text-subtle">
+                Vai no campo DESC % da planilha da fábrica. Os preços das peças não mudam.
+              </p>
+            </div>
+          )}
 
           {decisao && (
             <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">

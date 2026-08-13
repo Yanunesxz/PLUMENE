@@ -27,6 +27,8 @@ const PRIMEIRA_LINHA = 13;
 /** Onde o rodapé guarda os totais que o Excel calcularia sozinho. */
 const CELULA_TOTAL_PECAS = 'Z45';
 const CELULA_VALOR_PARCIAL = 'AB45';
+/** A taxa que o formulário chama de "DESC %" — em FRAÇÃO (0,1 = 10%). */
+const CELULA_DESCONTO_PERCENTUAL = 'AB46';
 const CELULA_DESCONTO = 'AB47';
 const CELULA_TOTAL = 'AB48';
 /**
@@ -50,7 +52,9 @@ type Patch =
   | { tipo: 'texto'; valor: string }
   | { tipo: 'numero'; valor: number }
   /** Mantém a fórmula onde está e troca só o valor que ela tem guardado. */
-  | { tipo: 'cache'; valor: number };
+  | { tipo: 'cache'; valor: number }
+  /** Como `cache`, mas o valor é uma fração e precisa de casas decimais. */
+  | { tipo: 'taxa'; valor: number };
 
 const textoDecodificado = new TextDecoder();
 const textoCodificado = new TextEncoder();
@@ -75,6 +79,21 @@ function desescaparXml(valor: string): string {
 function numeroXml(valor: number): string {
   const arredondado = Math.round(valor * 100) / 100;
   return Number.isInteger(arredondado) ? String(arredondado) : arredondado.toFixed(2);
+}
+
+/**
+ * Uma TAXA, não um valor em reais.
+ *
+ * `numeroXml` arredonda para centavos, que é o certo para dinheiro e errado
+ * para fração: numa taxa, duas casas são dois pontos percentuais inteiros, e
+ * 7,5% (0,075) viraria 8%. A fábrica leria "DESC 8%" ao lado de um desconto de
+ * R$ 75 em R$ 1.000 — dois números que se contradizem no mesmo rodapé.
+ *
+ * Seis casas cobrem centésimo de ponto percentual com folga, e o `Number()`
+ * derruba os zeros à direita para não poluir a célula.
+ */
+function taxaXml(valor: number): string {
+  return String(Number(valor.toFixed(6)));
 }
 
 function semAtributo(atributos: string, nome: string): string {
@@ -104,7 +123,8 @@ function aplicarPatches(xml: string, patches: Map<string, Patch>): string {
       }
 
       const formula = (interno ?? '').match(/<f[\s\S]*?(?:\/>|<\/f>)/)?.[0] ?? '';
-      return `<c r="${referencia}"${base}>${formula}<v>${numeroXml(patch.valor)}</v></c>`;
+      const escrito = patch.tipo === 'taxa' ? taxaXml(patch.valor) : numeroXml(patch.valor);
+      return `<c r="${referencia}"${base}>${formula}<v>${escrito}</v></c>`;
     },
   );
 }
@@ -153,6 +173,15 @@ export interface DadosDaFolha {
    * Ausente = célula fica em branco e a fábrica preenche, como sempre foi.
    */
   condicaoDePagamento?: string | undefined;
+  /**
+   * Desconto do pedido inteiro, em PERCENTUAL (10 = 10%). Vai para o campo
+   * DESC % do formulário, que a fábrica já tem. Ausente/zero = sem desconto.
+   *
+   * Em percentual e não em fração porque é assim que o resto do sistema fala —
+   * a conversão para a fração que a planilha quer acontece aqui dentro, num
+   * lugar só.
+   */
+  descontoPercentual?: number | undefined;
 }
 
 /**
@@ -201,10 +230,26 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
 
   patches.set(CELULA_TOTAL_PECAS, { tipo: 'cache', valor: totalPecas });
   patches.set(CELULA_VALOR_PARCIAL, { tipo: 'cache', valor: valorParcial });
-  // DESC % fica em branco no modelo, então o desconto é zero e o total fecha no
-  // parcial. Quem quiser dar desconto digita na planilha e o Excel refaz a conta.
-  patches.set(CELULA_DESCONTO, { tipo: 'cache', valor: 0 });
-  patches.set(CELULA_TOTAL, { tipo: 'cache', valor: valorParcial });
+
+  // O rodapé do formulário é uma conta em três degraus:
+  //
+  //     AB45  Valor Parcial   =SUM(AB13:AB44)
+  //     AB46  DESC  %         (entrada — FRAÇÃO: 0,1 é 10%)
+  //     AB47                  =AB45*AB46   → o desconto em reais
+  //     AB48  TOTAL           =AB45-AB47
+  //
+  // AB46 é fração porque o desconto é `parcial × AB46`; escrever 10 ali daria
+  // dez vezes o valor do pedido de desconto. Preenchemos os três em cache, e
+  // não só a taxa, porque o Control lê o valor guardado da célula — ele não
+  // recalcula a fórmula na importação.
+  //
+  // Sem desconto, tudo continua como sempre foi: zero na taxa e total = parcial.
+  const percentual = dados.descontoPercentual ?? 0;
+  const fracao = percentual / 100;
+  const valorDoDesconto = Number((valorParcial * fracao).toFixed(2));
+  patches.set(CELULA_DESCONTO_PERCENTUAL, { tipo: 'taxa', valor: fracao });
+  patches.set(CELULA_DESCONTO, { tipo: 'cache', valor: valorDoDesconto });
+  patches.set(CELULA_TOTAL, { tipo: 'cache', valor: Number((valorParcial - valorDoDesconto).toFixed(2)) });
 
   if (dados.numeroDoPedido) {
     patches.set(CELULA_NUMERO_DO_PEDIDO, { tipo: 'texto', valor: dados.numeroDoPedido });

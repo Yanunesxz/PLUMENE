@@ -6,6 +6,7 @@ import {
   createOrderHandler,
   updateStatusHandler,
   setInvoicedHandler,
+  setDiscountHandler,
   deleteOrderHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
@@ -47,6 +48,13 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
   fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
+  // O desconto é do representante: ele fecha o negócio na frente do lojista.
+  // Gerente e admin entram junto porque assumem o pedido quando o rep some.
+  fastify.patch(
+    '/orders/:id/desconto',
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] },
+    setDiscountHandler,
+  );
   fastify.patch(
     '/orders/:id/invoice',
     {

@@ -38,3 +38,17 @@ export const updateOrderStatusSchema = z.object({
 export const setInvoicedSchema = z.object({
   invoiced: z.boolean(),
 });
+
+/**
+ * O desconto que o representante dá no pedido inteiro.
+ *
+ * Duas casas porque o formulário do Control aceita fração (o DESC % dele é
+ * `AB45*AB46`, com AB46 em decimal) — 7,5% é um desconto comum e arredondar
+ * para 7 ou 8 mudaria o valor combinado com o lojista.
+ *
+ * O teto de 100 é o impossível, não a política comercial: quanto o
+ * representante PODE dar é decisão da fábrica, e ainda não foi definida.
+ */
+export const setDiscountSchema = z.object({
+  desconto: z.number().min(0).max(100).multipleOf(0.01),
+});

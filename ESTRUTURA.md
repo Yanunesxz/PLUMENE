@@ -93,7 +93,8 @@ apps/api/src/
 │       ├── 025_tabela_do_pedido.sql → orders.price_table_id (a tabela DO pedido)
 │       ├── 026_preco_da_faixa_maior.sql → product_prices.price_larger (EG/XG/48-54)
 │       ├── 027_valor_faturado.sql → orders.invoiced_total (o valor da NOTA)
-│       └── 028_condicoes_de_pagamento.sql → payment_conditions (146 do Control) + orders.payment_condition_id
+│       ├── 028_condicoes_de_pagamento.sql → payment_conditions (146 do Control) + orders.payment_condition_id
+│       └── 029_desconto_do_pedido.sql → orders.discount_percent (vai no DESC % da planilha)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

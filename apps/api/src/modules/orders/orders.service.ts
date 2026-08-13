@@ -412,6 +412,75 @@ export async function deleteOrder(
   return { ok: true };
 }
 
+/**
+ * Enquanto o pedido está com o representante ele pode mexer no desconto. Depois
+ * que sai para a fábrica, não: o gerente decide sobre o valor que viu.
+ */
+const DESCONTAVEL = new Set<Order['status']>(['draft', 'pending_rep']);
+
+export type DescontoResult =
+  | { ok: true; order: Order }
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' };
+
+/**
+ * O representante dá um percentual de desconto no pedido inteiro.
+ *
+ * Só enquanto o pedido está com ELE — rascunho ou triagem. Depois que foi para
+ * a fábrica, mudar o valor por baixo de quem já está decidindo seria alterar a
+ * proposta em cima da mesa do gerente.
+ *
+ * O total é recalculado A PARTIR DOS ITENS, nunca do total gravado: aplicar o
+ * percentual sobre o total anterior descontaria em cima do já descontado a cada
+ * troca de percentual (10% depois 10% viraria 19%).
+ *
+ * Os `unit_price` não são tocados. O formulário do Control tem campo próprio
+ * para o desconto (DESC % em AB46) e espera a coluna UNIT com o preço de
+ * tabela — ver a migração 029.
+ */
+export async function setOrderDiscount(
+  id: string,
+  company_id: string,
+  rep_id: string,
+  role: AuthRole,
+  percent: number,
+): Promise<DescontoResult> {
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, rep_id, status, invoiced')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!order) return { ok: false, reason: 'not_found' };
+  const o = order as { rep_id: string; status: Order['status']; invoiced: boolean | null };
+
+  if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
+  if (o.invoiced) return { ok: false, reason: 'tarde_demais' };
+  if (!DESCONTAVEL.has(o.status)) return { ok: false, reason: 'tarde_demais' };
+
+  const { data: itens } = await supabase
+    .from('order_items')
+    .select('total')
+    .eq('order_id', id);
+
+  const bruto = (itens ?? []).reduce((s, i) => s + Number((i as { total: number }).total), 0);
+  const total = Number((bruto * (1 - percent / 100)).toFixed(2));
+
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ discount_percent: percent, total, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .select()
+    .maybeSingle();
+
+  // Sem a migração 028 o PostgREST recusa a coluna. Falha com motivo, em vez de
+  // gravar o total descontado e perder o registro de quanto foi dado.
+  if (error) return { ok: false, reason: 'sem_coluna' };
+  if (!data) return { ok: false, reason: 'not_found' };
+  return { ok: true, order: data as Order };
+}
+
 export async function setOrderInvoiced(
   id: string,
   company_id: string,

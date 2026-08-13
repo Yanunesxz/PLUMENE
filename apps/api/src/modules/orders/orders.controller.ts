@@ -5,6 +5,7 @@ import {
   createOrder,
   updateOrderStatus,
   setOrderInvoiced,
+  setOrderDiscount,
   deleteOrder,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
@@ -13,7 +14,12 @@ import { getPedidoPublico } from './publicOrder.service.js';
 import { getCondicoesDePagamento } from './paymentConditions.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
-import { createOrderSchema, updateOrderStatusSchema, setInvoicedSchema } from './orders.schema.js';
+import {
+  createOrderSchema,
+  updateOrderStatusSchema,
+  setInvoicedSchema,
+  setDiscountSchema,
+} from './orders.schema.js';
 
 /**
  * GET /payment-conditions — as condições de pagamento que rep e loja escolhem
@@ -199,6 +205,45 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
     return;
   }
   await reply.send({ data: order });
+}
+
+export async function setDiscountHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub: rep_id, role } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(setDiscountSchema, request.body, reply);
+  if (!body) return;
+
+  const result = await setOrderDiscount(id, company_id, rep_id, role, body.desconto);
+  if (result.ok) {
+    await reply.send({ data: result.order });
+    return;
+  }
+
+  switch (result.reason) {
+    case 'forbidden':
+      await reply.status(403).send({
+        error: 'Você só pode dar desconto nos seus próprios pedidos',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    case 'tarde_demais':
+      await reply.status(409).send({
+        error: 'Este pedido já saiu para a fábrica — o desconto vale só antes de mandar',
+        code: 'ORDER_JA_ENVIADO',
+        statusCode: 409,
+      });
+      return;
+    case 'sem_coluna':
+      await reply.status(503).send({
+        error: 'O desconto ainda não está disponível — falta aplicar a migração 029',
+        code: 'DESCONTO_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    default:
+      await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+  }
 }
 
 export async function updateStatusHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
