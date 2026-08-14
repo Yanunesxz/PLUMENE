@@ -816,5 +816,16 @@ export async function updateOrderStatus(
     .single();
 
   if (error || !data) return null;
+
+  // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido
+  // nascia direto na fila, o create disparava; agora o pedido do representante
+  // nasce rascunho na área "Enviar pra fábrica", e o momento em que o cliente
+  // deve ser avisado é este — o rascunho virando pedido. Em segundo plano,
+  // como no create: e-mail é acessório e não pode segurar a resposta.
+  if (row.status === 'draft' && body.status === 'pending_approval') {
+    const completo = await getOrderById(id, company_id);
+    if (completo) void enviarConfirmacaoDoPedido(completo);
+  }
+
   return data as Order;
 }
