@@ -46,7 +46,10 @@ export async function enviarEmail({ para, assunto, html }: Email): Promise<boole
   const t = obterTransporte();
   if (!t) return false;
   const destino = para.trim();
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) return false;
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(destino)) {
+    console.error(`[Email] destino inválido, descartado: "${destino}"`);
+    return false;
+  }
   try {
     await t.sendMail({
       from: `"${env.EMAIL_FROM_NAME}" <${env.EMAIL_USER}>`,
@@ -54,6 +57,11 @@ export async function enviarEmail({ para, assunto, html }: Email): Promise<boole
       subject: assunto,
       html,
     });
+    // Sucesso também aparece no log. O silêncio no sucesso escondeu por dois
+    // dias uma senha de app errada: o erro era logado, mas ninguém procura erro
+    // de uma coisa que "está funcionando" — a linha de sucesso que NÃO aparece
+    // é o que entrega o problema.
+    console.log(`[Email] enviado para ${destino}: ${assunto}`);
     return true;
   } catch (err) {
     console.error(`[Email] falhou para ${destino}:`, err instanceof Error ? err.message : err);
