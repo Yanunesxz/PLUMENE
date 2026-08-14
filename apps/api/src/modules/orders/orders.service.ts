@@ -159,6 +159,16 @@ async function detectarColunaDaTabela(): Promise<boolean> {
   return temColunaDaTabela;
 }
 
+/** `orders.discount_percent` vem da migração 029 — mesmo cuidado das outras. */
+let temColunaDoDesconto: boolean | null = null;
+
+async function detectarColunaDoDesconto(): Promise<boolean> {
+  if (temColunaDoDesconto !== null) return temColunaDoDesconto;
+  const { error } = await supabase.from('orders').select('discount_percent').limit(1);
+  temColunaDoDesconto = !error;
+  return temColunaDoDesconto;
+}
+
 /**
  * `pending_rep` (triagem do representante) vem da migração 015, que altera o
  * CHECK de `orders.status`. CHECK não dá para detectar com um SELECT como se faz
@@ -285,7 +295,23 @@ export async function createOrder(
     };
   });
 
-  const total = items.reduce((sum, item) => sum + item.total, 0);
+  const totalBruto = items.reduce((sum, item) => sum + item.total, 0);
+
+  // O desconto que o representante fechou com o lojista, dado na MONTAGEM — é
+  // aqui que ele aparece para quem monta, porque o pedido do rep nasce direto
+  // na fila do gerente e nunca passa por uma tela de "antes de mandar".
+  //
+  // Só na origem 'rep' (o controller descarta o campo de quem não é) e só com a
+  // 029 no banco: descontar o total sem gravar QUANTO foi dado faria a planilha
+  // do Control sair cheia ao lado de um total menor — dois números que não
+  // fecham, e ninguém saberia qual vale.
+  const pctPedido = body.discount_percent ?? 0;
+  const comDesconto =
+    origem.source === 'rep' && pctPedido > 0 && (await detectarColunaDoDesconto());
+  const total = comDesconto
+    ? Number((totalBruto * (1 - pctPedido / 100)).toFixed(2))
+    : totalBruto;
+  const descontoGravado = comDesconto ? { discount_percent: pctPedido } : {};
 
   // Pedido enviado pelo representante já nasce na fila do gerente. Sem isto ele
   // ficava em 'draft' para sempre e a tela de aprovação nunca via nada.
@@ -338,6 +364,7 @@ export async function createOrder(
         ...camposDeOrigem,
         ...tabelaGravada,
         ...condicaoGravada,
+        ...descontoGravado,
       })
       .select()
       .single();

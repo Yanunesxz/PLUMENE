@@ -16,7 +16,7 @@ import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
-import { formatBRL } from '../../lib/utils.js';
+import { cn, formatBRL } from '../../lib/utils.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 import { precoDoTamanho } from '@csb/shared';
@@ -227,7 +227,18 @@ export function PaginaNovoPedido() {
   // Rep não edita preço (segue a tabela do representante); só gerente/admin ajusta.
   const canEditPrice = user?.role === 'manager' || user?.role === 'admin';
 
-  const total = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+  /**
+   * O desconto do pedido inteiro, fechado AQUI na montagem — o pedido do rep
+   * nasce direto na fila do gerente, então não existe "depois" para dar a %.
+   * Só o representante vê os botões; o servidor descarta o campo de qualquer
+   * outro papel.
+   */
+  const ehRep = user?.role === 'rep';
+  const [descontoPct, setDescontoPct] = useState(0);
+  const descontoAplicado = ehRep ? descontoPct : 0;
+
+  const totalBruto = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
+  const total = totalBruto * (1 - descontoAplicado / 100);
   const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
 
   // O que ainda falta para poder enviar o pedido (cliente é o mais esquecido:
@@ -276,6 +287,8 @@ export function PaginaNovoPedido() {
       // A condição escolhida (rep ou loja). Vai para o pedido, o e-mail e o
       // COND PGTO da planilha do Control.
       ...(condicaoId ? { payment_condition_id: condicaoId } : {}),
+      // A % fechada com o lojista. Só o rep manda; o servidor descarta dos outros.
+      ...(descontoAplicado > 0 ? { discount_percent: descontoAplicado } : {}),
       local_id,
       // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
       // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
@@ -302,6 +315,7 @@ export function PaginaNovoPedido() {
           customer_id: clienteDoPedido,
           notes: notes || undefined,
           payment_condition_id: condicaoId || undefined,
+          discount_percent: descontoAplicado > 0 ? descontoAplicado : undefined,
           items: payload.items,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -309,6 +323,7 @@ export function PaginaNovoPedido() {
         setToast({ message: 'Pedido salvo offline. Será sincronizado ao reconectar.', type: 'info' });
       }
       clearCart();
+      setDescontoPct(0);
       setTimeout(() => void navigate('/orders'), 1500);
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : 'Erro ao criar pedido', type: 'error' });
@@ -522,9 +537,54 @@ export function PaginaNovoPedido() {
         </div>
 
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          {/* O desconto mora junto do total: é a última coisa que o rep ajusta
+              com o lojista antes de enviar. Vai para o DESC % da planilha da
+              fábrica — os preços das peças não mudam. */}
+          {ehRep && items.length > 0 && (
+            <div className="mb-3 border-b border-border pb-3">
+              <p className="mb-2 text-sm font-medium text-foreground">Desconto no pedido</p>
+              <div className="flex flex-wrap gap-1.5">
+                {[0, 5, 10, 15, 20].map((pct) => (
+                  <button
+                    key={pct}
+                    type="button"
+                    onClick={() => setDescontoPct(pct)}
+                    className={cn(
+                      'tnum min-w-[52px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                      descontoPct === pct
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-border bg-background text-foreground hover:bg-sunken',
+                    )}
+                  >
+                    {pct === 0 ? 'Sem' : `${pct}%`}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.5}
+                  inputMode="decimal"
+                  placeholder="Outro"
+                  defaultValue={[0, 5, 10, 15, 20].includes(descontoPct) ? '' : descontoPct}
+                  onBlur={(e) => {
+                    const v = Number(e.target.value);
+                    if (e.target.value !== '' && v >= 0 && v <= 100) setDescontoPct(v);
+                  }}
+                  className="tnum w-[76px] rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
+                  aria-label="Outro percentual de desconto"
+                />
+              </div>
+            </div>
+          )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
               {totalQty} {totalQty === 1 ? 'item' : 'itens'}
+              {descontoAplicado > 0 && (
+                <span className="tnum ml-2 text-positive">
+                  −{descontoAplicado}% ({formatBRL(totalBruto - total)})
+                </span>
+              )}
             </span>
             <span className="text-xl font-bold text-foreground">{formatBRL(total)}</span>
           </div>

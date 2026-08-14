@@ -16,6 +16,9 @@ export const createOrderSchema = z.object({
   // Condição de pagamento escolhida (rep ou loja). Opcional: sem ela o pedido
   // sai como sempre saiu, com o COND PGTO da planilha em branco.
   payment_condition_id: z.string().uuid().optional(),
+  // O desconto do representante, fechado na montagem (029). O controller
+  // descarta o campo de quem não é rep — aqui só se valida a forma.
+  discount_percent: z.number().min(0).max(100).multipleOf(0.01).optional(),
   items: z
     .array(
       z.object({

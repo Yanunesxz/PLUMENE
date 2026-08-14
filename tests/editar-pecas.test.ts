@@ -234,6 +234,75 @@ describe('quem não pode', () => {
   });
 });
 
+describe('o desconto entra na MONTAGEM do pedido', () => {
+  // O pedido do representante nasce direto na fila do gerente — nunca passa por
+  // um "antes de mandar". Se a % não entrar no create, ela não existe para ele.
+  afterAll(() => {
+    vi.doUnmock('../apps/api/src/config/supabase.js');
+  });
+
+  const criarComDesconto = async (token: string, extra: Record<string, unknown> = {}) => {
+    vi.resetModules();
+    const { app, fake } = await subir({
+      customers: [
+        { data: { price_table_id: TABELA }, error: null },
+        { data: { id: 'c1', blocked: false }, error: null },
+      ],
+      users: { data: { price_table_id: TABELA }, error: null },
+      product_prices: [
+        { data: [{ price_larger: null }], error: null },
+        { data: [{ product_id: 'p1', price: 41.9, price_larger: 52.9 }], error: null },
+      ],
+      product_variants: {
+        data: [
+          { id: 'v-gg', size: 'GG' },
+          { id: 'v-48', size: '48' },
+        ],
+        error: null,
+      },
+      orders: [
+        { data: { id: 'o1' }, error: null },
+        { data: { id: 'o1', items: [] }, error: null },
+      ],
+      order_items: { data: [], error: null },
+    });
+
+    const res = await app.inject({
+      method: 'POST',
+      url: '/orders',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        customer_id: 'c1',
+        submit: true,
+        discount_percent: 10,
+        items: [
+          { product_id: 'p1', variant_id: 'v-gg', quantity: 2, unit_price: 1 },
+          { product_id: 'p1', variant_id: 'v-48', quantity: 3, unit_price: 1 },
+        ],
+        ...extra,
+      },
+    });
+    const gravado = fake.ultimaGravacao('orders', 'insert')?.valores as Record<string, unknown>;
+    await app.close();
+    return { status: res.statusCode, gravado };
+  };
+
+  it('o pedido do rep nasce com a % gravada e o total já descontado', async () => {
+    const { status, gravado } = await criarComDesconto(TOKEN_REP);
+    expect(status).toBe(201);
+    // (2×41,90 + 3×52,90) = 242,50 · com 10% = 218,25
+    expect(gravado['discount_percent']).toBe(10);
+    expect(gravado['total']).toBeCloseTo(218.25, 2);
+  });
+
+  it('a % da loja é descartada — o desconto é a palavra do representante', async () => {
+    const { status, gravado } = await criarComDesconto(TOKEN_LOJA);
+    expect(status).toBe(201);
+    expect(gravado['discount_percent']).toBeUndefined();
+    expect(gravado['total']).toBeCloseTo(242.5, 2);
+  });
+});
+
 describe('o desconto virou exclusivo do representante', () => {
   afterAll(() => {
     vi.doUnmock('../apps/api/src/config/supabase.js');

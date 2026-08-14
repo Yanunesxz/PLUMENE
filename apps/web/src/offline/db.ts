@@ -8,6 +8,8 @@ export interface SyncQueueItem {
   notes?: string | undefined;
   /** Condição de pagamento escolhida offline — viaja com o pedido no /sync. */
   payment_condition_id?: string | undefined;
+  /** Desconto % fechado offline — viaja com o pedido no /sync (só o rep manda). */
+  discount_percent?: number | undefined;
   items: Array<{ product_id: string; variant_id?: string | undefined; quantity: number; unit_price: number }>;
   created_at: string;
   updated_at: string;

@@ -132,6 +132,12 @@ export interface CreateOrderRequest {
   guest_name?: string | undefined;
   guest_whatsapp?: string | undefined;
   /**
+   * Desconto em % no pedido inteiro, fechado na montagem. Só o REPRESENTANTE
+   * manda — o servidor descarta o campo de loja, vitrine e gerência. Vai para
+   * `orders.discount_percent` e já sai aplicado no total.
+   */
+  discount_percent?: number | undefined;
+  /**
    * Condição de pagamento escolhida por quem montou (rep ou loja). Opcional:
    * sem ela o pedido sai como sempre saiu, com o COND PGTO em branco.
    */

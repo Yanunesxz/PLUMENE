@@ -73,6 +73,10 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   const body = await parseBody(createOrderSchema, request.body, reply);
   if (!body) return;
 
+  // O desconto é a palavra do REPRESENTANTE — só ele manda a %. Loja, vitrine
+  // e até gerente têm o campo descartado aqui, antes de qualquer conta.
+  if (role !== 'rep') delete body.discount_percent;
+
   // Quem RECEBE o pedido. Loja e visitante têm o representante dono no token;
   // o representante recebe o próprio.
   const destinatario = role === 'store' || role === 'guest' ? (dono ?? sub) : sub;

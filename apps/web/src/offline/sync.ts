@@ -30,6 +30,7 @@ async function descarregar(token: string): Promise<{ synced: number; failed: num
       customer_id: item.customer_id,
       notes: item.notes,
       payment_condition_id: item.payment_condition_id,
+      discount_percent: item.discount_percent,
       items: item.items,
       created_at: item.created_at,
       updated_at: item.updated_at,
