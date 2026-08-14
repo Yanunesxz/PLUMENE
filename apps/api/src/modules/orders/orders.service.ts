@@ -504,12 +504,15 @@ export async function setOrderDiscount(
  * Quem pode MEXER num pedido — peças, desconto e condição de pagamento passam
  * todos por este portão, para as três coisas nunca divergirem.
  *
- * Representante: nos PRÓPRIOS pedidos, enquanto estão com ele (rascunho e
- * triagem). O que já foi para a fábrica está na mesa de outra pessoa.
+ * Representante: nos PRÓPRIOS pedidos, até a fábrica DECIDIR. O pedido dele
+ * nasce direto na fila (`pending_approval`) — se a fila já fosse "da fábrica",
+ * ele não teria janela nenhuma para corrigir o que acabou de passar. O que
+ * fecha a mão dele é a decisão do gerente (aprovado), não o envio — regra do
+ * Yan (14/08/2026): a Simone passa o pedido e precisa poder alterar.
  *
- * Gerente/admin: em tudo que ainda está nas mãos da fábrica — triagem, fila de
- * aprovação e até o já aprovado — regra do Yan (14/08/2026): "o gerente pode
- * mudar o pedido do representante e do cliente".
+ * Gerente/admin: em tudo que ainda está nas mãos da fábrica — triagem, fila e
+ * até o já aprovado: "o gerente pode mudar o pedido do representante e do
+ * cliente".
  *
  * Ninguém: pedido faturado ou já no ERP. A nota saiu por aquele valor; mexer
  * aqui criaria uma verdade diferente da do Control.
@@ -524,7 +527,9 @@ function podeMexerNoPedido(
   }
   if (role === 'rep') {
     if (o.rep_id !== user_id) return 'forbidden';
-    return o.status === 'draft' || o.status === 'pending_rep' ? 'ok' : 'tarde_demais';
+    return o.status === 'draft' || o.status === 'pending_rep' || o.status === 'pending_approval'
+      ? 'ok'
+      : 'tarde_demais';
   }
   if (role === 'manager' || role === 'admin') {
     // Rascunho fica de fora: é a montagem privada do representante.

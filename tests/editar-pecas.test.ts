@@ -172,10 +172,42 @@ describe('quem não pode', () => {
     await app.close();
   });
 
-  it('pedido que já saiu para a fábrica não muda pela mão do representante', async () => {
+  it('o representante ainda alterna o PRÓPRIO pedido na fila — até a fábrica decidir', async () => {
+    // O pedido do rep nasce direto em pending_approval: se a fila fechasse a
+    // mão dele, não haveria janela nenhuma para corrigir o que acabou de passar
+    // (foi exatamente o que travou a Simone em 14/08/2026).
     vi.resetModules();
     const { app } = await subir({
-      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval' }, error: null },
+      orders: [
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval' }, error: null },
+        { data: { id: 'o1' }, error: null },
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval', items: [] }, error: null },
+      ],
+      product_prices: [
+        { data: [{ price_larger: null }], error: null },
+        { data: [{ product_id: 'p1', price: 41.9, price_larger: 52.9 }], error: null },
+      ],
+      product_variants: { data: [{ id: 'v-gg', size: 'GG' }], error: null },
+      order_items: [
+        { data: [], error: null },
+        { data: null, error: null },
+        { data: null, error: null },
+      ],
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [{ product_id: 'p1', variant_id: 'v-gg', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('depois que a fábrica DECIDE (aprovado), o representante não mexe mais', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'approved' }, error: null },
     });
     const res = await app.inject({
       method: 'PATCH',

@@ -77,7 +77,11 @@ export function PaginaDetalhePedido() {
     !order.invoiced &&
     isOnline &&
     (user?.role === 'rep'
-      ? order.status === 'draft' || order.status === 'pending_rep'
+      ? // Até a fábrica DECIDIR: o pedido do rep nasce direto na fila, e é lá
+        // que ele corrige o que acabou de passar. Aprovado, fecha a mão dele.
+        order.status === 'draft' ||
+        order.status === 'pending_rep' ||
+        order.status === 'pending_approval'
       : (user?.role === 'manager' || user?.role === 'admin') &&
         (order.status === 'pending_rep' ||
           order.status === 'pending_approval' ||
