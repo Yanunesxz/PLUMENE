@@ -470,10 +470,12 @@ export function PaginaDetalhePedido() {
 
             {/* O cliente pediu o link? Um toque abre o WhatsApp dele com a
                 mensagem e o link públicos prontos — decisão do Yan (14/08/2026):
-                nada automático, o representante manda quando pedirem. O link só
-                existe online (a API assina o token); no cache offline o botão
-                some. */}
-            {!ehLoja && order.public_link && order.status !== 'draft' && (
+                nada automático, o representante manda quando pedirem. Vale
+                ANTES de ir para a fábrica: a página é viva (lê o banco a cada
+                abertura), então o rep manda o link, ajusta o pedido no app e a
+                cliente vê a versão nova no MESMO link. O link só existe online
+                (a API assina o token); no cache offline o botão some. */}
+            {!ehLoja && order.public_link && (
               <a
                 href={linkDoWhatsApp(
                   zapDoComprador,
