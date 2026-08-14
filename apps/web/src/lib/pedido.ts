@@ -18,6 +18,25 @@ export function nomeDoComprador(order: Order, nomePorCliente: Map<string, string
   return order.guest_name?.trim() || 'Visitante';
 }
 
+/**
+ * Ordena referências como números: 15 antes de 130, 130 antes de 1001.
+ *
+ * As refs do catálogo vêm com zero à esquerda ("0015"), então a ordem
+ * alfabética quase funciona — até aparecer uma sem o zero, vinda do ERP ou de
+ * cadastro antigo, e "950" ir parar depois de "1001". Comparar o número
+ * resolve as duas formas; o que não é numérico cai na ordem alfabética.
+ *
+ * É por esta função que toda lista de peças (montagem, detalhe, página do
+ * cliente) sai em ordem crescente de referência — a mesma ordem do catálogo
+ * impresso, que é como o representante procura.
+ */
+export function compararReferencia(a: string, b: string): number {
+  const na = Number(a.trim());
+  const nb = Number(b.trim());
+  if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+  return a.localeCompare(b, 'pt-BR', { numeric: true });
+}
+
 export const ORIGEM_LABEL: Record<OrderSource, string> = {
   rep: 'Representante',
   store: 'Loja',

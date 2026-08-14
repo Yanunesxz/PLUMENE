@@ -12,7 +12,8 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia } from '../../lib/pedido.js';
+import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
@@ -127,8 +128,11 @@ export function PaginaDetalhePedido() {
 
   const iniciarEdicao = () => {
     if (!order) return;
+    // Nasce na mesma ordem da lista (ref crescente). Peça acrescentada depois
+    // entra no fim, de propósito: linha pulando de lugar no meio da edição
+    // faria o dedo errar o stepper.
     setLinhasEdit(
-      order.items.map((i) => ({
+      itensOrdenados.map((i) => ({
         product_id: i.product_id,
         variant_id: i.variant_id,
         quantity: i.quantity,
@@ -258,6 +262,24 @@ export function PaginaDetalhePedido() {
     for (const c of customers ?? []) if (c.whatsapp) m.set(c.id, c.whatsapp);
     return m;
   }, [customers]);
+
+  // Ref crescente e, na mesma ref, a ordem da grade — a ordem do catálogo
+  // impresso, que é como se confere um pedido. Do banco os itens chegam na
+  // ordem em que foram gravados, que não diz nada.
+  const itensOrdenados = useMemo(() => {
+    if (!order?.items) return [];
+    return [...order.items].sort((a, b) => {
+      const refA = prodMap.get(a.product_id)?.sku ?? '';
+      const refB = prodMap.get(b.product_id)?.sku ?? '';
+      return (
+        compararReferencia(refA, refB) ||
+        compararTamanho(
+          (a.variant_id && variantSize.get(a.variant_id)) || '',
+          (b.variant_id && variantSize.get(b.variant_id)) || '',
+        )
+      );
+    });
+  }, [order?.items, prodMap, variantSize]);
 
   // Pedido de vitrine não tem cadastro: o contato é o que o visitante digitou
   // no fechamento. É por ele que o representante vai retornar.
@@ -648,7 +670,7 @@ export function PaginaDetalhePedido() {
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {order.items.map((item) => {
+                {itensOrdenados.map((item) => {
                   const p = prodMap.get(item.product_id);
                   return (
                     <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">

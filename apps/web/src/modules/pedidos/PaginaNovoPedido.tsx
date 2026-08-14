@@ -18,6 +18,8 @@ import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
+import { compararReferencia } from '../../lib/pedido.js';
+import { compararTamanho } from '../../components/comercial/grade.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
 import { precoDoTamanho } from '@csb/shared';
 
@@ -237,6 +239,13 @@ export function PaginaNovoPedido() {
   const [descontoPct, setDescontoPct] = useState(0);
   const descontoAplicado = ehRep ? descontoPct : 0;
 
+  // Ref crescente e, dentro da mesma ref, a ordem da grade — a mesma ordem do
+  // catálogo impresso, que é como o representante confere com o lojista. Sem
+  // isso a lista fica na ordem em que as peças foram tocadas, que ninguém acha.
+  const itensOrdenados = [...items].sort(
+    (a, b) => compararReferencia(a.sku, b.sku) || compararTamanho(a.size, b.size),
+  );
+
   const totalBruto = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const total = totalBruto * (1 - descontoAplicado / 100);
   const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -442,7 +451,7 @@ export function PaginaNovoPedido() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {items.map((item) => (
+            {itensOrdenados.map((item) => (
               <li key={`${item.product_id}|${item.size}`} className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="mb-2 flex items-start justify-between gap-2">
                   <div className="min-w-0">

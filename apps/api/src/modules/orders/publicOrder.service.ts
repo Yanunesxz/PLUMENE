@@ -92,7 +92,14 @@ export async function getPedidoPublico(token: string): Promise<PedidoPublico | n
     representante: (rep.data as { name: string } | null)?.name ?? 'Representante',
     total: order.total ?? [...porProduto.values()].reduce((s, p) => s + p.total, 0),
     totalPecas,
-    produtos: [...porProduto.values()],
+    // Ref crescente, como o catálogo impresso — é a ordem em que o lojista
+    // confere o que pediu. Numérica, não alfabética: "950" antes de "1001".
+    produtos: [...porProduto.values()].sort((a, b) => {
+      const na = Number(a.ref);
+      const nb = Number(b.ref);
+      if (!Number.isNaN(na) && !Number.isNaN(nb)) return na - nb;
+      return a.ref.localeCompare(b.ref, 'pt-BR', { numeric: true });
+    }),
     condicaoDePagamento: order.payment_condition?.description ?? null,
     expirado,
   };
