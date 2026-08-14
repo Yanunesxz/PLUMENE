@@ -124,6 +124,24 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
         }),
       });
     }
+
+    // Para a FÁBRICA: toda confirmação chega também na caixa fixa de pedidos —
+    // a MESMA conta que envia (EMAIL_USER, pedidoscorposensual@gmail.com), que
+    // é onde o gerente acompanha. Decisão do Yan em 14/08/2026. O guarda contra
+    // duplicata cobre o caso de o representante ser a própria caixa.
+    const caixaDaFabrica = env.EMAIL_USER;
+    if (caixaDaFabrica && caixaDaFabrica !== representante?.email) {
+      await enviarEmail({
+        para: caixaDaFabrica,
+        assunto: `Novo pedido #${numero} — ${nomeCliente} (${nomeRep})`,
+        html: corpoHtml({
+          ...base,
+          saudacao: `Novo pedido de ${nomeCliente}`,
+          intro: `Pedido fechado por ${nomeRep}. Veja o detalhe com as fotos no link abaixo.`,
+          rodape: `Corpo Sensual · Caixa de pedidos da fábrica`,
+        }),
+      });
+    }
   } catch (err) {
     console.error('[Email] confirmação de pedido falhou:', err instanceof Error ? err.message : err);
   }
