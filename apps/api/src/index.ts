@@ -6,9 +6,16 @@
  * tempo todo, o que não existe em serverless. Em produção quem sincroniza é o
  * agente instalado no servidor da fábrica.
  */
+import dns from 'node:dns';
 import { buildApp } from './app.js';
 import { env } from './config/env.js';
 import { startErpSyncScheduler, stopErpSyncScheduler } from './jobs/erpSyncScheduler.js';
+
+// O Node moderno prefere IPv6 quando o DNS oferece os dois — e o container do
+// Railway não tem saída IPv6: conectar no Gmail dava ENETUNREACH 2607:… e o
+// e-mail de pedido morria calado (provado pelo /public/health-email em
+// 14/08/2026). IPv4 primeiro resolve; quem só tem IPv6 não passa por aqui.
+dns.setDefaultResultOrder('ipv4first');
 
 const server = await buildApp();
 
