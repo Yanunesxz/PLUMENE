@@ -146,3 +146,26 @@ export function decisaoDoPedido(
 
   return null;
 }
+
+/**
+ * O link "wa.me" que abre o WhatsApp com a mensagem pronta.
+ *
+ * O cadastro guarda o número como o Control mandou — "(11) 1734-0709",
+ * "32 99849 3125" — sem o DDI. O wa.me exige o número internacional completo:
+ * sem o 55 na frente, o WhatsApp diz que o número não existe. Número de 10–11
+ * dígitos (DDD + linha) ganha o 55; quem já veio com 55 passa direto; formato
+ * fora disso vai como está (melhor abrir errado que não abrir).
+ *
+ * Sem número, abre o WhatsApp no seletor de conversa — o representante escolhe
+ * o contato e a mensagem já está lá.
+ */
+export function linkDoWhatsApp(numero: string | null | undefined, texto?: string): string {
+  const mensagem = texto ? `?text=${encodeURIComponent(texto)}` : '';
+  const digitos = (numero ?? '').replace(/\D/g, '');
+  if (!digitos) return `https://wa.me/${mensagem}`;
+  const completo =
+    digitos.length === 10 || digitos.length === 11
+      ? `55${digitos}`
+      : digitos;
+  return `https://wa.me/${completo}${mensagem}`;
+}

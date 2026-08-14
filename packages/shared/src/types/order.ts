@@ -79,6 +79,12 @@ export interface Order {
 
 export interface OrderWithItems extends Order {
   items: OrderItem[];
+  /**
+   * O link público do pedido (o mesmo do e-mail), montado pela API no
+   * GET /orders/:id — o token é assinado no servidor. É o que o representante
+   * manda no WhatsApp quando o cliente pede. Ausente no cache offline.
+   */
+  public_link?: string;
 }
 
 // ─── Pedido na página pública (link do e-mail) ───────────────────────────────

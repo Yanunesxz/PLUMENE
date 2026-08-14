@@ -13,6 +13,8 @@ import {
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { getPedidoPublico } from './publicOrder.service.js';
+import { tokenDoPedido } from './publicToken.js';
+import { env } from '../../config/env.js';
 import { getCondicoesDePagamento } from './paymentConditions.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
 import { parseBody } from '../../lib/validation.js';
@@ -54,7 +56,12 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
   }
-  await reply.send({ data: order });
+  // O link público (o mesmo do e-mail) vai junto: é ele que o representante
+  // manda no WhatsApp quando o cliente pede. O token é assinado no servidor —
+  // o app não tem como montá-lo sozinho.
+  await reply.send({
+    data: { ...order, public_link: `${env.APP_PUBLIC_URL}/pedido/${tokenDoPedido(order.id)}` },
+  });
 }
 
 /** GET /public/pedido/:token — a página pública do pedido (link do e-mail). Sem login. */

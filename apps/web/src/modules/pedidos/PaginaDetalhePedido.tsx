@@ -12,7 +12,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
@@ -413,7 +413,7 @@ export function PaginaDetalhePedido() {
               </p>
               {zapDoComprador && (
                 <a
-                  href={`https://wa.me/${zapDoComprador.replace(/\D/g, '')}`}
+                  href={linkDoWhatsApp(zapDoComprador)}
                   target="_blank"
                   rel="noopener noreferrer"
                   aria-label="Falar no WhatsApp"
@@ -460,6 +460,27 @@ export function PaginaDetalhePedido() {
                   <span className="font-medium text-foreground">{condicaoDoPedido}</span>
                 </p>
               )
+            )}
+
+            {/* O cliente pediu o link? Um toque abre o WhatsApp dele com a
+                mensagem e o link públicos prontos — decisão do Yan (14/08/2026):
+                nada automático, o representante manda quando pedirem. O link só
+                existe online (a API assina o token); no cache offline o botão
+                some. */}
+            {!ehLoja && order.public_link && order.status !== 'draft' && (
+              <a
+                href={linkDoWhatsApp(
+                  zapDoComprador,
+                  `Olá! Seu pedido #${order.order_number ?? ''} da Corpo Sensual está registrado. ` +
+                    `Veja as peças com fotos e acompanhe por aqui: ${order.public_link}`,
+                )}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-positive-soft hover:text-positive-soft-foreground"
+              >
+                <MessageCircle className="h-4 w-4" strokeWidth={2.5} />
+                Enviar pedido para o cliente
+              </a>
             )}
 
             <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>
