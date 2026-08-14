@@ -39,6 +39,45 @@ export interface Email {
 }
 
 /**
+ * O e-mail está de pé? Testa a AUTENTICAÇÃO no Gmail sem enviar nada.
+ *
+ * Existe porque a falha de SMTP é silenciosa por desenho (e-mail nunca derruba
+ * pedido) — e uma senha de app errada ficou dois dias invisível por causa
+ * disso. Não expõe segredo: devolve só o endereço remetente (que já vai em
+ * todo e-mail enviado) e o motivo da recusa do Gmail.
+ */
+export async function diagnosticoDoEmail(): Promise<{
+  configurado: boolean;
+  usuario: string | null;
+  autentica: boolean;
+  erro: string | null;
+}> {
+  if (!env.EMAIL_USER || !env.EMAIL_APP_PASSWORD) {
+    return {
+      configurado: false,
+      usuario: env.EMAIL_USER ?? null,
+      autentica: false,
+      erro: 'EMAIL_USER e/ou EMAIL_APP_PASSWORD não definidos no ambiente.',
+    };
+  }
+  const t = obterTransporte();
+  if (!t) {
+    return { configurado: false, usuario: env.EMAIL_USER, autentica: false, erro: 'Transporte não criado.' };
+  }
+  try {
+    await t.verify();
+    return { configurado: true, usuario: env.EMAIL_USER, autentica: true, erro: null };
+  } catch (err) {
+    return {
+      configurado: true,
+      usuario: env.EMAIL_USER,
+      autentica: false,
+      erro: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+/**
  * Envia e nunca lança: e-mail é acessório, não pode quebrar o pedido. Devolve
  * true/false só para log.
  */

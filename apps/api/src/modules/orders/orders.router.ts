@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { authenticate, requireRole, requirePermission } from '../../middleware/auth.js';
+import { diagnosticoDoEmail } from '../../lib/email.js';
 import {
   listOrders,
   getOrder,
@@ -39,6 +40,17 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/public/pedido/:token',
     { config: { rateLimit: { max: 30, timeWindow: '1 minute' } } },
     pedidoPublicoHandler,
+  );
+
+  // O e-mail está de pé? Testa a autenticação no Gmail SEM enviar nada. A
+  // falha de SMTP é silenciosa por desenho (nunca derruba pedido) — esta rota
+  // é o jeito de enxergá-la sem caçar log no Railway. Não expõe segredo.
+  fastify.get(
+    '/public/health-email',
+    { config: { rateLimit: { max: 10, timeWindow: '1 minute' } } },
+    async (_request, reply) => {
+      await reply.send({ data: await diagnosticoDoEmail() });
+    },
   );
 
   // A lista que o seletor de condição de pagamento usa — rep e loja escolhem
