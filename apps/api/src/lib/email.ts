@@ -27,6 +27,14 @@ function obterTransporte(): Transporter | null {
     transporte = nodemailer.createTransport({
       service: 'gmail',
       auth: { user: env.EMAIL_USER, pass: env.EMAIL_APP_PASSWORD.replace(/\s+/g, '') },
+      // O padrão do nodemailer espera DOIS MINUTOS por conexão. Quando a saída
+      // SMTP está bloqueada (o Railway bloqueia as portas 25/465/587 no plano
+      // Trial), cada envio pendurava o processo por 2 min e morria calado.
+      // Com 10s, a falha aparece no log — e no /public/health-email — em vez
+      // de virar espera infinita.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 20_000,
     });
   }
   return transporte;
@@ -65,7 +73,23 @@ export async function diagnosticoDoEmail(): Promise<{
     return { configurado: false, usuario: env.EMAIL_USER, autentica: false, erro: 'Transporte não criado.' };
   }
   try {
-    await t.verify();
+    // Corrida com um teto próprio: mesmo com os timeouts do transporte, a rota
+    // de diagnóstico nunca pode pendurar quem consulta.
+    await Promise.race([
+      t.verify(),
+      new Promise((_, reject) =>
+        setTimeout(
+          () =>
+            reject(
+              new Error(
+                'Tempo esgotado conectando ao Gmail — a saída SMTP está bloqueada ou lenta. ' +
+                  'No Railway, o plano Trial bloqueia as portas de e-mail; o plano Hobby libera.',
+              ),
+            ),
+          12_000,
+        ),
+      ),
+    ]);
     return { configurado: true, usuario: env.EMAIL_USER, autentica: true, erro: null };
   } catch (err) {
     return {
