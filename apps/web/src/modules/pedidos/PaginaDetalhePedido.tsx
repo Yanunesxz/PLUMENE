@@ -17,8 +17,9 @@ import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
+import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { precoDoTamanho } from '@csb/shared';
-import type { OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
+import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
 interface LinhaEdit {
@@ -63,15 +64,26 @@ export function PaginaDetalhePedido() {
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
 
   /**
-   * O desconto é SÓ do representante, e só antes de mandar para a fábrica: a %
-   * é a palavra que ele deu ao lojista. O gerente decide sobre o pedido que
-   * recebeu — mexer no preço combinado não é papel dele (a rota também nega).
+   * Quem pode MEXER neste pedido — peças, desconto e condição de pagamento
+   * seguem o mesmo portão, espelho do da API: o representante nos próprios,
+   * enquanto estão com ele (rascunho/triagem); o gerente e o admin em tudo que
+   * ainda não virou nota — triagem, fila e até o aprovado. Regra do Yan: "o
+   * gerente pode mudar o pedido do representante e do cliente".
+   *
+   * Online porque alterar vale para os outros — não entra na fila offline.
    */
-  const podeDarDesconto =
+  const podeMudarPedido =
     !!order &&
     !order.invoiced &&
-    (order.status === 'draft' || order.status === 'pending_rep') &&
-    user?.role === 'rep';
+    isOnline &&
+    (user?.role === 'rep'
+      ? order.status === 'draft' || order.status === 'pending_rep'
+      : (user?.role === 'manager' || user?.role === 'admin') &&
+        (order.status === 'pending_rep' ||
+          order.status === 'pending_approval' ||
+          order.status === 'approved'));
+
+  const podeDarDesconto = podeMudarPedido;
 
   /** Soma dos itens, sem desconto — é o "Valor Parcial" do formulário. */
   const bruto = (order?.items ?? []).reduce((s, i) => s + (i.total ?? 0), 0);
@@ -110,21 +122,7 @@ export function PaginaDetalhePedido() {
   const [pickerEdit, setPickerEdit] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
   const [salvandoPecas, setSalvandoPecas] = useState(false);
 
-  /**
-   * Quem mexe nas peças: o representante enquanto o pedido está com ele
-   * (rascunho ou triagem — é onde ele tira o que sabe que não vende e põe o que
-   * o lojista esqueceu), e o gerente na fila dele, antes de aprovar. Online
-   * porque, como decidir, editar vale para outras pessoas — não entra na fila
-   * offline.
-   */
-  const podeEditarPecas =
-    !!order &&
-    !order.invoiced &&
-    isOnline &&
-    (user?.role === 'rep'
-      ? order.status === 'draft' || order.status === 'pending_rep'
-      : (user?.role === 'manager' || user?.role === 'admin') &&
-        (order.status === 'pending_rep' || order.status === 'pending_approval'));
+  const podeEditarPecas = podeMudarPedido;
 
   const iniciarEdicao = () => {
     if (!order) return;
@@ -209,6 +207,35 @@ export function PaginaDetalhePedido() {
   const products = useLiveQuery(() => db.products.toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
   const condicoes = useCondicoesDePagamento();
+
+  const [salvandoCondicao, setSalvandoCondicao] = useState(false);
+
+  const salvarCondicao = async (novaId: string) => {
+    if (!id || !order || !token || salvandoCondicao) return;
+    if ((order.payment_condition_id ?? '') === novaId) return;
+    setSalvandoCondicao(true);
+    try {
+      const res = await api.patch<ApiResponse<Order>>(
+        `/orders/${id}/pagamento`,
+        { payment_condition_id: novaId || null },
+        token,
+      );
+      // O embed `payment_condition` fica para trás no update — zera para o
+      // rótulo resolver pelo cache das condições, que tem a nova.
+      setOrder({ ...order, ...res.data, payment_condition: null });
+      setToast({
+        message: novaId ? 'Condição de pagamento atualizada.' : 'Condição de pagamento removida.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível trocar a condição.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoCondicao(false);
+    }
+  };
 
   // A condição de pagamento: a API manda resolvida; offline, o cache do Dexie
   // resolve pelo id. Sem nenhuma das duas, a linha não aparece.
@@ -404,11 +431,35 @@ export function PaginaDetalhePedido() {
               })}
             </p>
 
-            {condicaoDoPedido && (
-              <p className="mt-1 text-xs text-muted-foreground">
-                Cond. de pagamento:{' '}
-                <span className="font-medium text-foreground">{condicaoDoPedido}</span>
-              </p>
+            {/* Editável enquanto o pedido está ao alcance de quem olha — o
+                gerente corrige a condição sem devolver o pedido pro rep. */}
+            {podeMudarPedido && condicoes.length > 0 ? (
+              <div className="mt-2 space-y-1">
+                <p className="text-xs text-muted-foreground">Cond. de pagamento</p>
+                <SearchSelect
+                  id="condicao-pedido"
+                  value={order.payment_condition_id ?? ''}
+                  onSelect={(v) => void salvarCondicao(v)}
+                  placeholder="Sem condição — escolher…"
+                  searchPlaceholder="Digite os prazos ou o código…"
+                  emptyText="Nenhuma condição encontrada"
+                  options={[
+                    { value: '', label: 'Sem condição' },
+                    ...condicoes.map((c) => ({
+                      value: c.id,
+                      label: c.description,
+                      sublabel: `Código ${c.code}`,
+                    })),
+                  ]}
+                />
+              </div>
+            ) : (
+              condicaoDoPedido && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Cond. de pagamento:{' '}
+                  <span className="font-medium text-foreground">{condicaoDoPedido}</span>
+                </p>
+              )
             )}
 
             <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>
@@ -437,9 +488,9 @@ export function PaginaDetalhePedido() {
             </div>
           </div>
 
-          {/* O desconto fica ACIMA da decisão, e só enquanto o pedido está com
-              o representante: é a última coisa que ele ajusta antes de mandar.
-              Depois que sai, o gerente decide sobre o valor que viu. */}
+          {/* O desconto fica ACIMA da decisão: é a última coisa que se ajusta
+              antes de decidir — o rep no que está com ele, o gerente em tudo
+              que ainda não virou nota. */}
           {podeDarDesconto && (
             <div className="rounded-xl border border-border bg-card p-4">
               <div className="mb-2 flex items-baseline justify-between gap-2">

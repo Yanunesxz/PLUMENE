@@ -56,6 +56,11 @@ export const setDiscountSchema = z.object({
   desconto: z.number().min(0).max(100).multipleOf(0.01),
 });
 
+/** Troca da condição de pagamento num pedido em aberto. `null` remove. */
+export const setPaymentSchema = z.object({
+  payment_condition_id: z.string().uuid().nullable(),
+});
+
 /**
  * A troca das peças de um pedido em aberto. Só (produto × variante ×
  * quantidade): preço não entra no corpo de propósito — o servidor reprecifica

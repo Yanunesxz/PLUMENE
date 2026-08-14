@@ -303,7 +303,18 @@ describe('o desconto entra na MONTAGEM do pedido', () => {
   });
 });
 
-describe('o desconto virou exclusivo do representante', () => {
+describe('quem mexe no pedido — a regra do gerente', () => {
+  // Revisão de 14/08/2026: "o gerente pode mudar o pedido do representante e
+  // do cliente". Desconto, peças e condição de pagamento seguem o MESMO portão.
+  const TOKEN_GERENTE = assinar({
+    sub: 'ger-1',
+    email: 'gerente@csb.com',
+    company_id: EMPRESA,
+    name: 'GERENTE',
+    role: 'manager',
+    permissions: ['aprovar_pedidos'],
+  });
+
   afterAll(() => {
     vi.doUnmock('../apps/api/src/config/supabase.js');
   });
@@ -321,20 +332,120 @@ describe('o desconto virou exclusivo do representante', () => {
     await app.close();
   });
 
-  it('o gerente também não — a % é a palavra do representante', async () => {
+  it('o gerente dá desconto no pedido que já está na fila dele', async () => {
     vi.resetModules();
-    const TOKEN_GERENTE = assinar({
-      sub: 'ger-1',
-      email: 'gerente@csb.com',
+    const { app, fake } = await subir({
+      orders: [
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval' }, error: null },
+        { data: { id: 'o1', total: 90, discount_percent: 10 }, error: null },
+      ],
+      order_items: { data: [{ total: 100 }], error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/desconto',
+      headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      payload: { desconto: 10 },
+    });
+    expect(res.statusCode).toBe(200);
+    const upd = fake.ultimaGravacao('orders', 'update')?.valores as { total: number };
+    expect(upd.total).toBeCloseTo(90, 2);
+    await app.close();
+  });
+
+  it('o gerente edita as peças até do pedido já aprovado, enquanto não vira nota', async () => {
+    vi.resetModules();
+    const { app, fake } = await subir({
+      orders: [
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'approved', discount_percent: 0 }, error: null },
+        { data: { id: 'o1' }, error: null },
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'approved', items: [] }, error: null },
+      ],
+      product_prices: [
+        { data: [{ price_larger: null }], error: null },
+        { data: [{ product_id: 'p1', price: 41.9, price_larger: 52.9 }], error: null },
+      ],
+      product_variants: { data: [{ id: 'v-gg', size: 'GG' }], error: null },
+      order_items: [
+        { data: [], error: null },
+        { data: null, error: null },
+        { data: null, error: null },
+      ],
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      payload: { items: [{ product_id: 'p1', variant_id: 'v-gg', quantity: 2 }] },
+    });
+    expect(res.statusCode).toBe(200);
+    const inseridos = (fake.ultimaGravacao('order_items', 'insert')?.valores ?? []) as Array<{
+      unit_price: number;
+    }>;
+    expect(inseridos[0]?.unit_price).toBe(41.9);
+    await app.close();
+  });
+
+  it('o gerente troca a condição de pagamento do pedido na fila', async () => {
+    vi.resetModules();
+    const CONDICAO = '22222222-2222-4222-8222-222222222222';
+    const { app, fake } = await subir({
+      orders: [
+        { data: { ...PEDIDO_NA_TRIAGEM, status: 'pending_approval' }, error: null },
+        // detector da coluna payment_condition_id (028)
+        { data: [{ payment_condition_id: null }], error: null },
+        { data: { id: 'o1', payment_condition_id: CONDICAO }, error: null },
+      ],
+      payment_conditions: { data: { id: CONDICAO, active: true }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/pagamento',
+      headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      payload: { payment_condition_id: CONDICAO },
+    });
+    expect(res.statusCode).toBe(200);
+    const upd = fake.ultimaGravacao('orders', 'update')?.valores as {
+      payment_condition_id: string | null;
+    };
+    expect(upd.payment_condition_id).toBe(CONDICAO);
+    await app.close();
+  });
+
+  it('condição inválida é recusada com motivo — trocar não é a criação, onde ela é acessória', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: [
+        { data: PEDIDO_NA_TRIAGEM, error: null },
+        { data: [{ payment_condition_id: null }], error: null },
+      ],
+      payment_conditions: { data: null, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/pagamento',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { payment_condition_id: '11111111-1111-4111-8111-111111111111' },
+    });
+    expect(res.statusCode).toBe(422);
+    await app.close();
+  });
+
+  it('gerente SEM a tecla de aprovar não mexe em nada', async () => {
+    vi.resetModules();
+    const SEM_TECLA = assinar({
+      sub: 'ger-2',
+      email: 'g2@csb.com',
       company_id: EMPRESA,
-      name: 'GERENTE',
+      name: 'G2',
       role: 'manager',
+      permissions: [],
     });
     const { app } = await subir({ orders: { data: PEDIDO_NA_TRIAGEM, error: null } });
     const res = await app.inject({
       method: 'PATCH',
       url: '/orders/o1/desconto',
-      headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      headers: { authorization: `Bearer ${SEM_TECLA}` },
       payload: { desconto: 10 },
     });
     expect(res.statusCode).toBe(403);

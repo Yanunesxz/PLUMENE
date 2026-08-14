@@ -109,8 +109,9 @@ apps/api/src/
 │   ├── auth/             → login, refresh (auth.service tem findUserByEmail, buildAuthPayload)
 │   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep)
 │   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
-│   ├── orders/           → GET/POST /orders, /:id, /status, /invoice,
-│   │                       /desconto (só o rep) e /items (editar peças)
+│   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
+│   │                       alterações em aberto: /desconto, /items, /pagamento
+│   │                       (rep nos próprios; gerente em tudo até virar nota)
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)

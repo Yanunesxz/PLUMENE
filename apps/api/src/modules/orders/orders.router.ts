@@ -8,6 +8,7 @@ import {
   setInvoicedHandler,
   setDiscountHandler,
   setItemsHandler,
+  setPaymentHandler,
   deleteOrderHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
@@ -49,19 +50,15 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
   fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
-  // O desconto é SÓ do representante — decisão do Yan (13/08/2026): é ele quem
-  // fecha o negócio na frente do lojista, e a % é a palavra dele. O gerente
-  // decide sobre o pedido que recebeu, não sobre o preço combinado.
-  fastify.patch(
-    '/orders/:id/desconto',
-    { preHandler: [authenticate, requireRole(['rep'])] },
-    setDiscountHandler,
-  );
-  // Mexer nas peças antes de mandar: o representante ajusta o que a loja pediu
-  // (tira o que sabe que não vende, põe o que o lojista esqueceu) e o gerente
-  // faz o ajuste fino na fila dele. A mesma tecla da decisão vale aqui —
-  // editar peça é parte de decidir o pedido.
+  // Mexer no pedido em aberto — peças, desconto e condição de pagamento — segue
+  // um portão só (podeMexerNoPedido, no service): o representante nos próprios
+  // pedidos enquanto estão com ele; o gerente em tudo que ainda não virou nota.
+  // Regra do Yan (14/08/2026): "o gerente pode mudar o pedido do representante
+  // e do cliente" — revisão do desconto-só-do-rep do dia 13. A tecla da decisão
+  // vale para os três: alterar pedido é parte de decidir.
+  fastify.patch('/orders/:id/desconto', decideOPedido, setDiscountHandler);
   fastify.patch('/orders/:id/items', decideOPedido, setItemsHandler);
+  fastify.patch('/orders/:id/pagamento', decideOPedido, setPaymentHandler);
   fastify.patch(
     '/orders/:id/invoice',
     {

@@ -439,22 +439,15 @@ export async function deleteOrder(
   return { ok: true };
 }
 
-/**
- * Enquanto o pedido está com o representante ele pode mexer no desconto. Depois
- * que sai para a fábrica, não: o gerente decide sobre o valor que viu.
- */
-const DESCONTAVEL = new Set<Order['status']>(['draft', 'pending_rep']);
-
 export type DescontoResult =
   | { ok: true; order: Order }
   | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' };
 
 /**
- * O representante dá um percentual de desconto no pedido inteiro.
+ * O percentual de desconto do pedido inteiro.
  *
- * Só enquanto o pedido está com ELE — rascunho ou triagem. Depois que foi para
- * a fábrica, mudar o valor por baixo de quem já está decidindo seria alterar a
- * proposta em cima da mesa do gerente.
+ * Quem pode e quando é o `podeMexerNoPedido`: o representante nos próprios,
+ * enquanto estão com ele; o gerente em tudo que ainda não virou nota.
  *
  * O total é recalculado A PARTIR DOS ITENS, nunca do total gravado: aplicar o
  * percentual sobre o total anterior descontaria em cima do já descontado a cada
@@ -479,11 +472,10 @@ export async function setOrderDiscount(
     .maybeSingle();
 
   if (!order) return { ok: false, reason: 'not_found' };
-  const o = order as { rep_id: string; status: Order['status']; invoiced: boolean | null };
+  const o = order as unknown as Order;
 
-  if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
-  if (o.invoiced) return { ok: false, reason: 'tarde_demais' };
-  if (!DESCONTAVEL.has(o.status)) return { ok: false, reason: 'tarde_demais' };
+  const acesso = podeMexerNoPedido(o, role, rep_id);
+  if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   const { data: itens } = await supabase
     .from('order_items')
@@ -509,12 +501,39 @@ export async function setOrderDiscount(
 }
 
 /**
- * Enquanto está com o representante (rascunho ou triagem), o pedido é dele para
- * mexer. Na fila do gerente, é o gerente quem ajusta — o representante não
- * altera um pedido que já está na mesa de outra pessoa, e vice-versa.
+ * Quem pode MEXER num pedido — peças, desconto e condição de pagamento passam
+ * todos por este portão, para as três coisas nunca divergirem.
+ *
+ * Representante: nos PRÓPRIOS pedidos, enquanto estão com ele (rascunho e
+ * triagem). O que já foi para a fábrica está na mesa de outra pessoa.
+ *
+ * Gerente/admin: em tudo que ainda está nas mãos da fábrica — triagem, fila de
+ * aprovação e até o já aprovado — regra do Yan (14/08/2026): "o gerente pode
+ * mudar o pedido do representante e do cliente".
+ *
+ * Ninguém: pedido faturado ou já no ERP. A nota saiu por aquele valor; mexer
+ * aqui criaria uma verdade diferente da do Control.
  */
-const PECAS_EDITAVEIS_PELO_REP = new Set<Order['status']>(['draft', 'pending_rep']);
-const PECAS_EDITAVEIS_PELA_FABRICA = new Set<Order['status']>(['pending_rep', 'pending_approval']);
+function podeMexerNoPedido(
+  o: Order,
+  role: AuthRole,
+  user_id: string,
+): 'ok' | 'forbidden' | 'tarde_demais' {
+  if (o.invoiced || o.status === 'sent_erp' || o.status === 'rejected' || o.status === 'error_erp') {
+    return 'tarde_demais';
+  }
+  if (role === 'rep') {
+    if (o.rep_id !== user_id) return 'forbidden';
+    return o.status === 'draft' || o.status === 'pending_rep' ? 'ok' : 'tarde_demais';
+  }
+  if (role === 'manager' || role === 'admin') {
+    // Rascunho fica de fora: é a montagem privada do representante.
+    return o.status === 'pending_rep' || o.status === 'pending_approval' || o.status === 'approved'
+      ? 'ok'
+      : 'tarde_demais';
+  }
+  return 'forbidden';
+}
 
 export interface ItemEditado {
   product_id: string;
@@ -558,13 +577,8 @@ export async function setOrderItems(
   if (!order) return { ok: false, reason: 'not_found' };
   const o = order as Order;
 
-  if (o.invoiced) return { ok: false, reason: 'tarde_demais' };
-  if (role === 'rep') {
-    if (o.rep_id !== user_id) return { ok: false, reason: 'forbidden' };
-    if (!PECAS_EDITAVEIS_PELO_REP.has(o.status)) return { ok: false, reason: 'tarde_demais' };
-  } else if (!PECAS_EDITAVEIS_PELA_FABRICA.has(o.status)) {
-    return { ok: false, reason: 'tarde_demais' };
-  }
+  const acesso = podeMexerNoPedido(o, role, user_id);
+  if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
@@ -657,6 +671,58 @@ export async function setOrderItems(
     .maybeSingle();
 
   return { ok: true, order: (atualizado ?? { ...o, total, items: novos }) as OrderWithItems };
+}
+
+export type PagamentoResult =
+  | { ok: true; order: Order }
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'condicao_invalida' | 'sem_coluna' };
+
+/**
+ * Troca a condição de pagamento de um pedido em aberto.
+ *
+ * Na criação a condição é acessória (inválida = pedido segue sem ela), mas aqui
+ * a intenção é explícita: quem está TROCANDO uma condição quer aquela condição.
+ * Id inválido é recusado com motivo, em vez de silenciosamente virar "sem
+ * condição". `null` remove — o COND PGTO da planilha volta a sair em branco.
+ */
+export async function setOrderPayment(
+  id: string,
+  company_id: string,
+  user_id: string,
+  role: AuthRole,
+  payment_condition_id: string | null,
+): Promise<PagamentoResult> {
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, rep_id, status, invoiced')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!order) return { ok: false, reason: 'not_found' };
+  const o = order as unknown as Order;
+
+  const acesso = podeMexerNoPedido(o, role, user_id);
+  if (acesso !== 'ok') return { ok: false, reason: acesso };
+
+  if (!(await detectarColunaDaCondicao())) return { ok: false, reason: 'sem_coluna' };
+
+  let gravar: string | null = null;
+  if (payment_condition_id) {
+    gravar = await condicaoValida(payment_condition_id, company_id);
+    if (!gravar) return { ok: false, reason: 'condicao_invalida' };
+  }
+
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ payment_condition_id: gravar, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .select()
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, reason: 'not_found' };
+  return { ok: true, order: data as Order };
 }
 
 export async function setOrderInvoiced(
