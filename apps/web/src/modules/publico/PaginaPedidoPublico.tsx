@@ -180,12 +180,16 @@ const CSS = `
   .passo.atual .lbl { color:var(--wine); font-weight:700; }
   .titulo-secao { font-family:var(--serif); font-size:18px; margin:34px 4px 14px; font-weight:500; color:var(--ink); }
   .titulo-secao span { color:var(--soft); font-family:var(--sans); font-size:13px; }
-  .grade { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  .grade { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
+  @media (max-width:900px){ .grade{ grid-template-columns:repeat(3,1fr); gap:12px; } }
   @media (max-width:720px){ .grade{ grid-template-columns:repeat(2,1fr); gap:12px; } }
-  @media (max-width:440px){ .grade{ grid-template-columns:1fr; } }
+  @media (max-width:440px){ .grade{ grid-template-columns:repeat(2,1fr); gap:10px; } }
   .produto { background:var(--card); border:1px solid var(--line); border-radius:8px; overflow:hidden; display:flex; flex-direction:column; }
-  .foto { aspect-ratio:3/4; background:linear-gradient(150deg,var(--ph1),var(--ph2)); display:flex; align-items:center; justify-content:center; color:var(--soft); position:relative; }
-  .foto img { width:100%; height:100%; object-fit:cover; }
+  /* "contain" em vez de "cover": a foto do catalogo tem a peca inteira e o
+     cover cortava as bordas — o cliente nao via o produto direito. Quadro
+     quadrado (cartao menor) e fundo branco, que casa com o fundo das fotos. */
+  .foto { aspect-ratio:1/1; background:#fff; display:flex; align-items:center; justify-content:center; color:var(--soft); position:relative; border-bottom:1px solid var(--line); }
+  .foto img { width:100%; height:100%; object-fit:contain; padding:6px; }
   .foto .ref-tag { position:absolute; top:10px; left:10px; background:var(--card); color:var(--ink); font-size:12px; font-weight:700; padding:3px 9px; border-radius:5px; z-index:1; box-shadow:0 1px 4px rgba(0,0,0,.08); }
   .info { padding:13px 14px 15px; display:flex; flex-direction:column; gap:9px; flex:1; }
   .nome { font-size:13.5px; line-height:1.35; color:var(--ink); font-weight:600; }
