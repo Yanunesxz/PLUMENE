@@ -37,6 +37,11 @@ export interface ContextoDaExportacao {
    * ausente = cabeçalho em branco, que era o comportamento até 13/08/2026.
    */
   clienteDoPedido?: (pedido: OrderWithItems) => ClienteDaFolha | null;
+  /**
+   * product_id → cor do produto ("Azul"). Vai na coluna OBSERVAÇÃO de cada
+   * linha — o campo que a fábrica lê na separação. Ausente = coluna em branco.
+   */
+  corDoProduto?: Map<string, string | null>;
 }
 
 export interface ResultadoDaExportacao {
@@ -98,7 +103,13 @@ async function gerarArquivosDoPedido(
       semTamanho.push(`${sku} sem tamanho no pedido`);
       continue;
     }
-    itens.push({ sku, size, quantity: item.quantity, unit_price: item.unit_price });
+    itens.push({
+      sku,
+      size,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      observacao: contexto.corDoProduto?.get(item.product_id) ?? undefined,
+    });
   }
 
   for (const motivo of semTamanho) {

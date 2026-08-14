@@ -104,6 +104,14 @@ export function PaginaPedidos() {
     return m;
   }, [products]);
 
+  // product_id → cor. Vai na coluna OBSERVAÇÃO de cada linha da planilha — é o
+  // campo que a fábrica lê na separação (cada cor é um produto próprio).
+  const corDoProduto = useMemo(() => {
+    const m = new Map<string, string | null>();
+    for (const p of products ?? []) m.set(p.id, p.color_name ?? null);
+    return m;
+  }, [products]);
+
   // variant_id → tamanho. A planilha põe a quantidade na COLUNA do tamanho, então
   // sem isto o item não tem onde cair.
   const tamanhoDaVariante = useMemo(() => {
@@ -240,6 +248,7 @@ export function PaginaPedidos() {
       const resultado = await exportarPedidosParaControl(detailed, {
         skuDoProduto: productSku,
         tamanhoDaVariante,
+        corDoProduto,
         tabelaDoPedido: (pedido) => {
           // A do próprio pedido primeiro (migração 025). É a única que não é
           // palpite: o cliente pode ter trocado de tabela depois, e o rep pode

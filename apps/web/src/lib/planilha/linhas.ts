@@ -27,6 +27,12 @@ export interface ItemParaPlanilha {
   size: string;
   quantity: number;
   unit_price: number;
+  /**
+   * O que vai na coluna OBSERVAÇÃO da linha — hoje, a COR do produto ("Azul").
+   * É o campo que a fábrica lê na separação: cada cor é um produto próprio no
+   * catálogo, então uma linha da planilha tem uma cor só.
+   */
+  observacao?: string | undefined;
 }
 
 export interface LinhaDaPlanilha {
@@ -37,6 +43,8 @@ export interface LinhaDaPlanilha {
   /** Soma das quantidades — é o que a coluna QUANT mostra. */
   pecas: number;
   unit_price: number;
+  /** A OBSERVAÇÃO da linha (coluna B) — a cor, quando o produto tem uma. */
+  observacao?: string | undefined;
 }
 
 export interface ItemForaDaGrade {
@@ -94,6 +102,9 @@ export function montarLinhas(itens: readonly ItemParaPlanilha[]): MontagemDeLinh
     // mesmo produto pode vir repetido quando o pedido foi montado por cor.
     linha.quantidades[celula.coluna] = (linha.quantidades[celula.coluna] ?? 0) + item.quantity;
     linha.pecas += item.quantity;
+    // A cor: uma por linha (a linha é um produto, o produto tem uma cor). O
+    // primeiro item com cor manda; os demais são o mesmo produto.
+    linha.observacao ??= item.observacao?.trim() || undefined;
     porChave.set(chave, linha);
   }
 

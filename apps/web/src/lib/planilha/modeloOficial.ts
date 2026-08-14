@@ -277,6 +277,12 @@ export function preencherModelo(modelo: Uint8Array, dados: DadosDaFolha): FolhaP
     // sumiria. Ver refDaPlanilha sobre por que é essa a forma que o Control lê.
     patches.set(`A${numeroDaLinha}`, { tipo: 'texto', valor: linha.ref });
 
+    // A OBSERVAÇÃO da linha (coluna B, mescla B:K) — a cor da peça, que a
+    // fábrica lê na separação. Sem cor, a célula fica como está no modelo.
+    if (linha.observacao) {
+      patches.set(`B${numeroDaLinha}`, { tipo: 'texto', valor: linha.observacao });
+    }
+
     for (const [coluna, quantidade] of Object.entries(linha.quantidades)) {
       patches.set(`${coluna}${numeroDaLinha}`, { tipo: 'numero', valor: quantidade });
     }

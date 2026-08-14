@@ -263,6 +263,30 @@ describe('preenchimento do modelo oficial', () => {
     expect(folhaComUmaLinha().refsDesconhecidas).toEqual([]);
   });
 
+  it('escreve a cor da peça na coluna OBSERVAÇÃO da linha (B)', () => {
+    // A cor é o que a fábrica lê na SEPARAÇÃO — pedido do Yan (14/08/2026):
+    // "quando a 0130 escolhe azul", o azul vai no campo de observação DA LINHA,
+    // não só no bloco geral do rodapé.
+    const { linhas } = montarLinhas([
+      { sku: '0130', size: 'M', quantity: 3, unit_price: 43.9, observacao: 'Azul' },
+      { sku: '0130', size: '48', quantity: 2, unit_price: 53.9, observacao: 'Azul' },
+      { sku: '0854', size: 'M', quantity: 1, unit_price: 51.9 },
+    ]);
+    // A linha base e a PLUS carregam a cor; a peça sem cor fica sem observação.
+    expect(linhas.map((l) => [l.ref, l.observacao ?? null])).toEqual([
+      ['0130', 'Azul'],
+      ['0130 PLUS', 'Azul'],
+      ['0854', null],
+    ]);
+
+    const { arquivo } = preencherModelo(modelo(), { linhas });
+    const xml = sheet1(arquivo);
+    expect(xml).toMatch(/<c r="B13"[^>]*t="inlineStr"><is><t>Azul<\/t>/);
+    expect(xml).toMatch(/<c r="B14"[^>]*t="inlineStr"><is><t>Azul<\/t>/);
+    // B15 (0854, sem cor) fica exatamente como está no modelo.
+    expect(xml).not.toMatch(/<c r="B15"[^>]*t="inlineStr">/);
+  });
+
   it('escreve a condição de pagamento no COND PGTO (C8)', () => {
     const { linhas } = montarLinhas([item('0130', 'M', 3)]);
     const { arquivo } = preencherModelo(modelo(), {
