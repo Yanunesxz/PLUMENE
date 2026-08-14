@@ -23,18 +23,12 @@ export async function processSyncQueue(
     }
 
     try {
-      // Tudo que está na fila offline é pedido FECHADO por quem montou — ele
-      // apertou enviar sem sinal. Entra na fila (do gerente, se veio do
-      // representante; da triagem, se veio da loja), nunca como rascunho.
-      // Forçado aqui (e não só no cliente) para valer também para itens que já
-      // estavam na fila antes desta versão.
-      await createOrder(
-        company_id,
-        rep_id,
-        price_table_id,
-        { ...validation.data, submit: true },
-        origem,
-      );
+      // O pedido do representante que chega da fila offline vira RASCUNHO,
+      // igual ao salvo online: ele cai na área "Enviar pra fábrica" e o rep
+      // manda quando conferir (regra do Yan, 14/08/2026 — antes disto o sync
+      // forçava submit e o pedido pulava direto para a fila do gerente). O da
+      // loja não muda: a origem 'store' ignora o submit e cai na triagem.
+      await createOrder(company_id, rep_id, price_table_id, validation.data, origem);
       synced++;
     } catch (err) {
       failed.push({

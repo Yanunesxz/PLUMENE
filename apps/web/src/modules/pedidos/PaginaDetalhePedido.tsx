@@ -85,7 +85,9 @@ export function PaginaDetalhePedido() {
       : (user?.role === 'manager' || user?.role === 'admin') &&
         (order.status === 'pending_rep' ||
           order.status === 'pending_approval' ||
-          order.status === 'approved'));
+          order.status === 'approved' ||
+          // O rascunho do PRÓPRIO gerente — o alheio é montagem privada do rep.
+          (order.status === 'draft' && order.rep_id === user.id)));
 
   const podeDarDesconto = podeMudarPedido;
 
@@ -567,6 +569,27 @@ export function PaginaDetalhePedido() {
               <p className="mt-2 text-[11px] leading-tight text-subtle">
                 Vai no campo DESC % da planilha da fábrica. Os preços das peças não mudam.
               </p>
+            </div>
+          )}
+
+          {/* O rascunho é o pedido salvo que a fábrica ainda não viu. Este é o
+              botão que o tira da área "Enviar pra fábrica" — até lá, o
+              representante confere e altera à vontade. */}
+          {order.status === 'draft' && !ehLoja && podeAprovar && (
+            <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+              <p className="mb-3 text-sm text-foreground">
+                Este pedido está salvo, mas ainda não foi. Confira as peças, o desconto e a
+                condição — quando estiver certo, mande.
+              </p>
+              <Button
+                size="lg"
+                className="w-full bg-positive hover:bg-positive/90 active:bg-positive/80"
+                disabled={decidindo !== null}
+                onClick={() => void handleDecisao('pending_approval')}
+              >
+                <Check className="h-4 w-4" strokeWidth={2.5} />
+                Enviar para a fábrica
+              </Button>
             </div>
           )}
 

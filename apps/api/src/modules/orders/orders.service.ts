@@ -532,7 +532,9 @@ function podeMexerNoPedido(
       : 'tarde_demais';
   }
   if (role === 'manager' || role === 'admin') {
-    // Rascunho fica de fora: é a montagem privada do representante.
+    // Rascunho alheio fica de fora (é a montagem privada do representante) —
+    // mas o gerente que monta pedido também nasce em rascunho, e o dele é dele.
+    if (o.status === 'draft') return o.rep_id === user_id ? 'ok' : 'tarde_demais';
     return o.status === 'pending_rep' || o.status === 'pending_approval' || o.status === 'approved'
       ? 'ok'
       : 'tarde_demais';

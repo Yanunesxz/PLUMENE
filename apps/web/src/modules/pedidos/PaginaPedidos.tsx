@@ -33,12 +33,26 @@ const ALL_REPS = '__all__';
  *
  * A loja não tem rascunho e não aprova nada — mostrar "Pendentes" e "Rascunhos"
  * para ela seria oferecer duas gavetas que nunca enchem.
+ *
+ * Para o representante, as duas primeiras gavetas são o FLUXO dele: "Enviar pra
+ * fábrica" (o pedido salvo, que ele confere e altera com calma) e "Enviados"
+ * (o que já está na fila). O gerente mantém o vocabulário da mesa dele.
  */
-function filtrosDeStatus(ehLoja: boolean): { value: OrderStatus | 'all'; label: string }[] {
-  if (ehLoja) {
+function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStatus | 'all'; label: string }[] {
+  if (papel === 'store') {
     return [
       { value: 'all', label: 'Todos' },
       { value: 'pending_rep', label: 'Com o representante' },
+      { value: 'approved', label: 'Aprovados' },
+      { value: 'rejected', label: 'Recusados' },
+    ];
+  }
+  if (papel === 'rep') {
+    return [
+      { value: 'all', label: 'Todos' },
+      { value: 'draft', label: 'Enviar pra fábrica' },
+      { value: 'pending_approval', label: 'Enviados' },
+      { value: 'pending_rep', label: 'Para revisar' },
       { value: 'approved', label: 'Aprovados' },
       { value: 'rejected', label: 'Recusados' },
     ];
@@ -57,7 +71,10 @@ export function PaginaPedidos() {
   const { token, hasRole, user } = useAuthStore();
   const isManager = hasRole('manager', 'admin');
   const ehLoja = hasRole('store');
-  const STATUS_FILTERS = useMemo(() => filtrosDeStatus(ehLoja), [ehLoja]);
+  const STATUS_FILTERS = useMemo(
+    () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep'),
+    [ehLoja, isManager],
+  );
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');

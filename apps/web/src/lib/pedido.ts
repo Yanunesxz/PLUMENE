@@ -92,6 +92,12 @@ export function seloDoPedido(
   if (usaStatusInterno(papel)) {
     return { texto: ORDER_STATUS_LABELS[pedido.status], variante: STATUS_VARIANTE[pedido.status] };
   }
+  // O rascunho é a área "Enviar pra fábrica" do representante — o pedido salvo
+  // que ainda não foi. Deixá-lo cair nos degraus diria "Enviado pra fábrica"
+  // sobre um pedido que a fábrica nunca viu.
+  if (pedido.status === 'draft') {
+    return { texto: 'Enviar pra fábrica', variante: 'gray' };
+  }
   const degrau = statusDoCliente(pedido);
   return { texto: STATUS_DO_CLIENTE_LABELS[degrau], variante: VARIANTE_DO_CLIENTE[degrau] };
 }

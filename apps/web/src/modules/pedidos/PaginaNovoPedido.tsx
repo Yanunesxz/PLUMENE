@@ -299,10 +299,12 @@ export function PaginaNovoPedido() {
       // A % fechada com o lojista. Só o rep manda; o servidor descarta dos outros.
       ...(descontoAplicado > 0 ? { discount_percent: descontoAplicado } : {}),
       local_id,
-      // O botão diz "Enviar para aprovação" — então o pedido tem que entrar na
-      // fila do gerente. Sem isto ele nascia 'draft' e ninguém nunca o via.
-      // (Para a loja o servidor ignora: pedido dela nunca é rascunho.)
-      submit: true,
+      // O pedido do representante nasce RASCUNHO, de propósito — pedido do Yan
+      // (14/08/2026): "não mandar direto". Ele fica na área "Enviar pra
+      // fábrica" da lista, onde a Simone confere e altera com calma, e só vai
+      // para a fila do gerente quando ela mandar. (Para a loja o servidor
+      // ignora este campo: pedido dela nunca é rascunho, cai na triagem.)
+      submit: false,
       items: items.map(({ product_id, variant_id, quantity, unit_price }) => ({
         product_id,
         variant_id: variant_id ?? undefined,
@@ -315,7 +317,9 @@ export function PaginaNovoPedido() {
       if (isOnline && token) {
         await api.post<ApiResponse<OrderWithItems>>('/orders', payload, token);
         setToast({
-          message: ehLoja ? 'Pedido enviado ao seu representante!' : 'Pedido criado com sucesso!',
+          message: ehLoja
+            ? 'Pedido enviado ao seu representante!'
+            : 'Pedido salvo! Ele está em "Enviar pra fábrica" — mande quando conferir.',
           type: 'success',
         });
       } else {
@@ -356,7 +360,7 @@ export function PaginaNovoPedido() {
       <p className="mb-4 mt-1 text-sm text-muted-foreground">
         {ehLoja
           ? 'Monte o pedido e envie. Seu representante confere antes de ir para a fábrica.'
-          : 'Escolha o cliente e as peças. O pedido vai para a aprovação da fábrica.'}
+          : 'Escolha o cliente e as peças. O pedido fica salvo em "Enviar pra fábrica" até você mandar.'}
       </p>
 
       {!isOnline && (
@@ -610,12 +614,12 @@ export function PaginaNovoPedido() {
             disabled={submitting || missingReason !== null}
           >
             {submitting
-              ? 'Enviando…'
+              ? 'Salvando…'
               : !isOnline
                 ? 'Salvar offline'
                 : ehLoja
                   ? 'Enviar ao meu representante'
-                  : 'Enviar para aprovação'}
+                  : 'Salvar pedido'}
           </Button>
         </div>
       </form>
