@@ -73,6 +73,26 @@ const flagSim = (v: unknown): boolean => {
   return s === 'S' || s === 'SIM' || s === '1' || s === 'TRUE';
 };
 
+/**
+ * Miolo do código, para casar formatos diferentes do MESMO código: sem "#",
+ * sem zeros à frente. "#2225", "2225" e "02225" são o mesmo cliente no Control.
+ * Sem isso o casamento exato criaria um cliente novo a cada variação de formato.
+ */
+const miolo = (v: unknown): string | null => {
+  const s = txt(v);
+  if (!s) return null;
+  const semZero = s.replace(/#/g, '').trim().toUpperCase().replace(/^0+/, '');
+  return semZero === '' ? '0' : semZero;
+};
+
+/** CNPJ/CPF só dígitos — 11 (CPF) ou mais; menos que isso é lixo de digitação. */
+const digitos = (v: unknown): string | null => {
+  const s = txt(v);
+  if (!s) return null;
+  const d = s.replace(/\D/g, '');
+  return d.length >= 11 ? d : null;
+};
+
 /** Junta os pedaços do endereço numa linha só — é como o app guarda. */
 function montarEndereco(e: EnderecoParceiro | string | null | undefined): string | null {
   if (e == null) return null;
@@ -127,21 +147,30 @@ export async function receberClientes(
     );
   }
 
-  // Existentes por código, para decidir update × insert.
+  // Existentes por código (miolo, para "#2225"="2225"="02225") — e por CNPJ os
+  // que estão SEM código. Estes últimos vieram das cargas de carteira (relatório
+  // Curva ABC, que não traz código): quando o ERP mandar o mesmo cliente COM
+  // código, é adoção, não criação — senão a mesma loja vira duas.
   const { data: existentes } = await supabase
     .from('customers')
-    .select('id, erp_id')
-    .eq('company_id', company_id)
-    .not('erp_id', 'is', null);
+    .select('id, erp_id, cnpj')
+    .eq('company_id', company_id);
   const idPorCodigo = new Map<string, string>();
-  for (const c of (existentes ?? []) as Array<{ id: string; erp_id: string | null }>) {
-    const cod = txt(c.erp_id);
-    if (cod) idPorCodigo.set(cod, c.id);
+  const semCodigoPorCnpj = new Map<string, string>();
+  for (const c of (existentes ?? []) as Array<{ id: string; erp_id: string | null; cnpj: string | null }>) {
+    const cod = miolo(c.erp_id);
+    if (cod) {
+      idPorCodigo.set(cod, c.id);
+      continue;
+    }
+    const d = digitos(c.cnpj);
+    if (d && !semCodigoPorCnpj.has(d)) semCodigoPorCnpj.set(d, c.id);
   }
 
   const paraInserir: Record<string, unknown>[] = [];
   const paraAtualizar: Record<string, unknown>[] = [];
   const tabelasNaoAchadas = new Set<string>();
+  let adotadosPorCnpj = 0;
 
   for (const raw of clientes) {
     const codigo = txt(raw.codigo);
@@ -178,7 +207,18 @@ export async function receberClientes(
       updated_at: new Date().toISOString(),
     };
 
-    const existenteId = idPorCodigo.get(codigo);
+    let existenteId = idPorCodigo.get(miolo(codigo) ?? '');
+    if (!existenteId) {
+      // Adoção por CNPJ: o cliente já existe sem código (veio da carga de
+      // carteira) e agora aprende o código do Control — a linha já leva
+      // `erp_id`, então daqui em diante ele casa pelo caminho normal.
+      const d = digitos(raw.cnpj_cpf);
+      if (d && semCodigoPorCnpj.has(d)) {
+        existenteId = semCodigoPorCnpj.get(d);
+        semCodigoPorCnpj.delete(d); // duas linhas não adotam o mesmo cadastro
+        adotadosPorCnpj++;
+      }
+    }
     if (existenteId) paraAtualizar.push({ id: existenteId, ...linha });
     else paraInserir.push(linha);
   }
@@ -199,6 +239,11 @@ export async function receberClientes(
   if (tabelasNaoAchadas.size > 0) {
     avisos.push(
       `Tabelas de preço não encontradas (cliente ficou sem tabela): ${[...tabelasNaoAchadas].join(', ')}.`,
+    );
+  }
+  if (adotadosPorCnpj > 0) {
+    avisos.push(
+      `${adotadosPorCnpj} cliente(s) já existiam sem código e foram casados pelo CNPJ — agora têm o código do Control.`,
     );
   }
 

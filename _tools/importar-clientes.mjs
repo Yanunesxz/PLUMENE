@@ -161,11 +161,27 @@ async function baixarTudo(tabela, select, filtro = '') {
 
   // Mapas do que já existe no app
   const [custExist, reps] = await Promise.all([
-    baixarTudo('customers', 'id, erp_id', true),
+    baixarTudo('customers', 'id, erp_id, cnpj', true),
     baixarTudo('users', 'erp_rep_id, name, role', true),
   ]);
   const idPorMiolo = new Map();
-  for (const c of custExist) { const m = miolo(c.erp_id); if (m) idPorMiolo.set(m, c.id); }
+  // Clientes SEM código, indexados por CNPJ (dígitos): vieram das cargas de
+  // carteira (Curva ABC, sem código). Quando a linha com código chegar, é
+  // ADOÇÃO — atualiza aquele cadastro e grava o código —, nunca criação, senão
+  // a mesma loja vira duas.
+  const semCodigoPorCnpj = new Map();
+  const soDigitos = (v) => {
+    const s = txt(v);
+    if (!s) return null;
+    const d = s.replace(/\D/g, '');
+    return d.length >= 11 ? d : null;
+  };
+  for (const c of custExist) {
+    const m = miolo(c.erp_id);
+    if (m) { idPorMiolo.set(m, c.id); continue; }
+    const d = soDigitos(c.cnpj);
+    if (d && !semCodigoPorCnpj.has(d)) semCodigoPorCnpj.set(d, c.id);
+  }
   const repPorMiolo = new Map();
   for (const u of reps) { if (u.role === 'rep' && u.erp_rep_id) { const m = miolo(u.erp_rep_id); if (m) repPorMiolo.set(m, u.erp_rep_id); } }
 
@@ -204,7 +220,15 @@ async function baixarTudo(tabela, select, filtro = '') {
       updated_at: new Date().toISOString(),
     };
 
-    const existeId = idPorMiolo.get(miolo(codigo));
+    let existeId = idPorMiolo.get(miolo(codigo));
+    if (!existeId) {
+      const d = soDigitos(linha.cnpj);
+      if (d && semCodigoPorCnpj.has(d)) {
+        existeId = semCodigoPorCnpj.get(d);
+        semCodigoPorCnpj.delete(d); // duas linhas não adotam o mesmo cadastro
+        problemas.adotadosPorCnpj = (problemas.adotadosPorCnpj ?? 0) + 1;
+      }
+    }
     if (existeId) paraAtualizar.push({ id: existeId, ...linha });
     else paraCriar.push(linha);
   }
@@ -216,6 +240,9 @@ async function baixarTudo(tabela, select, filtro = '') {
   console.log(`  → atualizar (já existe): ${paraAtualizar.length}`);
   console.log(`  → ignorar sem código:    ${problemas.semCodigo}`);
   console.log(`  → ignorar sem razão:     ${problemas.semRazao}`);
+  if (problemas.adotadosPorCnpj) {
+    console.log(`  → adotados pelo CNPJ:    ${problemas.adotadosPorCnpj} (existiam sem código; agora ganham o código do Control)`);
+  }
   console.log(`Representantes casados:     ${repPorMiolo.size} no app`);
   if (repsNaoAchados.size) {
     console.log(`\n⚠️  Códigos de representante que NÃO existem no app (cliente fica atribuído ao código, mas só aparece quando o rep for cadastrado):`);

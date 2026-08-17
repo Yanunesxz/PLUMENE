@@ -64,6 +64,53 @@ describe('clientes', () => {
     expect(filtroPorId?.args[1]).toBe('existe-1');
   });
 
+  it('ADOTA pelo CNPJ o cliente que existia sem código — a mesma loja não vira duas', async () => {
+    // O cliente veio da carga de carteira (relatório Curva ABC, sem código do
+    // Control). Quando o ERP manda o mesmo CNPJ COM código, tem de atualizar
+    // aquele cadastro e gravar o código — não criar um segundo.
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [
+        {
+          data: [{ id: 'sem-codigo-1', erp_id: null, cnpj: '22.518.613/0001-58' }],
+          error: null,
+        },
+        { data: null, error: null }, // update
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: 'C0900', razao_social: 'SENSUALLY MODA INTIMA', cnpj_cpf: '22518613000158' },
+    ]);
+
+    expect(r.criados).toBe(0);
+    expect(r.atualizados).toBe(1);
+    expect(r.avisos.some((a) => a.includes('casados pelo CNPJ'))).toBe(true);
+
+    const update = fake.gravacoes.find((g) => g.tabela === 'customers' && g.operacao === 'update');
+    // O cadastro adotado APRENDE o código — daqui em diante casa pelo caminho normal.
+    expect((update!.valores as Record<string, unknown>)['erp_id']).toBe('C0900');
+    const filtroPorId = fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id');
+    expect(filtroPorId?.args[1]).toBe('sem-codigo-1');
+  });
+
+  it('casa o código pelo miolo — "#2225", "2225" e "02225" são o mesmo cliente', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [
+        { data: [{ id: 'existe-2', erp_id: '#2225', cnpj: null }], error: null },
+        { data: null, error: null },
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '02225', razao_social: 'MESMA LOJA' },
+    ]);
+
+    expect(r.criados).toBe(0);
+    expect(r.atualizados).toBe(1);
+  });
+
   it('monta o endereço em pedaços numa linha só', async () => {
     const { service, fake } = await carregar({
       price_tables: { data: [], error: null },
