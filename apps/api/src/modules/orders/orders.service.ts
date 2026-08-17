@@ -27,6 +27,12 @@ export async function getOrders(
     // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
     // tenha quem tiver montado (ela mesma ou o representante).
     if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
+    // O financeiro recebe o que a fábrica JÁ MANDOU — aprovado e enviado ao
+    // ERP — mais os pedidos que ele próprio criar, para acompanhá-los até lá.
+    // O resto da fila (triagem, aprovação) é mesa do gerente, não dele.
+    if (role === 'financeiro') {
+      query = query.or(`status.in.(approved,sent_erp),rep_id.eq.${rep_id}`);
+    }
 
     return query;
   });
@@ -531,7 +537,10 @@ function podeMexerNoPedido(
       ? 'ok'
       : 'tarde_demais';
   }
-  if (role === 'manager' || role === 'admin') {
+  // O financeiro altera como o gerente — inclusive o já APROVADO, que é a mesa
+  // dele ("alterar os pedidos mandados mesmo pela fábrica", Yan 14/08/2026).
+  // O teto é o mesmo de todos, lá em cima: faturou ou foi pro ERP, ninguém mexe.
+  if (role === 'manager' || role === 'admin' || role === 'financeiro') {
     // Rascunho alheio fica de fora (é a montagem privada do representante) —
     // mas o gerente que monta pedido também nasce em rascunho, e o dele é dele.
     if (o.status === 'draft') return o.rep_id === user_id ? 'ok' : 'tarde_demais';

@@ -85,6 +85,12 @@ export interface OrderWithItems extends Order {
    * manda no WhatsApp quando o cliente pede. Ausente no cache offline.
    */
   public_link?: string;
+  /**
+   * Quem vendeu, já resolvido pela API no GET /orders/:id — nome e o código
+   * do representante no Control. É o que o financeiro confere antes de lançar
+   * no ERP. Ausente no cache offline.
+   */
+  rep_info?: { name: string; erp_rep_id: string | null } | null;
 }
 
 // ─── Pedido na página pública (link do e-mail) ───────────────────────────────

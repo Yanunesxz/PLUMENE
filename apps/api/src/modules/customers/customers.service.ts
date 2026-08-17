@@ -14,7 +14,7 @@ const PAGE_SIZE = 1000;
 // Só o que as telas usam. `select('*')` + o embed da tabela de preço (que nada
 // no app lia) tornava a lista de 1.353 clientes ~5× maior do que precisa.
 const CUSTOMER_COLUMNS =
-  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id';
+  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id';
 
 export async function getCustomers(
   company_id: string,

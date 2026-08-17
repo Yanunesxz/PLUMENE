@@ -35,7 +35,7 @@ const RESPOSTA: Record<MotivoUsuario, { status: number; code: string; error: str
   papel_invalido: {
     status: 400,
     code: 'VALIDATION_ERROR',
-    error: 'Papel ou permissão inválidos. Por aqui criam-se apenas administradores e gerentes.',
+    error: 'Papel ou permissão inválidos. Por aqui criam-se administradores, gerentes e financeiro.',
   },
   erro: { status: 500, code: 'ERRO', error: 'Não foi possível concluir a operação.' },
 };

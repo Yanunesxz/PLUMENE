@@ -14,6 +14,7 @@ import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { getPedidoPublico } from './publicOrder.service.js';
 import { tokenDoPedido } from './publicToken.js';
+import { supabase } from '../../config/supabase.js';
 import { env } from '../../config/env.js';
 import { getCondicoesDePagamento } from './paymentConditions.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
@@ -59,8 +60,22 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
   // O link público (o mesmo do e-mail) vai junto: é ele que o representante
   // manda no WhatsApp quando o cliente pede. O token é assinado no servidor —
   // o app não tem como montá-lo sozinho.
+  //
+  // E quem vendeu vai resolvido (nome + código no Control): é o que o
+  // financeiro confere antes de lançar no ERP. Consulta à parte, nunca um
+  // embed — o rep_id tem três chaves para users e o PostgREST se perde.
+  const { data: rep } = await supabase
+    .from('users')
+    .select('name, erp_rep_id')
+    .eq('id', order.rep_id)
+    .maybeSingle();
+
   await reply.send({
-    data: { ...order, public_link: `${env.APP_PUBLIC_URL}/pedido/${tokenDoPedido(order.id)}` },
+    data: {
+      ...order,
+      public_link: `${env.APP_PUBLIC_URL}/pedido/${tokenDoPedido(order.id)}`,
+      rep_info: (rep as { name: string; erp_rep_id: string | null } | null) ?? null,
+    },
   });
 }
 
@@ -103,6 +118,13 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   // tem uma (809 dos 1.353 estão nessa situação).
   if (role === 'rep' && body.customer_id) {
     tabela = (await tabelaDaLoja(body.customer_id, sub)) ?? tabela;
+  }
+
+  // O financeiro também monta pedido ("pode acrescentar os pedidos", Yan
+  // 14/08/2026). Ele não tem tabela própria: o preço vem do cadastro do
+  // cliente, sem cair para tabela de ninguém.
+  if (role === 'financeiro' && body.customer_id) {
+    tabela = (await tabelaDaLoja(body.customer_id, null)) ?? tabela;
   }
 
   if (role === 'store') {

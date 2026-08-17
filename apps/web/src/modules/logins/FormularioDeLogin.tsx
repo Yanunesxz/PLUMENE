@@ -32,13 +32,20 @@ interface Props {
 export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancelar }: Props) {
   // Papel que não se cria por aqui (rep, loja) fica travado: o formulário edita
   // nome, e-mail e senha desses logins, mas não os transforma em gerente.
-  const papelFixo = editando !== null && editando.role !== 'admin' && editando.role !== 'manager';
+  const papelFixo =
+    editando !== null &&
+    editando.role !== 'admin' &&
+    editando.role !== 'manager' &&
+    editando.role !== 'financeiro';
 
   const [form, setForm] = useState<DadosDoFormulario>({
     name: editando?.name ?? '',
     email: editando?.email ?? '',
     password: '',
-    role: editando?.role === 'admin' ? 'admin' : 'manager',
+    role:
+      editando?.role === 'admin' || editando?.role === 'financeiro'
+        ? editando.role
+        : 'manager',
     permissions: editando
       ? TODAS_PERMISSOES.filter((t) => temPermissao('manager', editando.permissions, t))
       : [...PERMISSOES_PADRAO_GERENTE],
@@ -88,7 +95,7 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
         {!papelFixo && (
           <Campo label="Papel" obrigatorio>
             <div className="flex gap-2">
-              {(['manager', 'admin'] as const).map((papel) => (
+              {(['manager', 'financeiro', 'admin'] as const).map((papel) => (
                 <button
                   key={papel}
                   type="button"

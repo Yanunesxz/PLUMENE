@@ -66,6 +66,9 @@ export interface CustomerListItem
     // uma segunda requisição por cartão; o rep com duas tabelas ou mais precisa
     // ver isso na lista para saber o que está prestes a mudar.
     | 'price_table_id'
+    // O código do cliente NO CONTROL. Pesa ~5 caracteres e é o que o
+    // financeiro confere no pedido antes de lançar no ERP.
+    | 'erp_id'
   > {}
 
 /** Dados mínimos para um representante cadastrar um cliente no app. */

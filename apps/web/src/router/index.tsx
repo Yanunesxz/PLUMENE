@@ -53,6 +53,16 @@ function MinhaArea() {
   return <PaginaMinhaArea />;
 }
 
+/**
+ * A porta de entrada muda com o papel: o financeiro cai direto nos PEDIDOS —
+ * é a mesa de trabalho dele ("depois de aprovado pela fábrica cai no
+ * financeiro"). Os demais seguem no catálogo, como sempre foi.
+ */
+function Inicio() {
+  const papel = useAuthStore((s) => s.user?.role);
+  return <Navigate to={papel === 'financeiro' ? '/orders' : '/catalog'} replace />;
+}
+
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
     path: '/login',
@@ -77,7 +87,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
       {
         element: <AppLayout />,
         children: [
-          { index: true, element: <Navigate to="/catalog" replace /> },
+          { index: true, element: <Inicio /> },
           { path: 'minha-area', element: <MinhaArea /> },
           { path: 'catalog', element: <PaginaCatalogo /> },
           { path: 'orders', element: <PaginaPedidos /> },
@@ -99,8 +109,10 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             children: [{ index: true, element: <AoCarregar><PaginaPainel /></AoCarregar> }],
           },
           {
+            // O financeiro entra para VER (a tecla não se aplica a ele e a API
+            // nega as escritas); a tela esconde os botões de mexer.
             path: 'representantes',
-            element: <PrivateRoute roles={['manager', 'admin']} permissao="gerenciar_representantes" />,
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro']} permissao="gerenciar_representantes" />,
             children: [{ index: true, element: <AoCarregar><PaginaRepresentantes /></AoCarregar> }],
           },
           // Era `roles={['admin']}`: o admin continua entrando sempre (tecla não

@@ -38,7 +38,10 @@ export function PaginaDetalhePedido() {
   // "acesso negado" no toque. Quem protege de verdade é a API.
   const podeFaturar = usePermissao('faturar_pedidos');
   const podeAprovar = usePermissao('aprovar_pedidos');
-  const canInvoice = (user?.role === 'manager' || user?.role === 'admin') && podeFaturar;
+  // O financeiro fatura — é a razão de ele existir ("quem aceita os pedidos").
+  const canInvoice =
+    (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
+    podeFaturar;
   // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
   // dois), então os botões não aparecem em vez de responder 403 no toque.
   const ehLoja = user?.role === 'store';
@@ -82,7 +85,7 @@ export function PaginaDetalhePedido() {
         order.status === 'draft' ||
         order.status === 'pending_rep' ||
         order.status === 'pending_approval'
-      : (user?.role === 'manager' || user?.role === 'admin') &&
+      : (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
         (order.status === 'pending_rep' ||
           order.status === 'pending_approval' ||
           order.status === 'approved' ||
@@ -296,6 +299,12 @@ export function PaginaDetalhePedido() {
     return m;
   }, [customers]);
 
+  // O código do cliente NO CONTROL — vem do cache de clientes (agora carrega o
+  // erp_id). Cliente criado no app ainda sem código = linha não aparece.
+  const codigoDoCliente = order?.customer_id
+    ? ((customers ?? []).find((c) => c.id === order.customer_id)?.erp_id ?? null)
+    : null;
+
   // Ref crescente e, na mesma ref, a ordem da grade — a ordem do catálogo
   // impresso, que é como se confere um pedido. Do banco os itens chegam na
   // ordem em que foram gravados, que não diz nada.
@@ -436,6 +445,27 @@ export function PaginaDetalhePedido() {
                 year: 'numeric',
               })}
             </p>
+
+            {/* Quem vendeu e os códigos no Control — o que o financeiro confere
+                antes de lançar no ERP. A loja não precisa disso. */}
+            {!ehLoja && (order.rep_info || codigoDoCliente) && (
+              <p className="mt-1 text-xs text-muted-foreground">
+                {order.rep_info && (
+                  <>
+                    Representante:{' '}
+                    <span className="font-medium text-foreground">{order.rep_info.name}</span>
+                    {order.rep_info.erp_rep_id ? ` (cód. ${order.rep_info.erp_rep_id})` : ''}
+                  </>
+                )}
+                {order.rep_info && codigoDoCliente ? ' · ' : ''}
+                {codigoDoCliente && (
+                  <>
+                    Cód. cliente no ERP:{' '}
+                    <span className="font-medium text-foreground">{codigoDoCliente}</span>
+                  </>
+                )}
+              </p>
+            )}
 
             {/* Editável enquanto o pedido está ao alcance de quem olha — o
                 gerente corrige a condição sem devolver o pedido pro rep. */}

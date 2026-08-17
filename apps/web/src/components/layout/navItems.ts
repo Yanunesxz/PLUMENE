@@ -54,6 +54,17 @@ const adminItems: NavItem[] = [
   { to: '/logins', label: 'Logins', icon: ShieldCheck },
 ];
 
+// O financeiro recebe o que a fábrica aprovou: fatura, ajusta pedido quando
+// precisa e confere cadastros. Clientes e representantes são LEITURA (a API
+// nega escrita); a área dele traz o botão de atualizar o app.
+const financeiroItems: NavItem[] = [
+  { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Gauge },
+  { to: '/orders', label: 'Pedidos', icon: ClipboardList },
+  { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
+  { to: '/customers', label: 'Clientes', icon: Users },
+  { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
+];
+
 export function navItemsForRole(
   role: UserRole | undefined,
   permissions?: PermissaoGerente[] | null,
@@ -62,6 +73,7 @@ export function navItemsForRole(
   if (daFabrica && role) {
     return daFabrica.filter((i) => !i.permissao || temPermissao(role, permissions ?? null, i.permissao));
   }
+  if (role === 'financeiro') return financeiroItems;
   if (role === 'store') return storeItems;
   return repItems;
 }

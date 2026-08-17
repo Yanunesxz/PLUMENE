@@ -20,6 +20,7 @@ import type {
 const GRUPOS: Array<{ papel: UserRole; titulo: string }> = [
   { papel: 'admin', titulo: 'Administradores' },
   { papel: 'manager', titulo: 'Gerentes' },
+  { papel: 'financeiro', titulo: 'Financeiro' },
   { papel: 'rep', titulo: 'Representantes' },
   { papel: 'store', titulo: 'Lojas' },
 ];
@@ -83,7 +84,10 @@ export function PaginaLogins() {
     setSalvando(true);
     try {
       if (form.editando) {
-        const daFabrica = form.editando.role === 'admin' || form.editando.role === 'manager';
+        const daFabrica =
+          form.editando.role === 'admin' ||
+          form.editando.role === 'manager' ||
+          form.editando.role === 'financeiro';
         const corpo: AtualizarUsuarioRequest = {
           name: dados.name,
           email: dados.email,

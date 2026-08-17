@@ -119,8 +119,9 @@ export interface UpdateRepRequest {
 // ─── Controle de logins (admin) ───────────────────────────────────────────────
 // Papéis que o admin cria por aqui. Representante nasce em `/reps` (precisa de
 // CPF, tabela e código ERP) e loja nasce por convite — ter dois lugares
-// criando a mesma coisa é como um deles fica esquecido.
-export type PapelGerenciavel = Extract<UserRole, 'admin' | 'manager'>;
+// criando a mesma coisa é como um deles fica esquecido. O financeiro entrou
+// na migração 030: login da fábrica, criado como os outros.
+export type PapelGerenciavel = Extract<UserRole, 'admin' | 'manager' | 'financeiro'>;
 
 /** Um login na tela do admin. Nunca carrega hash de senha. */
 export interface UsuarioListItem {

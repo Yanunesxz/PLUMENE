@@ -147,7 +147,8 @@ export function PaginaCliente() {
             </p>
           )}
         </div>
-        {tabelas.length >= 2 && (
+        {/* O financeiro não troca tabela de cliente — cadastro é leitura pra ele. */}
+        {tabelas.length >= 2 && user?.role !== 'financeiro' && (
           <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
             Trocar
           </Button>
@@ -214,6 +215,8 @@ export function PaginaCliente() {
             credit_limit: cliente.credit_limit,
             whatsapp: cliente.whatsapp,
             price_table_id: cliente.price_table_id,
+            // A ficha não carrega o código do ERP e a troca de tabela não o usa.
+            erp_id: null,
           }}
           tabelas={tabelas}
           nomeDe={nomeDe}

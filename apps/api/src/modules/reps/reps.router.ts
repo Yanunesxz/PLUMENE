@@ -13,7 +13,10 @@ import {
 } from './reps.controller.js';
 
 export async function repsRouter(fastify: FastifyInstance): Promise<void> {
-  const guard = { preHandler: [authenticate, requireRole(['manager', 'admin'])] };
+  // O financeiro entra nas LEITURAS: ele visualiza o cadastro dos
+  // representantes (e precisa dos nomes na tela de pedidos), mas não cria,
+  // não edita e não apaga — as escritas ficam com o `podeGerenciar` abaixo.
+  const guard = { preHandler: [authenticate, requireRole(['manager', 'admin', 'financeiro'])] };
 
   // Escrever no cadastro de representante (e na meta dele) exige a tecla. LER
   // não exige, e isso é deliberado: outras telas consomem `GET /reps` e
@@ -40,7 +43,7 @@ export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   // é a meta, então não existe pedir a do colega.
   fastify.get(
     '/minha-meta',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] },
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
     minhaMetaHandler,
   );
 
@@ -49,7 +52,7 @@ export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   // Gerente e admin recebem todas — são eles que atribuem.
   fastify.get(
     '/price-tables/minhas',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] },
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
     minhasPriceTablesHandler,
   );
 }

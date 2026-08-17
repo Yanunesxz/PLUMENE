@@ -40,7 +40,7 @@ export async function getCustomerHandler(request: FastifyRequest, reply: Fastify
   const cliente = await obterCliente(company_id, id, {
     rep_id,
     erp_rep_id: erp_rep_id ?? null,
-    irrestrito: role === 'manager' || role === 'admin',
+    irrestrito: role === 'manager' || role === 'admin' || role === 'financeiro',
   });
 
   if (!cliente) {
@@ -141,7 +141,7 @@ export async function trocarTabelaDoClienteHandler(
   const resultado = await atualizarTabelaDoCliente(company_id, id, tabela.price_table_id, {
     rep_id,
     erp_rep_id: erp_rep_id ?? null,
-    irrestrito: role === 'manager' || role === 'admin',
+    irrestrito: role === 'manager' || role === 'admin' || role === 'financeiro',
   });
 
   if (!resultado.ok) {

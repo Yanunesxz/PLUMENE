@@ -33,7 +33,10 @@ const EMPTY = {
 };
 
 export function PaginaRepresentantes() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
+  // O financeiro entra para VER — a API nega as escritas dele, e a tela não
+  // mostra botão que só responderia "acesso negado" no toque.
+  const somenteLeitura = user?.role === 'financeiro';
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [tables, setTables] = useState<PriceTable[]>([]);
   const [showForm, setShowForm] = useState(false);
@@ -250,10 +253,12 @@ export function PaginaRepresentantes() {
           <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Representantes</h1>
           {reps && <p className="text-sm text-muted-foreground">{reps.length} cadastrados</p>}
         </div>
-        <Button size="md" onClick={() => (showForm ? closeForm() : startCreate())}>
-          {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
-          {showForm ? 'Cancelar' : 'Novo representante'}
-        </Button>
+        {!somenteLeitura && (
+          <Button size="md" onClick={() => (showForm ? closeForm() : startCreate())}>
+            {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
+            {showForm ? 'Cancelar' : 'Novo representante'}
+          </Button>
+        )}
       </div>
 
       {metaDe && (
@@ -465,32 +470,36 @@ export function PaginaRepresentantes() {
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
                   {!rep.active && <Badge variant="gray">Inativo</Badge>}
-                  <button
-                    type="button"
-                    onClick={() => setMetaDe({ id: rep.id, name: rep.name })}
-                    aria-label={`Meta de ${rep.name}`}
-                    title="Meta de bonificação"
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Target className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(rep)}
-                    aria-label={`Editar ${rep.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete(rep)}
-                    disabled={deletingId === rep.id}
-                    aria-label={`Excluir ${rep.name}`}
-                    className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  {!somenteLeitura && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => setMetaDe({ id: rep.id, name: rep.name })}
+                        aria-label={`Meta de ${rep.name}`}
+                        title="Meta de bonificação"
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Target className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(rep)}
+                        aria-label={`Editar ${rep.name}`}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void handleDelete(rep)}
+                        disabled={deletingId === rep.id}
+                        aria-label={`Excluir ${rep.name}`}
+                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 

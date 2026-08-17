@@ -69,7 +69,9 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStat
 
 export function PaginaPedidos() {
   const { token, hasRole, user } = useAuthStore();
-  const isManager = hasRole('manager', 'admin');
+  // O financeiro anda com a fábrica aqui: mesmos filtros, mesmo filtro por
+  // representante (a API já limita a lista dele aos aprovados + os próprios).
+  const isManager = hasRole('manager', 'admin', 'financeiro');
   const ehLoja = hasRole('store');
   const STATUS_FILTERS = useMemo(
     () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep'),

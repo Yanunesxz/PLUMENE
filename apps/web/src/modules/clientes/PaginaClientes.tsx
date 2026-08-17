@@ -29,7 +29,7 @@ import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/
 const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
 
 export function PaginaClientes() {
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
   const navigate = useNavigate();
   const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
   const [search, setSearch] = useState('');
@@ -161,10 +161,13 @@ export function PaginaClientes() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Clientes</h1>
-        <Button size="md" onClick={() => setShowForm((s) => !s)}>
-          {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
-          {showForm ? 'Cancelar' : 'Novo cliente'}
-        </Button>
+        {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. */}
+        {user?.role !== 'financeiro' && (
+          <Button size="md" onClick={() => setShowForm((s) => !s)}>
+            {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
+            {showForm ? 'Cancelar' : 'Novo cliente'}
+          </Button>
+        )}
       </div>
 
       {showForm && (
