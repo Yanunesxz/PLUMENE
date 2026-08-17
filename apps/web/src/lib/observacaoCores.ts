@@ -80,3 +80,42 @@ export function semLinhasDeCor(
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+/**
+ * Lê de volta as cores que `observacaoDeCores` escreveu nas notas do pedido e
+ * resume UMA observação por referência, para a coluna B da planilha.
+ *
+ * Por que ler das notas: nas peças com as bolinhas de cor do catálogo, a cor
+ * escolhida NÃO muda o produto — o item do pedido vai sortido e a escolha só
+ * existe nessas linhas de texto. É a única memória que o pedido guarda dela
+ * (o ERP recebe tudo como sortido, ver o topo deste arquivo).
+ *
+ * Uma cor só → o nome dela ("azul"). Cores diferentes por tamanho → o detalhe
+ * inteiro ("3M azul / 2G rosa"), porque é isso que a separação precisa saber.
+ */
+export function coresPorSku(
+  texto: string | null | undefined,
+  skusDoPedido: ReadonlySet<string>,
+): Map<string, string> {
+  const porSku = new Map<string, Array<{ qtdTam: string; cor: string }>>();
+  for (const linha of (texto ?? '').split('\n')) {
+    const [sku, qtdTam, ...resto] = linha.trim().split(/\s+/);
+    if (!sku || !qtdTam || !skusDoPedido.has(sku)) continue;
+    if (!/^\d+\S*$/.test(qtdTam) || resto.length === 0) continue;
+    const lista = porSku.get(sku) ?? [];
+    lista.push({ qtdTam, cor: resto.join(' ') });
+    porSku.set(sku, lista);
+  }
+
+  const resumo = new Map<string, string>();
+  for (const [sku, linhas] of porSku) {
+    const cores = [...new Set(linhas.map((l) => l.cor))];
+    resumo.set(
+      sku,
+      cores.length === 1
+        ? cores[0]!
+        : linhas.map((l) => `${l.qtdTam} ${l.cor}`).join(' / '),
+    );
+  }
+  return resumo;
+}

@@ -1,7 +1,7 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
 import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.js';
-import { semLinhasDeCor } from './observacaoCores.js';
+import { semLinhasDeCor, coresPorSku } from './observacaoCores.js';
 import type { NumeroDaTabela } from './planilha/tabela.js';
 import type { OrderWithItems } from '@csb/shared';
 
@@ -104,21 +104,35 @@ async function gerarArquivosDoPedido(
       semTamanho.push(`${sku} sem tamanho no pedido`);
       continue;
     }
-    // A OBSERVAÇÃO da linha: a cor escolhida — e "Variado" quando a peça é
-    // sortida (sem cor no cadastro). É o que a fábrica lê na separação. Só
-    // quando o chamador forneceu o mapa de cores; sem ele, coluna em branco.
+    // A cor do CADASTRO (peça que é um produto por cor). A cor escolhida nas
+    // bolinhas do catálogo não mora aqui — vem das notas, logo abaixo.
     const cor = contexto.corDoProduto?.get(item.product_id)?.trim();
     itens.push({
       sku,
       size,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      observacao: contexto.corDoProduto ? (cor || 'Variado') : undefined,
+      observacao: cor || undefined,
     });
   }
 
   for (const motivo of semTamanho) {
     avisos.push(`Pedido ${numero}: ${motivo} — não entrou na planilha.`);
+  }
+
+  // A OBSERVAÇÃO da linha, na ordem do que se sabe sobre a cor:
+  //   1. a cor escolhida nas bolinhas do catálogo — só existe nas NOTAS do
+  //      pedido (o item vai sortido pro ERP; as linhas "0706 6M azul" são a
+  //      única memória da escolha);
+  //   2. a cor do cadastro do produto (peça que é um produto por cor);
+  //   3. "Variado" — sortida de verdade, para a separação nunca ficar sem
+  //      resposta. Só quando o chamador forneceu o mapa de cores.
+  const skusDoPedido = new Set(itens.map((i) => i.sku));
+  const corDasNotas = coresPorSku(pedido.notes, skusDoPedido);
+  if (contexto.corDoProduto) {
+    for (const item of itens) {
+      item.observacao = corDasNotas.get(item.sku) ?? item.observacao ?? 'Variado';
+    }
   }
 
   const { linhas, foraDaGrade } = montarLinhas(itens);
@@ -148,9 +162,8 @@ async function gerarArquivosDoPedido(
   const dataDoPedido = new Date(pedido.created_at).toLocaleDateString('pt-BR');
 
   // O rodapé fica com o que o REPRESENTANTE digitou (remessas, boletos…). As
-  // linhas de cor que o app anexou às notas saem daqui: desde 14/08/2026 a cor
-  // vive na coluna OBSERVAÇÃO de cada linha, e dobrada confundiria a separação.
-  const skusDoPedido = new Set(itens.map((i) => i.sku));
+  // linhas de cor que o app anexou às notas saem daqui: a cor agora vive na
+  // coluna OBSERVAÇÃO de cada linha, e dobrada confundiria a separação.
   const notasDoRep = semLinhasDeCor(pedido.notes, skusDoPedido);
 
   return folhas.map((folha, indice) => {

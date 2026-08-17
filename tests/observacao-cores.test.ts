@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { observacaoDeCores, juntarObservacao, semLinhasDeCor } from '../apps/web/src/lib/observacaoCores.js';
+import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../apps/web/src/lib/observacaoCores.js';
 
 /**
  * A cor escolhida não cabe no item do pedido: o ERP recebe tudo como sortido
@@ -86,5 +86,35 @@ describe('semLinhasDeCor — o rodapé da planilha fica só com o que o rep digi
   it('só as cores, sem texto do rep, vira rodapé vazio', () => {
     expect(semLinhasDeCor('0015 3M azul\n0130 2G rosa', skus)).toBe('');
     expect(semLinhasDeCor(null, skus)).toBe('');
+  });
+});
+
+describe('coresPorSku — a cor escolhida nas bolinhas volta das notas para a linha', () => {
+  const skus = new Set(['0706', '0015']);
+
+  it('uma cor só vira o nome dela, limpo', () => {
+    // O caso do pedido 14572: 0706 6M azul + 6G azul → a linha diz "azul".
+    const notas = '0706 6M azul\n0706 6G azul';
+    expect(coresPorSku(notas, skus).get('0706')).toBe('azul');
+  });
+
+  it('cores diferentes por tamanho saem detalhadas', () => {
+    const notas = '0015 3M azul\n0015 2G rosa';
+    expect(coresPorSku(notas, skus).get('0015')).toBe('3M azul / 2G rosa');
+  });
+
+  it('recado do rep e ref sem linha de cor não entram', () => {
+    const resumo = coresPorSku('entregar até sexta\n0706 vai na segunda remessa', skus);
+    expect(resumo.size).toBe(0);
+  });
+
+  it('fecha o ciclo: o que observacaoDeCores escreve, coresPorSku lê de volta', () => {
+    const cores = observacaoDeCores([
+      { sku: '0706', size: 'M', quantity: 6, color_code: '01', color_name: 'azul' },
+      { sku: '0706', size: 'G', quantity: 6, color_code: '01', color_name: 'azul' },
+    ]);
+    const notas = juntarObservacao('FATURAR EM 2 REMESSAS', cores)!;
+    expect(coresPorSku(notas, skus).get('0706')).toBe('azul');
+    expect(semLinhasDeCor(notas, skus)).toBe('FATURAR EM 2 REMESSAS');
   });
 });
