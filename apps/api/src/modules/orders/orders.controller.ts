@@ -105,7 +105,11 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   // o representante recebe o próprio.
   const destinatario = role === 'store' || role === 'guest' ? (dono ?? sub) : sub;
 
-  let origem: OrigemPedido = { source: 'rep', created_by: sub };
+  let origem: OrigemPedido = {
+    source: 'rep',
+    created_by: sub,
+    venda_interna: request.user.venda_interna === true,
+  };
   let tabela = price_table_id ?? null;
   let corpo = body;
 
@@ -231,12 +235,25 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
 }
 
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id } = request.user;
+  const { company_id, role, sub, venda_interna } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(setInvoicedSchema, request.body, reply);
   if (!body) return;
 
-  const order = await setOrderInvoiced(id, company_id, body.invoiced);
+  // Representante comum não fatura — só o de VENDA INTERNA, e só o pedido
+  // dele (o balcão fecha a própria venda; a dos colegas é da fábrica).
+  if (role === 'rep' && venda_interna !== true) {
+    await reply.status(403).send({
+      error: 'Faturar é do financeiro e da fábrica — ou da venda interna, nos próprios pedidos.',
+      code: 'PERMISSAO_NEGADA',
+      statusCode: 403,
+    });
+    return;
+  }
+
+  const order = await setOrderInvoiced(id, company_id, body.invoiced, {
+    somenteDoRep: role === 'rep' ? sub : null,
+  });
   if (!order) {
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
@@ -250,7 +267,7 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
   const body = await parseBody(setDiscountSchema, request.body, reply);
   if (!body) return;
 
-  const result = await setOrderDiscount(id, company_id, rep_id, role, body.desconto);
+  const result = await setOrderDiscount(id, company_id, rep_id, role, body.desconto, request.user.venda_interna === true);
   if (result.ok) {
     await reply.send({ data: result.order });
     return;
@@ -289,7 +306,7 @@ export async function setPaymentHandler(request: FastifyRequest, reply: FastifyR
   const body = await parseBody(setPaymentSchema, request.body, reply);
   if (!body) return;
 
-  const result = await setOrderPayment(id, company_id, sub, role, body.payment_condition_id);
+  const result = await setOrderPayment(id, company_id, sub, role, body.payment_condition_id, request.user.venda_interna === true);
   if (result.ok) {
     await reply.send({ data: result.order });
     return;
@@ -335,7 +352,7 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
   const body = await parseBody(setOrderItemsSchema, request.body, reply);
   if (!body) return;
 
-  const result = await setOrderItems(id, company_id, sub, role, body.items);
+  const result = await setOrderItems(id, company_id, sub, role, body.items, request.user.venda_interna === true);
   if (result.ok) {
     await reply.send({ data: result.order });
     return;
@@ -382,7 +399,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   if (!body) return;
 
   try {
-    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' }, role);
+    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' }, role, request.user.venda_interna === true);
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
       return;

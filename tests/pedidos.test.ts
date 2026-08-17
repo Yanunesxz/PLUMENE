@@ -130,8 +130,12 @@ describe('criação de pedido', () => {
 });
 
 describe('transições de status', () => {
-  it('rascunho só pode ir para aprovação', () => {
-    expect(ORDER_STATUS_FLOW.draft).toEqual(['pending_approval']);
+  it('rascunho vai para a fila — ou direto a aprovado, que é a VENDA INTERNA', () => {
+    // O `approved` direto do rascunho existe para a venda interna (031): o
+    // balcão não pede licença à fábrica. Quem NÃO é venda interna continua
+    // barrado pelo portão de papel no updateOrderStatus — o mapa diz o que é
+    // possível, o portão diz quem pode.
+    expect(ORDER_STATUS_FLOW.draft).toEqual(['pending_approval', 'approved']);
   });
 
   it('aguardando aprovação vira aprovado ou recusado', () => {

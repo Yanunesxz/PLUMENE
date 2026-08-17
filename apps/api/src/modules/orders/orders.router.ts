@@ -76,7 +76,7 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     {
       preHandler: [
         authenticate,
-        requireRole(['manager', 'admin', 'financeiro']),
+        requireRole(['manager', 'admin', 'financeiro', 'rep']),
         requirePermission('faturar_pedidos'),
       ],
     },

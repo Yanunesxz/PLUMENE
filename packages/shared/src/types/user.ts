@@ -26,6 +26,8 @@ export interface User {
    * clientes que ele mesmo cadastrou no app.
    */
   erp_rep_id?: string | null;
+  /** Venda interna (migração 031): pedido nasce aprovado e ele mesmo fatura. */
+  venda_interna?: boolean;
   /** Loja: o cliente que este login representa. Nulo nos demais papéis. */
   customer_id?: string | null;
   /** Loja: o representante que convidou e que recebe os pedidos dela. */
@@ -57,6 +59,12 @@ export interface AuthPayload {
    * Para admin/manager/rep é nulo — o dono é o próprio `sub`.
    */
   rep_id?: string | null;
+  /**
+   * Representante de VENDA INTERNA (migração 031): o pedido dele nasce
+   * aprovado — venda de balcão não pede aprovação da fábrica — e ele mesmo
+   * marca o faturado. Ausente/false = representante comum.
+   */
+  venda_interna?: boolean;
   /** Teclas do gerente, para o guard não precisar ir ao banco a cada requisição. */
   permissions?: PermissaoGerente[] | null;
 }
@@ -81,6 +89,8 @@ export interface RepListItem {
   price_table_ids: string[];
   /** Código do rep no ERP — define a carteira de clientes que ele enxerga. */
   erp_rep_id: string | null;
+  /** Venda interna: pedido nasce aprovado e ele mesmo fatura (migração 031). */
+  venda_interna?: boolean;
   created_at: string;
 }
 
@@ -98,6 +108,8 @@ export interface CreateRepRequest {
   phone?: string | null;
   /** Código do rep no ERP (ex.: "00779"). Sem ele, o rep não recebe carteira. */
   erp_rep_id?: string | null;
+  /** Venda interna: pedido nasce aprovado, sem passar pela fábrica. */
+  venda_interna?: boolean;
 }
 
 /** Edição de representante — todos os campos opcionais (envia só o que mudou). */
@@ -112,6 +124,8 @@ export interface UpdateRepRequest {
   phone?: string | null;
   active?: boolean;
   erp_rep_id?: string | null;
+  /** Venda interna: pedido nasce aprovado, sem passar pela fábrica. */
+  venda_interna?: boolean;
   /** Se preenchida, redefine a senha; em branco/ausente, mantém a atual. */
   password?: string;
 }

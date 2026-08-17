@@ -215,6 +215,11 @@ export interface OrigemPedido {
   guest_name?: string | null;
   guest_whatsapp?: string | null;
   /**
+   * Representante de VENDA INTERNA (migração 031): o pedido enviado nasce
+   * APROVADO — venda de balcão não passa pela fila da fábrica. Vem do token.
+   */
+  venda_interna?: boolean;
+  /**
    * Quem apertou enviar. Para a loja é o usuário dela; para a vitrine não há
    * usuário, então fica o representante dono do link. `rep_id` continua sendo
    * quem RECEBE o pedido — os dois só coincidem no caminho do representante.
@@ -328,7 +333,11 @@ export async function createOrder(
   const statusInicial: Order['status'] =
     origem.source === 'rep'
       ? body.submit
-        ? 'pending_approval'
+        ? // Venda interna nasce APROVADA: o balcão não pede licença à fábrica.
+          // "Faturado" segue sendo o carimbo de sempre, nunca um status.
+          origem.venda_interna
+          ? 'approved'
+          : 'pending_approval'
         : 'draft'
       : temTriagem
         ? 'pending_rep'
@@ -469,6 +478,7 @@ export async function setOrderDiscount(
   rep_id: string,
   role: AuthRole,
   percent: number,
+  vendaInterna = false,
 ): Promise<DescontoResult> {
   const { data: order } = await supabase
     .from('orders')
@@ -480,7 +490,7 @@ export async function setOrderDiscount(
   if (!order) return { ok: false, reason: 'not_found' };
   const o = order as unknown as Order;
 
-  const acesso = podeMexerNoPedido(o, role, rep_id);
+  const acesso = podeMexerNoPedido(o, role, rep_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   const { data: itens } = await supabase
@@ -527,12 +537,16 @@ function podeMexerNoPedido(
   o: Order,
   role: AuthRole,
   user_id: string,
+  vendaInterna = false,
 ): 'ok' | 'forbidden' | 'tarde_demais' {
   if (o.invoiced || o.status === 'sent_erp' || o.status === 'rejected' || o.status === 'error_erp') {
     return 'tarde_demais';
   }
   if (role === 'rep') {
     if (o.rep_id !== user_id) return 'forbidden';
+    // VENDA INTERNA (031): o pedido dele NASCE aprovado — a janela de ajuste
+    // vai até o carimbo do faturamento (o teto lá em cima), como a do gerente.
+    if (vendaInterna && o.status === 'approved') return 'ok';
     return o.status === 'draft' || o.status === 'pending_rep' || o.status === 'pending_approval'
       ? 'ok'
       : 'tarde_demais';
@@ -580,6 +594,7 @@ export async function setOrderItems(
   user_id: string,
   role: AuthRole,
   itens: ItemEditado[],
+  vendaInterna = false,
 ): Promise<EditarPecasResult> {
   // `select('*')` de propósito: traz `price_table_id` (025) e `discount_percent`
   // (029) quando existem, sem quebrar quando a migração ainda não rodou.
@@ -593,7 +608,7 @@ export async function setOrderItems(
   if (!order) return { ok: false, reason: 'not_found' };
   const o = order as Order;
 
-  const acesso = podeMexerNoPedido(o, role, user_id);
+  const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
@@ -707,6 +722,7 @@ export async function setOrderPayment(
   user_id: string,
   role: AuthRole,
   payment_condition_id: string | null,
+  vendaInterna = false,
 ): Promise<PagamentoResult> {
   const { data: order } = await supabase
     .from('orders')
@@ -718,7 +734,7 @@ export async function setOrderPayment(
   if (!order) return { ok: false, reason: 'not_found' };
   const o = order as unknown as Order;
 
-  const acesso = podeMexerNoPedido(o, role, user_id);
+  const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   if (!(await detectarColunaDaCondicao())) return { ok: false, reason: 'sem_coluna' };
@@ -745,8 +761,12 @@ export async function setOrderInvoiced(
   id: string,
   company_id: string,
   invoiced: boolean,
+  opcoes: {
+    /** Venda interna: o rep só carimba o PRÓPRIO pedido. Nulo = sem restrição. */
+    somenteDoRep?: string | null;
+  } = {},
 ): Promise<Order | null> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('orders')
     .update({
       invoiced,
@@ -754,9 +774,11 @@ export async function setOrderInvoiced(
       updated_at: new Date().toISOString(),
     })
     .eq('id', id)
-    .eq('company_id', company_id)
-    .select()
-    .maybeSingle();
+    .eq('company_id', company_id);
+
+  if (opcoes.somenteDoRep) query = query.eq('rep_id', opcoes.somenteDoRep);
+
+  const { data, error } = await query.select().maybeSingle();
 
   if (error || !data) return null;
   return data as Order;
@@ -768,6 +790,7 @@ export async function updateOrderStatus(
   approverId: string,
   body: UpdateOrderStatusRequest,
   role?: AuthRole,
+  vendaInterna = false,
 ): Promise<Order | null> {
   const { data: current, error: currentError } = await supabase
     .from('orders')
@@ -791,7 +814,11 @@ export async function updateOrderStatus(
   // nunca sai da mão dele, e recusar fora da triagem seria o representante
   // derrubando um pedido que o gerente já tem na mesa.
   if (role === 'rep') {
-    const forcandoAprovacao = body.status === 'approved';
+    // VENDA INTERNA aprova o PRÓPRIO rascunho: o balcão não passa pela fila da
+    // fábrica (migração 031). Só do rascunho — o resto do ciclo segue igual.
+    const aprovandoVendaInterna =
+      vendaInterna && body.status === 'approved' && row.status === 'draft';
+    const forcandoAprovacao = body.status === 'approved' && !aprovandoVendaInterna;
     const recusandoForaDaTriagem = body.status === 'rejected' && row.status !== 'pending_rep';
     if (forcandoAprovacao || recusandoForaDaTriagem) {
       throw new Error('FORBIDDEN_ROLE');

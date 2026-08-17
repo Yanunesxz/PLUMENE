@@ -46,8 +46,21 @@ async function detectarErpRepId(): Promise<boolean> {
   return temErpRepId;
 }
 
+/** `users.venda_interna` vem da migração 031 — mesmo cuidado da 012 acima. */
+let temVendaInterna: boolean | null = null;
+
+async function detectarVendaInterna(): Promise<boolean> {
+  if (temVendaInterna !== null) return temVendaInterna;
+  const { error } = await supabase.from('users').select('venda_interna').limit(1);
+  temVendaInterna = !error;
+  return temVendaInterna;
+}
+
 async function repSelect(): Promise<string> {
-  return (await detectarErpRepId()) ? `${REP_BASE}, erp_rep_id` : REP_BASE;
+  let colunas = REP_BASE;
+  if (await detectarErpRepId()) colunas += ', erp_rep_id';
+  if (await detectarVendaInterna()) colunas += ', venda_interna';
+  return colunas;
 }
 
 // rep_price_tables vem da migração 018 — mesmo cuidado do erp_rep_id acima: até
@@ -285,6 +298,7 @@ export async function createRep(
       phone: body.phone?.trim() || null,
       price_table_id: padrao,
       ...((await detectarErpRepId()) ? { erp_rep_id: body.erp_rep_id?.trim() || null } : {}),
+      ...((await detectarVendaInterna()) ? { venda_interna: body.venda_interna === true } : {}),
     })
     .select(await repSelect())
     .single();
@@ -391,6 +405,9 @@ export async function updateRep(
     conjuntoNovo = conjunto;
   } else if (body.price_table_id !== undefined) {
     update.price_table_id = body.price_table_id || null;
+  }
+  if (body.venda_interna !== undefined && (await detectarVendaInterna())) {
+    update.venda_interna = body.venda_interna === true;
   }
   if (body.erp_rep_id !== undefined && (await detectarErpRepId())) {
     update.erp_rep_id = body.erp_rep_id?.trim() || null;

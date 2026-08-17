@@ -28,6 +28,8 @@ const EMPTY = {
   password: '',
   erp_rep_id: '',
   active: true,
+  /** Venda interna: pedido nasce aprovado e ele mesmo fatura (migração 031). */
+  venda_interna: false,
   /** Tabelas que ele pode atribuir a um cliente. Sempre contém price_table_id. */
   price_table_ids: [] as string[],
 };
@@ -114,6 +116,7 @@ export function PaginaRepresentantes() {
       password: '',
       erp_rep_id: rep.erp_rep_id ?? '',
       active: rep.active,
+      venda_interna: rep.venda_interna === true,
       // Rep antigo (antes da 018) chega sem conjunto: cai na tabela única dele.
       price_table_ids: rep.price_table_ids?.length
         ? rep.price_table_ids
@@ -199,6 +202,7 @@ export function PaginaRepresentantes() {
           phone: form.phone || null,
           erp_rep_id: form.erp_rep_id || null,
           active: form.active,
+          venda_interna: form.venda_interna,
           ...(form.password ? { password: form.password } : {}),
         };
         const res = await api.patch<ApiResponse<RepListItem> & { aviso?: string }>(
@@ -223,6 +227,7 @@ export function PaginaRepresentantes() {
           legal_name: form.legal_name || null,
           phone: form.phone || null,
           erp_rep_id: form.erp_rep_id || null,
+          venda_interna: form.venda_interna,
         };
         const res = await api.post<ApiResponse<RepListItem> & { aviso?: string }>(
           '/reps',
@@ -398,6 +403,17 @@ export function PaginaRepresentantes() {
                 </label>
               </Field>
             )}
+            <Field label="Venda interna">
+              <label className="flex h-10 items-center gap-2 text-sm text-foreground">
+                <input
+                  type="checkbox"
+                  checked={form.venda_interna}
+                  onChange={(e) => setForm((f) => ({ ...f, venda_interna: e.target.checked }))}
+                  className="h-4 w-4 rounded border-input text-primary focus:ring-ring"
+                />
+                Pedido nasce aprovado e ele mesmo fatura
+              </label>
+            </Field>
           </div>
 
           {error && <p className="mt-4 rounded-lg bg-danger-soft px-3 py-2 text-sm text-danger-soft-foreground">{error}</p>}
@@ -469,6 +485,7 @@ export function PaginaRepresentantes() {
                   </div>
                 </div>
                 <div className="flex shrink-0 items-center gap-1">
+                  {rep.venda_interna === true && <Badge variant="brand">Venda interna</Badge>}
                   {!rep.active && <Badge variant="gray">Inativo</Badge>}
                   {!somenteLeitura && (
                     <>

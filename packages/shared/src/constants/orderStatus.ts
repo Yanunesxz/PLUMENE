@@ -31,7 +31,11 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
  * Pedido montado pelo próprio representante pula a triagem — ele já é o filtro.
  */
 export const ORDER_STATUS_FLOW: Record<OrderStatus, OrderStatus[]> = {
-  draft: ['pending_approval'],
+  // `approved` direto do rascunho é a VENDA INTERNA (migração 031): o balcão
+  // não pede licença à fábrica. Quem NÃO é venda interna continua barrado pelo
+  // portão de papel no updateOrderStatus — o mapa diz o que é possível, o
+  // portão diz quem pode.
+  draft: ['pending_approval', 'approved'],
   pending_rep: ['pending_approval', 'rejected'],
   pending_approval: ['approved', 'rejected'],
   approved: ['sent_erp'],

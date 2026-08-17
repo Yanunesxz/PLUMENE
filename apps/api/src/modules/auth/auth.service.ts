@@ -31,6 +31,9 @@ export function buildAuthPayload(user: User): AuthPayload {
     // Eram nulos para todo mundo até aqui — a loja simplesmente não entrava.
     customer_id: user.customer_id ?? null,
     rep_id: user.rep_id ?? null,
+    // Venda interna (031): o pedido dele nasce aprovado e ele mesmo fatura.
+    // Viaja no token para o createOrder não consultar o banco a cada pedido.
+    venda_interna: user.venda_interna === true,
     // Teclas do gerente viajam no token para o guard não consultar o banco a
     // cada requisição. Nulo é significativo: quer dizer "padrão do papel".
     // O preço é o mesmo do bloqueio: mudança de tecla vale em até 1h.

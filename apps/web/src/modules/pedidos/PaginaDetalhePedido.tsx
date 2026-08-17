@@ -38,15 +38,20 @@ export function PaginaDetalhePedido() {
   // "acesso negado" no toque. Quem protege de verdade é a API.
   const podeFaturar = usePermissao('faturar_pedidos');
   const podeAprovar = usePermissao('aprovar_pedidos');
-  // O financeiro fatura — é a razão de ele existir ("quem aceita os pedidos").
-  const canInvoice =
-    (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
-    podeFaturar;
+  // A VENDA INTERNA fatura o próprio pedido: o balcão fecha a própria venda.
+  const ehVendaInterna = user?.role === 'rep' && user?.venda_interna === true;
   // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
   // dois), então os botões não aparecem em vez de responder 403 no toque.
   const ehLoja = user?.role === 'store';
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
+
+  // O financeiro fatura — é a razão de ele existir ("quem aceita os pedidos").
+  // E a venda interna, só nos pedidos DELA.
+  const canInvoice =
+    ((user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
+      podeFaturar) ||
+    (ehVendaInterna && !!order && order.rep_id === user.id);
   const [invoicing, setInvoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -81,10 +86,13 @@ export function PaginaDetalhePedido() {
     isOnline &&
     (user?.role === 'rep'
       ? // Até a fábrica DECIDIR: o pedido do rep nasce direto na fila, e é lá
-        // que ele corrige o que acabou de passar. Aprovado, fecha a mão dele.
+        // que ele corrige o que acabou de passar. Aprovado, fecha a mão dele —
+        // exceto na VENDA INTERNA, cujo pedido já NASCE aprovado: a janela de
+        // ajuste dela vai até o carimbo do faturamento.
         order.status === 'draft' ||
         order.status === 'pending_rep' ||
-        order.status === 'pending_approval'
+        order.status === 'pending_approval' ||
+        (user.venda_interna === true && order.status === 'approved' && order.rep_id === user.id)
       : (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
         (order.status === 'pending_rep' ||
           order.status === 'pending_approval' ||
@@ -606,21 +614,23 @@ export function PaginaDetalhePedido() {
 
           {/* O rascunho é o pedido salvo que a fábrica ainda não viu. Este é o
               botão que o tira da área "Enviar pra fábrica" — até lá, o
-              representante confere e altera à vontade. */}
+              representante confere e altera à vontade. Na VENDA INTERNA o mesmo
+              botão APROVA na hora: balcão não pede licença à fábrica. */}
           {order.status === 'draft' && !ehLoja && podeAprovar && (
             <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
               <p className="mb-3 text-sm text-foreground">
-                Este pedido está salvo, mas ainda não foi. Confira as peças, o desconto e a
-                condição — quando estiver certo, mande.
+                {ehVendaInterna
+                  ? 'Venda interna: ao aprovar, o pedido já sai aprovado — depois é só marcar o faturamento.'
+                  : 'Este pedido está salvo, mas ainda não foi. Confira as peças, o desconto e a condição — quando estiver certo, mande.'}
               </p>
               <Button
                 size="lg"
                 className="w-full bg-positive hover:bg-positive/90 active:bg-positive/80"
                 disabled={decidindo !== null}
-                onClick={() => void handleDecisao('pending_approval')}
+                onClick={() => void handleDecisao(ehVendaInterna ? 'approved' : 'pending_approval')}
               >
                 <Check className="h-4 w-4" strokeWidth={2.5} />
-                Enviar para a fábrica
+                {ehVendaInterna ? 'Aprovar venda' : 'Enviar para a fábrica'}
               </Button>
             </div>
           )}
