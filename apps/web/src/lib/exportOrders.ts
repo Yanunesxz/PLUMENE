@@ -1,6 +1,7 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
 import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.js';
+import { semLinhasDeCor } from './observacaoCores.js';
 import type { NumeroDaTabela } from './planilha/tabela.js';
 import type { OrderWithItems } from '@csb/shared';
 
@@ -103,12 +104,16 @@ async function gerarArquivosDoPedido(
       semTamanho.push(`${sku} sem tamanho no pedido`);
       continue;
     }
+    // A OBSERVAÇÃO da linha: a cor escolhida — e "Variado" quando a peça é
+    // sortida (sem cor no cadastro). É o que a fábrica lê na separação. Só
+    // quando o chamador forneceu o mapa de cores; sem ele, coluna em branco.
+    const cor = contexto.corDoProduto?.get(item.product_id)?.trim();
     itens.push({
       sku,
       size,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      observacao: contexto.corDoProduto?.get(item.product_id) ?? undefined,
+      observacao: contexto.corDoProduto ? (cor || 'Variado') : undefined,
     });
   }
 
@@ -142,13 +147,17 @@ async function gerarArquivosDoPedido(
       : null);
   const dataDoPedido = new Date(pedido.created_at).toLocaleDateString('pt-BR');
 
+  // O rodapé fica com o que o REPRESENTANTE digitou (remessas, boletos…). As
+  // linhas de cor que o app anexou às notas saem daqui: desde 14/08/2026 a cor
+  // vive na coluna OBSERVAÇÃO de cada linha, e dobrada confundiria a separação.
+  const skusDoPedido = new Set(itens.map((i) => i.sku));
+  const notasDoRep = semLinhasDeCor(pedido.notes, skusDoPedido);
+
   return folhas.map((folha, indice) => {
-    // O rodapé marca a página ("PÁGINA 01.") e leva os recados do pedido — as
-    // observações digitadas e as cores escolhidas. Só na primeira página, como
-    // no modelo da fábrica; as demais levam só o número.
+    // O rodapé marca a página ("PÁGINA 01.") e leva os recados do rep. Só na
+    // primeira página, como no modelo da fábrica; as demais levam só o número.
     const pagina = `PÁGINA ${String(indice + 1).padStart(2, '0')}.`;
-    const observacao =
-      indice === 0 && pedido.notes?.trim() ? `${pagina} ${pedido.notes.trim()}` : pagina;
+    const observacao = indice === 0 && notasDoRep ? `${pagina} ${notasDoRep}` : pagina;
 
     const { arquivo, refsDesconhecidas } = preencherModelo(modelo, {
       linhas: folha,

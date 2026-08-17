@@ -50,3 +50,33 @@ export function juntarObservacao(digitada: string | undefined, cores: string): s
   if (!cores) return texto || undefined;
   return texto ? `${texto}\n\n${cores}` : cores;
 }
+
+/**
+ * O inverso da `observacaoDeCores`: tira do texto as linhas de cor que ela
+ * gerou, deixando só o que o representante DIGITOU.
+ *
+ * Existe por causa da planilha do Control: desde 14/08/2026 a cor sai na
+ * coluna OBSERVAÇÃO de cada linha do formulário, e o bloco geral do rodapé
+ * fica para os recados do rep (remessas, boletos). Sem esta limpeza a cor
+ * sairia dobrada — na linha e no rodapé.
+ *
+ * Uma linha é "de cor" quando começa com um SKU do pedido seguido de
+ * quantidade+tamanho ("0015 3M azul") — o formato exato que
+ * `observacaoDeCores` escreve. Texto do rep que apenas MENCIONA uma
+ * referência no meio da frase não casa com esse formato e fica.
+ */
+export function semLinhasDeCor(
+  texto: string | null | undefined,
+  skusDoPedido: ReadonlySet<string>,
+): string {
+  if (!texto) return '';
+  return texto
+    .split('\n')
+    .filter((linha) => {
+      const [sku, qtdTam] = linha.trim().split(/\s+/);
+      return !(sku && qtdTam && skusDoPedido.has(sku) && /^\d+\S*$/.test(qtdTam));
+    })
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}

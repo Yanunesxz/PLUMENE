@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { observacaoDeCores, juntarObservacao } from '../apps/web/src/lib/observacaoCores.js';
+import { observacaoDeCores, juntarObservacao, semLinhasDeCor } from '../apps/web/src/lib/observacaoCores.js';
 
 /**
  * A cor escolhida não cabe no item do pedido: o ERP recebe tudo como sortido
@@ -58,5 +58,33 @@ describe('observação com as cores escolhidas', () => {
   it('sem cor e sem texto, não inventa observação vazia', () => {
     expect(juntarObservacao(undefined, '')).toBeUndefined();
     expect(juntarObservacao('   ', '')).toBeUndefined();
+  });
+});
+
+describe('semLinhasDeCor — o rodapé da planilha fica só com o que o rep digitou', () => {
+  const skus = new Set(['0015', '0130']);
+
+  it('tira as linhas de cor e preserva o texto do representante', () => {
+    const notas = 'FATURAR EM 2 REMESSAS\nBOLETOS ATÉ R$ 1.000\n\n0015 3M azul\n0130 2G rosa';
+    expect(semLinhasDeCor(notas, skus)).toBe('FATURAR EM 2 REMESSAS\nBOLETOS ATÉ R$ 1.000');
+  });
+
+  it('é o inverso exato do que observacaoDeCores escreve', () => {
+    const cores = observacaoDeCores([
+      { sku: '0015', size: 'M', quantity: 3, color_code: '02', color_name: 'azul' },
+    ]);
+    const notas = juntarObservacao('entregar até sexta', cores)!;
+    expect(semLinhasDeCor(notas, skus)).toBe('entregar até sexta');
+  });
+
+  it('não apaga frase do rep que só MENCIONA uma referência', () => {
+    const notas = '0015 vai na segunda remessa';
+    // "vai" não é quantidade+tamanho — a linha é recado, não cor.
+    expect(semLinhasDeCor(notas, skus)).toBe('0015 vai na segunda remessa');
+  });
+
+  it('só as cores, sem texto do rep, vira rodapé vazio', () => {
+    expect(semLinhasDeCor('0015 3M azul\n0130 2G rosa', skus)).toBe('');
+    expect(semLinhasDeCor(null, skus)).toBe('');
   });
 });
