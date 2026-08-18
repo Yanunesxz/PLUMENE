@@ -128,7 +128,9 @@ export function decisaoDoPedido(
   status: OrderStatus,
   podeAprovar = true,
 ): Decisao | null {
-  const daFabrica = papel === 'manager' || papel === 'admin';
+  // O financeiro decide junto com a fábrica: ele é "quem aceita os pedidos" —
+  // o que o rep manda cai na mesa dele para aprovar (e depois faturar).
+  const daFabrica = papel === 'manager' || papel === 'admin' || papel === 'financeiro';
 
   // Triagem: o pedido chegou da loja ou de um link. O gerente também passa por
   // aqui — se o representante sumir, o pedido não fica preso.

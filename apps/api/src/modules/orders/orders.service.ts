@@ -27,11 +27,12 @@ export async function getOrders(
     // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
     // tenha quem tiver montado (ela mesma ou o representante).
     if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
-    // O financeiro recebe o que a fábrica JÁ MANDOU — aprovado e enviado ao
-    // ERP — mais os pedidos que ele próprio criar, para acompanhá-los até lá.
-    // O resto da fila (triagem, aprovação) é mesa do gerente, não dele.
+    // O financeiro é "quem aceita os pedidos" (Yan, 14/08): o que o rep MANDA
+    // para a fábrica cai direto na mesa dele — fila de aprovação, aprovados e
+    // enviados ao ERP — mais os que ele próprio criar. Fora do alcance dele só
+    // a triagem (pedido de loja parado no rep) e o rascunho alheio.
     if (role === 'financeiro') {
-      query = query.or(`status.in.(approved,sent_erp),rep_id.eq.${rep_id}`);
+      query = query.or(`status.in.(pending_approval,approved,sent_erp),rep_id.eq.${rep_id}`);
     }
 
     return query;
