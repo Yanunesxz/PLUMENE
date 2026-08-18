@@ -1,7 +1,25 @@
-import { defineConfig } from 'vite';
+import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+
+// A marca desta instalação — as mesmas variáveis de `src/lib/marca.ts`, lidas
+// aqui no Node do build: o manifest do PWA e o <title> do index.html são
+// gerados antes de existir import.meta.env. Sem variável, é a Corpo Sensual.
+const NOME_DA_MARCA = process.env['VITE_BRAND_NAME'] || 'Corpo Sensual';
+const COR_DA_MARCA = process.env['VITE_BRAND_COLOR'] || '#0f766e';
+
+// Troca "Corpo Sensual" no index.html (título e descrição) pela marca da
+// instalação. O index.html continua escrito com a marca da casa — é o padrão —
+// e a troca só acontece quando a instalação define VITE_BRAND_NAME.
+function marcaNoHtml(): Plugin {
+  return {
+    name: 'marca-no-html',
+    transformIndexHtml(html) {
+      return html.replaceAll('Corpo Sensual', NOME_DA_MARCA);
+    },
+  };
+}
 
 export default defineConfig({
   resolve: {
@@ -17,6 +35,7 @@ export default defineConfig({
   },
   plugins: [
     react(),
+    marcaNoHtml(),
     VitePWA({
       // 'prompt', não 'autoUpdate'.
       //
@@ -40,10 +59,10 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: ['logo.png', 'pwa-192x192.png', 'pwa-512x512.png', 'pwa-maskable-512x512.png'],
       manifest: {
-        name: 'Representantes Corpo Sensual',
+        name: `Representantes ${NOME_DA_MARCA}`,
         short_name: 'Representantes',
         description: 'Plataforma comercial para representantes',
-        theme_color: '#0f766e',
+        theme_color: COR_DA_MARCA,
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',

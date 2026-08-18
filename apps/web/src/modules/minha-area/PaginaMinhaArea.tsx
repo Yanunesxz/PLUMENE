@@ -29,17 +29,16 @@ import { decisaoDoPedido } from '../../lib/pedido.js';
 import { valorDaVenda } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
+import { MARCA } from '../../lib/marca.js';
 import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
 import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
 import { useMinhaMeta } from '../../hooks/useMinhaMeta.js';
 
-// Gerente comercial (suporte) por WhatsApp — número (55) 32 9 9849-3177.
-// É quem controla senhas e acessos; o rep fala com ele por aqui.
-const SUPORTE_WHATSAPP = '5532998493177';
-const SUPORTE_WHATSAPP_LABEL = '(32) 9 9849-3177';
+// Suporte por WhatsApp — o número vem da configuração da marca (na Corpo
+// Sensual é o gerente comercial, que controla senhas e acessos).
 const suporteWhatsappUrl = (nome: string) =>
-  `https://wa.me/${SUPORTE_WHATSAPP}?text=${encodeURIComponent(
-    `Olá! Sou ${nome || 'representante'} e preciso de ajuda no app Corpo Sensual.`,
+  `https://wa.me/${MARCA.suporteWhatsapp}?text=${encodeURIComponent(
+    `Olá! Sou ${nome || 'representante'} e preciso de ajuda no app ${MARCA.nome}.`,
   )}`;
 
 export function PaginaMinhaArea() {
@@ -267,7 +266,7 @@ export function PaginaMinhaArea() {
             <span className="min-w-0">
               <span className="block text-sm font-medium text-foreground">Falar com o gerente comercial</span>
               <span className="block text-xs text-muted-foreground">
-                Senha, acesso ou dúvidas · WhatsApp {SUPORTE_WHATSAPP_LABEL}
+                Senha, acesso ou dúvidas · WhatsApp {MARCA.suporteWhatsappLabel}
               </span>
             </span>
           </span>

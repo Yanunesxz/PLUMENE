@@ -10,6 +10,7 @@ import { CartaoProduto } from '../../components/comercial/CartaoProduto.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { api } from '../../services/api.js';
 import { formatBRL } from '../../lib/utils.js';
+import { MARCA } from '../../lib/marca.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import type { ApiResponse, ProductWithPrice, SessaoVitrine } from '@csb/shared';
 import { precoDoTamanho } from '@csb/shared';
@@ -181,7 +182,7 @@ export function PaginaVitrine() {
         <div className="mx-auto flex max-w-6xl items-center gap-2.5 px-4 py-3">
           <Logo className="h-10 w-10 shrink-0" />
           <div className="min-w-0 flex-1">
-            <p className="titulo text-[18px] leading-none text-foreground">Corpo Sensual</p>
+            <p className="titulo text-[18px] leading-none text-foreground">{MARCA.nome}</p>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
               {sessao?.rep_name ? `Catálogo de ${sessao.rep_name}` : 'Catálogo'}
             </p>

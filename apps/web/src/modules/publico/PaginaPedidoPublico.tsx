@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
+import { MARCA } from '../../lib/marca.js';
 import type { PedidoPublico } from '@csb/shared';
 
 const API_BASE = import.meta.env['VITE_API_URL'] ?? 'http://localhost:3001';
@@ -53,7 +54,7 @@ export function PaginaPedidoPublico() {
       {estado === 'erro' && (
         <div className="centro">
           <div>
-            <p className="cs-brand" style={{ fontSize: 24 }}>Corpo Sensual</p>
+            <p className="cs-brand" style={{ fontSize: 24 }}>{MARCA.nome}</p>
             <p style={{ marginTop: 12 }}>Este link não está mais disponível. Fale com o seu representante.</p>
           </div>
         </div>
@@ -61,7 +62,7 @@ export function PaginaPedidoPublico() {
       {typeof estado === 'object' && estado.expirado && (
         <div className="centro">
           <div>
-            <p className="cs-brand" style={{ fontSize: 24 }}>Corpo Sensual</p>
+            <p className="cs-brand" style={{ fontSize: 24 }}>{MARCA.nome}</p>
             <p style={{ marginTop: 12 }}>Este link expirou (fica disponível por 7 dias após o faturamento).</p>
           </div>
         </div>
@@ -77,7 +78,7 @@ function Conteudo({ p }: { p: PedidoPublico }) {
   return (
     <div className="wrap">
       <header>
-        <p className="cs-brand">Corpo Sensual<span>Representantes</span></p>
+        <p className="cs-brand">{MARCA.nome}<span>Representantes</span></p>
       </header>
 
       <div className="resumo">
@@ -143,7 +144,7 @@ function Conteudo({ p }: { p: PedidoPublico }) {
       </div>
 
       <footer>
-        <p>Pedido feito com <span className="rep">{p.representante}</span>, seu representante Corpo Sensual.</p>
+        <p>Pedido feito com <span className="rep">{p.representante}</span>, seu representante {MARCA.nome}.</p>
         <p className="aviso">Este link fica disponível por 7 dias após o faturamento do pedido.</p>
       </footer>
     </div>
