@@ -42,7 +42,11 @@ export async function listProducts(request: FastifyRequest, reply: FastifyReply)
   // precificado pela tabela do cliente: sem poder abrir o catálogo nela, leria
   // um preço na tela e receberia outro no total. Fora do conjunto continua 403,
   // senão bastava o query param para ver o catálogo em qualquer tabela.
-  const canChooseTable = role === 'manager' || role === 'admin';
+  // O financeiro entra na régua da fábrica: sem tabela própria no token, a
+  // régua de comprador (onlyPriced) devolvia catálogo VAZIO — e sem catálogo no
+  // aparelho o pedido mostrava "Produto" genérico e a planilha saía com "fora
+  // do catálogo baixado" em todo item.
+  const canChooseTable = role === 'manager' || role === 'admin' || role === 'financeiro';
   if (price_table_id && !canChooseTable) {
     const permitida = role === 'rep' && (await repPodeUsarTabela(company_id, sub, price_table_id));
     if (!permitida) {
