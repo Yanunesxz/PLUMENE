@@ -15,6 +15,7 @@ import { useInstalarApp } from '../../hooks/useInstalarApp.js';
 import { pedirInstalacao } from '../../lib/instalarApp.js';
 import { Button } from './Button.js';
 import { cn } from '../../lib/utils.js';
+import { MARCA } from '../../lib/marca.js';
 
 /**
  * Convite para deixar o sistema como aplicativo na tela inicial.
@@ -168,7 +169,7 @@ function OutroAparelho() {
   const endereco = typeof window === 'undefined' ? '' : window.location.origin;
 
   const mensagem =
-    'Abra este endereço no aparelho onde você quer o aplicativo da Corpo Sensual, ' +
+    `Abra este endereço no aparelho onde você quer o aplicativo da ${MARCA.nome}, ` +
     'entre na sua conta e toque em «Deixe na tela inicial», na Minha área:\n\n' +
     endereco;
 

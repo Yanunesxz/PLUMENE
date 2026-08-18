@@ -1,15 +1,18 @@
+import { MARCA } from '../../lib/marca.js';
+
 interface LogoProps {
   className?: string;
 }
 
-// Logo oficial da Corpo Sensual (monograma CS). Arquivo em /public/logo.png.
-// O PNG tem fundo branco; mix-blend-multiply faz esse branco sumir sobre
-// fundos claros (login, topbar, sidebar), mantendo só o traço preto.
+// Logo da marca desta instalação. Arquivo em /public/logo.png — cada fork de
+// marca troca o arquivo, o código não muda. O PNG tem fundo branco;
+// mix-blend-multiply faz esse branco sumir sobre fundos claros (login, topbar,
+// sidebar), mantendo só o traço.
 export function Logo({ className }: LogoProps) {
   return (
     <img
       src="/logo.png"
-      alt="Corpo Sensual"
+      alt={MARCA.nome}
       className={`mix-blend-multiply${className ? ` ${className}` : ''}`}
     />
   );
