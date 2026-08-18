@@ -11,13 +11,14 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
-import { cn, formatBRL } from '../../lib/utils.js';
+import { formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
+import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { precoDoTamanho } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -105,21 +106,27 @@ export function PaginaDetalhePedido() {
   /** Soma dos itens, sem desconto — é o "Valor Parcial" do formulário. */
   const bruto = (order?.items ?? []).reduce((s, i) => s + (i.total ?? 0), 0);
 
-  const aplicarDesconto = async (percentual: number) => {
+  const aplicarDesconto = async (desconto: { percent?: number; valor?: number }) => {
     if (!id || !order || salvandoDesconto) return;
     setSalvandoDesconto(true);
     try {
       // O servidor refaz a conta a partir dos itens e devolve o pedido inteiro:
       // aplicar o percentual na tela sobre o total já descontado acumularia
-      // desconto a cada troca (10% depois 10% viraria 19%).
+      // desconto a cada troca (10% depois 10% viraria 19%). E quando vem em
+      // reais, é ele quem converte — com a soma que ele mesmo tem.
       const res = await api.patch<ApiResponse<OrderWithItems>>(
         `/orders/${id}/desconto`,
-        { desconto: percentual },
+        desconto.valor != null ? { desconto_valor: desconto.valor } : { desconto: desconto.percent },
         token!,
       );
       setOrder({ ...order, ...res.data });
+      const zerou = desconto.valor === 0 || desconto.percent === 0;
       setToast({
-        message: percentual > 0 ? `Desconto de ${percentual}% aplicado.` : 'Desconto removido.',
+        message: zerou
+          ? 'Desconto removido.'
+          : desconto.valor != null
+            ? `Desconto de ${formatBRL(desconto.valor)} aplicado.`
+            : `Desconto de ${desconto.percent}% aplicado.`,
         type: 'success',
       });
     } catch (err) {
@@ -560,55 +567,13 @@ export function PaginaDetalhePedido() {
               que ainda não virou nota. */}
           {podeDarDesconto && (
             <div className="rounded-xl border border-border bg-card p-4">
-              <div className="mb-2 flex items-baseline justify-between gap-2">
-                <p className="text-sm font-medium text-foreground">Desconto no pedido</p>
-                {(order.discount_percent ?? 0) > 0 && (
-                  <span className="tnum text-xs font-medium text-positive">
-                    −{formatBRL(bruto - (order.total ?? 0))}
-                  </span>
-                )}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {[0, 5, 10, 15, 20].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    disabled={salvandoDesconto}
-                    onClick={() => void aplicarDesconto(pct)}
-                    className={cn(
-                      'tnum min-w-[52px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors disabled:opacity-50',
-                      (order.discount_percent ?? 0) === pct
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-background text-foreground hover:bg-sunken',
-                    )}
-                  >
-                    {pct === 0 ? 'Sem' : `${pct}%`}
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  inputMode="decimal"
-                  placeholder="Outro"
-                  disabled={salvandoDesconto}
-                  defaultValue={
-                    [0, 5, 10, 15, 20].includes(order.discount_percent ?? 0)
-                      ? ''
-                      : (order.discount_percent ?? 0)
-                  }
-                  onBlur={(e) => {
-                    const v = Number(e.target.value);
-                    if (e.target.value !== '' && v >= 0 && v <= 100) void aplicarDesconto(v);
-                  }}
-                  className="tnum w-[76px] rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
-                  aria-label="Outro percentual de desconto"
-                />
-              </div>
-              <p className="mt-2 text-[11px] leading-tight text-subtle">
-                Vai no campo DESC % da planilha da fábrica. Os preços das peças não mudam.
-              </p>
+              <CampoDesconto
+                bruto={bruto}
+                percentual={Number(order.discount_percent ?? 0)}
+                desabilitado={salvandoDesconto}
+                onAplicar={(d) => void aplicarDesconto(d)}
+                rodape="Vai no campo DESC % da planilha da fábrica. Os preços das peças não mudam."
+              />
             </div>
           )}
 
@@ -674,8 +639,16 @@ export function PaginaDetalhePedido() {
                     <Pencil className="h-3.5 w-3.5" /> Editar peças
                   </button>
                 )}
+                {/* PEÇAS, não linhas — é o número que a fábrica confere no
+                    romaneio e o que o representante fala com o lojista ("131
+                    peças"). A contagem de linhas fica ao lado, menor. */}
                 <span className="text-xs text-muted-foreground">
-                  {editando ? linhasEdit.length : order.items.length}
+                  <span className="tnum font-semibold text-foreground">
+                    {editando
+                      ? linhasEdit.reduce((s, l) => s + l.quantity, 0)
+                      : order.items.reduce((s, i) => s + i.quantity, 0)}
+                  </span>{' '}
+                  peças · {editando ? linhasEdit.length : order.items.length} ref.
                 </span>
               </span>
             </div>
@@ -835,9 +808,28 @@ export function PaginaDetalhePedido() {
             )}
 
             {!editando && (
-              <div className="flex items-center justify-between border-t border-border px-4 py-3">
-                <span className="text-sm text-muted-foreground">Total</span>
-                <span className="text-xl font-bold text-foreground">{formatBRL(order.total ?? 0)}</span>
+              <div className="border-t border-border px-4 py-3">
+                {/* Com desconto, o rodapé mostra a conta inteira: o que as peças
+                    somam, quanto saiu, e o que o lojista deve. Sem ele, só o
+                    total — três linhas para dizer um número seria ruído. */}
+                {(order.discount_percent ?? 0) > 0 && (
+                  <>
+                    <div className="mb-1 flex items-center justify-between text-sm text-muted-foreground">
+                      <span>Valor das peças</span>
+                      <span className="tnum">{formatBRL(bruto)}</span>
+                    </div>
+                    <div className="mb-2 flex items-center justify-between text-sm text-positive">
+                      <span>
+                        Desconto ({Number(order.discount_percent).toFixed(2).replace(/\.?0+$/, '')}%)
+                      </span>
+                      <span className="tnum">−{formatBRL(bruto - (order.total ?? 0))}</span>
+                    </div>
+                  </>
+                )}
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total</span>
+                  <span className="text-xl font-bold text-foreground">{formatBRL(order.total ?? 0)}</span>
+                </div>
               </div>
             )}
           </div>

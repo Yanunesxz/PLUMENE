@@ -150,6 +150,12 @@ export interface CreateOrderRequest {
    */
   discount_percent?: number | undefined;
   /**
+   * O mesmo desconto, em REAIS. Mande um OU outro: o servidor converte o valor
+   * em percentual usando a soma que ele mesmo calculou dos itens — nunca um
+   * total vindo do aparelho. Valor maior que o pedido é ignorado.
+   */
+  discount_value?: number | undefined;
+  /**
    * Condição de pagamento escolhida por quem montou (rep ou loja). Opcional:
    * sem ela o pedido sai como sempre saiu, com o COND PGTO em branco.
    */
