@@ -67,6 +67,10 @@ export async function login(request: FastifyRequest, reply: FastifyReply): Promi
         // O web esconde botão pelas teclas; sem elas na resposta, o gerente veria
         // botão que a API recusa.
         permissions: user.permissions ?? null,
+        // VENDA INTERNA (031): a tela lê daqui, não do token — sem este campo o
+        // botão continuava "Enviar para a fábrica" e o faturar não aparecia,
+        // mesmo com a coluna marcada no banco.
+        venda_interna: user.venda_interna === true,
         last_login_at: user.last_login_at ?? null,
       },
     },
@@ -123,6 +127,7 @@ export async function refreshToken(request: FastifyRequest, reply: FastifyReply)
           customer_id: u.customer_id ?? null,
           rep_id: u.rep_id ?? null,
           permissions: u.permissions ?? null,
+          venda_interna: u.venda_interna === true,
           last_login_at: u.last_login_at ?? null,
         },
       },
