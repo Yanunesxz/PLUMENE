@@ -11,6 +11,7 @@ import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { cn, formatBRL } from '../../lib/utils.js';
+import { MARCA } from '../../lib/marca.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
 import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
@@ -304,7 +305,11 @@ export function PaginaPedidos() {
               Cancelar
             </Button>
           ) : (
-            hasOrders && (
+            // A exportação preenche o formulário oficial do Control da Corpo
+            // Sensual — instalação de outra marca esconde o botão até ter
+            // formato próprio (VITE_BRAND_CONTROL_EXPORT=false).
+            hasOrders &&
+            MARCA.exportaControl && (
               <Button variant="outline" size="md" onClick={toggleSelectMode}>
                 <FileSpreadsheet className="h-4 w-4" strokeWidth={2.5} />
                 Exportar

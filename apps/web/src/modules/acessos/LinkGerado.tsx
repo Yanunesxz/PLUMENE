@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Check, Copy, MessageCircle, X } from 'lucide-react';
 import { Button } from '../../components/interface/Button.js';
+import { MARCA } from '../../lib/marca.js';
 
 interface LinkGeradoProps {
   url: string;
@@ -81,10 +82,10 @@ export function LinkGerado({
   const saudacao = nomeParaSaudacao(cliente);
   const mensagem =
     tipo === 'convite'
-      ? `Oi${saudacao ? `, ${saudacao}` : ''}! Criei seu acesso ao catálogo da Corpo Sensual. ` +
+      ? `Oi${saudacao ? `, ${saudacao}` : ''}! Criei seu acesso ao catálogo da ${MARCA.nome}. ` +
         `É só abrir o link e cadastrar sua senha:\n\n${url}\n\n` +
         `Depois disso você monta o pedido quando quiser, direto por aí.`
-      : `Oi! Segue o catálogo da Corpo Sensual:\n\n${url}\n\n` +
+      : `Oi! Segue o catálogo da ${MARCA.nome}:\n\n${url}\n\n` +
         `O link fica disponível por ${horas ?? 24} horas.`;
 
   // Sem número, o WhatsApp abre a lista de contatos para escolher.

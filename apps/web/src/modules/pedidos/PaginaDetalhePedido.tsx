@@ -12,6 +12,7 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
+import { MARCA } from '../../lib/marca.js';
 import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
@@ -524,7 +525,7 @@ export function PaginaDetalhePedido() {
               <a
                 href={linkDoWhatsApp(
                   zapDoComprador,
-                  `Olá! Seu pedido #${order.order_number ?? ''} da Corpo Sensual está registrado. ` +
+                  `Olá! Seu pedido #${order.order_number ?? ''} da ${MARCA.nome} está registrado. ` +
                     `Veja as peças com fotos e acompanhe por aqui: ${order.public_link}`,
                 )}
                 target="_blank"

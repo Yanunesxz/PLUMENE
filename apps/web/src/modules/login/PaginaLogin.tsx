@@ -8,6 +8,7 @@ import { resetOfflineIfUserChanged } from '../../offline/db.js';
 import { Input } from '../../components/interface/Input.js';
 import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
+import { MARCA } from '../../lib/marca.js';
 import type { LoginResponse, ApiResponse } from '@csb/shared';
 
 export function PaginaLogin() {
@@ -66,7 +67,7 @@ export function PaginaLogin() {
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo className="h-28 w-28" />
           <div>
-            <h1 className="titulo text-[30px] leading-none text-foreground">Corpo Sensual</h1>
+            <h1 className="titulo text-[30px] leading-none text-foreground">{MARCA.nome}</h1>
             <p className="mt-0.5 text-sm text-muted-foreground">Representantes</p>
           </div>
         </div>
@@ -118,7 +119,7 @@ export function PaginaLogin() {
           </form>
         </div>
 
-        <p className="mt-6 text-center text-xs text-muted-foreground">© 2026 Corpo Sensual</p>
+        <p className="mt-6 text-center text-xs text-muted-foreground">© 2026 {MARCA.nome}</p>
       </div>
     </div>
   );

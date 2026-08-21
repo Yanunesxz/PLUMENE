@@ -7,6 +7,7 @@ import { Spinner } from '../../components/interface/Spinner.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { resetOfflineIfUserChanged } from '../../offline/db.js';
 import { api } from '../../services/api.js';
+import { MARCA } from '../../lib/marca.js';
 import type { ApiResponse, ConvitePublico, LoginResponse } from '@csb/shared';
 
 /**
@@ -92,7 +93,7 @@ export function PaginaConvite() {
       <div className="w-full max-w-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
           <Logo className="h-24 w-24" />
-          <h1 className="titulo text-[28px] leading-none text-foreground">Corpo Sensual</h1>
+          <h1 className="titulo text-[28px] leading-none text-foreground">{MARCA.nome}</h1>
         </div>
 
         {carregando ? (

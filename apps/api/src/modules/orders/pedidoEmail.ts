@@ -42,7 +42,7 @@ function corpoHtml(opts: {
   <div style="max-width:520px;margin:0 auto;padding:24px 16px 40px;">
     <div style="background:#fff;border:1px solid #e7ded9;border-radius:6px;overflow:hidden;">
       <div style="text-align:center;padding:30px 24px 22px;border-bottom:1px solid #e7ded9;">
-        <div style="font-family:Georgia,serif;font-size:27px;letter-spacing:.05em;">Corpo Sensual</div>
+        <div style="font-family:Georgia,serif;font-size:27px;letter-spacing:.05em;">${env.EMAIL_FROM_NAME}</div>
         <div style="font-size:10px;letter-spacing:.36em;text-transform:uppercase;color:#a98b5a;margin-top:7px;font-weight:600;">Representantes</div>
       </div>
       <div style="padding:30px 32px 6px;">
@@ -101,12 +101,12 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
     if (cliente?.email) {
       await enviarEmail({
         para: cliente.email,
-        assunto: `Pedido #${numero} recebido — Corpo Sensual`,
+        assunto: `Pedido #${numero} recebido — ${env.EMAIL_FROM_NAME}`,
         html: corpoHtml({
           ...base,
           saudacao: `Recebemos o seu pedido!`,
           intro: `Olá! Registramos o seu pedido e ele já foi enviado para a fábrica. Veja tudo que você escolheu, com as fotos, no link abaixo.`,
-          rodape: `Pedido feito com ${nomeRep}, seu representante Corpo Sensual.`,
+          rodape: `Pedido feito com ${nomeRep}, seu representante ${env.EMAIL_FROM_NAME}.`,
         }),
       });
     }
@@ -120,7 +120,7 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
           ...base,
           saudacao: `Novo pedido de ${nomeCliente}`,
           intro: `Um pedido foi fechado no seu nome. Veja o detalhe com as fotos no link abaixo.`,
-          rodape: `Corpo Sensual · Representantes`,
+          rodape: `${env.EMAIL_FROM_NAME} · Representantes`,
         }),
       });
     }
@@ -138,7 +138,7 @@ export async function enviarConfirmacaoDoPedido(order: OrderWithItems): Promise<
           ...base,
           saudacao: `Novo pedido de ${nomeCliente}`,
           intro: `Pedido fechado por ${nomeRep}. Veja o detalhe com as fotos no link abaixo.`,
-          rodape: `Corpo Sensual · Caixa de pedidos da fábrica`,
+          rodape: `${env.EMAIL_FROM_NAME} · Caixa de pedidos da fábrica`,
         }),
       });
     }
