@@ -317,7 +317,13 @@ export async function createOrder(
   // 029 no banco: descontar o total sem gravar QUANTO foi dado faria a planilha
   // do Control sair cheia ao lado de um total menor — dois números que não
   // fecham, e ninguém saberia qual vale.
-  const pctPedido = body.discount_percent ?? 0;
+  // Em % ou em R$: o valor vira percentual com a soma que ACABAMOS de calcular.
+  // Desconto maior que o pedido é erro de digitação — o pedido sai sem desconto
+  // em vez de virar 100% e entregar a mercadoria de graça.
+  const pctPedido =
+    body.discount_value != null
+      ? (percentualDoValor(body.discount_value, totalBruto) ?? 0)
+      : (body.discount_percent ?? 0);
   const comDesconto =
     origem.source === 'rep' && pctPedido > 0 && (await detectarColunaDoDesconto());
   const total = comDesconto
@@ -457,7 +463,23 @@ export async function deleteOrder(
 
 export type DescontoResult =
   | { ok: true; order: Order }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' | 'maior_que_o_pedido' };
+
+/**
+ * O percentual que corresponde a um desconto em REAIS.
+ *
+ * Seis casas porque o percentual é o que fica guardado: R$ 8,90 sobre
+ * R$ 1.234,56 dá 0,720915…%, e cortar em duas casas devolveria R$ 8,89 — um
+ * centavo a menos do que foi combinado com o lojista (ver migração 032).
+ *
+ * `null` quando o desconto passa do valor do pedido: isso não é desconto, é
+ * erro de digitação, e virar 100% em silêncio seria dar a mercadoria.
+ */
+function percentualDoValor(valor: number, bruto: number): number | null {
+  if (bruto <= 0) return valor > 0 ? null : 0;
+  if (valor > bruto) return null;
+  return Number(((valor / bruto) * 100).toFixed(6));
+}
 
 /**
  * O percentual de desconto do pedido inteiro.
@@ -478,7 +500,7 @@ export async function setOrderDiscount(
   company_id: string,
   rep_id: string,
   role: AuthRole,
-  percent: number,
+  desconto: { percent?: number | undefined; valor?: number | undefined },
   vendaInterna = false,
 ): Promise<DescontoResult> {
   const { data: order } = await supabase
@@ -500,6 +522,13 @@ export async function setOrderDiscount(
     .eq('order_id', id);
 
   const bruto = (itens ?? []).reduce((s, i) => s + Number((i as { total: number }).total), 0);
+
+  // Desconto em REAIS vira percentual aqui, com a soma que o servidor calculou —
+  // nunca com um total vindo do aparelho, que pode estar velho ou adulterado.
+  const percent =
+    desconto.valor != null ? percentualDoValor(desconto.valor, bruto) : (desconto.percent ?? 0);
+  if (percent == null) return { ok: false, reason: 'maior_que_o_pedido' };
+
   const total = Number((bruto * (1 - percent / 100)).toFixed(2));
 
   const { data, error } = await supabase

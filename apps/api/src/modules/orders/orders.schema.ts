@@ -16,9 +16,10 @@ export const createOrderSchema = z.object({
   // Condição de pagamento escolhida (rep ou loja). Opcional: sem ela o pedido
   // sai como sempre saiu, com o COND PGTO da planilha em branco.
   payment_condition_id: z.string().uuid().optional(),
-  // O desconto do representante, fechado na montagem (029). O controller
-  // descarta o campo de quem não é rep — aqui só se valida a forma.
-  discount_percent: z.number().min(0).max(100).multipleOf(0.01).optional(),
+  // O desconto fechado na montagem (029). Em % ou em R$ — o servidor converte o
+  // valor usando a soma dos itens. O controller descarta de quem não é rep.
+  discount_percent: z.number().min(0).max(100).optional(),
+  discount_value: z.number().min(0).optional(),
   items: z
     .array(
       z.object({
@@ -52,9 +53,25 @@ export const setInvoicedSchema = z.object({
  * O teto de 100 é o impossível, não a política comercial: quanto o
  * representante PODE dar é decisão da fábrica, e ainda não foi definida.
  */
-export const setDiscountSchema = z.object({
-  desconto: z.number().min(0).max(100).multipleOf(0.01),
-});
+/**
+ * O desconto do pedido — em % ou em REAIS, um dos dois.
+ *
+ * Quem manda o valor não manda o percentual: é o SERVIDOR que converte, usando
+ * a soma dos itens que ele mesmo calculou. Aceitar os dois do aparelho abriria
+ * a porta para eles discordarem, e aí o total e a planilha contariam histórias
+ * diferentes.
+ */
+export const setDiscountSchema = z
+  .object({
+    desconto: z.number().min(0).max(100).optional(),
+    desconto_valor: z.number().min(0).optional(),
+  })
+  .refine((b) => b.desconto != null || b.desconto_valor != null, {
+    message: 'Informe "desconto" (%) ou "desconto_valor" (R$)',
+  })
+  .refine((b) => !(b.desconto != null && b.desconto_valor != null), {
+    message: 'Informe só um: "desconto" (%) OU "desconto_valor" (R$)',
+  });
 
 /** Troca da condição de pagamento num pedido em aberto. `null` remove. */
 export const setPaymentSchema = z.object({

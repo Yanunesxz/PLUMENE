@@ -11,12 +11,13 @@ import { addToSyncQueue } from '../../offline/sync.js';
 import { Button } from '../../components/interface/Button.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
+import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
-import { cn, formatBRL } from '../../lib/utils.js';
+import { formatBRL } from '../../lib/utils.js';
 import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
 import { compararReferencia } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
@@ -236,6 +237,9 @@ export function PaginaNovoPedido() {
    * outro papel.
    */
   const ehRep = user?.role === 'rep';
+  // Guardamos o PERCENTUAL mesmo quando ele digita em reais: é o que vai para o
+  // servidor e para a planilha. A conversão usa a soma das peças da tela, que
+  // aqui é a mesma que o servidor vai calcular (os preços já vieram da tabela).
   const [descontoPct, setDescontoPct] = useState(0);
   const descontoAplicado = ehRep ? descontoPct : 0;
 
@@ -555,47 +559,30 @@ export function PaginaNovoPedido() {
               fábrica — os preços das peças não mudam. */}
           {ehRep && items.length > 0 && (
             <div className="mb-3 border-b border-border pb-3">
-              <p className="mb-2 text-sm font-medium text-foreground">Desconto no pedido</p>
-              <div className="flex flex-wrap gap-1.5">
-                {[0, 5, 10, 15, 20].map((pct) => (
-                  <button
-                    key={pct}
-                    type="button"
-                    onClick={() => setDescontoPct(pct)}
-                    className={cn(
-                      'tnum min-w-[52px] rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
-                      descontoPct === pct
-                        ? 'border-primary bg-primary text-primary-foreground'
-                        : 'border-border bg-background text-foreground hover:bg-sunken',
-                    )}
-                  >
-                    {pct === 0 ? 'Sem' : `${pct}%`}
-                  </button>
-                ))}
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  inputMode="decimal"
-                  placeholder="Outro"
-                  defaultValue={[0, 5, 10, 15, 20].includes(descontoPct) ? '' : descontoPct}
-                  onBlur={(e) => {
-                    const v = Number(e.target.value);
-                    if (e.target.value !== '' && v >= 0 && v <= 100) setDescontoPct(v);
-                  }}
-                  className="tnum w-[76px] rounded-lg border border-border bg-background px-2 py-2 text-sm text-foreground"
-                  aria-label="Outro percentual de desconto"
-                />
-              </div>
+              <CampoDesconto
+                bruto={totalBruto}
+                percentual={descontoPct}
+                onAplicar={(d) =>
+                  setDescontoPct(
+                    d.valor != null
+                      ? totalBruto > 0
+                        ? Number(((d.valor / totalBruto) * 100).toFixed(6))
+                        : 0
+                      : (d.percent ?? 0),
+                  )
+                }
+              />
             </div>
           )}
           <div className="mb-3 flex items-center justify-between">
             <span className="text-sm text-muted-foreground">
-              {totalQty} {totalQty === 1 ? 'item' : 'itens'}
+              {/* PEÇAS: é o número que o representante confere com o lojista e
+                  que a fábrica lê no romaneio. As referências vêm ao lado. */}
+              <span className="tnum font-semibold text-foreground">{totalQty}</span>{' '}
+              {totalQty === 1 ? 'peça' : 'peças'} · {items.length} ref.
               {descontoAplicado > 0 && (
                 <span className="tnum ml-2 text-positive">
-                  −{descontoAplicado}% ({formatBRL(totalBruto - total)})
+                  −{formatBRL(totalBruto - total)}
                 </span>
               )}
             </span>

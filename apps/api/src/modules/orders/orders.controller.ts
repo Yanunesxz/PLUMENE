@@ -99,7 +99,10 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
 
   // O desconto é a palavra do REPRESENTANTE — só ele manda a %. Loja, vitrine
   // e até gerente têm o campo descartado aqui, antes de qualquer conta.
-  if (role !== 'rep') delete body.discount_percent;
+  if (role !== 'rep') {
+    delete body.discount_percent;
+    delete body.discount_value;
+  }
 
   // Quem RECEBE o pedido. Loja e visitante têm o representante dono no token;
   // o representante recebe o próprio.
@@ -267,7 +270,14 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
   const body = await parseBody(setDiscountSchema, request.body, reply);
   if (!body) return;
 
-  const result = await setOrderDiscount(id, company_id, rep_id, role, body.desconto, request.user.venda_interna === true);
+  const result = await setOrderDiscount(
+    id,
+    company_id,
+    rep_id,
+    role,
+    { percent: body.desconto, valor: body.desconto_valor },
+    request.user.venda_interna === true,
+  );
   if (result.ok) {
     await reply.send({ data: result.order });
     return;
@@ -286,6 +296,13 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
         error: 'Este pedido já saiu para a fábrica — o desconto vale só antes de mandar',
         code: 'ORDER_JA_ENVIADO',
         statusCode: 409,
+      });
+      return;
+    case 'maior_que_o_pedido':
+      await reply.status(422).send({
+        error: 'O desconto é maior que o valor do pedido',
+        code: 'DESCONTO_MAIOR_QUE_PEDIDO',
+        statusCode: 422,
       });
       return;
     case 'sem_coluna':
