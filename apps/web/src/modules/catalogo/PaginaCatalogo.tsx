@@ -106,6 +106,13 @@ export function PaginaCatalogo() {
   const defaultTableId = user?.price_table_id ?? '';
   const { tabelas: tables } = useMinhasTabelas();
   const [viewTableId, setViewTableId] = useState<string>(defaultTableId);
+  // Quem não tem tabela própria (admin, gerente) começava com o estado VAZIO
+  // enquanto o <select> mostrava a primeira opção: o navegador exibe "TABELA 01"
+  // mas ninguém buscou preço nenhum, e o catálogo inteiro saía "sob consulta".
+  // Quando as tabelas chegam e não há escolha, a primeira vira escolha de verdade.
+  useEffect(() => {
+    if (viewTableId === '' && tables.length > 0) setViewTableId(tables[0]!.id);
+  }, [tables, viewTableId]);
   // Overlay: mapa produto→preço da tabela consultada (null = usar a tabela do rep).
   const [overlayPrices, setOverlayPrices] = useState<Map<string, number | null> | null>(null);
   const isConsulting = viewTableId !== '' && viewTableId !== defaultTableId;
