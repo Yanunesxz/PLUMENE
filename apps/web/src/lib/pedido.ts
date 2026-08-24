@@ -89,6 +89,16 @@ export function seloDoPedido(
   pedido: Pick<Order, 'status'> & { invoiced?: boolean | null; delivered?: boolean | null },
   papel: AuthRole | undefined,
 ): SeloDoPedido {
+  // O financeiro fala a língua da MESA dele, não a do fluxo interno: o que
+  // chegou espera o aceite; o que ele aceitou espera o faturamento; o que
+  // faturou acabou. É o selo que casa com as filas da tela de pedidos.
+  if (papel === 'financeiro') {
+    if (pedido.status === 'draft') return { texto: 'Rascunho', variante: 'gray' };
+    if (pedido.invoiced) return { texto: 'Faturado', variante: 'green' };
+    if (pedido.status === 'pending_approval') return { texto: 'Aguardando aceite', variante: 'yellow' };
+    if (pedido.status === 'approved') return { texto: 'A faturar', variante: 'brand' };
+    return { texto: ORDER_STATUS_LABELS[pedido.status], variante: STATUS_VARIANTE[pedido.status] };
+  }
   if (usaStatusInterno(papel)) {
     return { texto: ORDER_STATUS_LABELS[pedido.status], variante: STATUS_VARIANTE[pedido.status] };
   }

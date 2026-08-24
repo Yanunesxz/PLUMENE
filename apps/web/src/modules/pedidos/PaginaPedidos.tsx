@@ -68,11 +68,39 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStat
   ];
 }
 
+/**
+ * A MESA do financeiro: filas por ação, não por status interno.
+ *
+ * "Chegaram" é o que espera o aceite dele; "A faturar" é o que ele já aceitou
+ * (ou a venda interna auto-aprovou) e falta cobrar; "Faturados" é o resolvido.
+ * O "já vi" é consequência da AÇÃO — aceitou, mudou de fila — e não de um
+ * marcador de lido, que mentiria (abrir sem tratar não é tratar).
+ */
+type FilaDoFinanceiro = 'chegaram' | 'a_faturar' | 'faturados' | 'rascunhos' | 'all';
+
+const FILAS_DO_FINANCEIRO: { value: FilaDoFinanceiro; label: string }[] = [
+  { value: 'chegaram', label: 'Chegaram' },
+  { value: 'a_faturar', label: 'A faturar' },
+  { value: 'faturados', label: 'Faturados' },
+  { value: 'rascunhos', label: 'Rascunhos' },
+  { value: 'all', label: 'Todos' },
+];
+
+function pedidoNaFila(o: Order, fila: FilaDoFinanceiro): boolean {
+  if (fila === 'all') return true;
+  if (fila === 'chegaram') return o.status === 'pending_approval';
+  if (fila === 'a_faturar') return o.status === 'approved' && !o.invoiced;
+  // `sent_erp` já passou da mesa dele: mora junto dos resolvidos.
+  if (fila === 'faturados') return o.invoiced === true || o.status === 'sent_erp';
+  return o.status === 'draft';
+}
+
 export function PaginaPedidos() {
   const { token, hasRole, user } = useAuthStore();
   // O financeiro anda com a fábrica aqui: mesmos filtros, mesmo filtro por
   // representante (a API já limita a lista dele aos aprovados + os próprios).
   const isManager = hasRole('manager', 'admin', 'financeiro');
+  const ehFinanceiro = hasRole('financeiro');
   const ehLoja = hasRole('store');
   const STATUS_FILTERS = useMemo(
     () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep'),
@@ -81,6 +109,8 @@ export function PaginaPedidos() {
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<OrderStatus | 'all'>('all');
+  // A mesa abre na fila do trabalho novo — o que espera o aceite.
+  const [fila, setFila] = useState<FilaDoFinanceiro>('chegaram');
   const [repId, setRepId] = useState<string>(ALL_REPS);
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   const [selectMode, setSelectMode] = useState(false);
@@ -190,15 +220,40 @@ export function PaginaPedidos() {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return (orders ?? [])
-      .filter((o) => status === 'all' || o.status === status)
+    const lista = (orders ?? [])
+      .filter((o) => (ehFinanceiro ? pedidoNaFila(o, fila) : status === 'all' || o.status === status))
       .filter((o) => repId === ALL_REPS || o.rep_id === repId)
       .filter((o) => {
         if (!q) return true;
         const name = nomeDoComprador(o, customerName).toLowerCase();
         return name.includes(q) || o.id.toLowerCase().includes(q);
       });
-  }, [orders, status, repId, search, customerName]);
+    // Nas filas de TRABALHO o mais antigo vem primeiro — fila é fila, e sem
+    // isso o pedido velho fica soterrado pelos novos até alguém reclamar.
+    if (ehFinanceiro && (fila === 'chegaram' || fila === 'a_faturar')) {
+      return [...lista].reverse();
+    }
+    return lista;
+  }, [orders, status, fila, ehFinanceiro, repId, search, customerName]);
+
+  // O placar da mesa: o dia do financeiro num relance.
+  const placar = useMemo(() => {
+    if (!ehFinanceiro) return null;
+    const todos = orders ?? [];
+    const mes = new Date().toISOString().slice(0, 7);
+    return {
+      chegaram: todos.filter((o) => pedidoNaFila(o, 'chegaram')).length,
+      aFaturar: todos.filter((o) => pedidoNaFila(o, 'a_faturar')).length,
+      faturadosNoMes: todos.filter((o) => o.invoiced && (o.invoiced_at ?? '').startsWith(mes)).length,
+    };
+  }, [ehFinanceiro, orders]);
+
+  // Os representantes de venda interna, para o selinho no cartão: o pedido
+  // deles chega direto em "A faturar" sem passar pelo aceite — o selo explica.
+  const repsVendaInterna = useMemo(
+    () => new Set((reps ?? []).filter((r) => r.venda_interna === true).map((r) => r.id)),
+    [reps],
+  );
 
   const isInitialLoading = orders === undefined || (loading && (orders?.length ?? 0) === 0);
   const hasOrders = (orders?.length ?? 0) > 0;
@@ -391,12 +446,30 @@ export function PaginaPedidos() {
             )}
           </div>
           <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
-            {STATUS_FILTERS.map((f) => (
-              <Chip key={f.value} active={status === f.value} onClick={() => setStatus(f.value)}>
-                {f.label}
-              </Chip>
-            ))}
+            {ehFinanceiro
+              ? FILAS_DO_FINANCEIRO.map((f) => (
+                  <Chip key={f.value} active={fila === f.value} onClick={() => setFila(f.value)}>
+                    {f.label}
+                    {f.value === 'chegaram' && placar && placar.chegaram > 0
+                      ? ` (${placar.chegaram})`
+                      : f.value === 'a_faturar' && placar && placar.aFaturar > 0
+                        ? ` (${placar.aFaturar})`
+                        : ''}
+                  </Chip>
+                ))
+              : STATUS_FILTERS.map((f) => (
+                  <Chip key={f.value} active={status === f.value} onClick={() => setStatus(f.value)}>
+                    {f.label}
+                  </Chip>
+                ))}
           </div>
+
+          {placar && (
+            <p className="-mt-2 mb-4 text-xs text-muted-foreground">
+              {placar.chegaram} aguardando aceite · {placar.aFaturar} a faturar ·{' '}
+              {placar.faturadosNoMes} faturado(s) no mês
+            </p>
+          )}
         </>
       )}
 
@@ -437,6 +510,13 @@ export function PaginaPedidos() {
                     {origemParaExibir(order) && (
                       <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                         {origemParaExibir(order)}
+                      </span>
+                    )}
+                    {/* Explica ao financeiro por que este pedido chegou direto
+                        em "A faturar" sem passar pelo aceite dele. */}
+                    {ehFinanceiro && repsVendaInterna.has(order.rep_id) && (
+                      <span className="shrink-0 rounded bg-primary-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary-soft-foreground">
+                        Venda interna
                       </span>
                     )}
                   </span>
