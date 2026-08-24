@@ -117,7 +117,9 @@ export default defineConfig({
             // operação manual e rara; quando acontece, a nova aparece no fim da
             // validade. Foto velha por alguns dias custa menos do que catálogo
             // que não abre.
-            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*\.(?:png|jpe?g|webp|avif)$/i,
+            // O `(\?.*)?` aceita a URL versionada (?v=carimbo) que a API grava
+            // ao reenviar foto — sem ele, foto nova caía fora deste cache.
+            urlPattern: /^https:\/\/.*\.supabase\.co\/storage\/.*\.(?:png|jpe?g|webp|avif)(\?.*)?$/i,
             handler: 'CacheFirst',
             options: {
               cacheName: 'fotos-produtos',

@@ -57,7 +57,11 @@ export async function uploadProductPhoto(
   if (upErr) return { ok: false, reason: 'error', detail: upErr.message };
 
   const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  const url = pub.publicUrl;
+  // O caminho no Storage é fixo (empresa/SKU.jpg) e o cache é de um ano —
+  // reenviar a foto trocava o arquivo mas ninguém via: navegador, service
+  // worker e CDN seguravam a versão antiga na MESMA URL. O ?v= com o carimbo
+  // do envio faz cada versão ter endereço próprio, e o cache antigo morre só.
+  const url = `${pub.publicUrl}?v=${Date.now()}`;
 
   // Grava a URL da foto e, se veio, a cor da bolinha (extraída da foto no navegador).
   const update: Record<string, unknown> = { image_url: url, updated_at: new Date().toISOString() };
