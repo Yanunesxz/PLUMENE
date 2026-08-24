@@ -39,7 +39,15 @@ const ALL_REPS = '__all__';
  * fábrica" (o pedido salvo, que ele confere e altera com calma) e "Enviados"
  * (o que já está na fila). O gerente mantém o vocabulário da mesa dele.
  */
-function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStatus | 'all'; label: string }[] {
+/**
+ * Além dos status, dois filtros COMPOSTOS que olham o carimbo do faturamento:
+ * "A faturar" (aprovado, nota ainda não saiu — é este que vai pro Control e
+ * espera) e "Faturados". Para o representante são só INFORMAÇÃO: quem fatura
+ * continua sendo o financeiro/fábrica (e a venda interna, nos próprios).
+ */
+type FiltroDeStatus = OrderStatus | 'all' | 'a_faturar' | 'faturados';
+
+function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: FiltroDeStatus; label: string }[] {
   if (papel === 'store') {
     return [
       { value: 'all', label: 'Todos' },
@@ -54,7 +62,8 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStat
       { value: 'draft', label: 'Enviar pra fábrica' },
       { value: 'pending_approval', label: 'Enviados' },
       { value: 'pending_rep', label: 'Para revisar' },
-      { value: 'approved', label: 'Aprovados' },
+      { value: 'a_faturar', label: 'Aprovados — sem faturar' },
+      { value: 'faturados', label: 'Faturados' },
       { value: 'rejected', label: 'Recusados' },
     ];
   }
@@ -62,10 +71,19 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: OrderStat
     { value: 'all', label: 'Todos' },
     { value: 'pending_rep', label: 'Para revisar' },
     { value: 'pending_approval', label: 'Pendentes' },
-    { value: 'approved', label: 'Aprovados' },
+    { value: 'a_faturar', label: 'A faturar' },
+    { value: 'faturados', label: 'Faturados' },
     { value: 'rejected', label: 'Recusados' },
     { value: 'draft', label: 'Rascunhos' },
   ];
+}
+
+/** O filtro composto resolve status + carimbo; o simples, só o status. */
+function pedidoNoFiltro(o: Order, filtro: FiltroDeStatus): boolean {
+  if (filtro === 'all') return true;
+  if (filtro === 'a_faturar') return o.status === 'approved' && !o.invoiced;
+  if (filtro === 'faturados') return o.invoiced === true;
+  return o.status === filtro;
 }
 
 /**
@@ -108,7 +126,7 @@ export function PaginaPedidos() {
   );
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<OrderStatus | 'all'>('all');
+  const [status, setStatus] = useState<FiltroDeStatus>('all');
   // A mesa abre na fila do trabalho novo — o que espera o aceite.
   const [fila, setFila] = useState<FilaDoFinanceiro>('chegaram');
   const [repId, setRepId] = useState<string>(ALL_REPS);
@@ -221,7 +239,7 @@ export function PaginaPedidos() {
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
     const lista = (orders ?? [])
-      .filter((o) => (ehFinanceiro ? pedidoNaFila(o, fila) : status === 'all' || o.status === status))
+      .filter((o) => (ehFinanceiro ? pedidoNaFila(o, fila) : pedidoNoFiltro(o, status)))
       .filter((o) => repId === ALL_REPS || o.rep_id === repId)
       .filter((o) => {
         if (!q) return true;
