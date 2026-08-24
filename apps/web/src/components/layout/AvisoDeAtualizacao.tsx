@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { ArrowDownToLine } from 'lucide-react';
 import { useAtualizacao } from '../../hooks/useAtualizacao.js';
 import { aplicarAtualizacao } from '../../lib/atualizarApp.js';
+import { MARCA } from '../../lib/marca.js';
 
 /**
  * A faixa "versão nova pronta", em TODAS as telas.
@@ -20,7 +21,9 @@ export function AvisoDeAtualizacao() {
   const estado = useAtualizacao();
   const [aplicando, setAplicando] = useState(false);
 
-  if (estado !== 'disponivel') return null;
+  // A marca pode desligar a faixa (VITE_BRAND_UPDATE_BANNER=false); a troca
+  // automática de versão continua funcionando por baixo, sem aviso.
+  if (!MARCA.avisoDeAtualizacao || estado !== 'disponivel') return null;
 
   const aplicar = () => {
     setAplicando(true);

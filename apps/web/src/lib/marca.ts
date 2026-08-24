@@ -29,4 +29,12 @@ export const MARCA = {
    * ter um formato próprio. Só a string 'false' desliga — ausência liga.
    */
   exportaControl: (env['VITE_BRAND_CONTROL_EXPORT'] as string | undefined) !== 'false',
+
+  /**
+   * A faixa "versão nova pronta" aparece nesta instalação? Ela existe porque
+   * aparelho que fica o dia inteiro no app nunca chega ao momento da troca
+   * automática (3 atualizações não chegaram ao Yan em 19/08/2026). O dono da
+   * marca pode desligá-la; a troca automática continua funcionando por baixo.
+   */
+  avisoDeAtualizacao: (env['VITE_BRAND_UPDATE_BANNER'] as string | undefined) !== 'false',
 } as const;
