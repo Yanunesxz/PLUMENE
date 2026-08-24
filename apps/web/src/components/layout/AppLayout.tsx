@@ -4,6 +4,7 @@ import { LogOut, WifiOff } from 'lucide-react';
 import { BottomNav } from './BottomNav.js';
 import { SideNav } from './SideNav.js';
 import { ReconnectBanner } from './ReconnectBanner.js';
+import { AvisoDeAtualizacao } from './AvisoDeAtualizacao.js';
 import { Logo } from '../interface/Logo.js';
 import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
@@ -84,6 +85,9 @@ export function AppLayout() {
             </button>
           </div>
         </header>
+
+        {/* Em todas as telas: versão nova baixada = um toque e ela entra. */}
+        <AvisoDeAtualizacao />
 
         <main className="min-w-0 flex-1 overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
           <div className="mx-auto w-full max-w-6xl">
