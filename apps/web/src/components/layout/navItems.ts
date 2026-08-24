@@ -59,7 +59,8 @@ const adminItems: NavItem[] = [
 // nega escrita); a área dele traz o botão de atualizar o app.
 const financeiroItems: NavItem[] = [
   { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Gauge },
-  { to: '/orders', label: 'Pedidos', icon: ClipboardList },
+  // O número no menu é a fila "Chegaram": pedidos aguardando o aceite dele.
+  { to: '/orders', label: 'Pedidos', icon: ClipboardList, fila: 'aprovacao' },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/customers', label: 'Clientes', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
