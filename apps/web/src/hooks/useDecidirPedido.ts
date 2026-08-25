@@ -36,7 +36,9 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
           ? 'Pedido recusado.'
           : status === 'approved'
             ? 'Pedido aprovado!'
-            : 'Pedido enviado para a fábrica!',
+            : status === 'sent_erp'
+              ? 'Pedido lançado no ERP — agora é aguardar a nota para faturar.'
+              : 'Pedido enviado para a fábrica!',
         status === 'rejected',
       );
       return true;

@@ -96,7 +96,10 @@ export function seloDoPedido(
     if (pedido.status === 'draft') return { texto: 'Rascunho', variante: 'gray' };
     if (pedido.invoiced) return { texto: 'Faturado', variante: 'green' };
     if (pedido.status === 'pending_approval') return { texto: 'Aguardando aceite', variante: 'yellow' };
-    if (pedido.status === 'approved') return { texto: 'A faturar', variante: 'brand' };
+    // Aceito mas fora do Control: falta o LANÇAMENTO (a planilha).
+    if (pedido.status === 'approved') return { texto: 'A lançar', variante: 'brand' };
+    // Lançado: agora é esperar a nota sair para carimbar.
+    if (pedido.status === 'sent_erp') return { texto: 'A faturar', variante: 'gray' };
     return { texto: ORDER_STATUS_LABELS[pedido.status], variante: STATUS_VARIANTE[pedido.status] };
   }
   if (usaStatusInterno(papel)) {

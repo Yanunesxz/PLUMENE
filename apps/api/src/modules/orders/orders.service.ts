@@ -850,7 +850,10 @@ export async function updateOrderStatus(
       vendaInterna && body.status === 'approved' && row.status === 'draft';
     const forcandoAprovacao = body.status === 'approved' && !aprovandoVendaInterna;
     const recusandoForaDaTriagem = body.status === 'rejected' && row.status !== 'pending_rep';
-    if (forcandoAprovacao || recusandoForaDaTriagem) {
+    // Lançar no ERP é de quem importa a planilha no Control — financeiro e
+    // fábrica. Representante (venda interna incluída) não carimba isso.
+    const lancandoNoErp = body.status === 'sent_erp';
+    if (forcandoAprovacao || recusandoForaDaTriagem || lancandoNoErp) {
       throw new Error('FORBIDDEN_ROLE');
     }
   }

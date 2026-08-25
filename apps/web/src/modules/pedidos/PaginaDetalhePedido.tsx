@@ -601,6 +601,31 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
+          {/* Aceito, mas ainda fora do Control. Este botão registra o LANÇAMENTO:
+              a fábrica importou a planilha no ERP e o pedido passa a esperar só a
+              nota. É mesa do financeiro/fábrica — o representante (venda interna
+              inclusa) não lança, e a API recusa se tentar. */}
+          {order.status === 'approved' &&
+            !order.invoiced &&
+            (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
+            podeAprovar && (
+              <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+                <p className="mb-3 text-sm text-foreground">
+                  Pedido aceito. Depois de importar a planilha no Control, marque aqui que ele foi
+                  lançado — ele sai da fila &quot;A lançar&quot; e fica aguardando a nota.
+                </p>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={decidindo !== null}
+                  onClick={() => void handleDecisao('sent_erp')}
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  Lançar no ERP
+                </Button>
+              </div>
+            )}
+
           {decisao && (
             <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
               <p className="mb-3 text-sm text-foreground">{decisao.explicacao}</p>
