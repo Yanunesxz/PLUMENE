@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../apps/web/src/lib/observacaoCores.js';
+// O módulo mora no pacote compartilhado: a planilha (web) e a API de Parceiro
+// leem as mesmas linhas de cor das notas do pedido.
+import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../packages/shared/src/pedidos/observacaoCores.js';
 
 /**
  * A cor escolhida não cabe no item do pedido: o ERP recebe tudo como sortido

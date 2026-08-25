@@ -1,7 +1,7 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
 import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.js';
-import { semLinhasDeCor, coresPorSku } from './observacaoCores.js';
+import { semLinhasDeCor, coresPorSku } from '@csb/shared';
 import type { NumeroDaTabela } from './planilha/tabela.js';
 import type { OrderWithItems } from '@csb/shared';
 

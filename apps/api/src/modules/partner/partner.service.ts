@@ -6,6 +6,7 @@
  * daí o pedido fica como `sent_erp` e sai da fila.
  */
 import { supabase } from '../../config/supabase.js';
+import { coresPorSku, semLinhasDeCor } from '@csb/shared';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
 const COR_SORTIDA = '00001';
@@ -17,6 +18,8 @@ export interface PartnerOrderItem {
   quantidade: number;
   preco_unitario: number;
   valor_total: number;
+  /** A(s) cor(es) que o cliente escolheu para esta referência — vazio = sortido. */
+  observacao: string | null;
 }
 
 export interface PartnerOrder {
@@ -36,6 +39,18 @@ export interface PartnerOrder {
   };
   representante_erp: string | null;
   tabela_preco: { codigo_erp: string | null; coluna: number };
+  /** Código e descrição da condição no Control (ex.: "021" / "30/60/90"). */
+  condicao_pagamento: { codigo: string; descricao: string | null } | null;
+  /**
+   * Desconto do representante em PONTOS PERCENTUAIS: 10 = 10%. Os preços dos
+   * itens vêm SEM o desconto (preço de tabela); `valor_total` do pedido já o
+   * aplica — o mesmo contrato da planilha (AB46).
+   */
+  desconto_percentual: number;
+  /** O carimbo de faturado — só aparece preenchido com `incluir=todos`. */
+  faturado: boolean;
+  faturado_em: string | null;
+  valor_faturado: number | null;
   itens: PartnerOrderItem[];
   /** true quando todos os vínculos com o ERP estão presentes */
   importavel: boolean;
@@ -52,6 +67,11 @@ interface OrderRow {
   created_at: string;
   updated_at: string;
   erp_order_id: string | null;
+  discount_percent?: number | null;
+  invoiced?: boolean | null;
+  invoiced_at?: string | null;
+  invoiced_total?: number | null;
+  payment_condition?: { code: string; description: string | null } | null;
   /** Foto da tabela de preço no momento do pedido (preferida sobre a do cliente) */
   price_table_erp_code: string | null;
   price_column: number | null;
@@ -72,10 +92,21 @@ interface OrderRow {
   }>;
 }
 
-function buildOrderSelect(withOrderNumber: boolean): string {
+/** Quais colunas opcionais (migrações 009/027/028/029) este banco já tem. */
+interface ColunasOpcionais {
+  orderNumber: boolean;
+  invoiced: boolean;
+  condition: boolean;
+  discount: boolean;
+}
+
+function buildOrderSelect(c: ColunasOpcionais): string {
   return `
-    id, ${withOrderNumber ? 'order_number, ' : ''}status, total, notes,
+    id, ${c.orderNumber ? 'order_number, ' : ''}status, total, notes,
     created_at, updated_at, erp_order_id, price_table_erp_code, price_column,
+    ${c.invoiced ? 'invoiced, invoiced_at, invoiced_total, ' : ''}
+    ${c.discount ? 'discount_percent, ' : ''}
+    ${c.condition ? 'payment_condition:payment_conditions(code, description), ' : ''}
     customer:customers(erp_id, cnpj, name, trade_name, rep_erp_id, price_table_id),
     items:order_items(quantity, unit_price, total,
       variant:product_variants(erp_sku, size),
@@ -83,15 +114,24 @@ function buildOrderSelect(withOrderNumber: boolean): string {
   `;
 }
 
-// orders.order_number vem da migração 009, que pode não estar aplicada.
-// Detecta uma vez e guarda; sem a coluna, `numero` sai null.
-let hasOrderNumber: boolean | null = null;
+// Colunas de migrações que podem não estar aplicadas (009, 027, 028, 029).
+// Detecta uma vez e guarda; sem a coluna, o campo correspondente sai null/0.
+let colunasDetectadas: ColunasOpcionais | null = null;
 
-async function detectOrderNumber(): Promise<boolean> {
-  if (hasOrderNumber !== null) return hasOrderNumber;
-  const { error } = await supabase.from('orders').select('order_number').limit(1);
-  hasOrderNumber = !error;
-  return hasOrderNumber;
+async function detectColunas(): Promise<ColunasOpcionais> {
+  if (colunasDetectadas) return colunasDetectadas;
+  const probe = async (coluna: string) => {
+    const { error } = await supabase.from('orders').select(coluna).limit(1);
+    return !error;
+  };
+  const [orderNumber, invoiced, condition, discount] = await Promise.all([
+    probe('order_number'),
+    probe('invoiced'),
+    probe('payment_condition_id'),
+    probe('discount_percent'),
+  ]);
+  colunasDetectadas = { orderNumber, invoiced, condition, discount };
+  return colunasDetectadas;
 }
 
 function mapOrder(
@@ -112,6 +152,16 @@ function mapOrder(
   const coluna = row.price_column ?? customerTable?.price_column ?? 1;
   if (!tabelaErp) pendencias.push('pedido sem tabela de preço vinculada no ERP');
 
+  // A cor escolhida pelo cliente vive nas linhas "0015 3M azul" das notas —
+  // o item vai sortido para o ERP e a escolha viaja na observação, igual à
+  // coluna OBSERVAÇÃO da planilha do Control (ver @csb/shared observacaoCores).
+  const skusDoPedido = new Set<string>();
+  for (const it of row.items ?? []) {
+    if (it.product?.sku) skusDoPedido.add(it.product.sku);
+    if (it.product?.erp_id) skusDoPedido.add(it.product.erp_id);
+  }
+  const corDasNotas = coresPorSku(row.notes, skusDoPedido);
+
   const itens: PartnerOrderItem[] = (row.items ?? []).map((it) => {
     let produto: string | null = null;
     let tamanho: string | null = null;
@@ -124,6 +174,10 @@ function mapOrder(
       tamanho = it.variant?.size ?? null;
     }
     if (!produto || !tamanho) pendencias.push('item sem vínculo de produto/tamanho com o ERP');
+    const observacao =
+      (it.product?.sku ? corDasNotas.get(it.product.sku) : undefined) ??
+      (it.product?.erp_id ? corDasNotas.get(it.product.erp_id) : undefined) ??
+      null;
     return {
       produto,
       tamanho,
@@ -131,6 +185,7 @@ function mapOrder(
       quantidade: it.quantity,
       preco_unitario: it.unit_price,
       valor_total: it.total,
+      observacao,
     };
   });
 
@@ -143,7 +198,8 @@ function mapOrder(
     criado_em: row.created_at,
     atualizado_em: row.updated_at,
     valor_total: row.total,
-    observacoes: row.notes,
+    // Só o que o representante DIGITOU — as linhas de cor já saem por item.
+    observacoes: semLinhasDeCor(row.notes, skusDoPedido) || null,
     pedido_erp: row.erp_order_id,
     cliente: {
       codigo_erp: customer?.erp_id ?? null,
@@ -153,6 +209,13 @@ function mapOrder(
     },
     representante_erp: customer?.rep_erp_id ?? null,
     tabela_preco: { codigo_erp: tabelaErp, coluna },
+    condicao_pagamento: row.payment_condition
+      ? { codigo: row.payment_condition.code, descricao: row.payment_condition.description }
+      : null,
+    desconto_percentual: Number(row.discount_percent ?? 0),
+    faturado: row.invoiced === true,
+    faturado_em: row.invoiced_at ?? null,
+    valor_faturado: row.invoiced_total ?? null,
     itens,
     importavel: pendencias.length === 0,
     pendencias: [...new Set(pendencias)],
@@ -184,10 +247,10 @@ export async function getPartnerOrders(
   company_id: string,
   opts: { desde?: string | undefined; incluirImportados?: boolean },
 ): Promise<PartnerOrder[]> {
-  const withOrderNumber = await detectOrderNumber();
+  const colunas = await detectColunas();
   let query = supabase
     .from('orders')
-    .select(buildOrderSelect(withOrderNumber))
+    .select(buildOrderSelect(colunas))
     .eq('company_id', company_id)
     .order('created_at', { ascending: true });
 

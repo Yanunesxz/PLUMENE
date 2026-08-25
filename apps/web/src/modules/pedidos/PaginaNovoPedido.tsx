@@ -18,7 +18,7 @@ import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js'
 import { Textarea } from '../../components/interface/Textarea.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
-import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
+import { observacaoDeCores, juntarObservacao } from '@csb/shared';
 import { compararReferencia } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
