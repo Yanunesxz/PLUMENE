@@ -487,6 +487,43 @@ export function PaginaNovoPedido() {
               const primeiro = itens[0]!;
               const subtotal = itens.reduce((s, i) => s + i.quantity * i.unit_price, 0);
               const precos = [...new Set(itens.map((i) => i.unit_price))];
+
+              // Na grade aberta aparecem TODOS os tamanhos do produto, os
+              // zerados inclusos — o + neles adiciona a linha na hora, sem
+              // voltar ao seletor. Produto fora do catálogo cai só nas linhas
+              // que o pedido já tem.
+              const produtoDoGrupo = activeProducts.find((p) => p.id === primeiro.product_id);
+              const noCarrinho = new Map(itens.map((i) => [i.size, i]));
+              const linhasDaGrade = produtoDoGrupo?.variants?.length
+                ? [
+                    ...[...produtoDoGrupo.variants]
+                      .sort((a, b) => compararTamanho(a.size, b.size))
+                      .map((v) => ({
+                        size: v.size,
+                        variant_id: v.id as string | null,
+                        item: noCarrinho.get(v.size),
+                      })),
+                    ...itens
+                      .filter((i) => !produtoDoGrupo.variants!.some((v) => v.size === i.size))
+                      .map((i) => ({ size: i.size, variant_id: i.variant_id, item: i })),
+                  ]
+                : itens.map((i) => ({ size: i.size, variant_id: i.variant_id, item: i }));
+
+              const adicionarTamanho = (size: string, variant_id: string | null, quantity: number) =>
+                addToCart({
+                  product_id: primeiro.product_id,
+                  variant_id,
+                  size,
+                  product_name: primeiro.product_name,
+                  sku: primeiro.sku,
+                  quantity,
+                  unit_price: produtoDoGrupo
+                    ? (precoDoTamanho(size, produtoDoGrupo.price, produtoDoGrupo.price_larger) ?? 0)
+                    : primeiro.unit_price,
+                  color_code: primeiro.color_code ?? null,
+                  color_name: primeiro.color_name ?? null,
+                });
+
               return (
                 <li key={chave} className="rounded-xl border border-border bg-card p-3 shadow-sm">
                   <div className="mb-2 flex items-start justify-between gap-2">
@@ -554,53 +591,70 @@ export function PaginaNovoPedido() {
 
                   {gradeEmEdicao === chave ? (
                     <>
-                      {/* Grade aberta para mexer: uma coluna por tamanho, com os
-                          botões. O − no 1 tira o tamanho da grade. */}
+                      {/* Grade aberta para mexer: TODOS os tamanhos do produto,
+                          zerados inclusos (célula tracejada, o + adiciona). O −
+                          no 1 tira o tamanho da grade. */}
                       <div className="flex flex-wrap items-end gap-2">
-                        {itens.map((item) => (
+                        {linhasDaGrade.map(({ size, variant_id, item }) => (
                           <div
-                            key={item.size}
-                            className="flex flex-col items-center gap-1 rounded-lg border border-primary/25 bg-primary-soft px-1.5 pb-1.5 pt-1"
+                            key={size}
+                            className={`flex flex-col items-center gap-1 rounded-lg border px-1.5 pb-1.5 pt-1 ${
+                              item
+                                ? 'border-primary/25 bg-primary-soft'
+                                : 'border-dashed border-border bg-transparent'
+                            }`}
                           >
-                            <span className="text-xs font-bold uppercase tracking-wide text-primary">
-                              {item.size || 'Único'}
+                            <span
+                              className={`text-xs font-bold uppercase tracking-wide ${
+                                item ? 'text-primary' : 'text-muted-foreground'
+                              }`}
+                            >
+                              {size || 'Único'}
                             </span>
                             <div className="flex items-center">
                               <button
                                 type="button"
+                                disabled={!item}
                                 onClick={() =>
-                                  item.quantity <= 1
+                                  item &&
+                                  (item.quantity <= 1
                                     ? removeItem(item.product_id, item.size, item.color_code)
-                                    : setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)
+                                    : setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code))
                                 }
-                                aria-label={`Diminuir quantidade do ${item.size}`}
-                                className="flex h-9 w-9 items-center justify-center rounded-l-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
+                                aria-label={`Diminuir quantidade do ${size}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-l-md border border-input bg-background text-foreground transition-colors hover:bg-muted disabled:opacity-40"
                               >
                                 <Minus className="h-3 w-3" strokeWidth={2.5} />
                               </button>
                               <input
                                 type="number"
-                                min={1}
-                                value={item.quantity}
-                                onChange={(e) =>
-                                  setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)
-                                }
-                                aria-label={`Quantidade do ${item.size}`}
-                                className="tnum h-9 w-10 border-y border-input bg-background text-center text-sm font-bold text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                                min={0}
+                                value={item ? item.quantity : 0}
+                                onChange={(e) => {
+                                  const v = Number(e.target.value);
+                                  if (item) setQuantity(item.product_id, item.size, v, item.color_code);
+                                  else if (v >= 1) adicionarTamanho(size, variant_id, v);
+                                }}
+                                aria-label={`Quantidade do ${size}`}
+                                className={`tnum h-9 w-10 border-y border-input bg-background text-center text-sm font-bold focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none ${
+                                  item ? 'text-foreground' : 'text-subtle'
+                                }`}
                               />
                               <button
                                 type="button"
                                 onClick={() =>
-                                  setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)
+                                  item
+                                    ? setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)
+                                    : adicionarTamanho(size, variant_id, 1)
                                 }
-                                aria-label={`Aumentar quantidade do ${item.size}`}
+                                aria-label={`Aumentar quantidade do ${size}`}
                                 className="flex h-9 w-9 items-center justify-center rounded-r-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
                               >
                                 <Plus className="h-3 w-3" strokeWidth={2.5} />
                               </button>
                             </div>
                             {/* Preço por tamanho só quando difere na ref (faixa maior). */}
-                            {precos.length > 1 && (
+                            {precos.length > 1 && item && (
                               <span className="tnum text-[10px] text-muted-foreground">
                                 {formatBRL(item.unit_price)}
                               </span>
