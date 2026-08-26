@@ -257,6 +257,20 @@ export function PaginaNovoPedido() {
     (a, b) => compararReferencia(a.sku, b.sku) || compararTamanho(a.size, b.size),
   );
 
+  // Um card por (referência × cor), com a grade de tamanhos junta — a cor faz
+  // parte da identidade da linha (3 azuis M ≠ 2 rosas M), então cores
+  // diferentes da mesma ref viram cards separados de propósito.
+  const gruposDoCarrinho = (() => {
+    const porGrupo = new Map<string, typeof itensOrdenados>();
+    for (const item of itensOrdenados) {
+      const chave = `${item.product_id}|${item.color_code ?? ''}`;
+      const lista = porGrupo.get(chave);
+      if (lista) lista.push(item);
+      else porGrupo.set(chave, [item]);
+    }
+    return [...porGrupo.entries()].map(([chave, itens]) => ({ chave, itens }));
+  })();
+
   const totalBruto = items.reduce((sum, i) => sum + i.quantity * i.unit_price, 0);
   const total = totalBruto * (1 - descontoAplicado / 100);
   const totalQty = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -466,100 +480,149 @@ export function PaginaNovoPedido() {
           </div>
         ) : (
           <ul className="space-y-2">
-            {itensOrdenados.map((item) => (
-              <li key={`${item.product_id}|${item.size}`} className="rounded-xl border border-border bg-card p-3 shadow-sm">
-                <div className="mb-2 flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 items-start gap-2.5">
-                    <div className="h-16 w-10 shrink-0 overflow-hidden rounded-lg bg-sunken">
-                      {imagemPorProduto.get(item.product_id) ? (
-                        <img
-                          src={imagemPorProduto.get(item.product_id)}
-                          alt={item.product_name}
-                          loading="lazy"
-                          className="h-full w-full object-cover"
+            {gruposDoCarrinho.map(({ chave, itens }) => {
+              const primeiro = itens[0]!;
+              const subtotal = itens.reduce((s, i) => s + i.quantity * i.unit_price, 0);
+              const precos = [...new Set(itens.map((i) => i.unit_price))];
+              return (
+                <li key={chave} className="rounded-xl border border-border bg-card p-3 shadow-sm">
+                  <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-start gap-2.5">
+                      <div className="h-16 w-10 shrink-0 overflow-hidden rounded-lg bg-sunken">
+                        {imagemPorProduto.get(primeiro.product_id) ? (
+                          <img
+                            src={imagemPorProduto.get(primeiro.product_id)}
+                            alt={primeiro.product_name}
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-primary/40">
+                            <ShoppingCart className="h-4 w-4" strokeWidth={1.5} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-medium text-foreground">
+                          {primeiro.product_name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {primeiro.sku}
+                          {primeiro.color_name && (
+                            <>
+                              {' · '}
+                              <span className="font-medium text-primary">{primeiro.color_name}</span>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        for (const i of itens) removeItem(i.product_id, i.size, i.color_code);
+                      }}
+                      aria-label="Remover referência do pedido"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+
+                  {/* A grade junta: uma coluna por tamanho, com o tamanho em
+                      destaque. O − no 1 tira o tamanho da grade. */}
+                  <div className="flex flex-wrap items-end gap-2">
+                    {itens.map((item) => (
+                      <div
+                        key={item.size}
+                        className="flex flex-col items-center gap-1 rounded-lg border border-primary/25 bg-primary-soft px-1.5 pb-1.5 pt-1"
+                      >
+                        <span className="text-xs font-bold uppercase tracking-wide text-primary">
+                          {item.size || 'Único'}
+                        </span>
+                        <div className="flex items-center">
+                          <button
+                            type="button"
+                            onClick={() =>
+                              item.quantity <= 1
+                                ? removeItem(item.product_id, item.size, item.color_code)
+                                : setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)
+                            }
+                            aria-label={`Diminuir quantidade do ${item.size}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-l-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
+                          >
+                            <Minus className="h-3 w-3" strokeWidth={2.5} />
+                          </button>
+                          <input
+                            type="number"
+                            min={1}
+                            value={item.quantity}
+                            onChange={(e) =>
+                              setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)
+                            }
+                            aria-label={`Quantidade do ${item.size}`}
+                            className="tnum h-9 w-10 border-y border-input bg-background text-center text-sm font-bold text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)
+                            }
+                            aria-label={`Aumentar quantidade do ${item.size}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-r-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
+                          >
+                            <Plus className="h-3 w-3" strokeWidth={2.5} />
+                          </button>
+                        </div>
+                        {/* Preço por tamanho só quando difere na ref (faixa maior). */}
+                        {precos.length > 1 && (
+                          <span className="tnum text-[10px] text-muted-foreground">
+                            {formatBRL(item.unit_price)}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+                    <div className="min-w-[6rem]">
+                      <label className="mb-1 block text-xs text-muted-foreground">Preço unit.</label>
+                      {canEditPrice ? (
+                        <input
+                          type="number"
+                          min={0}
+                          step={0.01}
+                          value={precos.length === 1 ? (precos[0] ?? 0) : ''}
+                          placeholder={
+                            precos.length > 1
+                              ? `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`
+                              : undefined
+                          }
+                          onChange={(e) => {
+                            const v = Number(e.target.value);
+                            for (const i of itens) setUnitPrice(i.product_id, i.size, v, i.color_code);
+                          }}
+                          className="h-11 w-36 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         />
                       ) : (
-                        <div className="flex h-full w-full items-center justify-center text-primary/40">
-                          <ShoppingCart className="h-4 w-4" strokeWidth={1.5} />
-                        </div>
+                        <p className="flex h-11 items-center text-sm font-medium text-foreground">
+                          {precos.length === 1
+                            ? formatBRL(precos[0] ?? 0)
+                            : `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`}
+                        </p>
                       )}
                     </div>
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-foreground">{item.product_name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {item.sku}
-                        {item.size ? ` · Tam ${item.size}` : ''}
-                        {item.color_name ? ` · ${item.color_name}` : ''}
+
+                    <div className="text-right">
+                      <p className="mb-1 text-xs text-muted-foreground">
+                        {itens.reduce((s, i) => s + i.quantity, 0)} peças · Subtotal
                       </p>
+                      <p className="text-sm font-semibold text-foreground">{formatBRL(subtotal)}</p>
                     </div>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => removeItem(item.product_id, item.size, item.color_code)}
-                    aria-label="Remover item"
-                    className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-
-                <div className="flex flex-wrap items-end gap-3">
-                  <div>
-                    <label className="mb-1 block text-xs text-muted-foreground">Qtd</label>
-                    <div className="flex items-center">
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)}
-                        aria-label="Diminuir quantidade"
-                        className="flex h-11 w-11 items-center justify-center rounded-l-lg border border-input text-foreground transition-colors hover:bg-muted"
-                      >
-                        <Minus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      </button>
-                      <input
-                        type="number"
-                        min={1}
-                        value={item.quantity}
-                        onChange={(e) => setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)}
-                        className="h-11 w-12 border-y border-input bg-background text-center text-sm text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)}
-                        aria-label="Aumentar quantidade"
-                        className="flex h-11 w-11 items-center justify-center rounded-r-lg border border-input text-foreground transition-colors hover:bg-muted"
-                      >
-                        <Plus className="h-3.5 w-3.5" strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="min-w-[6rem] flex-1">
-                    <label className="mb-1 block text-xs text-muted-foreground">Preço unit.</label>
-                    {canEditPrice ? (
-                      <input
-                        type="number"
-                        min={0}
-                        step={0.01}
-                        value={item.unit_price}
-                        onChange={(e) => setUnitPrice(item.product_id, item.size, Number(e.target.value), item.color_code)}
-                        className="h-11 w-full rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      />
-                    ) : (
-                      <p className="flex h-11 items-center text-sm font-medium text-foreground">
-                        {formatBRL(item.unit_price)}
-                      </p>
-                    )}
-                  </div>
-
-                  <div className="text-right">
-                    <p className="mb-1 text-xs text-muted-foreground">Subtotal</p>
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatBRL(item.quantity * item.unit_price)}
-                    </p>
-                  </div>
-                </div>
-              </li>
-            ))}
+                </li>
+              );
+            })}
           </ul>
         )}
 
