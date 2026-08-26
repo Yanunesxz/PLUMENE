@@ -648,19 +648,21 @@ export function PaginaNovoPedido() {
                     </>
                   ) : (
                     <>
-                      {/* Grade fechada: só tamanho e quantidade, miúdo. Mexer é
-                          no lápis — sem botão à vista, sem toque acidental. */}
-                      <div className="flex flex-wrap items-center gap-1">
+                      {/* Grade fechada: mini-tabela — o tamanho no tarjão roxo,
+                          a quantidade embaixo. Mexer é no lápis. */}
+                      <div className="flex flex-wrap items-start gap-1.5">
                         {itens.map((item) => (
-                          <span
+                          <div
                             key={item.size}
-                            className="rounded-md border border-primary/20 bg-primary-soft px-2 py-1 text-xs"
+                            className="min-w-9 overflow-hidden rounded-md border border-primary/30 text-center shadow-sm"
                           >
-                            <span className="font-bold uppercase tracking-wide text-primary">
-                              {item.size || 'Único'}
-                            </span>
-                            <span className="tnum font-semibold text-foreground"> {item.quantity}</span>
-                          </span>
+                            <div className="bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                              {item.size || 'Ún.'}
+                            </div>
+                            <div className="tnum bg-primary-soft px-1.5 py-0.5 text-sm font-bold text-foreground">
+                              {item.quantity}
+                            </div>
+                          </div>
                         ))}
                       </div>
                       <div className="mt-1.5 flex items-center justify-between">
