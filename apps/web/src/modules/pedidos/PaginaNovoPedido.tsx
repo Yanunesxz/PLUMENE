@@ -702,18 +702,15 @@ export function PaginaNovoPedido() {
                     </>
                   ) : (
                     <>
-                      {/* Grade fechada: mini-tabela — o tamanho no tarjão roxo,
-                          a quantidade embaixo. Mexer é no lápis. */}
-                      <div className="flex flex-wrap items-start gap-1.5">
+                      {/* Grade fechada: uma régua só, no tom dos selos do app —
+                          tamanhos em cima, quantidades embaixo. Mexer é no lápis. */}
+                      <div className="inline-flex max-w-full flex-wrap divide-x divide-border overflow-hidden rounded-lg border border-border shadow-sm">
                         {itens.map((item) => (
-                          <div
-                            key={item.size}
-                            className="min-w-9 overflow-hidden rounded-md border border-primary/30 text-center shadow-sm"
-                          >
-                            <div className="bg-primary px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary-foreground">
+                          <div key={item.size} className="min-w-10 flex-1 text-center">
+                            <div className="border-b border-border bg-primary-soft px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary-soft-foreground">
                               {item.size || 'Ún.'}
                             </div>
-                            <div className="tnum bg-primary-soft px-1.5 py-0.5 text-sm font-bold text-foreground">
+                            <div className="tnum bg-card px-2 py-1 text-sm font-bold text-foreground">
                               {item.quantity}
                             </div>
                           </div>
