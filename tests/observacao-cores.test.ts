@@ -79,6 +79,14 @@ describe('semLinhasDeCor — o rodapé da planilha fica só com o que o rep digi
     expect(semLinhasDeCor(notas, skus)).toBe('entregar até sexta');
   });
 
+  // O cartão da fila de decisão não tem os itens do pedido em mãos: o modo
+  // genérico (skus = null) tira qualquer linha com cara de "ref qtd+tam cor",
+  // mas exige o texto da cor no fim — recado do rep citando uma ref fica.
+  it('modo genérico (sem os SKUs): tira linha de cor, preserva recado com ref', () => {
+    const notas = 'FATURAR URGENTE ref 0550\n0015 3M azul\n0810 202 Cores variadas\n0015 3M';
+    expect(semLinhasDeCor(notas, null)).toBe('FATURAR URGENTE ref 0550\n0015 3M');
+  });
+
   it('não apaga frase do rep que só MENCIONA uma referência', () => {
     const notas = '0015 vai na segunda remessa';
     // "vai" não é quantidade+tamanho — a linha é recado, não cor.

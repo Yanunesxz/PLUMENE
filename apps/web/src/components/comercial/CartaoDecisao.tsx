@@ -4,6 +4,7 @@ import { Badge } from '../interface/Badge.js';
 import { Button } from '../interface/Button.js';
 import { formatBRL } from '../../lib/utils.js';
 import { nomeDoComprador, origemParaExibir, type Decisao } from '../../lib/pedido.js';
+import { semLinhasDeCor } from '@csb/shared';
 import type { Order } from '@csb/shared';
 
 /**
@@ -27,6 +28,9 @@ export function CartaoDecisao({
   onDecidir: (status: Decisao['aceitar'] | 'rejected') => void;
 }) {
   const origem = origemParaExibir(order);
+  // Só o recado do rep — as linhas de cor vivem nos itens, e o cartão da fila
+  // não tem os itens em mãos (por isso o modo genérico, sem o conjunto de SKUs).
+  const obsDoRep = semLinhasDeCor(order.notes, null);
 
   return (
     <li className="rounded-xl border border-border bg-card p-4 shadow-sm">
@@ -55,8 +59,10 @@ export function CartaoDecisao({
         </Badge>
       </div>
 
-      {order.notes && (
-        <p className="mb-3 rounded-lg bg-muted p-2 text-xs text-muted-foreground">{order.notes}</p>
+      {obsDoRep && (
+        <p className="mb-3 whitespace-pre-line rounded-lg bg-muted p-2 text-xs text-muted-foreground">
+          {obsDoRep}
+        </p>
       )}
 
       {/* Decidir sem abrir é o caminho rápido; abrir é para conferir os itens. */}
