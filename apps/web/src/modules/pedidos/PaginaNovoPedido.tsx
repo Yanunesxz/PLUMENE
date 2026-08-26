@@ -246,6 +246,13 @@ export function PaginaNovoPedido() {
   // Ref crescente e, dentro da mesma ref, a ordem da grade — a mesma ordem do
   // catálogo impresso, que é como o representante confere com o lojista. Sem
   // isso a lista fica na ordem em que as peças foram tocadas, que ninguém acha.
+  // A mini foto de cada linha do carrinho — a mesma do catálogo.
+  const imagemPorProduto = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const p of allProducts ?? []) if (p.image_url) m.set(p.id, p.image_url);
+    return m;
+  }, [allProducts]);
+
   const itensOrdenados = [...items].sort(
     (a, b) => compararReferencia(a.sku, b.sku) || compararTamanho(a.size, b.size),
   );
@@ -462,13 +469,29 @@ export function PaginaNovoPedido() {
             {itensOrdenados.map((item) => (
               <li key={`${item.product_id}|${item.size}`} className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <div className="mb-2 flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-medium text-foreground">{item.product_name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {item.sku}
-                      {item.size ? ` · Tam ${item.size}` : ''}
-                      {item.color_name ? ` · ${item.color_name}` : ''}
-                    </p>
+                  <div className="flex min-w-0 items-start gap-2.5">
+                    <div className="h-16 w-10 shrink-0 overflow-hidden rounded-lg bg-sunken">
+                      {imagemPorProduto.get(item.product_id) ? (
+                        <img
+                          src={imagemPorProduto.get(item.product_id)}
+                          alt={item.product_name}
+                          loading="lazy"
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center text-primary/40">
+                          <ShoppingCart className="h-4 w-4" strokeWidth={1.5} />
+                        </div>
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium text-foreground">{item.product_name}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {item.sku}
+                        {item.size ? ` · Tam ${item.size}` : ''}
+                        {item.color_name ? ` · ${item.color_name}` : ''}
+                      </p>
+                    </div>
                   </div>
                   <button
                     type="button"
