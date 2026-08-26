@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle } from 'lucide-react';
+import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle, Pencil, Check } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -51,6 +51,9 @@ export function PaginaNovoPedido() {
   const [condicaoId, setCondicaoId] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [picker, setPicker] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
+  // Qual card do carrinho está com a grade aberta para mexer. Fechado, o card
+  // mostra só tamanho e quantidade — os botões aparecem no toque do lápis.
+  const [gradeEmEdicao, setGradeEmEdicao] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
   const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
@@ -517,109 +520,162 @@ export function PaginaNovoPedido() {
                         </p>
                       </div>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        for (const i of itens) removeItem(i.product_id, i.size, i.color_code);
-                      }}
-                      aria-label="Remover referência do pedido"
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-
-                  {/* A grade junta: uma coluna por tamanho, com o tamanho em
-                      destaque. O − no 1 tira o tamanho da grade. */}
-                  <div className="flex flex-wrap items-end gap-2">
-                    {itens.map((item) => (
-                      <div
-                        key={item.size}
-                        className="flex flex-col items-center gap-1 rounded-lg border border-primary/25 bg-primary-soft px-1.5 pb-1.5 pt-1"
+                    <div className="flex shrink-0 items-center">
+                      <button
+                        type="button"
+                        onClick={() => setGradeEmEdicao(gradeEmEdicao === chave ? null : chave)}
+                        aria-label={
+                          gradeEmEdicao === chave ? 'Concluir a grade' : 'Mexer na grade'
+                        }
+                        className={`flex h-11 w-11 items-center justify-center rounded-lg transition-colors ${
+                          gradeEmEdicao === chave
+                            ? 'bg-primary-soft text-primary'
+                            : 'text-muted-foreground hover:bg-sunken hover:text-foreground'
+                        }`}
                       >
-                        <span className="text-xs font-bold uppercase tracking-wide text-primary">
-                          {item.size || 'Único'}
-                        </span>
-                        <div className="flex items-center">
-                          <button
-                            type="button"
-                            onClick={() =>
-                              item.quantity <= 1
-                                ? removeItem(item.product_id, item.size, item.color_code)
-                                : setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)
-                            }
-                            aria-label={`Diminuir quantidade do ${item.size}`}
-                            className="flex h-9 w-9 items-center justify-center rounded-l-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
-                          >
-                            <Minus className="h-3 w-3" strokeWidth={2.5} />
-                          </button>
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)
-                            }
-                            aria-label={`Quantidade do ${item.size}`}
-                            className="tnum h-9 w-10 border-y border-input bg-background text-center text-sm font-bold text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          <button
-                            type="button"
-                            onClick={() =>
-                              setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)
-                            }
-                            aria-label={`Aumentar quantidade do ${item.size}`}
-                            className="flex h-9 w-9 items-center justify-center rounded-r-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
-                          >
-                            <Plus className="h-3 w-3" strokeWidth={2.5} />
-                          </button>
-                        </div>
-                        {/* Preço por tamanho só quando difere na ref (faixa maior). */}
-                        {precos.length > 1 && (
-                          <span className="tnum text-[10px] text-muted-foreground">
-                            {formatBRL(item.unit_price)}
-                          </span>
+                        {gradeEmEdicao === chave ? (
+                          <Check className="h-4 w-4" strokeWidth={2.5} />
+                        ) : (
+                          <Pencil className="h-4 w-4" />
                         )}
-                      </div>
-                    ))}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          for (const i of itens) removeItem(i.product_id, i.size, i.color_code);
+                        }}
+                        aria-label="Remover referência do pedido"
+                        className="flex h-11 w-11 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
 
-                  <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
-                    <div className="min-w-[6rem]">
-                      <label className="mb-1 block text-xs text-muted-foreground">Preço unit.</label>
-                      {canEditPrice ? (
-                        <input
-                          type="number"
-                          min={0}
-                          step={0.01}
-                          value={precos.length === 1 ? (precos[0] ?? 0) : ''}
-                          placeholder={
-                            precos.length > 1
-                              ? `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`
-                              : undefined
-                          }
-                          onChange={(e) => {
-                            const v = Number(e.target.value);
-                            for (const i of itens) setUnitPrice(i.product_id, i.size, v, i.color_code);
-                          }}
-                          className="h-11 w-36 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                        />
-                      ) : (
-                        <p className="flex h-11 items-center text-sm font-medium text-foreground">
+                  {gradeEmEdicao === chave ? (
+                    <>
+                      {/* Grade aberta para mexer: uma coluna por tamanho, com os
+                          botões. O − no 1 tira o tamanho da grade. */}
+                      <div className="flex flex-wrap items-end gap-2">
+                        {itens.map((item) => (
+                          <div
+                            key={item.size}
+                            className="flex flex-col items-center gap-1 rounded-lg border border-primary/25 bg-primary-soft px-1.5 pb-1.5 pt-1"
+                          >
+                            <span className="text-xs font-bold uppercase tracking-wide text-primary">
+                              {item.size || 'Único'}
+                            </span>
+                            <div className="flex items-center">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  item.quantity <= 1
+                                    ? removeItem(item.product_id, item.size, item.color_code)
+                                    : setQuantity(item.product_id, item.size, item.quantity - 1, item.color_code)
+                                }
+                                aria-label={`Diminuir quantidade do ${item.size}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-l-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
+                              >
+                                <Minus className="h-3 w-3" strokeWidth={2.5} />
+                              </button>
+                              <input
+                                type="number"
+                                min={1}
+                                value={item.quantity}
+                                onChange={(e) =>
+                                  setQuantity(item.product_id, item.size, Number(e.target.value), item.color_code)
+                                }
+                                aria-label={`Quantidade do ${item.size}`}
+                                className="tnum h-9 w-10 border-y border-input bg-background text-center text-sm font-bold text-foreground focus:outline-none [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setQuantity(item.product_id, item.size, item.quantity + 1, item.color_code)
+                                }
+                                aria-label={`Aumentar quantidade do ${item.size}`}
+                                className="flex h-9 w-9 items-center justify-center rounded-r-md border border-input bg-background text-foreground transition-colors hover:bg-muted"
+                              >
+                                <Plus className="h-3 w-3" strokeWidth={2.5} />
+                              </button>
+                            </div>
+                            {/* Preço por tamanho só quando difere na ref (faixa maior). */}
+                            {precos.length > 1 && (
+                              <span className="tnum text-[10px] text-muted-foreground">
+                                {formatBRL(item.unit_price)}
+                              </span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="mt-2 flex flex-wrap items-end justify-between gap-3">
+                        <div className="min-w-[6rem]">
+                          <label className="mb-1 block text-xs text-muted-foreground">Preço unit.</label>
+                          {canEditPrice ? (
+                            <input
+                              type="number"
+                              min={0}
+                              step={0.01}
+                              value={precos.length === 1 ? (precos[0] ?? 0) : ''}
+                              placeholder={
+                                precos.length > 1
+                                  ? `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`
+                                  : undefined
+                              }
+                              onChange={(e) => {
+                                const v = Number(e.target.value);
+                                for (const i of itens) setUnitPrice(i.product_id, i.size, v, i.color_code);
+                              }}
+                              className="h-11 w-36 rounded-lg border border-input bg-background px-2 text-sm text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            />
+                          ) : (
+                            <p className="flex h-11 items-center text-sm font-medium text-foreground">
+                              {precos.length === 1
+                                ? formatBRL(precos[0] ?? 0)
+                                : `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`}
+                            </p>
+                          )}
+                        </div>
+
+                        <div className="text-right">
+                          <p className="mb-1 text-xs text-muted-foreground">
+                            {itens.reduce((s, i) => s + i.quantity, 0)} peças · Subtotal
+                          </p>
+                          <p className="text-sm font-semibold text-foreground">{formatBRL(subtotal)}</p>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* Grade fechada: só tamanho e quantidade, miúdo. Mexer é
+                          no lápis — sem botão à vista, sem toque acidental. */}
+                      <div className="flex flex-wrap items-center gap-1">
+                        {itens.map((item) => (
+                          <span
+                            key={item.size}
+                            className="rounded-md border border-primary/20 bg-primary-soft px-2 py-1 text-xs"
+                          >
+                            <span className="font-bold uppercase tracking-wide text-primary">
+                              {item.size || 'Único'}
+                            </span>
+                            <span className="tnum font-semibold text-foreground"> {item.quantity}</span>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between">
+                        <span className="tnum text-[11px] text-muted-foreground">
                           {precos.length === 1
                             ? formatBRL(precos[0] ?? 0)
                             : `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`}
-                        </p>
-                      )}
-                    </div>
-
-                    <div className="text-right">
-                      <p className="mb-1 text-xs text-muted-foreground">
-                        {itens.reduce((s, i) => s + i.quantity, 0)} peças · Subtotal
-                      </p>
-                      <p className="text-sm font-semibold text-foreground">{formatBRL(subtotal)}</p>
-                    </div>
-                  </div>
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {itens.reduce((s, i) => s + i.quantity, 0)} peças ·{' '}
+                          <span className="text-sm font-semibold text-foreground">{formatBRL(subtotal)}</span>
+                        </span>
+                      </div>
+                    </>
+                  )}
                 </li>
               );
             })}
