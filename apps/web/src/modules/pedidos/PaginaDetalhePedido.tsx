@@ -1,9 +1,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
+import { useCartStore } from '../../store/cartStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { useDecidirPedido } from '../../hooks/useDecidirPedido.js';
 import { api } from '../../services/api.js';
@@ -387,6 +388,50 @@ export function PaginaDetalhePedido() {
     ? (custWhats.get(order.customer_id) ?? null)
     : (order?.guest_whatsapp ?? null);
 
+  const clearCart = useCartStore((s) => s.clear);
+  const addToCart = useCartStore((s) => s.add);
+
+  // Clonar: monta o MESMO pedido de novo no carrinho e cai na tela de novo
+  // pedido com cliente, condição, desconto e observações já no lugar. Os
+  // preços saem da tabela ATUAL (não os do pedido antigo — preço velho em
+  // pedido novo é briga na certa); peça que saiu do catálogo fica de fora,
+  // avisada. As observações vão como estão — as linhas de cor viajam nelas.
+  const clonarPedido = () => {
+    if (!order) return;
+    clearCart();
+    let pecasFora = 0;
+    for (const item of itensOrdenados) {
+      const p = prodMap.get(item.product_id);
+      const size = (item.variant_id && variantSize.get(item.variant_id)) || '';
+      if (!p) {
+        pecasFora += item.quantity;
+        continue;
+      }
+      addToCart({
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? null,
+        size,
+        product_name: p.name,
+        sku: p.sku,
+        quantity: item.quantity,
+        unit_price: precoDoTamanho(size, p.price, p.price_larger) ?? item.unit_price,
+        color_code: null,
+        color_name: null,
+      });
+    }
+    const query = order.customer_id ? `?customer_id=${order.customer_id}` : '';
+    void navigate(`/orders/new${query}`, {
+      state: {
+        clone: {
+          notes: order.notes ?? '',
+          payment_condition_id: order.payment_condition_id ?? '',
+          discount_percent: Number(order.discount_percent ?? 0),
+          pecasFora,
+        },
+      },
+    });
+  };
+
   useEffect(() => {
     if (!id) return;
     let cancel = false;
@@ -577,6 +622,20 @@ export function PaginaDetalhePedido() {
                 <MessageCircle className="h-4 w-4" strokeWidth={2.5} />
                 Enviar pedido para o cliente
               </a>
+            )}
+
+            {/* Fazer o MESMO pedido de novo — pedido de reposição é rotina.
+                Só o representante (o pedido é dele); vale em qualquer
+                situação, do rascunho ao já enviado. */}
+            {user?.role === 'rep' && order.items.length > 0 && (
+              <button
+                type="button"
+                onClick={clonarPedido}
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-sunken"
+              >
+                <Copy className="h-4 w-4" strokeWidth={2.5} />
+                Clonar pedido
+              </button>
             )}
 
             <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>

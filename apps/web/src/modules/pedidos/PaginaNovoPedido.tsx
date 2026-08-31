@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle, Pencil, Check } from 'lucide-react';
 import { db } from '../../offline/db.js';
@@ -245,6 +245,38 @@ export function PaginaNovoPedido() {
   // aqui é a mesma que o servidor vai calcular (os preços já vieram da tabela).
   const [descontoPct, setDescontoPct] = useState(0);
   const descontoAplicado = ehRep ? descontoPct : 0;
+
+  // Pedido CLONADO (botão no detalhe): o carrinho já chegou montado pelo
+  // clonar; aqui entram condição, desconto e observações do pedido original.
+  // O state é apagado em seguida para um F5 não reaplicar por cima do que a
+  // pessoa já tiver mudado.
+  const location = useLocation();
+  useEffect(() => {
+    const clone = (
+      location.state as {
+        clone?: {
+          notes: string;
+          payment_condition_id: string;
+          discount_percent: number;
+          pecasFora: number;
+        };
+      } | null
+    )?.clone;
+    if (!clone) return;
+    if (clone.notes) setNotes(clone.notes);
+    if (clone.payment_condition_id) setCondicaoId(clone.payment_condition_id);
+    if (clone.discount_percent > 0) setDescontoPct(clone.discount_percent);
+    setToast({
+      message:
+        clone.pecasFora > 0
+          ? `Pedido clonado — ${clone.pecasFora} peça(s) fora do catálogo ficaram de fora.`
+          : 'Pedido clonado! Confira as peças e salve.',
+      type: 'info',
+    });
+    window.history.replaceState({}, '');
+    // roda uma vez, na chegada da navegação
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Ref crescente e, dentro da mesma ref, a ordem da grade — a mesma ordem do
   // catálogo impresso, que é como o representante confere com o lojista. Sem
