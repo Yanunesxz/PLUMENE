@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle, Pencil, Check } from 'lucide-react';
+import { Trash2, Minus, Plus, WifiOff, ShoppingCart, AlertCircle, Pencil, Check, Copy } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -246,6 +246,38 @@ export function PaginaNovoPedido() {
   const [descontoPct, setDescontoPct] = useState(0);
   const descontoAplicado = ehRep ? descontoPct : 0;
 
+  // Pedido CLONADO (botão no detalhe): o carrinho já chegou montado pelo
+  // clonar; aqui entram condição, desconto e observações do pedido original,
+  // e o aviso fixo no topo — toast some em segundos, e quem clonou precisa
+  // saber que isto é um pedido NOVO que pode mexer à vontade. O state é
+  // apagado em seguida para um F5 não reaplicar por cima do que a pessoa
+  // já tiver mudado.
+  const location = useLocation();
+  const [avisoClone, setAvisoClone] = useState<{ numero: number | null; pecasFora: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    const clone = (
+      location.state as {
+        clone?: {
+          numero: number | null;
+          notes: string;
+          payment_condition_id: string;
+          discount_percent: number;
+          pecasFora: number;
+        };
+      } | null
+    )?.clone;
+    if (!clone) return;
+    if (clone.notes) setNotes(clone.notes);
+    if (clone.payment_condition_id) setCondicaoId(clone.payment_condition_id);
+    if (clone.discount_percent > 0) setDescontoPct(clone.discount_percent);
+    setAvisoClone({ numero: clone.numero ?? null, pecasFora: clone.pecasFora });
+    window.history.replaceState({}, '');
+    // roda uma vez, na chegada da navegação
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Ref crescente e, dentro da mesma ref, a ordem da grade — a mesma ordem do
   // catálogo impresso, que é como o representante confere com o lojista. Sem
   // isso a lista fica na ordem em que as peças foram tocadas, que ninguém acha.
@@ -395,6 +427,21 @@ export function PaginaNovoPedido() {
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
           <WifiOff className="h-4 w-4 shrink-0" strokeWidth={2.5} />
           Você está offline. O pedido será salvo localmente e sincronizado depois.
+        </div>
+      )}
+
+      {avisoClone && (
+        <div className="mb-4 rounded-xl border border-primary/25 bg-primary-soft p-3">
+          <p className="flex items-center gap-2 text-sm font-semibold text-primary-soft-foreground">
+            <Copy className="h-4 w-4 shrink-0" strokeWidth={2.5} />
+            Pedido clonado{avisoClone.numero ? ` do #${avisoClone.numero}` : ''}
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-primary-soft-foreground/80">
+            Peças, cliente, condição e observações vieram copiados — mas este é um pedido NOVO:
+            mexa no que quiser antes de salvar. Os preços são os da tabela de hoje.
+            {avisoClone.pecasFora > 0 &&
+              ` Atenção: ${avisoClone.pecasFora} peça(s) fora do catálogo ficaram de fora.`}
+          </p>
         </div>
       )}
 
