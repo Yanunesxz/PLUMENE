@@ -144,6 +144,22 @@ export function instrucoesDoRelatorio(marca: string): string {
   );
 }
 
+/**
+ * Qual motor pensa o relatório: a chave presente decide. Com as duas, a
+ * preferência (IA_PROVEDOR) desempata; sem preferência, Claude primeiro.
+ * A assinatura do ChatGPT (chatgpt.com) NÃO serve aqui — só chave de API.
+ */
+export function escolherProvedor(chaves: {
+  anthropic: string;
+  openai: string;
+  preferencia?: string;
+}): 'anthropic' | 'openai' | null {
+  if (chaves.preferencia === 'openai' && chaves.openai) return 'openai';
+  if (chaves.anthropic) return 'anthropic';
+  if (chaves.openai) return 'openai';
+  return null;
+}
+
 export function montarPedido(escopo: 'minha carteira' | 'empresa inteira', resumo: ResumoDaCarteira, linhas: string[]): string {
   return (
     `Faca o relatorio simples da ${escopo}.\n\n` +

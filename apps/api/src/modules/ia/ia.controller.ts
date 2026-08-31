@@ -20,7 +20,7 @@ export async function relatorioDaCarteiraHandler(
   }
   if (r.reason === 'sem_chave') {
     await reply.status(503).send({
-      error: 'A IA ainda não está ligada — falta a chave ANTHROPIC_API_KEY no Railway',
+      error: 'A IA ainda não está ligada — falta uma chave de API no Railway (OPENAI_API_KEY ou ANTHROPIC_API_KEY)',
       code: 'IA_DESLIGADA',
       statusCode: 503,
     });

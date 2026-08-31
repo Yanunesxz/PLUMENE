@@ -5,6 +5,7 @@ import {
   linhasDaCarteira,
   linhasDaEmpresa,
   montarPedido,
+  escolherProvedor,
   MAXIMO_DE_LINHAS,
   type ClienteParaRelatorio,
 } from '../apps/api/src/modules/ia/ia.relatorio.js';
@@ -100,6 +101,18 @@ describe('linhas da empresa (visão do escritório)', () => {
     expect(linhas.some((l) => l.startsWith('SEM REPRESENTANTE:'))).toBe(true);
     // O pior parado aparece na lista nominal com o rep entre parênteses.
     expect(linhas.join('\n')).toContain('(SILVIO)');
+  });
+});
+
+describe('escolherProvedor', () => {
+  it('a chave presente decide; com as duas, a preferência desempata', () => {
+    expect(escolherProvedor({ anthropic: '', openai: '' })).toBeNull();
+    expect(escolherProvedor({ anthropic: 'sk-ant', openai: '' })).toBe('anthropic');
+    expect(escolherProvedor({ anthropic: '', openai: 'sk-oai' })).toBe('openai');
+    expect(escolherProvedor({ anthropic: 'sk-ant', openai: 'sk-oai' })).toBe('anthropic');
+    expect(escolherProvedor({ anthropic: 'sk-ant', openai: 'sk-oai', preferencia: 'openai' })).toBe('openai');
+    // Preferir openai SEM ter a chave não desliga a IA — cai no que existe.
+    expect(escolherProvedor({ anthropic: 'sk-ant', openai: '', preferencia: 'openai' })).toBe('anthropic');
   });
 });
 

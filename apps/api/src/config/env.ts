@@ -49,9 +49,17 @@ export const env = {
   /** Chave da API da Anthropic (console.anthropic.com → API keys, crédito
    *  pré-pago). Vazia = IA desligada: a rota responde 503 e o app avisa. */
   ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
-  /** Modelo dos relatórios. O Haiku custa centavos por relatório e resolve;
-   *  trocar por um maior é só mudar esta variável no Railway. */
+  /** Modelo dos relatórios no Claude. O Haiku custa centavos por relatório e
+   *  resolve; trocar por um maior é só mudar esta variável no Railway. */
   IA_MODELO: process.env['IA_MODELO'] ?? 'claude-haiku-4-5-20251001',
+  /** Chave da API da OpenAI (platform.openai.com → API keys, crédito pré-pago).
+   *  ATENÇÃO: a assinatura do ChatGPT (chatgpt.com, inclusive a Pro) NÃO dá
+   *  chave de API — a cobrança da plataforma é separada. */
+  OPENAI_API_KEY: process.env['OPENAI_API_KEY'] ?? '',
+  /** Modelo dos relatórios no ChatGPT — o mini é o equivalente barato do Haiku. */
+  OPENAI_MODELO: process.env['OPENAI_MODELO'] ?? 'gpt-4o-mini',
+  /** Com as DUAS chaves no ar, quem pensa: 'anthropic' (padrão) ou 'openai'. */
+  IA_PROVEDOR: process.env['IA_PROVEDOR'] ?? '',
 
   // ── Notificações push (Web Push / VAPID) ─────────────────────────────────────
   // Par de chaves gerado UMA vez (npx web-push generate-vapid-keys) e colado no

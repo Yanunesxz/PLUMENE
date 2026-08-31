@@ -1,9 +1,11 @@
 /**
- * Relatório da carteira feito pelo Claude (API da Anthropic) — SÓ quando pedem.
+ * Relatório da carteira feito por IA — SÓ quando pedem.
  *
- * Não existe rotina, agendamento nem análise de fundo: o custo nasce do toque
- * no botão e morre com a resposta. Sem a chave no Railway a rota responde 503
- * com o motivo — o app continua inteiro sem IA, que é acessório, não fundação.
+ * O motor é a chave que estiver no Railway: Claude (ANTHROPIC_API_KEY) ou
+ * ChatGPT (OPENAI_API_KEY) — chave de API, nunca assinatura de chat. Não
+ * existe rotina, agendamento nem análise de fundo: o custo nasce do toque no
+ * botão e morre com a resposta. Sem chave nenhuma a rota responde 503 com o
+ * motivo — o app continua inteiro sem IA, que é acessório, não fundação.
  */
 import { env } from '../../config/env.js';
 import { supabase } from '../../config/supabase.js';
@@ -13,6 +15,7 @@ import {
   resumirCarteira,
   instrucoesDoRelatorio,
   montarPedido,
+  escolherProvedor,
   type ClienteParaRelatorio,
 } from './ia.relatorio.js';
 
@@ -30,7 +33,12 @@ export async function relatorioDaCarteira(
   company_id: string,
   escopo: { rep_id: string; erp_rep_id?: string | null; irrestrito: boolean },
 ): Promise<RelatorioResult> {
-  if (!env.ANTHROPIC_API_KEY) return { ok: false, reason: 'sem_chave' };
+  const provedor = escolherProvedor({
+    anthropic: env.ANTHROPIC_API_KEY,
+    openai: env.OPENAI_API_KEY,
+    preferencia: env.IA_PROVEDOR,
+  });
+  if (!provedor) return { ok: false, reason: 'sem_chave' };
 
   const clientes: ClienteParaRelatorio[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
@@ -74,10 +82,12 @@ export async function relatorioDaCarteira(
     alcance = 'minha carteira';
   }
 
-  const texto = await perguntarAoClaude(
-    instrucoesDoRelatorio(env.EMAIL_FROM_NAME),
-    montarPedido(alcance, resumo, linhas),
-  );
+  const instrucoes = instrucoesDoRelatorio(env.EMAIL_FROM_NAME);
+  const pedido = montarPedido(alcance, resumo, linhas);
+  const texto =
+    provedor === 'openai'
+      ? await perguntarAoChatGPT(instrucoes, pedido)
+      : await perguntarAoClaude(instrucoes, pedido);
   if (!texto) return { ok: false, reason: 'falha_ia' };
   return { ok: true, relatorio: texto, clientes: clientes.length };
 }
@@ -106,5 +116,33 @@ async function perguntarAoClaude(instrucoes: string, pedido: string): Promise<st
     return texto || null;
   } catch {
     return null; // rede, timeout, JSON torto — para o app é tudo "IA não respondeu"
+  }
+}
+
+/** O mesmo contrato, no formato da OpenAI (chat completions). */
+async function perguntarAoChatGPT(instrucoes: string, pedido: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${env.OPENAI_API_KEY}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: env.OPENAI_MODELO,
+        max_completion_tokens: 1000,
+        messages: [
+          { role: 'system', content: instrucoes },
+          { role: 'user', content: pedido },
+        ],
+      }),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
+    const texto = json.choices?.[0]?.message?.content?.trim();
+    return texto || null;
+  } catch {
+    return null;
   }
 }
