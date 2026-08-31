@@ -976,11 +976,18 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       },
       <span class="k">"representante_erp"</span>: <span class="s">"00042"</span>,
       <span class="k">"tabela_preco"</span>: { <span class="k">"codigo_erp"</span>: <span class="s">"00007"</span>, <span class="k">"coluna"</span>: <span class="n">1</span> },
+      <span class="k">"condicao_pagamento"</span>: { <span class="k">"codigo"</span>: <span class="s">"021"</span>, <span class="k">"descricao"</span>: <span class="s">"30/60/90"</span> },
+      <span class="k">"desconto_percentual"</span>: <span class="n">10</span>,
+      <span class="k">"faturado"</span>: <span class="n">false</span>,
+      <span class="k">"faturado_em"</span>: <span class="n">null</span>,
+      <span class="k">"valor_faturado"</span>: <span class="n">null</span>,
       <span class="k">"itens"</span>: [
         { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"G"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
-          <span class="k">"quantidade"</span>: <span class="n">3</span>, <span class="k">"preco_unitario"</span>: <span class="n">42.90</span>, <span class="k">"valor_total"</span>: <span class="n">128.70</span> },
+          <span class="k">"quantidade"</span>: <span class="n">3</span>, <span class="k">"preco_unitario"</span>: <span class="n">42.90</span>, <span class="k">"valor_total"</span>: <span class="n">128.70</span>,
+          <span class="k">"observacao"</span>: <span class="s">"azul"</span> },
         { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"GG"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
-          <span class="k">"quantidade"</span>: <span class="n">2</span>, <span class="k">"preco_unitario"</span>: <span class="n">55.00</span>, <span class="k">"valor_total"</span>: <span class="n">110.00</span> }
+          <span class="k">"quantidade"</span>: <span class="n">2</span>, <span class="k">"preco_unitario"</span>: <span class="n">55.00</span>, <span class="k">"valor_total"</span>: <span class="n">110.00</span>,
+          <span class="k">"observacao"</span>: <span class="n">null</span> }
       ],
       <span class="k">"importavel"</span>: <span class="n">true</span>,
       <span class="k">"pendencias"</span>: []
@@ -1170,13 +1177,20 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <tr><td><code>situacao</code></td><td class="t-mut">texto</td><td><code>approved</code> aguardando importação · <code>sent_erp</code> já confirmado.</td></tr>
             <tr><td><code>criado_em</code></td><td class="t-mut">data</td><td>Quando o representante fechou o pedido.</td></tr>
             <tr><td><code>atualizado_em</code></td><td class="t-mut">data</td><td>Última alteração. É o campo usado pelo filtro <code>desde</code>.</td></tr>
-            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do pedido.</td></tr>
-            <tr><td><code>observacoes</code></td><td class="t-mut">texto</td><td>Anotações do representante. Pode vir vazio.</td></tr>
+            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do pedido, <b>já com o desconto aplicado</b>.</td></tr>
+            <tr><td><code>observacoes</code></td><td class="t-mut">texto</td><td>Só o que o representante digitou (remessa, boleto, recado). A cor escolhida sai por item, em <code>itens[].observacao</code>.</td></tr>
+            <tr><td><code>pedido_erp</code></td><td class="t-mut">texto</td><td><b>O número do pedido no seu ERP</b> (ex.: SX16680). Vem <code>null</code> na fila; é preenchido pela sua confirmação.</td></tr>
             <tr><td><code>cliente.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código do cliente no seu ERP.</b></td></tr>
             <tr><td><code>cliente.cnpj</code></td><td class="t-mut">texto</td><td>CNPJ ou CPF, para dupla conferência.</td></tr>
             <tr><td><code>representante_erp</code></td><td class="t-mut">texto</td><td><b>Código do representante no seu ERP.</b></td></tr>
             <tr><td><code>tabela_preco.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código da tabela de preço no seu ERP.</b></td></tr>
             <tr><td><code>tabela_preco.coluna</code></td><td class="t-mut">inteiro</td><td>Coluna de preço usada, de 1 a 6.</td></tr>
+            <tr><td><code>condicao_pagamento.codigo</code></td><td class="t-mut">texto</td><td><b>Código da condição de pagamento no seu ERP</b> (ex.: <code>"021"</code>) — o mesmo da célula C8 da planilha.</td></tr>
+            <tr><td><code>condicao_pagamento.descricao</code></td><td class="t-mut">texto</td><td>Ex.: <code>"30/60/90"</code>, para conferência humana.</td></tr>
+            <tr><td><code>desconto_percentual</code></td><td class="t-mut">número</td><td>Desconto do representante em pontos percentuais (10 = 10%). Os preços dos itens vêm <b>sem</b> ele; o <code>valor_total</code> já o aplica — o mesmo contrato da célula AB46 da planilha.</td></tr>
+            <tr><td><code>faturado</code></td><td class="t-mut">booleano</td><td>O carimbo de faturado, que o seu <code>POST /faturamento</code> preenche. Na fila pendente vem sempre <code>false</code>.</td></tr>
+            <tr><td><code>faturado_em</code></td><td class="t-mut">data</td><td>Quando a nota saiu.</td></tr>
+            <tr><td><code>valor_faturado</code></td><td class="t-mut">número</td><td>O valor que a nota fechou (pode ser menor que o pedido).</td></tr>
             <tr><td><code>importavel</code></td><td class="t-mut">booleano</td><td><code>true</code> quando todos os vínculos com o ERP estão presentes.</td></tr>
             <tr><td><code>pendencias</code></td><td class="t-mut">lista</td><td>O que falta quando <code>importavel</code> é <code>false</code>.</td></tr>
           </tbody>
@@ -1192,13 +1206,54 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           <tbody>
             <tr><td><code>produto</code></td><td class="t-mut">texto</td><td><b>Referência do produto no seu ERP.</b></td></tr>
             <tr><td><code>tamanho</code></td><td class="t-mut">texto</td><td>P, M, G, GG, EG ou numeração (10, 12, 14…).</td></tr>
-            <tr><td><code>cor</code></td><td class="t-mut">texto</td><td>Código da cor no seu ERP.</td></tr>
+            <tr><td><code>cor</code></td><td class="t-mut">texto</td><td>Código da cor no seu ERP. <code>"00001"</code> = sortido.</td></tr>
             <tr><td><code>quantidade</code></td><td class="t-mut">inteiro</td><td>Quantidade de peças.</td></tr>
-            <tr><td><code>preco_unitario</code></td><td class="t-mut">número</td><td>Preço unitário praticado no pedido.</td></tr>
-            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do item.</td></tr>
+            <tr><td><code>preco_unitario</code></td><td class="t-mut">número</td><td>Preço unitário de tabela, <b>sem</b> o desconto.</td></tr>
+            <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do item (quantidade × preço de tabela).</td></tr>
+            <tr><td><code>observacao</code></td><td class="t-mut">texto</td><td><b>A(s) cor(es) que o cliente escolheu</b> para a referência (ex.: <code>"azul"</code>, <code>"3M azul / 2G rosa"</code>). <code>null</code> = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha.</td></tr>
           </tbody>
         </table>
       </div>
+
+      <h3>Quem é dono de cada dado</h3>
+      <p>
+        Regra geral da integração: <b>cada dado tem um dono único</b> — quem cria.
+        O outro lado recebe cópia, nunca inventa.
+      </p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Dado</th><th>Dono</th><th>Como circula</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>Código do cliente</td><td class="t-mut">ERP</td><td>O seu sistema envia por <code>POST /partner/v1/clientes</code> (código, razão social, CNPJ, representante, tabela, endereço, bloqueado, WhatsApp); o app guarda e devolve no pedido como <code>cliente.codigo_erp</code>.</td></tr>
+            <tr><td>Código do representante</td><td class="t-mut">ERP</td><td>Enviado por <code>POST /partner/v1/representantes</code> (código, nome, e-mail, ativo); liga a carteira e sai no pedido como <code>representante_erp</code>.</td></tr>
+            <tr><td>Tabela de preço</td><td class="t-mut">ERP</td><td>Código + coluna (1–6). O pedido fotografa a tabela na criação — trocar depois não muda pedido antigo.</td></tr>
+            <tr><td>Condição de pagamento</td><td class="t-mut">ERP</td><td>As condições do ERP estão cadastradas no app; o representante só escolhe. O código volta intacto em <code>condicao_pagamento.codigo</code>.</td></tr>
+            <tr><td>Referência do produto</td><td class="t-mut">ERP</td><td>O app só vende o que está no catálogo da coleção; a referência sai em <code>itens[].produto</code>.</td></tr>
+            <tr><td>Pedido (itens, desconto, condição, observações)</td><td class="t-mut">App</td><td>Montado pelo representante ou pela loja; o seu sistema importa via <code>GET /partner/v1/pedidos</code>.</td></tr>
+            <tr><td><b>Número do pedido no ERP</b></td><td class="t-mut">ERP</td><td>Nasce na importação (ex.: SX16680) e volta pelo <code>POST /confirmar</code>. O app nunca inventa esse número.</td></tr>
+            <tr><td>Faturamento (nota, valor, data)</td><td class="t-mut">ERP</td><td>Volta pelo <code>POST /faturamento</code>; o app carimba o pedido sozinho.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Situações do pedido — e o carimbo de faturado</h3>
+      <p>
+        O app tem etapas internas (rascunho, triagem do representante, aceite do
+        financeiro) que <b>nunca aparecem na API</b> — pedido só entra na fila
+        depois de aprovado. Para o seu sistema existem só duas situações:
+        <code>approved</code> (aguardando importação) e <code>sent_erp</code>
+        (importado e confirmado).
+      </p>
+      <p>
+        <b>"Faturado" não é situação — é carimbo.</b> Um pedido <code>sent_erp</code>
+        pode estar faturado ou não; quem diz é o campo <code>faturado</code> (com
+        <code>faturado_em</code> e <code>valor_faturado</code>), preenchido pelo seu
+        <code>POST /faturamento</code>. Assim o faturamento pode ser desfeito
+        (<code>"faturado": false</code>) sem mexer na história do pedido — e é ele
+        que promove o pedido a "Aprovado" aos olhos do lojista.
+      </p>
 
       <div class="note">
         <span class="note-t">Pedidos com cadastro incompleto</span>
@@ -1222,7 +1277,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         Na operação de cores sortidas, em que o representante pede por tamanho e a
         cor é definida na produção, o campo <code>cor</code> vem com o código padrão
         de sortido combinado com a sua fábrica (por exemplo <code>"00001"</code>) e o
-        pedido é uma linha por tamanho.
+        pedido é uma linha por tamanho. Quando o cliente escolhe a cor no catálogo,
+        a escolha não muda a linha: ela vem escrita em <code>observacao</code> do
+        item (ex.: <code>"azul"</code>) — o mesmo texto da coluna OBSERVAÇÃO da
+        planilha, que a separação já conhece.
       </p>
       <p>
         Quando houver venda por cor específica — a referência 0800 em preto, branco e

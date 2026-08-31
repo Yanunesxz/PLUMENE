@@ -81,7 +81,11 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: FiltroDeS
 /** O filtro composto resolve status + carimbo; o simples, só o status. */
 function pedidoNoFiltro(o: Order, filtro: FiltroDeStatus): boolean {
   if (filtro === 'all') return true;
-  if (filtro === 'a_faturar') return o.status === 'approved' && !o.invoiced;
+  // Para gerente e rep, "a faturar" é todo aprovado sem nota — lançado no ERP
+  // ou não. O detalhe do lançamento é mesa do financeiro, que tem fila própria.
+  if (filtro === 'a_faturar') {
+    return (o.status === 'approved' || o.status === 'sent_erp') && !o.invoiced;
+  }
   if (filtro === 'faturados') return o.invoiced === true;
   return o.status === filtro;
 }
@@ -94,10 +98,11 @@ function pedidoNoFiltro(o: Order, filtro: FiltroDeStatus): boolean {
  * O "já vi" é consequência da AÇÃO — aceitou, mudou de fila — e não de um
  * marcador de lido, que mentiria (abrir sem tratar não é tratar).
  */
-type FilaDoFinanceiro = 'chegaram' | 'a_faturar' | 'faturados' | 'rascunhos' | 'all';
+type FilaDoFinanceiro = 'chegaram' | 'a_lancar' | 'a_faturar' | 'faturados' | 'rascunhos' | 'all';
 
 const FILAS_DO_FINANCEIRO: { value: FilaDoFinanceiro; label: string }[] = [
   { value: 'chegaram', label: 'Chegaram' },
+  { value: 'a_lancar', label: 'A lançar' },
   { value: 'a_faturar', label: 'A faturar' },
   { value: 'faturados', label: 'Faturados' },
   { value: 'rascunhos', label: 'Rascunhos' },
@@ -107,9 +112,11 @@ const FILAS_DO_FINANCEIRO: { value: FilaDoFinanceiro; label: string }[] = [
 function pedidoNaFila(o: Order, fila: FilaDoFinanceiro): boolean {
   if (fila === 'all') return true;
   if (fila === 'chegaram') return o.status === 'pending_approval';
-  if (fila === 'a_faturar') return o.status === 'approved' && !o.invoiced;
-  // `sent_erp` já passou da mesa dele: mora junto dos resolvidos.
-  if (fila === 'faturados') return o.invoiced === true || o.status === 'sent_erp';
+  // Aceito e ainda fora do Control: é o que espera o LANÇAMENTO (a planilha).
+  if (fila === 'a_lancar') return o.status === 'approved' && !o.invoiced;
+  // Lançado no ERP: agora é só esperar a nota sair para carimbar o faturado.
+  if (fila === 'a_faturar') return o.status === 'sent_erp' && !o.invoiced;
+  if (fila === 'faturados') return o.invoiced === true;
   return o.status === 'draft';
 }
 
@@ -248,7 +255,7 @@ export function PaginaPedidos() {
       });
     // Nas filas de TRABALHO o mais antigo vem primeiro — fila é fila, e sem
     // isso o pedido velho fica soterrado pelos novos até alguém reclamar.
-    if (ehFinanceiro && (fila === 'chegaram' || fila === 'a_faturar')) {
+    if (ehFinanceiro && (fila === 'chegaram' || fila === 'a_lancar' || fila === 'a_faturar')) {
       return [...lista].reverse();
     }
     return lista;
@@ -261,6 +268,7 @@ export function PaginaPedidos() {
     const mes = new Date().toISOString().slice(0, 7);
     return {
       chegaram: todos.filter((o) => pedidoNaFila(o, 'chegaram')).length,
+      aLancar: todos.filter((o) => pedidoNaFila(o, 'a_lancar')).length,
       aFaturar: todos.filter((o) => pedidoNaFila(o, 'a_faturar')).length,
       faturadosNoMes: todos.filter((o) => o.invoiced && (o.invoiced_at ?? '').startsWith(mes)).length,
     };
@@ -470,9 +478,11 @@ export function PaginaPedidos() {
                     {f.label}
                     {f.value === 'chegaram' && placar && placar.chegaram > 0
                       ? ` (${placar.chegaram})`
-                      : f.value === 'a_faturar' && placar && placar.aFaturar > 0
-                        ? ` (${placar.aFaturar})`
-                        : ''}
+                      : f.value === 'a_lancar' && placar && placar.aLancar > 0
+                        ? ` (${placar.aLancar})`
+                        : f.value === 'a_faturar' && placar && placar.aFaturar > 0
+                          ? ` (${placar.aFaturar})`
+                          : ''}
                   </Chip>
                 ))
               : STATUS_FILTERS.map((f) => (
@@ -484,8 +494,8 @@ export function PaginaPedidos() {
 
           {placar && (
             <p className="-mt-2 mb-4 text-xs text-muted-foreground">
-              {placar.chegaram} aguardando aceite · {placar.aFaturar} a faturar ·{' '}
-              {placar.faturadosNoMes} faturado(s) no mês
+              {placar.chegaram} aguardando aceite · {placar.aLancar} a lançar ·{' '}
+              {placar.aFaturar} a faturar · {placar.faturadosNoMes} faturado(s) no mês
             </p>
           )}
         </>

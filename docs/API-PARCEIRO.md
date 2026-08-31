@@ -93,11 +93,18 @@ GET /partner/v1/pedidos?incluir=todos
       },
       "representante_erp": "04518",
       "tabela_preco": { "codigo_erp": "00016", "coluna": 1 },
+      "condicao_pagamento": { "codigo": "021", "descricao": "30/60/90" },
+      "desconto_percentual": 10,
+      "faturado": false,
+      "faturado_em": null,
+      "valor_faturado": null,
       "itens": [
         { "produto": "0015", "tamanho": "EG", "cor": "00001",
-          "quantidade": 3, "preco_unitario": 42.9, "valor_total": 128.7 },
+          "quantidade": 3, "preco_unitario": 42.9, "valor_total": 128.7,
+          "observacao": "azul" },
         { "produto": "0015", "tamanho": "G", "cor": "00001",
-          "quantidade": 2, "preco_unitario": 55.0, "valor_total": 110.0 }
+          "quantidade": 2, "preco_unitario": 55.0, "valor_total": 110.0,
+          "observacao": null }
       ],
       "importavel": true,
       "pendencias": []
@@ -114,14 +121,19 @@ GET /partner/v1/pedidos?incluir=todos
 | `numero` | inteiro ou null | Número legível do pedido no aplicativo |
 | `situacao` | texto | `approved` (aguardando importação) ou `sent_erp` (já confirmado) |
 | `criado_em` / `atualizado_em` | data ISO | Criação / última alteração |
-| `valor_total` | número | Total do pedido |
-| `observacoes` | texto ou null | Anotações do representante |
+| `valor_total` | número | Total do pedido, **já com o desconto aplicado** |
+| `observacoes` | texto ou null | Só o que o representante DIGITOU (a cor escolhida sai por item, em `itens[].observacao`) |
 | `pedido_erp` | texto ou null | Número no ERP (preenchido após a confirmação) |
 | `cliente.codigo_erp` | texto | **Código do cliente no seu ERP** (campo CLIENTE) |
 | `cliente.cnpj` | texto ou null | CNPJ/CPF para conferência |
 | `representante_erp` | texto | **Código do representante no seu ERP** (campo REPRESENTANTE) |
 | `tabela_preco.codigo_erp` | texto | **Código da tabela de preço no seu ERP** |
 | `tabela_preco.coluna` | inteiro | Coluna de preço usada (1 a 6) |
+| `condicao_pagamento` | objeto ou null | **Código da condição no seu ERP** (`codigo`, ex.: `"021"`) + `descricao`. O mesmo código da célula C8 da planilha |
+| `desconto_percentual` | número | Desconto do representante em **pontos percentuais** (10 = 10%). Os preços dos itens vêm SEM ele; o `valor_total` já o aplica — mesmo contrato da célula AB46 da planilha |
+| `faturado` | booleano | O carimbo de faturado (informado pelo passo 4). Na fila pendente vem sempre `false` |
+| `faturado_em` | data ISO ou null | Quando a nota saiu |
+| `valor_faturado` | número ou null | O valor que a nota fechou |
 | `importavel` | booleano | `true` = todos os vínculos com o ERP presentes |
 | `pendencias` | lista | O que falta quando `importavel=false` (ex.: cliente sem código) |
 
@@ -133,13 +145,15 @@ GET /partner/v1/pedidos?incluir=todos
 | `tamanho` | texto | Tamanho (P, M, G, GG, EG, numeração...) |
 | `cor` | texto | Código da cor. `"00001"` = cores sortidas (pedido por tamanho) |
 | `quantidade` | inteiro | Quantidade de peças |
-| `preco_unitario` | número | Preço unitário praticado |
-| `valor_total` | número | Total do item |
+| `preco_unitario` | número | Preço unitário de tabela, **sem** o desconto |
+| `valor_total` | número | Total do item (quantidade × preço de tabela) |
+| `observacao` | texto ou null | **A(s) cor(es) que o cliente escolheu** para a referência (ex.: `"azul"`, `"3M azul / 2G rosa"`). `null` = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha |
 
-**Sobre a cor:** hoje a operação é por *cores sortidas* — o representante pede
-por tamanho e a cor vem fixa `"00001"`. O campo já existe por item; quando/se
-houver venda por cor específica (ex.: ref. 0800 em preto, branco e rosa), o
-código real da cor virá neste campo, sem mudança no formato da API.
+**Sobre a cor:** a operação é por *cores sortidas* — o item vai agregado por
+(produto × tamanho) e a coluna COR recebe sempre `"00001"`. Quando o cliente
+escolhe cor nas bolinhas do catálogo, a escolha **não muda o produto**: ela
+viaja em `observacao`, no texto que a separação lê. Se um dia houver venda por
+cor com grade própria no ERP, o código real virá em `cor`, sem mudar o formato.
 
 **Sobre `importavel`:** pedidos com cadastro incompleto vêm com
 `importavel: false` e a lista `pendencias` explicando o motivo. Recomendação:
@@ -374,6 +388,141 @@ código, mesmo antes de o rep ter login.
   cadastro do ERP.
 - Preencha o código do ERP das tabelas de preço no app uma vez, senão os clientes
   entram sem tabela.
+
+---
+
+# Dicionário de dados — TODOS os dados da integração
+
+Referência completa, do cadastro do cliente até o carimbo de faturado. É o
+inventário de tudo que circula entre o app e o ERP, com o **dono** de cada dado
+(quem cria e quem só lê). Vale a regra geral: **cada dado tem um dono único** —
+o outro lado recebe cópia, nunca inventa.
+
+## Quem é dono de cada dado
+
+| Dado | Dono (quem cria) | O outro lado |
+|---|---|---|
+| Código do cliente | **ERP** | O app recebe por `POST /clientes` e guarda como `codigo_erp` |
+| Código do representante | **ERP** | O app recebe e usa para ligar carteira e pedidos |
+| Tabela de preço (código e coluna) | **ERP** | O app guarda o vínculo e fotografa no pedido |
+| Condição de pagamento (código) | **ERP** | O app tem as 146 cadastradas; rep e loja só escolhem |
+| Referência do produto | **ERP** | O app vende só o que está no catálogo da coleção |
+| Pedido (itens, desconto, condição, observações) | **App** | O ERP importa via `GET /pedidos` |
+| **Número do pedido no ERP** (ex.: SX16680) | **ERP** | Nasce na importação e volta pelo `POST /confirmar` — o app nunca inventa esse número |
+| Faturamento (nota, valor, data) | **ERP** | Volta pelo `POST /faturamento`; o app carimba sozinho |
+
+## Cliente
+
+O que o app guarda de cada cliente (alimentado pelo ERP via `POST /clientes`):
+
+| Dado | Campo no envio | Para que serve |
+|---|---|---|
+| Código no ERP | `codigo` | A identidade do cliente na integração — chave do upsert e o que sai no pedido como `cliente.codigo_erp` |
+| Razão social | `razao_social` | Nome oficial, sai nas telas e na conferência do pedido |
+| Nome fantasia | `nome_fantasia` | O nome que o representante procura |
+| CNPJ/CPF | `cnpj_cpf` | Conferência e casamento de cadastro (as cargas casam por CNPJ) |
+| Representante dono | `representante` | Código do rep no ERP — define de quem é a carteira |
+| Tabela de preço | `tabela_preco` | Código da tabela no ERP; sem ela o cliente usa a tabela do representante |
+| Endereço | `endereco` | Entrega e cadastro |
+| Bloqueado | `bloqueado` | `"S"` = não fecha pedido no app |
+| Limite de crédito | `limite_credito` | Informativo |
+| WhatsApp / e-mail | `whatsapp`, `email` | Contato e o botão "Enviar pedido para o cliente" |
+
+## Representante
+
+| Dado | Campo no envio | Para que serve |
+|---|---|---|
+| Código no ERP | `codigo` | Liga clientes e pedidos ao rep; sai no pedido como `representante_erp` |
+| Nome / razão social | `nome`, `razao_social` | Telas e planilha |
+| E-mail | `email` | Vira o login no app |
+| Ativo | `ativo` | `"N"` desativa o acesso |
+
+O app ainda tem dados **internos** do rep que o ERP não precisa conhecer:
+login/senha, teclas de permissão e o interruptor de *venda interna* (pedido de
+balcão que nasce aprovado — para o ERP é um pedido igual aos outros).
+
+## Tabela de preço
+
+| Dado | Onde vive | Observação |
+|---|---|---|
+| Código no ERP | `tabela_preco.codigo_erp` | Precisa estar preenchido no app (uma vez) para o vínculo funcionar |
+| Coluna (1–6) | `tabela_preco.coluna` | Qual coluna de preço do ERP o pedido usou |
+| T1/T2/T3 | interno do app | Os nomes das tabelas no catálogo; o ERP só vê código + coluna |
+
+O pedido **fotografa** a tabela no momento da criação — trocar a tabela do
+cliente depois não muda pedido antigo.
+
+## Condição de pagamento
+
+| Dado | Onde aparece | Observação |
+|---|---|---|
+| Código | `condicao_pagamento.codigo` | O MESMO código do Control (ex.: `"021"`) — é o que a planilha põe em C8 |
+| Descrição | `condicao_pagamento.descricao` | Ex.: `"30/60/90"` — para conferência humana |
+
+As 146 condições do Control estão cadastradas no app; representante e loja
+escolhem uma ao fechar o pedido. Condição nova no ERP precisa ser cadastrada no
+app (hoje por carga; no futuro pode virar um `POST /condicoes` — a combinar).
+
+## Pedido
+
+| Dado | Campo | Dono | Observação |
+|---|---|---|---|
+| Identificador técnico | `id` | App | UUID — use na confirmação; nunca muda |
+| Número no app | `numero` | App | O número que rep e cliente enxergam (ex.: 14600) |
+| **Número no ERP** | `pedido_erp` | **ERP** | Ex.: `SX16680`. Nasce na importação, volta pela confirmação e aparece no app para todo mundo |
+| Situação | `situacao` | App | Ver "Situações do pedido" abaixo |
+| Cliente | `cliente.*` | ERP | Código, CNPJ, razão social, fantasia |
+| Representante | `representante_erp` | ERP | Código do rep |
+| Tabela de preço | `tabela_preco.*` | ERP | Código + coluna, fotografados no pedido |
+| Condição de pagamento | `condicao_pagamento.*` | ERP (código) | Escolhida no app entre as condições do Control |
+| Desconto | `desconto_percentual` | App | Pontos percentuais (10 = 10%). Preços dos itens SEM desconto; `valor_total` COM. Igual à planilha (AB46) |
+| Total | `valor_total` | App | Com o desconto aplicado |
+| Observações gerais | `observacoes` | App | Só o que o rep digitou (remessa, boleto, recado) |
+| Datas | `criado_em`, `atualizado_em` | App | ISO 8601 |
+| Faturamento | `faturado`, `faturado_em`, `valor_faturado` | ERP | O carimbo — ver abaixo |
+
+### Item do pedido
+
+| Dado | Campo | Observação |
+|---|---|---|
+| Referência | `produto` | A referência que o ERP conhece (ex.: `0015`, `0130 PLUS`) |
+| Tamanho | `tamanho` | P, M, G, GG, EG... — nas PLUS a numeração (48...) |
+| Cor | `cor` | Sempre `"00001"` (sortido) — a grade do ERP é por tamanho |
+| Cor escolhida | `observacao` | O texto da separação: `"azul"`, `"3M azul / 2G rosa"`, ou `null` se sortido |
+| Quantidade | `quantidade` | Peças |
+| Preço | `preco_unitario` | De tabela, sem desconto |
+| Total do item | `valor_total` | quantidade × preço de tabela |
+
+## Situações do pedido (o que o ERP enxerga)
+
+O app tem etapas internas (rascunho, triagem do representante, aceite do
+financeiro) que **nunca aparecem na API** — pedido só entra na fila depois de
+aprovado. Para o ERP existem só estas:
+
+| `situacao` | Significado | O que fazer |
+|---|---|---|
+| `approved` | Aprovado pelo financeiro, aguardando importação | Importar e confirmar com o número gerado |
+| `sent_erp` | Já importado e confirmado (tem `pedido_erp`) | Nada — só aparece com `incluir=todos` |
+
+**"Faturado" não é situação — é carimbo.** Um pedido `sent_erp` pode estar
+faturado ou não; quem diz é o campo `faturado` (com `faturado_em` e
+`valor_faturado`), que o ERP preenche pelo `POST /faturamento`. É de propósito:
+o faturamento pode ser desfeito (`"faturado": false`) sem mexer na história do
+pedido, e é ele que promove o degrau "Aprovado" na página do cliente e conta
+venda no painel da fábrica.
+
+## O ciclo completo, dado a dado
+
+```
+ERP  → POST /clientes, /representantes     (códigos, carteira, tabela)
+rep  → monta o pedido no app               (itens, cores, desconto, condição)
+fin. → aceita                              (pedido entra na fila da API)
+ERP  → GET /pedidos                        (lê tudo acima)
+ERP  → grava e gera o número               (ex.: SX16680)
+ERP  → POST /pedidos/{id}/confirmar        (o número volta para o app)
+ERP  → fatura e POST /faturamento          (nota, valor, data → carimbo)
+app  → página do cliente vira "Aprovado", painel conta a venda
+```
 
 ---
 

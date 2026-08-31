@@ -11,7 +11,7 @@ import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { api } from '../../services/api.js';
 import { formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
-import { observacaoDeCores, juntarObservacao } from '../../lib/observacaoCores.js';
+import { observacaoDeCores, juntarObservacao } from '@csb/shared';
 import type { ApiResponse, ProductWithPrice, SessaoVitrine } from '@csb/shared';
 import { precoDoTamanho } from '@csb/shared';
 

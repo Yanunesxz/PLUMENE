@@ -20,7 +20,7 @@ import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js'
 import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
-import { precoDoTamanho } from '@csb/shared';
+import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
@@ -339,6 +339,48 @@ export function PaginaDetalhePedido() {
     });
   }, [order?.items, prodMap, variantSize]);
 
+  // Uma linha por REFERÊNCIA, com a grade junta — é assim que se confere um
+  // pedido: a peça, os tamanhos dela e a cor, não uma linha solta por tamanho.
+  // A ordem vem de itensOrdenados, então os grupos já saem por ref crescente
+  // e cada grade na ordem de tamanho.
+  const grupos = useMemo(() => {
+    const porProduto = new Map<
+      string,
+      { product_id: string; linhas: typeof itensOrdenados; pecas: number; total: number }
+    >();
+    for (const item of itensOrdenados) {
+      let g = porProduto.get(item.product_id);
+      if (!g) {
+        g = { product_id: item.product_id, linhas: [], pecas: 0, total: 0 };
+        porProduto.set(item.product_id, g);
+      }
+      g.linhas.push(item);
+      g.pecas += item.quantity;
+      g.total += item.total;
+    }
+    return [...porProduto.values()];
+  }, [itensOrdenados]);
+
+  // A cor escolhida mora nas linhas "0015 3M azul" das notas (o item vai
+  // sortido para o ERP) — aqui ela volta para a linha do produto, onde quem
+  // confere olha. O que sobra das notas é o recado que o rep digitou.
+  const skusDoPedido = useMemo(() => {
+    const s = new Set<string>();
+    for (const item of order?.items ?? []) {
+      const sku = prodMap.get(item.product_id)?.sku;
+      if (sku) s.add(sku);
+    }
+    return s;
+  }, [order?.items, prodMap]);
+  const corPorRef = useMemo(
+    () => coresPorSku(order?.notes, skusDoPedido),
+    [order?.notes, skusDoPedido],
+  );
+  const obsDoRep = useMemo(
+    () => semLinhasDeCor(order?.notes, skusDoPedido),
+    [order?.notes, skusDoPedido],
+  );
+
   // Pedido de vitrine não tem cadastro: o contato é o que o visitante digitou
   // no fechamento. É por ele que o representante vai retornar.
   const zapDoComprador = order?.customer_id
@@ -601,6 +643,31 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
+          {/* Aceito, mas ainda fora do Control. Este botão registra o LANÇAMENTO:
+              a fábrica importou a planilha no ERP e o pedido passa a esperar só a
+              nota. É mesa do financeiro/fábrica — o representante (venda interna
+              inclusa) não lança, e a API recusa se tentar. */}
+          {order.status === 'approved' &&
+            !order.invoiced &&
+            (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
+            podeAprovar && (
+              <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+                <p className="mb-3 text-sm text-foreground">
+                  Pedido aceito. Depois de importar a planilha no Control, marque aqui que ele foi
+                  lançado — ele sai da fila &quot;A lançar&quot; e fica aguardando a nota.
+                </p>
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={decidindo !== null}
+                  onClick={() => void handleDecisao('sent_erp')}
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  Lançar no ERP
+                </Button>
+              </div>
+            )}
+
           {decisao && (
             <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
               <p className="mb-3 text-sm text-foreground">{decisao.explicacao}</p>
@@ -649,7 +716,7 @@ export function PaginaDetalhePedido() {
                       ? linhasEdit.reduce((s, l) => s + l.quantity, 0)
                       : order.items.reduce((s, i) => s + i.quantity, 0)}
                   </span>{' '}
-                  peças · {editando ? linhasEdit.length : order.items.length} ref.
+                  peças · {editando ? linhasEdit.length : grupos.length} ref.
                 </span>
               </span>
             </div>
@@ -785,23 +852,62 @@ export function PaginaDetalhePedido() {
               </div>
             ) : (
               <ul className="divide-y divide-border">
-                {itensOrdenados.map((item) => {
-                  const p = prodMap.get(item.product_id);
+                {grupos.map((g) => {
+                  const p = prodMap.get(g.product_id);
+                  const cor = p?.sku ? corPorRef.get(p.sku) : undefined;
+                  const precos = [...new Set(g.linhas.map((l) => l.unit_price))];
                   return (
-                    <li key={item.id} className="flex items-start justify-between gap-3 px-4 py-3">
-                      <div className="min-w-0">
+                    <li key={g.product_id} className="flex items-start gap-3 px-4 py-3">
+                      <div className="h-16 w-10 shrink-0 overflow-hidden rounded-lg bg-sunken">
+                        {p?.image_url ? (
+                          <img
+                            src={p.image_url}
+                            alt={p.name}
+                            loading="lazy"
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center text-primary/40">
+                            <Package className="h-4 w-4" strokeWidth={1.5} />
+                          </div>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
                         <p className="truncate text-sm font-medium text-foreground">
                           {p?.name ?? 'Produto'}
                         </p>
                         <p className="text-xs text-muted-foreground">
-                          {p?.sku ? `${p.sku} · ` : ''}
-                          {item.variant_id && variantSize.get(item.variant_id)
-                            ? `Tam ${variantSize.get(item.variant_id)} · `
-                            : ''}
-                          {item.quantity} × {formatBRL(item.unit_price)}
+                          {p?.sku ?? ''}
+                          {cor && (
+                            <>
+                              {p?.sku ? ' · ' : ''}
+                              <span className="font-medium text-primary">{cor}</span>
+                            </>
+                          )}
+                        </p>
+                        {/* A grade junta: um chip por tamanho, na ordem da grade. */}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                          {g.linhas.map((l) => (
+                            <span
+                              key={l.id}
+                              className="tnum rounded-md bg-sunken px-1.5 py-0.5 text-[11px] font-semibold text-foreground"
+                            >
+                              {(l.variant_id && variantSize.get(l.variant_id)) || 'Único'}
+                              <span className="font-normal text-muted-foreground"> ×{l.quantity}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right">
+                        <p className="text-sm font-semibold text-foreground">{formatBRL(g.total)}</p>
+                        <p className="tnum text-[11px] text-muted-foreground">
+                          {g.pecas} {g.pecas === 1 ? 'peça' : 'peças'}
+                          {' · '}
+                          {precos.length === 1
+                            ? formatBRL(precos[0] ?? 0)
+                            : `${formatBRL(Math.min(...precos))}–${formatBRL(Math.max(...precos))}`}
                         </p>
                       </div>
-                      <p className="shrink-0 text-sm font-semibold text-foreground">{formatBRL(item.total)}</p>
                     </li>
                   );
                 })}
@@ -835,10 +941,11 @@ export function PaginaDetalhePedido() {
             )}
           </div>
 
-          {order.notes && (
+          {/* Só o recado do rep: as linhas de cor já aparecem em cada item. */}
+          {obsDoRep && (
             <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
               <h2 className="mb-1 text-sm font-semibold text-foreground">Observações</h2>
-              <p className="text-sm text-muted-foreground">{order.notes}</p>
+              <p className="whitespace-pre-line text-sm text-muted-foreground">{obsDoRep}</p>
             </div>
           )}
 

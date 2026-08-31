@@ -1,5 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../apps/web/src/lib/observacaoCores.js';
+// O módulo mora no pacote compartilhado: a planilha (web) e a API de Parceiro
+// leem as mesmas linhas de cor das notas do pedido.
+import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../packages/shared/src/pedidos/observacaoCores.js';
 
 /**
  * A cor escolhida não cabe no item do pedido: o ERP recebe tudo como sortido
@@ -75,6 +77,14 @@ describe('semLinhasDeCor — o rodapé da planilha fica só com o que o rep digi
     ]);
     const notas = juntarObservacao('entregar até sexta', cores)!;
     expect(semLinhasDeCor(notas, skus)).toBe('entregar até sexta');
+  });
+
+  // O cartão da fila de decisão não tem os itens do pedido em mãos: o modo
+  // genérico (skus = null) tira qualquer linha com cara de "ref qtd+tam cor",
+  // mas exige o texto da cor no fim — recado do rep citando uma ref fica.
+  it('modo genérico (sem os SKUs): tira linha de cor, preserva recado com ref', () => {
+    const notas = 'FATURAR URGENTE ref 0550\n0015 3M azul\n0810 202 Cores variadas\n0015 3M';
+    expect(semLinhasDeCor(notas, null)).toBe('FATURAR URGENTE ref 0550\n0015 3M');
   });
 
   it('não apaga frase do rep que só MENCIONA uma referência', () => {
