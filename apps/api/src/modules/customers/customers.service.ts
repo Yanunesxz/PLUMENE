@@ -63,7 +63,7 @@ export async function createCustomer(
   rep_id: string,
   body: CreateCustomerRequest,
   price_table_id: string | null,
-): Promise<CustomerListItem | null> {
+): Promise<CustomerListItem | { erro: string }> {
   const { data, error } = await supabase
     .from('customers')
     .insert({
@@ -81,7 +81,10 @@ export async function createCustomer(
     .select(CUSTOMER_COLUMNS)
     .single();
 
-  if (error || !data) return null;
+  // O motivo do banco viaja na resposta, como no onboarding. Sem ele, um schema
+  // fora do lugar numa instalação nova vira "não foi possível" mudo — foi
+  // preciso uma semana de cegueira com a Simone (Plumene) para aprender isso.
+  if (error || !data) return { erro: error?.message ?? 'insert sem retorno' };
   return data as CustomerListItem;
 }
 

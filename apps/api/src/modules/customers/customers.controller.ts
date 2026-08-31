@@ -104,8 +104,12 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
     },
     tabela.price_table_id,
   );
-  if (!customer) {
-    await reply.status(500).send({ error: 'Não foi possível criar o cliente', code: 'CREATE_FAILED', statusCode: 500 });
+  if ('erro' in customer) {
+    await reply.status(500).send({
+      error: `Não foi possível criar o cliente: ${customer.erro}`,
+      code: 'CREATE_FAILED',
+      statusCode: 500,
+    });
     return;
   }
   await reply.status(201).send({ data: customer });
