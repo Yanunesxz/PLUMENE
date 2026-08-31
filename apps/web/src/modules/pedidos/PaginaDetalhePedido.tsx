@@ -423,6 +423,7 @@ export function PaginaDetalhePedido() {
     void navigate(`/orders/new${query}`, {
       state: {
         clone: {
+          numero: order.order_number ?? null,
           notes: order.notes ?? '',
           payment_condition_id: order.payment_condition_id ?? '',
           discount_percent: Number(order.discount_percent ?? 0),
