@@ -64,8 +64,7 @@ export function PaginaClientes() {
 
   // ─── A carteira por frescor ────────────────────────────────────────────────
   // A Minha Área manda para cá com ?frescor=parado — o rep cai direto na lista
-  // de quem precisa de visita.
-  const [params] = useSearchParams();
+  // de quem precisa de visita. (O `params` é o mesmo lá de cima, do ?novo.)
   const frescorDaUrl = params.get('frescor');
   const [frescor, setFrescor] = useState<Frescor | 'all'>(
     frescorDaUrl === 'parado' || frescorDaUrl === 'esfriando' || frescorDaUrl === 'ativo'
