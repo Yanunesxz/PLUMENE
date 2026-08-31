@@ -12,6 +12,7 @@ import {
   CheckCircle2,
   CloudOff,
   MessageCircle,
+  Sparkles,
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
@@ -90,6 +91,31 @@ export function PaginaMinhaArea() {
   };
 
   const tarefasAbertas = tarefas.filter((t) => t.status !== 'feita');
+
+  // ─── Relatório da carteira pela IA — só quando pedem ───────────────────────
+  // Cada toque é uma chamada paga na API da Anthropic; nada roda sozinho.
+  const [relatorio, setRelatorio] = useState('');
+  const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
+
+  const gerarRelatorio = async () => {
+    if (!token || gerandoRelatorio) return;
+    setGerandoRelatorio(true);
+    try {
+      const r = await api.post<ApiResponse<{ relatorio: string; clientes: number }>>(
+        '/ia/relatorio-carteira',
+        {},
+        token,
+      );
+      setRelatorio(r.data.relatorio);
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'A IA não respondeu — tente de novo.',
+        type: 'error',
+      });
+    } finally {
+      setGerandoRelatorio(false);
+    }
+  };
 
   const handleSync = async () => {
     if (!token || syncing) return;
@@ -310,6 +336,40 @@ export function PaginaMinhaArea() {
           </p>
         </Link>
       )}
+
+      {/* O relatório é gerado na hora, pelo Claude, e SÓ quando alguém pede —
+          nada analisa a carteira em segundo plano. Precisa de internet. */}
+      <section>
+        <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary-soft-foreground">
+                <Sparkles className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Relatório da carteira</p>
+                <p className="text-xs text-muted-foreground">
+                  A IA lê seus clientes e diz quem procurar primeiro.
+                </p>
+              </div>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={gerandoRelatorio || !isOnline}
+              onClick={() => void gerarRelatorio()}
+            >
+              {gerandoRelatorio ? <Spinner /> : <Sparkles className="h-4 w-4" strokeWidth={2.5} />}
+              {gerandoRelatorio ? 'Analisando…' : relatorio ? 'Gerar de novo' : 'Gerar relatório'}
+            </Button>
+          </div>
+          {relatorio && (
+            <div className="mt-4 whitespace-pre-wrap rounded-lg bg-muted p-3.5 text-sm leading-relaxed text-foreground">
+              {relatorio}
+            </div>
+          )}
+        </div>
+      </section>
 
       <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} faixas={faixasDoMes} />
 

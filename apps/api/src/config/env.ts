@@ -45,6 +45,14 @@ export const env = {
   /** Base pública do app, para montar o link do pedido no e-mail. */
   APP_PUBLIC_URL: process.env['APP_PUBLIC_URL'] ?? 'https://setorx-web-web.vercel.app',
 
+  // ── IA (relatório da carteira sob demanda) ───────────────────────────────────
+  /** Chave da API da Anthropic (console.anthropic.com → API keys, crédito
+   *  pré-pago). Vazia = IA desligada: a rota responde 503 e o app avisa. */
+  ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
+  /** Modelo dos relatórios. O Haiku custa centavos por relatório e resolve;
+   *  trocar por um maior é só mudar esta variável no Railway. */
+  IA_MODELO: process.env['IA_MODELO'] ?? 'claude-haiku-4-5-20251001',
+
   // ── Notificações push (Web Push / VAPID) ─────────────────────────────────────
   // Par de chaves gerado UMA vez (npx web-push generate-vapid-keys) e colado no
   // Railway. Vazio = push desligado: o app esconde o botão e a API responde 503.
