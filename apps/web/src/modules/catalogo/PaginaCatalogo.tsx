@@ -116,7 +116,6 @@ export function PaginaCatalogo() {
   // Overlay: mapa produto→preço da tabela consultada (null = usar a tabela do rep).
   const [overlayPrices, setOverlayPrices] = useState<Map<string, number | null> | null>(null);
   const isConsulting = viewTableId !== '' && viewTableId !== defaultTableId;
-  const viewTableName = tables.find((t) => t.id === viewTableId)?.name ?? null;
 
   const cartCount = cartItems.reduce((n, i) => n + i.quantity, 0);
   const cartTotal = cartItems.reduce((t, i) => t + i.quantity * i.unit_price, 0);
@@ -284,13 +283,6 @@ export function PaginaCatalogo() {
           </Select>
         )}
       </div>
-
-      {isConsulting && (
-        <div className="mb-3 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
-          Simulando preços de <strong>{viewTableName}</strong>. É só referência: o preço do
-          pedido vem da tabela cadastrada no cliente, não desta.
-        </div>
-      )}
 
       <div className="no-scrollbar mb-4 flex gap-2 overflow-x-auto pb-1">
         {SEGMENTOS.map((s) => (
