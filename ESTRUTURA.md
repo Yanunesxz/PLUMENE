@@ -94,7 +94,11 @@ apps/api/src/
 │       ├── 026_preco_da_faixa_maior.sql → product_prices.price_larger (EG/XG/48-54)
 │       ├── 027_valor_faturado.sql → orders.invoiced_total (o valor da NOTA)
 │       ├── 028_condicoes_de_pagamento.sql → payment_conditions (146 do Control) + orders.payment_condition_id
-│       └── 029_desconto_do_pedido.sql → orders.discount_percent (vai no DESC % da planilha)
+│       ├── 029_desconto_do_pedido.sql → orders.discount_percent (vai no DESC % da planilha)
+│       ├── 030_perfil_financeiro.sql → role 'financeiro' no CHECK de users
+│       ├── 031_venda_interna.sql → users.venda_interna (Simone e Nicoli)
+│       ├── 032_desconto_em_valor.sql → desconto digitado em reais vira percentual
+│       └── 033_endereco_do_cliente.sql → customers.address (na CS existia só à mão; a Plumene quebrava sem ela)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
