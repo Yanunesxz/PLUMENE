@@ -31,7 +31,7 @@ export interface StoreInvite {
   status: 'pendente' | 'usado' | 'expirado' | 'revogado';
 }
 
-/** Vitrine temporária: catálogo anônimo que expira. */
+/** Vitrine temporária: catálogo que expira, amarrado a um cliente da carteira. */
 export interface ShowcaseLink {
   id: string;
   expires_at: string;
@@ -39,6 +39,8 @@ export interface ShowcaseLink {
   opened_count: number;
   last_opened_at: string | null;
   created_at: string;
+  /** O cliente dono do link (035). Nulo = link antigo, de visitante. */
+  customer_id?: string | null;
   status: 'ativo' | 'expirado' | 'revogado';
 }
 
@@ -89,6 +91,8 @@ export interface SessaoVitrine {
   token: string;
   expires_at: string;
   rep_name: string;
+  /** O cliente dono do link — a vitrine cumprimenta e dispensa nome/zap. */
+  cliente_nome?: string | null;
 }
 
 /**
