@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -41,6 +41,8 @@ const managerItems: NavItem[] = [
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
+  // As tarefas que o escritório marcou e o andamento (OK do rep, feitas).
+  { to: '/atividades', label: 'Atividades', short: 'Ativ.', icon: CalendarClock },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact, permissao: 'gerenciar_representantes' },
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
   // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
@@ -66,6 +68,13 @@ const financeiroItems: NavItem[] = [
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
 ];
 
+// O relacionamento (Bruna) seleciona o cliente e encaminha pro rep — e
+// acompanha o OK. Duas telas, de propósito: o resto do sistema não é dela.
+const relacionamentoItems: NavItem[] = [
+  { to: '/atividades', label: 'Atividades', icon: CalendarClock },
+  { to: '/customers', label: 'Clientes', icon: Users },
+];
+
 export function navItemsForRole(
   role: UserRole | undefined,
   permissions?: PermissaoGerente[] | null,
@@ -75,6 +84,7 @@ export function navItemsForRole(
     return daFabrica.filter((i) => !i.permissao || temPermissao(role, permissions ?? null, i.permissao));
   }
   if (role === 'financeiro') return financeiroItems;
+  if (role === 'relacionamento') return relacionamentoItems;
   if (role === 'store') return storeItems;
   return repItems;
 }

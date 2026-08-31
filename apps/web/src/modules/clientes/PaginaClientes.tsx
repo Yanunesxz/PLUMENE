@@ -89,11 +89,12 @@ export function PaginaClientes() {
     return { visiveis, contagem };
   }, [customers, frescor]);
 
-  const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string }> = [
+  // As cores do Yan: verde ativo, amarelo atenção, vermelho desativado.
+  const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
-    { valor: 'parado', rotulo: `Parados${contagem.parado ? ` (${contagem.parado})` : ''}` },
-    { valor: 'esfriando', rotulo: `Esfriando${contagem.esfriando ? ` (${contagem.esfriando})` : ''}` },
-    { valor: 'ativo', rotulo: 'Ativos' },
+    { valor: 'parado', rotulo: `Desativados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
+    { valor: 'ativo', rotulo: 'Ativos', cor: 'bg-positive' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
   ];
 
@@ -207,8 +208,9 @@ export function PaginaClientes() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Clientes</h1>
-        {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. */}
-        {user?.role !== 'financeiro' && (
+        {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. O
+            relacionamento (Bruna) também não cadastra: seleciona e encaminha. */}
+        {user?.role !== 'financeiro' && user?.role !== 'relacionamento' && (
           <Button size="md" onClick={() => setShowForm((s) => !s)}>
             {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
             {showForm ? 'Cancelar' : 'Novo cliente'}
@@ -303,6 +305,7 @@ export function PaginaClientes() {
                 : 'border-border bg-background text-muted-foreground hover:bg-sunken',
             )}
           >
+            {f.cor && <span className={cn('mr-1.5 inline-block h-2 w-2 rounded-full align-middle', f.cor)} />}
             {f.rotulo}
           </button>
         ))}
@@ -376,13 +379,25 @@ export function PaginaClientes() {
                       Vencido: {formatBRL(customer.overdue_amount ?? 0)}
                     </p>
                   )}
+                  {/* Vermelho pede um porquê: com motivo, mostra; sem, cobra.
+                      É a pendência que o rep e a Bruna vão preenchendo. */}
+                  {situacao.nivel === 'parado' &&
+                    (customer.inactivity_reason ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        Motivo: {customer.inactivity_reason}
+                      </p>
+                    ) : (
+                      <p className="truncate text-xs font-medium text-danger">
+                        Falta o motivo — toque para preencher
+                      </p>
+                    ))}
                 </div>
               </button>
 
               {/* Atalho para vender direto, sem passar pela ficha. A tabela e o
                   botão de trocar vivem na ficha: aqui já são três alvos de
                   toque, e um quarto no celular vira erro de dedo. */}
-              {!customer.blocked && (
+              {!customer.blocked && user?.role !== 'relacionamento' && (
                 <button
                   type="button"
                   onClick={() => void navigate(`/orders/new?customer_id=${customer.id}`)}

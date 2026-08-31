@@ -30,10 +30,21 @@ async function detectarHistoricoDeCompra(): Promise<boolean> {
   return temHistoricoDeCompra;
 }
 
+/** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
+let temInatividade: boolean | null = null;
+
+async function detectarInatividade(): Promise<boolean> {
+  if (temInatividade !== null) return temInatividade;
+  const { error } = await supabase.from('customers').select('inactivity_reason').limit(1);
+  temInatividade = !error;
+  return temInatividade;
+}
+
 async function colunasDaLista(): Promise<string> {
-  return (await detectarHistoricoDeCompra())
-    ? `${CUSTOMER_COLUMNS}, last_purchase_at, overdue_amount`
-    : CUSTOMER_COLUMNS;
+  let colunas = CUSTOMER_COLUMNS;
+  if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at, overdue_amount';
+  if (await detectarInatividade()) colunas += ', inactivity_reason';
+  return colunas;
 }
 
 export async function getCustomers(
@@ -155,6 +166,14 @@ const MAX_PEDIDOS_DA_FICHA = 50;
 const DETALHE_COLUNAS =
   'id, name, trade_name, cnpj, whatsapp, email, address, credit_limit, blocked, block_reason, price_table_id';
 
+/** A ficha soma o que as migrações 036/039 trouxerem — sem elas, vem como antes. */
+async function colunasDoDetalhe(): Promise<string> {
+  let colunas = DETALHE_COLUNAS;
+  if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
+  if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
+  return colunas;
+}
+
 /**
  * A ficha do cliente: cadastro, tabela de preço e histórico de pedidos.
  *
@@ -171,7 +190,7 @@ export async function obterCliente(
     company_id,
     customer_id,
     escopo,
-    DETALHE_COLUNAS,
+    await colunasDoDetalhe(),
   );
   if (!cliente) return null;
 
@@ -194,6 +213,41 @@ export async function obterCliente(
   }));
 
   return { ...cliente, pedidos };
+}
+
+export type MarcaDeInatividade =
+  | { ok: true }
+  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'erro' };
+
+/**
+ * O porquê do cliente vermelho — motivo + observação com as palavras de quem
+ * apurou. O rep escreve sobre a própria carteira; relacionamento e gerência,
+ * sobre qualquer cliente (o controller decide o escopo).
+ */
+export async function marcarInatividade(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+  quem: string,
+  body: { motivo: string; observacao?: string | undefined },
+): Promise<MarcaDeInatividade> {
+  if (!(await detectarInatividade())) return { ok: false, motivo: 'sem_migracao' };
+
+  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  const { error } = await supabase
+    .from('customers')
+    .update({
+      inactivity_reason: body.motivo.trim(),
+      inactivity_note: body.observacao?.trim() || null,
+      inactivity_updated_by: quem,
+      inactivity_updated_at: new Date().toISOString(),
+    })
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+
+  return error ? { ok: false, motivo: 'erro' } : { ok: true };
 }
 
 export type TrocaDeTabela =

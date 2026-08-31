@@ -51,6 +51,14 @@ export interface Customer {
   total_purchased?: number | null;
   /** R$ Vencido do Control — retrato, o app não atualiza. */
   overdue_amount?: number | null;
+  /**
+   * Controle de inatividade (migração 039): quando o cliente fica VERMELHO
+   * (180+ dias sem comprar), o rep ou o relacionamento registram o porquê.
+   */
+  inactivity_reason?: string | null;
+  /** Observação com as palavras de quem apurou. */
+  inactivity_note?: string | null;
+  inactivity_updated_at?: string | null;
   updated_at: string;
 }
 
@@ -83,7 +91,16 @@ export interface CustomerListItem
     // a lista de clientes numa ferramenta de trabalho do representante.
     | 'last_purchase_at'
     | 'overdue_amount'
+    // O controle por cores: cliente vermelho SEM motivo é pendência visível na
+    // lista — é o que cobra o preenchimento sem precisar de relatório.
+    | 'inactivity_reason'
   > {}
+
+/** O rep (ou o relacionamento) explica o cliente vermelho. */
+export interface MarcarInatividadeRequest {
+  motivo: string;
+  observacao?: string;
+}
 
 /** Dados mínimos para um representante cadastrar um cliente no app. */
 export interface CreateCustomerRequest {
@@ -142,6 +159,12 @@ export interface CustomerDetail {
   blocked: boolean;
   block_reason: string | null;
   price_table_id: string | null;
+  /** Última compra (migração 036) — a ficha mostra a cor do cliente. */
+  last_purchase_at?: string | null;
+  /** Controle de inatividade (migração 039). */
+  inactivity_reason?: string | null;
+  inactivity_note?: string | null;
+  inactivity_updated_at?: string | null;
   /** Do mais recente para o mais antigo. */
   pedidos: PedidoDoCliente[];
 }

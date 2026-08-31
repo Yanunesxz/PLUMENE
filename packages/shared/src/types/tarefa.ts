@@ -20,6 +20,10 @@ export interface TarefaDoRep {
   titulo: string;
   /** Data/horário combinado (ISO). Nulo = sem hora marcada. */
   prazo: string | null;
+  /** Onde é a visita — endereço, loja, ponto de encontro. */
+  local: string | null;
+  /** O que quem marcou apurou na ligação: contexto para o rep chegar preparado. */
+  observacoes: string | null;
   status: StatusDaTarefa;
   created_at: string;
 }
@@ -31,4 +35,6 @@ export interface CriarTarefaRequest {
   titulo: string;
   /** ISO com offset. */
   prazo?: string;
+  local?: string;
+  observacoes?: string;
 }

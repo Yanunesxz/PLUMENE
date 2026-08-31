@@ -28,7 +28,7 @@ export type ResultadoExclusao =
   | { ok: false; motivo: MotivoUsuario; pedidos?: number };
 
 /** Ordem da tela: quem tem mais poder primeiro. */
-const ORDEM_PAPEL: Record<UserRole, number> = { admin: 0, manager: 1, financeiro: 2, rep: 3, store: 4 };
+const ORDEM_PAPEL: Record<UserRole, number> = { admin: 0, manager: 1, financeiro: 2, relacionamento: 3, rep: 4, store: 5 };
 
 /**
  * `permissions` e `last_login_at` vêm da 022, que pode não estar aplicada.
@@ -123,9 +123,15 @@ export async function criarUsuario(
   company_id: string,
   body: CriarUsuarioRequest,
 ): Promise<ResultadoUsuario> {
-  // Financeiro entra aqui junto: é login da fábrica, criado pelo admin como os
-  // outros. Rep e loja continuam nascendo nos fluxos próprios (carteira/acesso).
-  if (body.role !== 'admin' && body.role !== 'manager' && body.role !== 'financeiro') {
+  // Financeiro e relacionamento entram aqui junto: são logins da fábrica,
+  // criados pelo admin como os outros. Rep e loja continuam nascendo nos
+  // fluxos próprios (carteira/acesso).
+  if (
+    body.role !== 'admin' &&
+    body.role !== 'manager' &&
+    body.role !== 'financeiro' &&
+    body.role !== 'relacionamento'
+  ) {
     return { ok: false, motivo: 'papel_invalido' };
   }
   if (body.permissions && !teclasValidas(body.permissions)) {
@@ -190,7 +196,8 @@ export async function atualizarUsuario(
     body.role !== undefined &&
     body.role !== 'admin' &&
     body.role !== 'manager' &&
-    body.role !== 'financeiro'
+    body.role !== 'financeiro' &&
+    body.role !== 'relacionamento'
   ) {
     return { ok: false, motivo: 'papel_invalido' };
   }

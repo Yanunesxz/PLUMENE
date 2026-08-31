@@ -14,6 +14,10 @@ const criarSchema = z.object({
   customer_id: z.string().uuid().optional(),
   titulo: z.string().trim().min(3).max(200),
   prazo: z.string().datetime({ offset: true }).optional(),
+  /** Onde é a visita. */
+  local: z.string().trim().max(200).optional(),
+  /** O que quem ligou apurou — contexto para o rep chegar preparado. */
+  observacoes: z.string().trim().max(2000).optional(),
 });
 
 const statusSchema = z.object({

@@ -246,6 +246,14 @@ export function PaginaMinhaArea() {
                 {t.cliente_nome && (
                   <p className="truncate text-xs text-muted-foreground">Cliente: {t.cliente_nome}</p>
                 )}
+                {t.local && (
+                  <p className="truncate text-xs text-muted-foreground">Local: {t.local}</p>
+                )}
+                {t.observacoes && (
+                  <p className="mt-1.5 whitespace-pre-wrap rounded-lg bg-muted px-2.5 py-1.5 text-xs text-muted-foreground">
+                    {t.observacoes}
+                  </p>
+                )}
                 <div className="mt-3 flex gap-2">
                   {t.status === 'pendente' && t.prazo && (
                     <Button

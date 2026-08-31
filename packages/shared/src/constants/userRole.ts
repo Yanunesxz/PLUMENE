@@ -10,6 +10,13 @@ export const USER_ROLE = {
    * catálogo — mas sem a parte de representantes (migração 030).
    */
   FINANCEIRO: 'financeiro',
+  /**
+   * Relacionamento (migração 038): a Bruna, interna, liga para cliente parado.
+   * Limitada DE PROPÓSITO a duas coisas — ler clientes de qualquer carteira e
+   * marcar visita/tarefa (local, horário, observações) para o representante
+   * dono. Pedido, catálogo, faturamento e cadastro ficam fora do alcance.
+   */
+  RELACIONAMENTO: 'relacionamento',
 } as const;
 
 export type UserRole = (typeof USER_ROLE)[keyof typeof USER_ROLE];
@@ -30,6 +37,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   rep: 'Representante',
   store: 'Loja',
   financeiro: 'Financeiro',
+  relacionamento: 'Relacionamento',
 };
 
 /**

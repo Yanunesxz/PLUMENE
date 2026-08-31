@@ -31,8 +31,9 @@ describe('situação da compra', () => {
     expect(situacaoDaCompra('não é data').nivel).toBe('sem_registro');
   });
 
-  it('o rótulo fala tempo humano, não timestamps', () => {
+  it('o rótulo fala tempo humano e a cor do Yan: vermelho = Desativado', () => {
     expect(situacaoDaCompra(diasAtras(0)).rotulo).toBe('Comprou hoje');
-    expect(situacaoDaCompra(diasAtras(240)).rotulo).toMatch(/^Parado há \d+ meses$/);
+    expect(situacaoDaCompra(diasAtras(240)).rotulo).toMatch(/^Desativado — parado há \d+ meses$/);
+    expect(situacaoDaCompra(diasAtras(120)).rotulo).toMatch(/^Atenção — sem comprar há \d+ meses$/);
   });
 });

@@ -38,10 +38,21 @@ export function situacaoDaCompra(lastPurchaseAt: string | null | undefined): Sit
   if (Number.isNaN(dias)) {
     return { nivel: 'sem_registro', rotulo: 'Sem compra registrada', dias: null };
   }
-  if (dias >= PARADO_APOS_DIAS) return { nivel: 'parado', rotulo: `Parado ${rotuloDeTempo(dias)}`, dias };
-  if (dias >= ESFRIANDO_APOS_DIAS) return { nivel: 'esfriando', rotulo: `Esfriando — ${rotuloDeTempo(dias)}`, dias };
+  if (dias >= PARADO_APOS_DIAS) return { nivel: 'parado', rotulo: `Desativado — parado ${rotuloDeTempo(dias)}`, dias };
+  if (dias >= ESFRIANDO_APOS_DIAS) return { nivel: 'esfriando', rotulo: `Atenção — sem comprar ${rotuloDeTempo(dias)}`, dias };
   return { nivel: 'ativo', rotulo: `Comprou ${rotuloDeTempo(dias)}`, dias };
 }
+
+/**
+ * O vocabulário do Yan para as cores (31/08/2026): "verde de ativo, amarelo de
+ * atenção, vermelho de desativado". Nome curto para chips e títulos.
+ */
+export const NOME_DO_NIVEL: Record<Frescor, string> = {
+  ativo: 'Ativo',
+  esfriando: 'Atenção',
+  parado: 'Desativado',
+  sem_registro: 'Sem registro',
+};
 
 /** Cor do selo, no vocabulário do Badge. */
 export const VARIANTE_DO_FRESCOR: Record<Frescor, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {

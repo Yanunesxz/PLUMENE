@@ -25,6 +25,10 @@ CREATE TABLE IF NOT EXISTS rep_tasks (
   titulo TEXT NOT NULL,
   /** Data/horário combinado. NULL = tarefa sem hora marcada. */
   prazo TIMESTAMPTZ,
+  /** Onde é a visita — endereço, loja, ponto de encontro. */
+  local TEXT,
+  /** O que a Bruna apurou na ligação: contexto para o rep chegar preparado. */
+  observacoes TEXT,
   status TEXT NOT NULL DEFAULT 'pendente'
     CHECK (status IN ('pendente', 'confirmada', 'feita')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),

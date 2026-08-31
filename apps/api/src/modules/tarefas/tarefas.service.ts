@@ -44,6 +44,8 @@ async function comNomes(linhas: Record<string, unknown>[]): Promise<TarefaDoRep[
     cliente_nome: t.customer_id ? (nomeCust.get(t.customer_id as string) ?? null) : null,
     titulo: t.titulo as string,
     prazo: (t.prazo as string | null) ?? null,
+    local: (t.local as string | null) ?? null,
+    observacoes: (t.observacoes as string | null) ?? null,
     status: t.status as TarefaDoRep['status'],
     created_at: t.created_at as string,
   }));
@@ -80,6 +82,8 @@ export async function criarTarefa(
     customer_id?: string | null | undefined;
     titulo: string;
     prazo?: string | null | undefined;
+    local?: string | null | undefined;
+    observacoes?: string | null | undefined;
   },
 ): Promise<CriarTarefaResult> {
   if (!(await detectarTarefas())) return { ok: false, reason: 'sem_migracao' };
@@ -126,6 +130,8 @@ export async function criarTarefa(
       customer_id: body.customer_id ?? null,
       titulo: body.titulo.trim(),
       prazo: body.prazo ?? null,
+      local: body.local?.trim() || null,
+      observacoes: body.observacoes?.trim() || null,
     })
     .select()
     .single();

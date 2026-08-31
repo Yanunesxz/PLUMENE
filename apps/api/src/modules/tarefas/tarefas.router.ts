@@ -15,8 +15,10 @@ import {
 } from './tarefas.controller.js';
 
 export async function tarefasRouter(fastify: FastifyInstance): Promise<void> {
-  const forcaDeVendas = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] };
-  const escritorio = { preHandler: [authenticate, requireRole(['manager', 'admin', 'financeiro'])] };
+  // O papel relacionamento (Bruna, migração 038) existe PARA isto: marcar a
+  // visita e acompanhar o OK. Entra na leitura e na criação, como o escritório.
+  const forcaDeVendas = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento'])] };
+  const escritorio = { preHandler: [authenticate, requireRole(['manager', 'admin', 'financeiro', 'relacionamento'])] };
 
   fastify.get('/tarefas', forcaDeVendas, listarTarefasHandler);
   fastify.post('/tarefas', escritorio, criarTarefaHandler);

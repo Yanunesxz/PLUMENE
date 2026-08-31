@@ -25,6 +25,7 @@ const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js'
 const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
 const PaginaLogins = lazy(() => import('../modules/logins/PaginaLogins.js').then((m) => ({ default: m.PaginaLogins })));
 const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLoja.js').then((m) => ({ default: m.PaginaMinhaAreaLoja })));
+const PaginaAtividades = lazy(() => import('../modules/atividades/PaginaAtividades.js').then((m) => ({ default: m.PaginaAtividades })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
 const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
@@ -50,6 +51,8 @@ function MinhaArea() {
       </AoCarregar>
     );
   }
+  // O relacionamento não vende — a "área" dele são as Atividades.
+  if (papel === 'relacionamento') return <Navigate to="/atividades" replace />;
   return <PaginaMinhaArea />;
 }
 
@@ -60,6 +63,7 @@ function MinhaArea() {
  */
 function Inicio() {
   const papel = useAuthStore((s) => s.user?.role);
+  if (papel === 'relacionamento') return <Navigate to="/atividades" replace />;
   return <Navigate to={papel === 'financeiro' ? '/orders' : '/catalog'} replace />;
 }
 
@@ -103,6 +107,13 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           // Endereço antigo da loja: quem tem o app instalado tem este link
           // salvo. Leva para o novo lugar em vez de dar "página não encontrada".
           { path: 'minha-conta', element: <Navigate to="/minha-area" replace /> },
+          {
+            // A mesa de quem marca tarefa: Fabian, Bruna e a gerência. O rep
+            // não entra — as tarefas DELE chegam na Minha Área.
+            path: 'atividades',
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'relacionamento']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaAtividades /></AoCarregar> }],
+          },
           {
             path: 'dashboard',
             element: <PrivateRoute roles={['manager', 'admin']} />,
