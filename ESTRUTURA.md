@@ -98,7 +98,11 @@ apps/api/src/
 │       ├── 030_perfil_financeiro.sql → role 'financeiro' no CHECK de users
 │       ├── 031_venda_interna.sql → users.venda_interna (Simone e Nicoli)
 │       ├── 032_desconto_em_valor.sql → desconto digitado em reais vira percentual
-│       └── 033_endereco_do_cliente.sql → customers.address (na CS existia só à mão; a Plumene quebrava sem ela)
+│       ├── 033_endereco_do_cliente.sql → customers.address (na CS existia só à mão; a Plumene quebrava sem ela)
+│       ├── 034_notificacoes_push.sql → push_subscriptions (avisos no celular, Web Push)
+│       ├── 035_vitrine_com_cliente.sql → showcase_links.customer_id (link temporário amarrado)
+│       ├── 036_historico_de_compra.sql → customers.last_purchase_at/total_purchased/overdue_amount
+│       └── 037_tarefas_do_representante.sql → rep_tasks (o que o escritório pede ao rep)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
