@@ -145,9 +145,108 @@ export function instrucoesDoRelatorio(marca: string): string {
 }
 
 /**
+ * O relatório que o PRÓPRIO APP escreve — sem IA, sem chave, sem custo.
+ *
+ * É o motor padrão: a conta (quem parou, quanto comprava, quanto venceu) é
+ * toda nossa, e texto com número certo vale mais que prosa. A IA é opcional
+ * por cima, nunca requisito. Prioridade de visita: entre os parados, quem
+ * mais COMPRAVA vem primeiro — cliente grande parado é a venda mais barata
+ * de recuperar; o desempate é o tempo parado.
+ */
+const brl = (v: number) => `R$ ${Math.round(v).toLocaleString('pt-BR')}`;
+
+function tempoParado(dias: number): string {
+  if (dias < 60) return `há ${dias} dias`;
+  const meses = Math.round(dias / 30);
+  return `há ${meses} meses`;
+}
+
+function quemProcurarPrimeiro(clientes: ClienteParaRelatorio[], hoje: Date): string[] {
+  const candidatos = clientes
+    .map((c) => ({ c, dias: diasDesde(c.last_purchase_at, hoje) }))
+    .filter((x): x is { c: ClienteParaRelatorio; dias: number } => x.dias !== null && x.dias >= ESFRIANDO_APOS_DIAS)
+    .sort((a, b) => {
+      const grupoA = a.dias >= PARADO_APOS_DIAS ? 0 : 1;
+      const grupoB = b.dias >= PARADO_APOS_DIAS ? 0 : 1;
+      if (grupoA !== grupoB) return grupoA - grupoB;
+      const compraA = a.c.total_purchased ?? 0;
+      const compraB = b.c.total_purchased ?? 0;
+      if (compraA !== compraB) return compraB - compraA;
+      return b.dias - a.dias;
+    })
+    .slice(0, 8);
+
+  return candidatos.map(({ c, dias }) => {
+    const partes = [
+      `- ${c.trade_name?.trim() || c.name} — ${dias >= PARADO_APOS_DIAS ? 'parado' : 'esfriando'} ${tempoParado(dias)}`,
+    ];
+    if (c.total_purchased) partes.push(`já comprou ${brl(c.total_purchased)}`);
+    if (c.overdue_amount) partes.push(`vencido ${brl(c.overdue_amount)}`);
+    return partes.join(', ');
+  });
+}
+
+export function relatorioLocal(
+  clientes: ClienteParaRelatorio[],
+  opcoes: { alcance: 'minha carteira' | 'empresa inteira'; nomeDoRep?: Map<string, string> },
+  hoje = new Date(),
+): string {
+  const r = resumirCarteira(clientes, hoje);
+  const blocos: string[] = [];
+
+  const dona = opcoes.alcance === 'empresa inteira' ? 'A empresa tem' : 'Sua carteira tem';
+  blocos.push(
+    `${dona} ${r.total} clientes: ${r.parados} parados (6+ meses sem comprar), ` +
+      `${r.esfriando} esfriando (3–6 meses), ${r.ativos} ativos e ${r.semRegistro} sem registro de compra.` +
+      (r.vencidoTotal > 0 ? ` Há ${brl(r.vencidoTotal)} vencidos.` : ''),
+  );
+
+  if (opcoes.alcance === 'empresa inteira') {
+    const porRep = new Map<string, ClienteParaRelatorio[]>();
+    for (const c of clientes) {
+      const chave = c.rep_erp_id ?? 'sem_rep';
+      porRep.set(chave, [...(porRep.get(chave) ?? []), c]);
+    }
+    const linhas = [...porRep.entries()]
+      .map(([codigo, lista]) => {
+        const rr = resumirCarteira(lista, hoje);
+        const nome =
+          codigo === 'sem_rep' ? 'Sem representante' : (opcoes.nomeDoRep?.get(codigo) ?? `Rep ${codigo}`);
+        return { nome, rr };
+      })
+      .filter((x) => x.rr.parados > 0)
+      .sort((a, b) => b.rr.parados - a.rr.parados)
+      .slice(0, 8)
+      .map(
+        ({ nome, rr }) =>
+          `- ${nome}: ${rr.parados} parados de ${rr.total}` +
+          (rr.vencidoTotal > 0 ? `, ${brl(rr.vencidoTotal)} vencidos` : ''),
+      );
+    if (linhas.length > 0) blocos.push(`Carteiras com mais clientes parados:\n${linhas.join('\n')}`);
+  }
+
+  const prioridade = quemProcurarPrimeiro(clientes, hoje);
+  if (prioridade.length > 0) {
+    blocos.push(`Quem procurar primeiro:\n${prioridade.join('\n')}`);
+    blocos.push(
+      'Próximo passo: comece pelos parados que mais compravam — recuperar cliente antigo é a venda mais barata que existe.',
+    );
+  } else {
+    blocos.push(
+      r.semRegistro === r.total
+        ? 'Ainda não há registro de compra nesta carteira — os selos acendem quando o histórico for carregado.'
+        : 'Nenhum cliente parado ou esfriando — carteira em dia.',
+    );
+  }
+
+  return blocos.join('\n\n');
+}
+
+/**
  * Qual motor pensa o relatório: a chave presente decide. Com as duas, a
  * preferência (IA_PROVEDOR) desempata; sem preferência, Claude primeiro.
- * A assinatura do ChatGPT (chatgpt.com) NÃO serve aqui — só chave de API.
+ * Sem chave NENHUMA não é erro — o app escreve o relatório sozinho (motor
+ * 'app', custo zero). A assinatura do ChatGPT (chatgpt.com) NÃO serve aqui.
  */
 export function escolherProvedor(chaves: {
   anthropic: string;

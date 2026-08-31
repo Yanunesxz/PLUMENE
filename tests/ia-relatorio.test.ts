@@ -6,6 +6,7 @@ import {
   linhasDaEmpresa,
   montarPedido,
   escolherProvedor,
+  relatorioLocal,
   MAXIMO_DE_LINHAS,
   type ClienteParaRelatorio,
 } from '../apps/api/src/modules/ia/ia.relatorio.js';
@@ -101,6 +102,58 @@ describe('linhas da empresa (visão do escritório)', () => {
     expect(linhas.some((l) => l.startsWith('SEM REPRESENTANTE:'))).toBe(true);
     // O pior parado aparece na lista nominal com o rep entre parênteses.
     expect(linhas.join('\n')).toContain('(SILVIO)');
+  });
+});
+
+describe('relatório local (o app escreve sozinho, custo zero)', () => {
+  it('resume, prioriza quem mais comprava entre os parados e fecha com próximo passo', () => {
+    const texto = relatorioLocal(
+      [
+        cliente({ name: 'ATIVA', last_purchase_at: '2026-08-01' }),
+        cliente({ name: 'PEQUENA PARADA', last_purchase_at: '2025-06-01', total_purchased: 800 }),
+        cliente({ name: 'GRANDE PARADA', last_purchase_at: '2025-09-01', total_purchased: 42000, overdue_amount: 350 }),
+        cliente({ name: 'ESFRIANDO SO', last_purchase_at: '2026-04-15', total_purchased: 99000 }),
+        cliente({}),
+      ],
+      { alcance: 'minha carteira' },
+      HOJE,
+    );
+    expect(texto).toContain('Sua carteira tem 5 clientes: 2 parados');
+    // Parado grande vem antes do parado pequeno E antes do esfriando gigante:
+    // primeiro o grupo (parado), depois o tamanho da compra.
+    const ordem = [texto.indexOf('GRANDE PARADA'), texto.indexOf('PEQUENA PARADA'), texto.indexOf('ESFRIANDO SO')];
+    expect([...ordem].sort((a, b) => a - b)).toEqual(ordem);
+    expect(ordem.every((i) => i > 0)).toBe(true);
+    expect(texto).toContain('Quem procurar primeiro:');
+    expect(texto).toContain('vencido R$ 350');
+    expect(texto).toContain('Próximo passo:');
+    expect(texto).not.toContain('ATIVA —'); // quem está em dia não entra na lista de visita
+  });
+
+  it('carteira toda em dia não inventa urgência', () => {
+    const texto = relatorioLocal([cliente({ last_purchase_at: '2026-08-20' })], { alcance: 'minha carteira' }, HOJE);
+    expect(texto).toContain('carteira em dia');
+    expect(texto).not.toContain('Quem procurar primeiro');
+  });
+
+  it('sem histórico nenhum, diz que falta carregar — não que está tudo bem', () => {
+    const texto = relatorioLocal([cliente({}), cliente({})], { alcance: 'minha carteira' }, HOJE);
+    expect(texto).toContain('não há registro de compra');
+  });
+
+  it('na empresa inteira, aponta as carteiras com mais parados pelo nome do rep', () => {
+    const texto = relatorioLocal(
+      [
+        cliente({ rep_erp_id: '01879', last_purchase_at: '2024-01-01' }),
+        cliente({ rep_erp_id: '01879', last_purchase_at: '2024-06-01' }),
+        cliente({ rep_erp_id: '00779', last_purchase_at: '2026-08-01' }),
+      ],
+      { alcance: 'empresa inteira', nomeDoRep: new Map([['01879', 'SILVIO']]) },
+      HOJE,
+    );
+    expect(texto).toContain('A empresa tem 3 clientes');
+    expect(texto).toContain('- SILVIO: 2 parados de 2');
+    expect(texto).not.toContain('Rep 00779'); // carteira sem parado não vira cobrança
   });
 });
 

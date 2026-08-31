@@ -92,21 +92,25 @@ export function PaginaMinhaArea() {
 
   const tarefasAbertas = tarefas.filter((t) => t.status !== 'feita');
 
-  // ─── Relatório da carteira pela IA — só quando pedem ───────────────────────
-  // Cada toque é uma chamada paga na API da Anthropic; nada roda sozinho.
+  // ─── Relatório da carteira — só quando pedem ───────────────────────────────
+  // Por padrão quem escreve é o PRÓPRIO APP, com os números da carteira (custo
+  // zero). Se um dia houver chave de IA no servidor, ela assume — e o rodapé
+  // diz quem fez, porque relatório de conta não finge ser IA.
   const [relatorio, setRelatorio] = useState('');
+  const [motorDoRelatorio, setMotorDoRelatorio] = useState('');
   const [gerandoRelatorio, setGerandoRelatorio] = useState(false);
 
   const gerarRelatorio = async () => {
     if (!token || gerandoRelatorio) return;
     setGerandoRelatorio(true);
     try {
-      const r = await api.post<ApiResponse<{ relatorio: string; clientes: number }>>(
+      const r = await api.post<ApiResponse<{ relatorio: string; clientes: number; motor: string }>>(
         '/ia/relatorio-carteira',
         {},
         token,
       );
       setRelatorio(r.data.relatorio);
+      setMotorDoRelatorio(r.data.motor);
     } catch (err) {
       setToast({
         message: err instanceof Error ? err.message : 'A IA não respondeu — tente de novo.',
@@ -337,8 +341,8 @@ export function PaginaMinhaArea() {
         </Link>
       )}
 
-      {/* O relatório é gerado na hora, pelo Claude, e SÓ quando alguém pede —
-          nada analisa a carteira em segundo plano. Precisa de internet. */}
+      {/* O relatório é gerado na hora e SÓ quando alguém pede — nada analisa a
+          carteira em segundo plano. Precisa de internet. */}
       <section>
         <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
           <div className="flex flex-wrap items-center justify-between gap-3">
@@ -349,7 +353,7 @@ export function PaginaMinhaArea() {
               <div className="min-w-0">
                 <p className="text-sm font-medium text-foreground">Relatório da carteira</p>
                 <p className="text-xs text-muted-foreground">
-                  A IA lê seus clientes e diz quem procurar primeiro.
+                  Quem procurar primeiro, com os números da sua carteira.
                 </p>
               </div>
             </div>
@@ -364,9 +368,16 @@ export function PaginaMinhaArea() {
             </Button>
           </div>
           {relatorio && (
-            <div className="mt-4 whitespace-pre-wrap rounded-lg bg-muted p-3.5 text-sm leading-relaxed text-foreground">
-              {relatorio}
-            </div>
+            <>
+              <div className="mt-4 whitespace-pre-wrap rounded-lg bg-muted p-3.5 text-sm leading-relaxed text-foreground">
+                {relatorio}
+              </div>
+              <p className="mt-2 text-[11px] text-muted-foreground">
+                {motorDoRelatorio === 'app'
+                  ? 'Feito pelo app com os números da carteira.'
+                  : `Escrito por IA (${motorDoRelatorio === 'chatgpt' ? 'ChatGPT' : 'Claude'}) sobre os números da carteira.`}
+              </p>
+            </>
           )}
         </div>
       </section>

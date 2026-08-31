@@ -15,14 +15,13 @@ export async function relatorioDaCarteiraHandler(
   });
 
   if (r.ok) {
-    await reply.send({ data: { relatorio: r.relatorio, clientes: r.clientes, gerado_em: new Date().toISOString() } });
-    return;
-  }
-  if (r.reason === 'sem_chave') {
-    await reply.status(503).send({
-      error: 'A IA ainda não está ligada — falta uma chave de API no Railway (OPENAI_API_KEY ou ANTHROPIC_API_KEY)',
-      code: 'IA_DESLIGADA',
-      statusCode: 503,
+    await reply.send({
+      data: {
+        relatorio: r.relatorio,
+        clientes: r.clientes,
+        motor: r.motor,
+        gerado_em: new Date().toISOString(),
+      },
     });
     return;
   }

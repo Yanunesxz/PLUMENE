@@ -16,6 +16,7 @@ import {
   instrucoesDoRelatorio,
   montarPedido,
   escolherProvedor,
+  relatorioLocal,
   type ClienteParaRelatorio,
 } from './ia.relatorio.js';
 
@@ -26,20 +27,13 @@ const COLUNAS =
   'name, trade_name, last_purchase_at, total_purchased, overdue_amount, rep_erp_id, rep_id';
 
 export type RelatorioResult =
-  | { ok: true; relatorio: string; clientes: number }
-  | { ok: false; reason: 'sem_chave' | 'sem_migracao' | 'sem_clientes' | 'falha_ia' };
+  | { ok: true; relatorio: string; clientes: number; motor: 'app' | 'claude' | 'chatgpt' }
+  | { ok: false; reason: 'sem_migracao' | 'sem_clientes' | 'falha_ia' };
 
 export async function relatorioDaCarteira(
   company_id: string,
   escopo: { rep_id: string; erp_rep_id?: string | null; irrestrito: boolean },
 ): Promise<RelatorioResult> {
-  const provedor = escolherProvedor({
-    anthropic: env.ANTHROPIC_API_KEY,
-    openai: env.OPENAI_API_KEY,
-    preferencia: env.IA_PROVEDOR,
-  });
-  if (!provedor) return { ok: false, reason: 'sem_chave' };
-
   const clientes: ClienteParaRelatorio[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
@@ -61,35 +55,61 @@ export async function relatorioDaCarteira(
   }
   if (clientes.length === 0) return { ok: false, reason: 'sem_clientes' };
 
-  const resumo = resumirCarteira(clientes);
-  let linhas: string[];
-  let alcance: 'minha carteira' | 'empresa inteira';
+  const alcance: 'minha carteira' | 'empresa inteira' = escopo.irrestrito
+    ? 'empresa inteira'
+    : 'minha carteira';
+  let nomeDoRep = new Map<string, string>();
   if (escopo.irrestrito) {
     const { data: reps } = await supabase
       .from('users')
       .select('erp_rep_id, name')
       .eq('company_id', company_id)
       .eq('role', 'rep');
-    const nomeDoRep = new Map(
+    nomeDoRep = new Map(
       ((reps ?? []) as { erp_rep_id: string | null; name: string }[])
         .filter((r) => r.erp_rep_id)
         .map((r) => [r.erp_rep_id as string, r.name]),
     );
-    linhas = linhasDaEmpresa(clientes, nomeDoRep);
-    alcance = 'empresa inteira';
-  } else {
-    linhas = linhasDaCarteira(clientes);
-    alcance = 'minha carteira';
   }
 
+  // Sem chave nenhuma, o app escreve sozinho — é o caminho padrão e sem custo.
+  const provedor = escolherProvedor({
+    anthropic: env.ANTHROPIC_API_KEY,
+    openai: env.OPENAI_API_KEY,
+    preferencia: env.IA_PROVEDOR,
+  });
+  if (!provedor) {
+    return {
+      ok: true,
+      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep }),
+      clientes: clientes.length,
+      motor: 'app',
+    };
+  }
+
+  const resumo = resumirCarteira(clientes);
+  const linhas = escopo.irrestrito ? linhasDaEmpresa(clientes, nomeDoRep) : linhasDaCarteira(clientes);
   const instrucoes = instrucoesDoRelatorio(env.EMAIL_FROM_NAME);
   const pedido = montarPedido(alcance, resumo, linhas);
   const texto =
     provedor === 'openai'
       ? await perguntarAoChatGPT(instrucoes, pedido)
       : await perguntarAoClaude(instrucoes, pedido);
-  if (!texto) return { ok: false, reason: 'falha_ia' };
-  return { ok: true, relatorio: texto, clientes: clientes.length };
+  // A IA falhou? O relatório local responde no lugar — o botão nunca dá tela vazia.
+  if (!texto) {
+    return {
+      ok: true,
+      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep }),
+      clientes: clientes.length,
+      motor: 'app',
+    };
+  }
+  return {
+    ok: true,
+    relatorio: texto,
+    clientes: clientes.length,
+    motor: provedor === 'openai' ? 'chatgpt' : 'claude',
+  };
 }
 
 /** Uma pergunta, uma resposta — sem streaming, sem histórico, sem ferramenta. */
