@@ -15,11 +15,23 @@ interface LinhaVitrine {
   company_id: string;
   rep_id: string;
   price_table_id: string | null;
+  /** Migração 035: o cliente dono do link. Ausente = link antigo, de visitante. */
+  customer_id?: string | null;
   expires_at: string;
   revoked_at: string | null;
   opened_count: number;
   last_opened_at: string | null;
   created_at: string;
+}
+
+// showcase_links.customer_id vem da migração 035, que pode não estar aplicada.
+// Detecta uma vez; sem a coluna, o link nasce sem cliente (como sempre foi).
+let temColunaCliente: boolean | null = null;
+async function detectarColunaCliente(): Promise<boolean> {
+  if (temColunaCliente !== null) return temColunaCliente;
+  const { error } = await supabase.from('showcase_links').select('customer_id').limit(1);
+  temColunaCliente = !error;
+  return temColunaCliente;
 }
 
 function statusDe(l: Pick<LinhaVitrine, 'revoked_at' | 'expires_at'>): ShowcaseLink['status'] {
@@ -36,6 +48,7 @@ function paraLista(l: LinhaVitrine): ShowcaseLink {
     opened_count: l.opened_count,
     last_opened_at: l.last_opened_at,
     created_at: l.created_at,
+    customer_id: l.customer_id ?? null,
     status: statusDe(l),
   };
 }
@@ -63,9 +76,13 @@ export async function criarVitrine(
   rep_id: string,
   price_table_id: string | null,
   horas: ShowcaseDuration,
+  customer_id: string | null = null,
 ): Promise<VitrineCriada | null> {
   const token = generateToken();
   const expires_at = new Date(Date.now() + horas * 60 * 60 * 1000).toISOString();
+
+  // Sem a coluna (035 pendente), o vínculo é descartado — o link ainda nasce.
+  const comCliente = customer_id && (await detectarColunaCliente()) ? { customer_id } : {};
 
   const { data, error } = await supabase
     .from('showcase_links')
@@ -75,6 +92,7 @@ export async function criarVitrine(
       price_table_id,
       token_hash: hashToken(token),
       expires_at,
+      ...comCliente,
     })
     .select('id, expires_at')
     .single();

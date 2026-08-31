@@ -253,10 +253,11 @@ export async function createOrder(
     throw new Error('ACESSO_INDISPONIVEL');
   }
 
-  // Pedido de vitrine não tem cliente: quem pediu é um visitante identificado
-  // só por nome e WhatsApp. Nos outros caminhos, o cliente é obrigatório e
-  // precisa estar liberado.
-  if (!daVitrine) {
+  // Cliente do pedido: obrigatório e liberado em todo caminho, MENOS na
+  // vitrine antiga de visitante (link sem cliente atrelado, anterior à 035) —
+  // ali quem pediu se identifica só por nome e WhatsApp. Vitrine com cliente
+  // (o link novo) passa pela mesma checagem dos outros.
+  if (!daVitrine || body.customer_id) {
     if (!body.customer_id) return null;
     const { data: customer } = await supabase
       .from('customers')
@@ -377,7 +378,9 @@ export async function createOrder(
       .insert({
         company_id,
         rep_id,
-        customer_id: daVitrine ? null : body.customer_id,
+        // Vitrine COM cliente (link novo, 035) grava o cliente; a de visitante
+        // (link antigo) segue sem — o contato fica nos campos guest_*.
+        customer_id: body.customer_id ?? null,
         status,
         total,
         notes: body.notes ?? null,

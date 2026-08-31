@@ -154,22 +154,34 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   if (role === 'guest') {
     const nome = body.guest_name?.trim();
     const zap = body.guest_whatsapp?.replace(/\D/g, '') ?? '';
-    if (!nome || nome.length < 2) {
-      await reply.status(400).send({ error: 'Informe o nome da loja', code: 'VALIDATION_ERROR', statusCode: 400 });
-      return;
-    }
-    if (zap.length < 10 || zap.length > 11) {
+    // Link amarrado a um cliente (035): o cadastro já diz quem é — nome e
+    // WhatsApp digitados viram complemento, não obrigação.
+    const clienteDoLink = customer_id ?? null;
+    if (!clienteDoLink) {
+      if (!nome || nome.length < 2) {
+        await reply.status(400).send({ error: 'Informe o nome da loja', code: 'VALIDATION_ERROR', statusCode: 400 });
+        return;
+      }
+      if (zap.length < 10 || zap.length > 11) {
+        await reply.status(400).send({ error: 'Informe o WhatsApp com DDD', code: 'VALIDATION_ERROR', statusCode: 400 });
+        return;
+      }
+    } else if (zap.length > 0 && (zap.length < 10 || zap.length > 11)) {
       await reply.status(400).send({ error: 'Informe o WhatsApp com DDD', code: 'VALIDATION_ERROR', statusCode: 400 });
       return;
     }
-    // Vitrine não tem cliente: mesmo que venha um customer_id no corpo, ele é
-    // descartado — quem abriu o link não escolhe para quem está comprando.
-    const semCliente = { ...body };
-    delete semCliente.customer_id;
-    corpo = semCliente;
+    // Quem abriu o link NÃO escolhe para quem está comprando: o cliente é o do
+    // link (assinado no token) — ou nenhum, nos links antigos de visitante.
+    const doLink = { ...body };
+    delete doLink.customer_id;
+    corpo = clienteDoLink ? { ...doLink, customer_id: clienteDoLink } : doLink;
+    if (clienteDoLink) {
+      // O preço é o do CADASTRO do cliente, como em todo caminho que tem cliente.
+      tabela = (await tabelaDaLoja(clienteDoLink, dono ?? null)) ?? tabela;
+    }
     origem = {
       source: 'showcase',
-      guest_name: nome,
+      guest_name: nome ?? null,
       guest_whatsapp: body.guest_whatsapp ?? null,
       // Não há usuário do outro lado: fica o representante dono do link.
       created_by: dono ?? sub,

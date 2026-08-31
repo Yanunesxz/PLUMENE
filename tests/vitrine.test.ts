@@ -112,6 +112,38 @@ describe('abrir a vitrine', () => {
   });
 });
 
+describe('link amarrado a um cliente (035)', () => {
+  it('criar com cliente grava o customer_id no link', async () => {
+    const { criarVitrine, fake } = await carregar({
+      showcase_links: [
+        // sonda "a coluna customer_id existe?" (consome duas entradas — o
+        // dublê pré-busca a resposta seguinte a cada from())
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: { id: 'link-9', expires_at: daquiAHoras(6) }, error: null },
+      ],
+    });
+    const criado = await criarVitrine(EMPRESA, REP, 'tabela-1', 6, 'cliente-7');
+    expect(criado?.id).toBe('link-9');
+    const gravacao = fake.ultimaGravacao('showcase_links', 'insert');
+    expect((gravacao?.valores as { customer_id?: string }).customer_id).toBe('cliente-7');
+  });
+
+  it('sem a migração 035, o vínculo é descartado e o link ainda nasce', async () => {
+    const { criarVitrine, fake } = await carregar({
+      showcase_links: [
+        { data: null, error: { message: 'column customer_id does not exist' } },
+        { data: null, error: { message: 'column customer_id does not exist' } },
+        { data: { id: 'link-9', expires_at: daquiAHoras(6) }, error: null },
+      ],
+    });
+    const criado = await criarVitrine(EMPRESA, REP, 'tabela-1', 6, 'cliente-7');
+    expect(criado?.id).toBe('link-9');
+    const gravacao = fake.ultimaGravacao('showcase_links', 'insert');
+    expect((gravacao?.valores as { customer_id?: string }).customer_id).toBeUndefined();
+  });
+});
+
 describe('o link vale por um pedido', () => {
   it('encerra assim que o pedido sai — dois pedidos pelo mesmo link é confusão', async () => {
     const { encerrarVitrinePorPedido, fake } = await carregar({

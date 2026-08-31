@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Link2, Ban, Clock, Store, Eye, Tag } from 'lucide-react';
 import { db } from '../../offline/db.js';
@@ -10,7 +11,6 @@ import { Toast } from '../../components/interface/Toast.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { LinkGerado } from './LinkGerado.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
-import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn } from '../../lib/utils.js';
 import { SHOWCASE_DURATIONS } from '@csb/shared';
@@ -55,10 +55,10 @@ function faltam(ate: string): string {
 
 export function PaginaAcessos() {
   const { token } = useAuthStore();
-  const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
+  const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const { nomeDe } = useMinhasTabelas();
   const [aba, setAba] = useState<Aba>('convites');
-  const [tabelaEscolhida, setTabelaEscolhida] = useState('');
-  const [confirmando, setConfirmando] = useState<ShowcaseDuration | null>(null);
   const [confirmandoConvite, setConfirmandoConvite] = useState(false);
   const [convites, setConvites] = useState<StoreInvite[] | null>(null);
   const [vitrines, setVitrines] = useState<ShowcaseLink[] | null>(null);
@@ -70,6 +70,16 @@ export function PaginaAcessos() {
   const clientes = useLiveQuery(() => db.customers.orderBy('name').toArray(), []);
   const escolhido = clientes?.find((c) => c.id === clienteId);
   const nomeDaLoja = escolhido?.trade_name?.trim() || escolhido?.name || 'Esta loja';
+
+  // Voltando do cadastro ("Sem cliente criado"): o cliente recém-criado chega
+  // na URL e já entra selecionado, na aba do link temporário.
+  useEffect(() => {
+    const clienteNovo = params.get('cliente');
+    if (params.get('aba') === 'vitrine') setAba('vitrine');
+    if (clienteNovo) setClienteId(clienteNovo);
+    // roda uma vez, na chegada
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // O cache pode ser anterior ao dia em que `price_table_id` passou a vir na
   // lista. Sem esta releitura, a faixa acima diria "sem tabela cadastrada" para
@@ -134,35 +144,44 @@ export function PaginaAcessos() {
   };
 
   /**
-   * Quem tem duas tabelas ou mais confirma antes: o link mostra preço a alguém
-   * de fora, e não há uma segunda pessoa para reparar no erro.
+   * O link nasce amarrado a um cliente ("mesmo temporário tem que ter algum
+   * cliente atrelado"). A tabela deixou de ser escolha: é a do CADASTRO do
+   * cliente, como na conta de loja — a faixa informativa mostra qual antes de
+   * gerar.
    */
-  const pedirVitrine = (horas: ShowcaseDuration) => {
-    if (precisaEscolher) {
-      setConfirmando(horas);
-      return;
-    }
-    void gerarVitrine(horas);
-  };
-
   const gerarVitrine = async (horas: ShowcaseDuration) => {
-    if (!token) return;
+    if (!token || !clienteId) return;
     setOcupado(true);
     try {
       const res = await api.post<ApiResponse<LinkCriado>>(
         '/showcase-links',
-        { hours: horas, ...(tabelaEscolhida ? { price_table_id: tabelaEscolhida } : {}) },
+        { hours: horas, customer_id: clienteId },
         token,
       );
-      setGerado({ url: res.data.url, expiraEm: res.data.expires_at, tipo: 'vitrine', horas });
-      setConfirmando(null);
+      const cliente = clientes?.find((c) => c.id === clienteId);
+      setGerado({
+        url: res.data.url,
+        expiraEm: res.data.expires_at,
+        tipo: 'vitrine',
+        horas,
+        cliente: cliente?.trade_name?.trim() || cliente?.name,
+        whatsapp: cliente?.whatsapp ?? undefined,
+      });
       await recarregar();
     } catch (e) {
-      setConfirmando(null);
       setToast({ message: e instanceof Error ? e.message : 'Não foi possível gerar o link', type: 'error' });
     } finally {
       setOcupado(false);
     }
+  };
+
+  /** A opção "Sem cliente criado" leva ao cadastro e volta com ele escolhido. */
+  const escolherClienteDoLink = (id: string) => {
+    if (id === '__novo__') {
+      void navigate('/customers?novo=1&voltar=vitrine');
+      return;
+    }
+    setClienteId(id);
   };
 
   const revogar = async (tipo: Aba, id: string) => {
@@ -321,30 +340,77 @@ export function PaginaAcessos() {
           <div className="mb-5 rounded-xl border border-border bg-card p-4">
             <p className="text-sm font-medium text-foreground">Mostrar o catálogo por um tempo</p>
             <p className="mb-3 mt-1 text-xs leading-relaxed text-muted-foreground">
-              Para quem só quer dar uma olhada. Sem conta e sem senha: mostra os seus preços e para
-              de funcionar sozinho. Vale por <strong>um pedido</strong> — assim que a pessoa envia, o
-              link se encerra e o pedido cai para você com o contato dela.
+              Sem conta e sem senha: o cliente vê os preços <strong>da tabela dele</strong> e o link
+              para de funcionar sozinho. Vale por <strong>um pedido</strong> — assim que ele envia,
+              o link se encerra e o pedido cai para você já no cadastro certo.
             </p>
+
+            {/* O link nasce amarrado: primeiro o cliente, depois a validade.
+                Quem ainda não é cliente se cadastra por aqui mesmo. */}
             <div className="mb-3">
-              <SeletorDeTabela
-                tabelas={tabelas}
-                valor={tabelaEscolhida}
-                onEscolher={setTabelaEscolhida}
-                contexto="link"
+              <SearchSelect
+                value={clienteId}
+                onSelect={escolherClienteDoLink}
+                placeholder="Escolha o cliente do link"
+                searchPlaceholder="Buscar por nome ou CNPJ…"
+                emptyText="Nenhum cliente na sua carteira"
+                options={[
+                  {
+                    value: '__novo__',
+                    label: '+ Sem cliente criado — cadastrar agora',
+                  },
+                  ...(clientes ?? []).map((c) => ({
+                    value: c.id,
+                    label: c.name,
+                    sublabel: c.cnpj ? `CNPJ ${c.cnpj}` : undefined,
+                  })),
+                ]}
               />
             </div>
+
+            {escolhido && (
+              <div
+                className={cn(
+                  'mb-3 flex items-center gap-2 rounded-lg px-3 py-2 text-xs',
+                  escolhido.price_table_id
+                    ? 'bg-muted text-muted-foreground'
+                    : 'bg-warn-soft text-warn-soft-foreground',
+                )}
+              >
+                <Tag className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                {escolhido.price_table_id ? (
+                  <span>
+                    O link abre com a{' '}
+                    <strong className="font-semibold">
+                      {nomeDe(escolhido.price_table_id) ?? 'tabela do cadastro'}
+                    </strong>
+                  </span>
+                ) : (
+                  <span>
+                    <strong className="font-semibold">Sem tabela cadastrada</strong> — o link abre
+                    pela sua tabela principal
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="grid grid-cols-4 gap-2">
               {SHOWCASE_DURATIONS.map((h) => (
                 <Button
                   key={h}
                   variant="outline"
-                  disabled={ocupado || (precisaEscolher && !tabelaEscolhida)}
-                  onClick={() => pedirVitrine(h)}
+                  disabled={ocupado || !clienteId}
+                  onClick={() => void gerarVitrine(h)}
                 >
                   {h}h
                 </Button>
               ))}
             </div>
+            {!clienteId && (
+              <p className="mt-2 text-[11px] text-subtle">
+                Escolha o cliente para liberar a validade do link.
+              </p>
+            )}
           </div>
 
           {vitrines === null ? (
@@ -359,8 +425,12 @@ export function PaginaAcessos() {
                   className="flex items-center gap-3 border-b border-border px-4 py-3 last:border-b-0"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-foreground">
-                      {ROTULO_STATUS[v.status]}
+                    <p className="truncate text-sm font-medium text-foreground">
+                      {(() => {
+                        const dono = clientes?.find((c) => c.id === v.customer_id);
+                        const nome = dono ? dono.trade_name?.trim() || dono.name : null;
+                        return nome ? `${nome} · ${ROTULO_STATUS[v.status]}` : ROTULO_STATUS[v.status];
+                      })()}
                       {v.status === 'ativo' && faltam(v.expires_at) && ` · ${faltam(v.expires_at)}`}
                     </p>
                     <p className="tnum flex items-center gap-1 text-xs text-subtle">
@@ -404,17 +474,6 @@ export function PaginaAcessos() {
           ocupado={ocupado}
           onConfirmar={() => void gerarConvite()}
           onCancelar={() => setConfirmandoConvite(false)}
-        />
-      )}
-
-      {confirmando !== null && (
-        <ConfirmarTabela
-          titulo={`Gerar link de ${confirmando}h com a ${nomeDe(tabelaEscolhida) ?? ''}?`}
-          detalhe="Quem abrir o link vê os preços desta tabela. Ela fica congelada: mesmo que suas tabelas mudem depois, o link continua com esta."
-          tabela={nomeDe(tabelaEscolhida) ?? ''}
-          ocupado={ocupado}
-          onConfirmar={() => void gerarVitrine(confirmando)}
-          onCancelar={() => setConfirmando(null)}
         />
       )}
 

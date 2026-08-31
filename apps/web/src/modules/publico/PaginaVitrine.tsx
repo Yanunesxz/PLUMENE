@@ -98,17 +98,23 @@ export function PaginaVitrine() {
   const pecas = linhas.reduce((n, l) => n + l.quantidade, 0);
   const total = linhas.reduce((t, l) => t + l.quantidade * l.preco, 0);
 
+  // Link amarrado a um cliente (novo padrão): o cadastro já diz quem é — a
+  // vitrine cumprimenta pelo nome e não pede nome/WhatsApp de novo.
+  const clienteDoLink = sessao?.cliente_nome ?? null;
+
   const enviar = async (e: FormEvent) => {
     e.preventDefault();
     setErro('');
     const digitos = whatsapp.replace(/\D/g, '');
-    if (nome.trim().length < 2) {
-      setErro('Informe o nome da sua loja.');
-      return;
-    }
-    if (digitos.length < 10 || digitos.length > 11) {
-      setErro('Informe o WhatsApp com DDD.');
-      return;
+    if (!clienteDoLink) {
+      if (nome.trim().length < 2) {
+        setErro('Informe o nome da sua loja.');
+        return;
+      }
+      if (digitos.length < 10 || digitos.length > 11) {
+        setErro('Informe o WhatsApp com DDD.');
+        return;
+      }
     }
 
     setEnviando(true);
@@ -116,8 +122,8 @@ export function PaginaVitrine() {
       await api.post(
         '/orders',
         {
-          guest_name: nome.trim(),
-          guest_whatsapp: whatsapp,
+          ...(nome.trim() ? { guest_name: nome.trim() } : {}),
+          ...(digitos ? { guest_whatsapp: whatsapp } : {}),
           // O ERP recebe tudo como sortido; a cor escolhida vai na observação.
           notes: juntarObservacao(undefined, observacaoDeCores(linhas)),
           items: linhas.map((l) => ({
@@ -184,7 +190,11 @@ export function PaginaVitrine() {
           <div className="min-w-0 flex-1">
             <p className="titulo text-[18px] leading-none text-foreground">{MARCA.nome}</p>
             <p className="mt-0.5 truncate text-[11px] text-muted-foreground">
-              {sessao?.rep_name ? `Catálogo de ${sessao.rep_name}` : 'Catálogo'}
+              {clienteDoLink
+                ? `Pedido para ${clienteDoLink}`
+                : sessao?.rep_name
+                  ? `Catálogo de ${sessao.rep_name}`
+                  : 'Catálogo'}
             </p>
           </div>
           {sessao && (
@@ -262,7 +272,9 @@ export function PaginaVitrine() {
           <div className="animate-slide-up relative w-full max-w-md rounded-t-2xl bg-card p-5 sm:rounded-2xl">
             <h2 className="titulo mb-1 text-[22px] leading-none text-foreground">Quase lá</h2>
             <p className="mb-3 text-sm text-muted-foreground">
-              O representante precisa saber com quem falar para confirmar o pedido.
+              {clienteDoLink
+                ? `Pedido para ${clienteDoLink} — confira e envie.`
+                : 'O representante precisa saber com quem falar para confirmar o pedido.'}
             </p>
             {/* Antes de enviar, não depois: o link vale por um pedido, e a
                 pessoa tem que saber disso enquanto ainda dá para adicionar. */}
@@ -275,26 +287,32 @@ export function PaginaVitrine() {
             </p>
 
             <form onSubmit={(e) => void enviar(e)} className="space-y-4">
-              <div className="space-y-1.5">
-                <label htmlFor="nome" className="text-sm font-medium text-foreground">
-                  Nome da loja
-                </label>
-                <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
-              </div>
+              {/* Com cliente amarrado ao link, o cadastro responde quem é —
+                  pedir nome e WhatsApp de novo seria formulário por hábito. */}
+              {!clienteDoLink && (
+                <>
+                  <div className="space-y-1.5">
+                    <label htmlFor="nome" className="text-sm font-medium text-foreground">
+                      Nome da loja
+                    </label>
+                    <Input id="nome" value={nome} onChange={(e) => setNome(e.target.value)} required />
+                  </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="zap" className="text-sm font-medium text-foreground">
-                  WhatsApp
-                </label>
-                <Input
-                  id="zap"
-                  value={whatsapp}
-                  onChange={(e) => setWhatsapp(e.target.value)}
-                  inputMode="tel"
-                  placeholder="(00) 00000-0000"
-                  required
-                />
-              </div>
+                  <div className="space-y-1.5">
+                    <label htmlFor="zap" className="text-sm font-medium text-foreground">
+                      WhatsApp
+                    </label>
+                    <Input
+                      id="zap"
+                      value={whatsapp}
+                      onChange={(e) => setWhatsapp(e.target.value)}
+                      inputMode="tel"
+                      placeholder="(00) 00000-0000"
+                      required
+                    />
+                  </div>
+                </>
+              )}
 
               <div className="flex items-center justify-between rounded-lg bg-muted px-3 py-2">
                 <span className="tnum text-sm text-muted-foreground">

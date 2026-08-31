@@ -1,6 +1,6 @@
 import { useState, useEffect, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Users,
@@ -31,9 +31,13 @@ const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: ''
 export function PaginaClientes() {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  // "Sem cliente criado" no link temporário cai aqui com o formulário aberto;
+  // depois de salvar, `voltarPara` devolve à criação do link com o cliente novo.
+  const [showForm, setShowForm] = useState(params.get('novo') === '1');
+  const voltarPara = params.get('voltar');
   const [form, setForm] = useState({ ...EMPTY_CUST });
   const [tabelaEscolhida, setTabelaEscolhida] = useState('');
   const [confirmando, setConfirmando] = useState(false);
@@ -148,6 +152,12 @@ export function PaginaClientes() {
       setTabelaEscolhida('');
       setConfirmando(false);
       setShowForm(false);
+      // Veio do link temporário: devolve à criação do link com o cliente
+      // recém-cadastrado já escolhido.
+      if (voltarPara === 'vitrine') {
+        void navigate(`/acessos?aba=vitrine&cliente=${res.data.id}`);
+        return;
+      }
       setToast({ message: 'Cliente cadastrado!', type: 'success' });
     } catch (err) {
       setConfirmando(false);
