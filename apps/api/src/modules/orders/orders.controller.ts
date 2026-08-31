@@ -18,6 +18,12 @@ import { supabase } from '../../config/supabase.js';
 import { env } from '../../config/env.js';
 import { getCondicoesDePagamento } from './paymentConditions.service.js';
 import { encerrarVitrinePorPedido } from '../access/showcase.service.js';
+import {
+  avisarTriagemDoRep,
+  avisarMesaParaAceite,
+  avisarDecisaoAoRep,
+  avisarFaturadoAoRep,
+} from '../push/push.avisos.js';
 import { parseBody } from '../../lib/validation.js';
 import {
   createOrderSchema,
@@ -189,6 +195,9 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
       }
     }
 
+    // Pedido que chegou de FORA cai na triagem — o rep fica sabendo na hora.
+    if (order.status === 'pending_rep') avisarTriagemDoRep(company_id, order);
+
     await reply.status(201).send({ data: order });
   } catch (err) {
     if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
@@ -261,6 +270,10 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
   }
+
+  // A notícia que o rep mais espera — só no CARIMBO, nunca no desfazer.
+  if (body.invoiced) avisarFaturadoAoRep(company_id, order, sub);
+
   await reply.send({ data: order });
 }
 
@@ -421,6 +434,12 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
       return;
     }
+
+    // Os avisos do fluxo: quem precisa saber, sabe na hora — sem e-mail.
+    if (body.status === 'pending_approval') avisarMesaParaAceite(company_id, order, approverId);
+    if (body.status === 'approved') avisarDecisaoAoRep(company_id, order, true, approverId);
+    if (body.status === 'rejected') avisarDecisaoAoRep(company_id, order, false, approverId);
+
     await reply.send({ data: order });
   } catch (err) {
     if (err instanceof Error && err.message === 'FORBIDDEN_NOT_OWNER') {

@@ -44,4 +44,14 @@ export const env = {
   EMAIL_FROM_NAME: process.env['EMAIL_FROM_NAME'] ?? 'Corpo Sensual',
   /** Base pública do app, para montar o link do pedido no e-mail. */
   APP_PUBLIC_URL: process.env['APP_PUBLIC_URL'] ?? 'https://setorx-web-web.vercel.app',
+
+  // ── Notificações push (Web Push / VAPID) ─────────────────────────────────────
+  // Par de chaves gerado UMA vez (npx web-push generate-vapid-keys) e colado no
+  // Railway. Vazio = push desligado: o app esconde o botão e a API responde 503.
+  /** Chave pública — vai para o navegador assinar o aparelho. */
+  VAPID_PUBLIC_KEY: process.env['VAPID_PUBLIC_KEY'] ?? '',
+  /** Chave privada — NUNCA sai do servidor. */
+  VAPID_PRIVATE_KEY: process.env['VAPID_PRIVATE_KEY'] ?? '',
+  /** Contato do responsável, exigido pelo padrão (mailto:...). */
+  VAPID_SUBJECT: process.env['VAPID_SUBJECT'] ?? 'mailto:pedidoscorposensual@gmail.com',
 } as const;

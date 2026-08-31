@@ -25,6 +25,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
+import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { valorDaVenda } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
@@ -189,6 +190,8 @@ export function PaginaMinhaArea() {
       <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} faixas={faixasDoMes} />
 
       <CartaoInstalar />
+
+      <CartaoAvisos />
 
       <CartaoAtualizar />
 

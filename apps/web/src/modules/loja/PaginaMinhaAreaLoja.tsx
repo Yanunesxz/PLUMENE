@@ -26,6 +26,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
+import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { seloDoPedido } from '../../lib/pedido.js';
 import type { ApiResponse, MinhaAreaLoja, PecaComprada, ProductWithPrice } from '@csb/shared';
@@ -324,6 +325,8 @@ export function PaginaMinhaAreaLoja() {
       </section>
 
       <CartaoInstalar />
+
+      <CartaoAvisos />
 
       <CartaoAtualizar />
 
