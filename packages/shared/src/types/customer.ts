@@ -42,6 +42,15 @@ export interface Customer {
   email: string | null;
   /** Endereço completo */
   address: string | null;
+  /**
+   * Última compra (migração 036): retrato do Control (Curva ABC) empurrado
+   * para frente por todo pedido FATURADO no app. NULL = sem registro.
+   */
+  last_purchase_at?: string | null;
+  /** R$ Total Comprado do Control — retrato, o app não atualiza. */
+  total_purchased?: number | null;
+  /** R$ Vencido do Control — retrato, o app não atualiza. */
+  overdue_amount?: number | null;
   updated_at: string;
 }
 
@@ -69,6 +78,11 @@ export interface CustomerListItem
     // O código do cliente NO CONTROL. Pesa ~5 caracteres e é o que o
     // financeiro confere no pedido antes de lançar no ERP.
     | 'erp_id'
+    // A carteira inteligente: a data diz quem parou de comprar, o vencido diz
+    // quem precisa de cobrança. ~15 caracteres por linha, e é o que transforma
+    // a lista de clientes numa ferramenta de trabalho do representante.
+    | 'last_purchase_at'
+    | 'overdue_amount'
   > {}
 
 /** Dados mínimos para um representante cadastrar um cliente no app. */

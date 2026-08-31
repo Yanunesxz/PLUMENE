@@ -1,6 +1,6 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Users,
@@ -24,6 +24,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
+import { situacaoDaCompra, type Frescor } from '../../lib/carteira.js';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
 const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
@@ -56,6 +57,42 @@ export function PaginaClientes() {
         : db.customers.orderBy('name').toArray(),
     [search],
   );
+
+  // ─── A carteira por frescor ────────────────────────────────────────────────
+  // A Minha Área manda para cá com ?frescor=parado — o rep cai direto na lista
+  // de quem precisa de visita.
+  const [params] = useSearchParams();
+  const frescorDaUrl = params.get('frescor');
+  const [frescor, setFrescor] = useState<Frescor | 'all'>(
+    frescorDaUrl === 'parado' || frescorDaUrl === 'esfriando' || frescorDaUrl === 'ativo'
+      ? frescorDaUrl
+      : 'all',
+  );
+
+  const { visiveis, contagem } = useMemo(() => {
+    const decorados = (customers ?? []).map((c) => ({
+      cliente: c,
+      situacao: situacaoDaCompra(c.last_purchase_at),
+    }));
+    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
+    for (const d of decorados) contagem[d.situacao.nivel]++;
+    let visiveis = frescor === 'all' ? decorados : decorados.filter((d) => d.situacao.nivel === frescor);
+    // Filtrando por frescor, quem está há MAIS tempo sem comprar vem primeiro —
+    // é a ordem de prioridade da visita. Sem filtro, a ordem alfabética de
+    // sempre (a busca por nome depende dela).
+    if (frescor !== 'all') {
+      visiveis = [...visiveis].sort((a, b) => (b.situacao.dias ?? 0) - (a.situacao.dias ?? 0));
+    }
+    return { visiveis, contagem };
+  }, [customers, frescor]);
+
+  const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string }> = [
+    { valor: 'all', rotulo: 'Todos' },
+    { valor: 'parado', rotulo: `Parados${contagem.parado ? ` (${contagem.parado})` : ''}` },
+    { valor: 'esfriando', rotulo: `Esfriando${contagem.esfriando ? ` (${contagem.esfriando})` : ''}` },
+    { valor: 'ativo', rotulo: 'Ativos' },
+    { valor: 'sem_registro', rotulo: 'Sem registro' },
+  ];
 
   useEffect(() => {
     if (!token) return;
@@ -242,13 +279,33 @@ export function PaginaClientes() {
         />
       </div>
 
+      {/* O frescor da carteira: quem parou, quem está esfriando. É o filtro que
+          transforma a lista num roteiro de visita. */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {FILTROS.map((f) => (
+          <button
+            key={f.valor}
+            type="button"
+            onClick={() => setFrescor(f.valor)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              frescor === f.valor
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-muted-foreground hover:bg-sunken',
+            )}
+          >
+            {f.rotulo}
+          </button>
+        ))}
+      </div>
+
       {customers === undefined ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : customers.length === 0 ? (
+      ) : visiveis.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Users className="h-7 w-7" strokeWidth={1.5} />
@@ -257,7 +314,7 @@ export function PaginaClientes() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {customers.map((customer) => (
+          {visiveis.map(({ cliente: customer, situacao }) => (
             <div
               key={customer.id}
               className={cn(
@@ -288,6 +345,27 @@ export function PaginaClientes() {
                   )}
                   {customer.blocked && customer.block_reason && (
                     <p className="truncate text-xs text-danger">{customer.block_reason}</p>
+                  )}
+                  {/* O frescor: a data está escrita, então retrato velho nunca engana. */}
+                  {situacao.nivel !== 'sem_registro' && (
+                    <p
+                      className={cn(
+                        'truncate text-xs font-medium',
+                        situacao.nivel === 'parado' && 'text-danger',
+                        situacao.nivel === 'esfriando' && 'text-warn-soft-foreground',
+                        situacao.nivel === 'ativo' && 'text-positive-soft-foreground',
+                      )}
+                    >
+                      {situacao.rotulo}
+                      {customer.last_purchase_at
+                        ? ` · ${new Date(customer.last_purchase_at).toLocaleDateString('pt-BR')}`
+                        : ''}
+                    </p>
+                  )}
+                  {(customer.overdue_amount ?? 0) > 0 && (
+                    <p className="truncate text-xs text-danger">
+                      Vencido: {formatBRL(customer.overdue_amount ?? 0)}
+                    </p>
                   )}
                 </div>
               </button>

@@ -787,6 +787,42 @@ export async function setOrderPayment(
   return { ok: true, order: data as Order };
 }
 
+/** `customers.last_purchase_at` vem da migração 036 — mesmo cuidado das outras. */
+let temUltimaCompra: boolean | null = null;
+
+async function detectarUltimaCompra(): Promise<boolean> {
+  if (temUltimaCompra !== null) return temUltimaCompra;
+  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
+  temUltimaCompra = !error;
+  return temUltimaCompra;
+}
+
+/**
+ * O carimbo do faturamento empurra a última compra do cliente para FRENTE — é
+ * o que mantém o selo da carteira vivo para quem vende pelo app.
+ *
+ * Só para frente, nunca para trás: desfazer um faturamento não apaga a compra
+ * que existiu, e um carimbo retroativo não rejuvenesce o retrato. Falha aqui
+ * não derruba o faturamento — o selo é acessório do carimbo, não o contrário.
+ */
+export async function registrarCompraDoCliente(
+  customer_id: string | null | undefined,
+  quando: string | null | undefined,
+): Promise<void> {
+  if (!customer_id || !quando) return;
+  if (!(await detectarUltimaCompra())) return;
+  const dia = quando.slice(0, 10);
+  try {
+    await supabase
+      .from('customers')
+      .update({ last_purchase_at: dia, updated_at: new Date().toISOString() })
+      .eq('id', customer_id)
+      .or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
+  } catch {
+    /* acessório — nunca derruba o carimbo */
+  }
+}
+
 export async function setOrderInvoiced(
   id: string,
   company_id: string,
@@ -811,7 +847,9 @@ export async function setOrderInvoiced(
   const { data, error } = await query.select().maybeSingle();
 
   if (error || !data) return null;
-  return data as Order;
+  const order = data as Order;
+  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? undefined);
+  return order;
 }
 
 export async function updateOrderStatus(

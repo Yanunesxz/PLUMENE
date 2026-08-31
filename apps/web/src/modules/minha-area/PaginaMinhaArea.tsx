@@ -27,7 +27,10 @@ import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
+import { situacaoDaCompra } from '../../lib/carteira.js';
+import { Link } from 'react-router-dom';
 import { valorDaVenda } from '@csb/shared';
+import type { TarefaDoRep } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
@@ -54,6 +57,39 @@ export function PaginaMinhaArea() {
   const pendingSync = useLiveQuery(() => db.sync_queue.count(), []) ?? 0;
   const [syncing, setSyncing] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
+
+  // ─── O que pediram para você (tarefas do escritório) ───────────────────────
+  const [tarefas, setTarefas] = useState<TarefaDoRep[]>([]);
+  const [tarefaOcupada, setTarefaOcupada] = useState<string | null>(null);
+
+  const carregarTarefas = (t: string) =>
+    api
+      .get<ApiResponse<TarefaDoRep[]>>('/tarefas', t)
+      .then((r) => setTarefas(r.data))
+      .catch(() => {});
+
+  useEffect(() => {
+    if (token) void carregarTarefas(token);
+  }, [token]);
+
+  const agirNaTarefa = async (id: string, status: 'confirmada' | 'feita') => {
+    if (!token || tarefaOcupada) return;
+    setTarefaOcupada(id);
+    try {
+      await api.patch<ApiResponse<{ ok: boolean }>>(`/tarefas/${id}`, { status }, token);
+      setTarefas((ts) => ts.map((t) => (t.id === id ? { ...t, status } : t)));
+      setToast({
+        message: status === 'feita' ? 'Tarefa concluída!' : 'OK enviado — quem marcou já sabe.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Não deu para atualizar.', type: 'error' });
+    } finally {
+      setTarefaOcupada(null);
+    }
+  };
+
+  const tarefasAbertas = tarefas.filter((t) => t.status !== 'feita');
 
   const handleSync = async () => {
     if (!token || syncing) return;
@@ -133,6 +169,20 @@ export function PaginaMinhaArea() {
     for (const c of customers ?? []) m.set(c.id, c.name);
     return m;
   }, [customers]);
+
+  // A saúde da carteira, para o aviso lá embaixo.
+  const carteira = useMemo(() => {
+    let parados = 0;
+    let esfriando = 0;
+    let vencido = 0;
+    for (const c of customers ?? []) {
+      const s = situacaoDaCompra(c.last_purchase_at);
+      if (s.nivel === 'parado') parados++;
+      if (s.nivel === 'esfriando') esfriando++;
+      vencido += c.overdue_amount ?? 0;
+    }
+    return { parados, esfriando, vencido };
+  }, [customers]);
   const { decidir, decidindo } = useDecidirPedido((mensagem, erro) =>
     setToast({ message: mensagem, type: erro ? 'error' : 'success' }),
   );
@@ -145,6 +195,58 @@ export function PaginaMinhaArea() {
         </h1>
         <p className="text-sm text-muted-foreground">Seu desempenho</p>
       </div>
+
+      {/* O escritório manda, você executa: a visita que a Bruna marcou, a
+          tarefa que o Fabian pediu. OK = "vi e topei o horário"; Feito fecha. */}
+      {tarefasAbertas.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            O que pediram para você
+          </h2>
+          <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+            {tarefasAbertas.map((t) => (
+              <li key={t.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+                <p className="text-sm font-medium text-foreground">{t.titulo}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t.criado_por_nome ? `pedido por ${t.criado_por_nome}` : 'pedido pelo escritório'}
+                  {t.prazo
+                    ? ` · ${new Date(t.prazo).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às ${new Date(t.prazo).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                    : ''}
+                </p>
+                {t.cliente_nome && (
+                  <p className="truncate text-xs text-muted-foreground">Cliente: {t.cliente_nome}</p>
+                )}
+                <div className="mt-3 flex gap-2">
+                  {t.status === 'pendente' && t.prazo && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="flex-1"
+                      disabled={tarefaOcupada === t.id}
+                      onClick={() => void agirNaTarefa(t.id, 'confirmada')}
+                    >
+                      Dar OK no horário
+                    </Button>
+                  )}
+                  <Button
+                    size="sm"
+                    className="flex-1 bg-positive hover:bg-positive/90 active:bg-positive/80"
+                    disabled={tarefaOcupada === t.id}
+                    onClick={() => void agirNaTarefa(t.id, 'feita')}
+                  >
+                    Feito
+                  </Button>
+                </div>
+                {t.status === 'confirmada' && (
+                  <p className="mt-2 text-[11px] text-positive-soft-foreground">
+                    Você deu OK — quem marcou já sabe.
+                  </p>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {triagem.length > 0 && (
         <section>
@@ -186,6 +288,28 @@ export function PaginaMinhaArea() {
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
+
+      {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
+          O toque cai na lista de Clientes já filtrada nos parados. */}
+      {(carteira.parados > 0 || carteira.esfriando > 0) && (
+        <Link
+          to="/customers?frescor=parado"
+          className="block rounded-xl border border-warn/30 bg-warn-soft p-4 transition-colors hover:border-warn/60"
+        >
+          <p className="text-sm font-semibold text-warn-soft-foreground">
+            {carteira.parados > 0
+              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} sem comprar há 6+ meses`
+              : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} esfriando`}
+          </p>
+          <p className="mt-0.5 text-xs text-warn-soft-foreground/80">
+            {carteira.parados > 0 && carteira.esfriando > 0
+              ? `E mais ${carteira.esfriando} esfriando (3–6 meses). `
+              : ''}
+            {carteira.vencido > 0 ? `${formatBRL(carteira.vencido)} vencidos na carteira. ` : ''}
+            Toque para ver quem visitar primeiro.
+          </p>
+        </Link>
+      )}
 
       <ReguaDaMeta enviadoNoMes={m.enviadoNoMes} faixas={faixasDoMes} />
 

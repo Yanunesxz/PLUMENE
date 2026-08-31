@@ -10,6 +10,7 @@ import {
   ShoppingCart,
   ChevronRight,
   Receipt,
+  CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -42,6 +43,45 @@ export function PaginaCliente() {
   const [erro, setErro] = useState('');
   const [trocando, setTrocando] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ─── Marcar visita para o representante (fluxo da Bruna) ───────────────────
+  const ehEscritorio =
+    user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro';
+  const [marcando, setMarcando] = useState(false);
+  const [tituloVisita, setTituloVisita] = useState('');
+  const [prazoVisita, setPrazoVisita] = useState('');
+  const [salvandoVisita, setSalvandoVisita] = useState(false);
+
+  useEffect(() => {
+    if (cliente) setTituloVisita(`Visitar ${cliente.trade_name || cliente.name}`);
+  }, [cliente]);
+
+  const marcarVisita = async () => {
+    if (!token || !id || salvandoVisita) return;
+    setSalvandoVisita(true);
+    try {
+      // Sem rep_id de propósito: o servidor entrega ao dono da carteira.
+      await api.post<ApiResponse<unknown>>(
+        '/tarefas',
+        {
+          customer_id: id,
+          titulo: tituloVisita.trim(),
+          ...(prazoVisita ? { prazo: new Date(prazoVisita).toISOString() } : {}),
+        },
+        token,
+      );
+      setMarcando(false);
+      setPrazoVisita('');
+      setToast({ message: 'Visita marcada — o representante recebe na Minha Área dele.', type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível marcar a visita.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoVisita(false);
+    }
+  };
 
   const carregar = useCallback(async () => {
     if (!token || !id) return;
@@ -121,12 +161,51 @@ export function PaginaCliente() {
         </dl>
 
         {!cliente.blocked && (
-          <div className="mt-4">
+          <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={() => void navigate(`/orders/new?customer_id=${cliente.id}`)}>
               <ShoppingCart className="h-4 w-4" strokeWidth={2.5} />
               Novo pedido
             </Button>
+            {/* O fluxo da Bruna: ligou pro cliente parado, combinou a visita,
+                marca aqui — cai na Minha Área do representante dono da
+                carteira, que dá o OK. Só o escritório vê este botão. */}
+            {ehEscritorio && (
+              <Button variant="outline" onClick={() => setMarcando((v) => !v)}>
+                <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
+                {marcando ? 'Cancelar' : 'Marcar visita pro rep'}
+              </Button>
+            )}
           </div>
+        )}
+
+        {marcando && (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              void marcarVisita();
+            }}
+            className="mt-3 grid gap-3 rounded-lg bg-sunken p-3 sm:grid-cols-[1fr_auto_auto]"
+          >
+            <input
+              value={tituloVisita}
+              onChange={(e) => setTituloVisita(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              aria-label="O que o representante deve fazer"
+            />
+            <input
+              type="datetime-local"
+              value={prazoVisita}
+              onChange={(e) => setPrazoVisita(e.target.value)}
+              className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+              aria-label="Data e horário combinados"
+            />
+            <Button type="submit" disabled={salvandoVisita || tituloVisita.trim().length < 3}>
+              {salvandoVisita ? 'Marcando…' : 'Marcar'}
+            </Button>
+            <p className="text-[11px] leading-tight text-subtle sm:col-span-3">
+              Vai para a Minha Área do representante da carteira, que dá o OK no horário.
+            </p>
+          </form>
         )}
       </div>
 
