@@ -26,6 +26,7 @@ const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').t
 const PaginaLogins = lazy(() => import('../modules/logins/PaginaLogins.js').then((m) => ({ default: m.PaginaLogins })));
 const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLoja.js').then((m) => ({ default: m.PaginaMinhaAreaLoja })));
 const PaginaAtividades = lazy(() => import('../modules/atividades/PaginaAtividades.js').then((m) => ({ default: m.PaginaAtividades })));
+const PaginaAlertas = lazy(() => import('../modules/alertas/PaginaAlertas.js').then((m) => ({ default: m.PaginaAlertas })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
 const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
@@ -103,6 +104,13 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'acessos',
             element: <PrivateRoute roles={['rep', 'manager', 'admin']} />,
             children: [{ index: true, element: <AoCarregar><PaginaAcessos /></AoCarregar> }],
+          },
+          {
+            // A central de pendências do representante — os 3 degraus de
+            // alerta com o botão de resolver ali (atualizar, avisos, instalar).
+            path: 'alertas',
+            element: <PrivateRoute roles={['rep']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaAlertas /></AoCarregar> }],
           },
           // Endereço antigo da loja: quem tem o app instalado tem este link
           // salvo. Leva para o novo lugar em vez de dar "página não encontrada".
