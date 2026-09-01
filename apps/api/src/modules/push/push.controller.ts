@@ -86,7 +86,7 @@ export async function testeHandler(request: FastifyRequest, reply: FastifyReply)
   await reply.send({ data: { entregues } });
 }
 
-const PUBLICOS: PublicoDoAviso[] = ['todos', 'reps', 'lojas', 'lojas_compraram'];
+const PUBLICOS: PublicoDoAviso[] = ['todos', 'reps', 'lojas', 'lojas_compraram', 'escritorio'];
 
 /**
  * POST /push/enviar — o aviso manual da fábrica (promoção, coleção nova,
