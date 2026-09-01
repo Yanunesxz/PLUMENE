@@ -107,6 +107,32 @@ describe('enviarParaUsuarios', () => {
   });
 });
 
+describe('resolverPublico — quem recebe o aviso manual', () => {
+  it('lojas_compraram: só as lojas cujos clientes fizeram pedido no período', async () => {
+    const { service, fake } = await carregar({
+      orders: { data: [{ customer_id: 'cli-1' }, { customer_id: 'cli-1' }, { customer_id: 'cli-2' }], error: null },
+      users: { data: [{ id: 'loja-1' }, { id: 'loja-2' }], error: null },
+    });
+    const ids = await service.resolverPublico(EMPRESA, 'lojas_compraram', 90);
+    expect(ids).toEqual(['loja-1', 'loja-2']);
+    // o filtro de papel foi aplicado na consulta de usuários
+    const filtroDePapel = fake
+      .filtrosDe('users', 'eq')
+      .some((f) => f.args[0] === 'role' && f.args[1] === 'store');
+    expect(filtroDePapel).toBe(true);
+  });
+
+  it('reps: só o papel rep entra na consulta', async () => {
+    const { service, fake } = await carregar({
+      users: { data: [{ id: 'rep-1' }], error: null },
+    });
+    const ids = await service.resolverPublico(EMPRESA, 'reps');
+    expect(ids).toEqual(['rep-1']);
+    const filtro = fake.filtrosDe('users', 'in').find((f) => f.args[0] === 'role');
+    expect(filtro?.args[1]).toEqual(['rep']);
+  });
+});
+
 describe('avisos do fluxo', () => {
   it('quem decide o PRÓPRIO pedido não recebe aviso da própria decisão', async () => {
     const { avisos } = await carregar({

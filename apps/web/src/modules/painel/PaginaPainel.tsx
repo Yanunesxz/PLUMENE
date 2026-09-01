@@ -8,6 +8,7 @@ import { api } from '../../services/api.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
+import { EnviarAviso } from './EnviarAviso.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -101,6 +102,8 @@ export function PaginaPainel() {
         <MetricCard icon={Clock} tint="yellow" value={String(metrics.pendingCount)} label="Aguardando aprovação" />
         <MetricCard icon={Wallet} tint="brand" value={formatBRL(metrics.ticket)} label="Ticket médio" />
       </div>
+
+      <EnviarAviso />
 
       {metrics.topClientes.length > 0 && (
         <section>

@@ -139,6 +139,57 @@ export async function enviarParaUsuarios(
   return enviarParaLinhas(linhas, aviso);
 }
 
+/**
+ * O público de um AVISO manual (a tela "Enviar aviso" do Painel):
+ *
+ *   todos           → todo login ativo da empresa
+ *   reps            → só os representantes
+ *   lojas           → só as contas de loja
+ *   lojas_compraram → lojas cujo cliente fez pedido nos últimos N dias
+ */
+export type PublicoDoAviso = 'todos' | 'reps' | 'lojas' | 'lojas_compraram';
+
+export async function resolverPublico(
+  company_id: string,
+  publico: PublicoDoAviso,
+  dias = 90,
+): Promise<string[]> {
+  if (publico === 'lojas_compraram') {
+    const corte = new Date(Date.now() - dias * 86400_000).toISOString();
+    const { data: pedidos } = await supabase
+      .from('orders')
+      .select('customer_id')
+      .eq('company_id', company_id)
+      .gte('created_at', corte)
+      .not('customer_id', 'is', null)
+      .limit(1000);
+    const clientes = [...new Set(((pedidos ?? []) as Array<{ customer_id: string }>).map((p) => p.customer_id))];
+    if (clientes.length === 0) return [];
+    const { data: usuarios } = await supabase
+      .from('users')
+      .select('id')
+      .eq('company_id', company_id)
+      .eq('active', true)
+      .eq('role', 'store')
+      .in('customer_id', clientes);
+    return ((usuarios ?? []) as Array<{ id: string }>).map((u) => u.id);
+  }
+
+  const papeis =
+    publico === 'reps'
+      ? ['rep']
+      : publico === 'lojas'
+        ? ['store']
+        : ['rep', 'store', 'manager', 'admin', 'financeiro', 'relacionamento'];
+  const { data } = await supabase
+    .from('users')
+    .select('id')
+    .eq('company_id', company_id)
+    .eq('active', true)
+    .in('role', papeis);
+  return ((data ?? []) as Array<{ id: string }>).map((u) => u.id);
+}
+
 /** Envia para todos os usuários ativos destes papéis (ex.: a mesa do financeiro). */
 export async function enviarParaPapeis(
   company_id: string,
