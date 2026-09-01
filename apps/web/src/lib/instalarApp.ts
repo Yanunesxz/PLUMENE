@@ -72,11 +72,35 @@ function ehFirefox(): boolean {
   return /firefox|fxios/i.test(navigator.userAgent);
 }
 
+// A memória de "este APARELHO já instalou": rodar como app ou concluir a
+// instalação grava a marca. Sem ela, quem instalou mas abriu pelo navegador
+// (o Chrome não reoferece instalação de app que já existe) parecia
+// não-instalado — e o alerta de "deixe na tela inicial" ficava lá para sempre.
+const MARCA_INSTALOU = 'app-ja-instalado-aqui';
+
+function gravarQueInstalou(): void {
+  try {
+    localStorage.setItem(MARCA_INSTALOU, '1');
+  } catch {
+    /* sem storage: a marca não fica, o alerta volta — nada quebra */
+  }
+}
+
+/** Este aparelho já teve o app instalado (mesmo se agora abriu pelo navegador). */
+export function jaInstalouNesteAparelho(): boolean {
+  try {
+    return localStorage.getItem(MARCA_INSTALOU) === '1';
+  } catch {
+    return false;
+  }
+}
+
 /** Chamado uma vez, no arranque do app. */
 export function observarInstalacao(): void {
   if (typeof window === 'undefined') return;
 
   jaInstalado = rodandoComoApp();
+  if (jaInstalado) gravarQueInstalou();
 
   window.addEventListener('beforeinstallprompt', (evento) => {
     // Sem isto o Chrome mostra a barrinha dele por cima do app. Preferimos
@@ -89,6 +113,7 @@ export function observarInstalacao(): void {
   window.addEventListener('appinstalled', () => {
     convite = null;
     jaInstalado = true;
+    gravarQueInstalou();
     avisarTodos();
   });
 }
