@@ -484,3 +484,101 @@ describe('quem mexe no pedido — a regra do gerente', () => {
     await app.close();
   });
 });
+
+/**
+ * VENDA INTERNA (Simone e Nicoli): quem carimba o faturamento do pedido é ela
+ * mesma — não há integração que avise. Então o teto dela é o CARIMBO, não o
+ * envio para a fábrica: enquanto a nota não saiu, o pedido é dela para
+ * ajustar. Regra do Yan (01/09/2026): "ela tem que poder alterar esses
+ * pedidos, só trava depois de marcar como faturado".
+ */
+describe('a venda interna mexe no próprio pedido até o carimbo', () => {
+  afterAll(() => {
+    vi.doUnmock('../apps/api/src/config/supabase.js');
+  });
+
+  const TOKEN_INTERNA = assinar({
+    sub: 'rep-1',
+    email: 'simone@csb.com',
+    company_id: EMPRESA,
+    name: 'SIMONE',
+    role: 'rep',
+    price_table_id: TABELA,
+    venda_interna: true,
+  });
+
+  it('edita as peças do pedido JÁ ENVIADO à fábrica — onde o rep comum trava', async () => {
+    vi.resetModules();
+    const NA_FABRICA = { ...PEDIDO_NA_TRIAGEM, status: 'sent_erp' };
+    const { app } = await subir({
+      orders: [
+        { data: NA_FABRICA, error: null },
+        { data: { id: 'o1' }, error: null },
+        { data: { ...NA_FABRICA, items: [] }, error: null },
+      ],
+      product_prices: [
+        { data: [{ price_larger: null }], error: null },
+        { data: [{ product_id: 'p1', price: 41.9, price_larger: 52.9 }], error: null },
+      ],
+      product_variants: { data: [{ id: 'v-gg', size: 'GG' }], error: null },
+      order_items: [
+        { data: [], error: null },
+        { data: null, error: null },
+        { data: null, error: null },
+      ],
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { items: [{ product_id: 'p1', variant_id: 'v-gg', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(200);
+    await app.close();
+  });
+
+  it('o mesmo pedido, para o rep COMUM, continua fechado', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'sent_erp' }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: { items: [{ product_id: 'p1', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it('depois do carimbo, nem ela mexe — o faturado é o fim da linha', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'approved', invoiced: true }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/items',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { items: [{ product_id: 'p1', quantity: 1 }] },
+    });
+    expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+
+  it('pedido de OUTRO representante segue fora do alcance dela', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, rep_id: 'rep-2', status: 'approved' }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/desconto',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { desconto: 5 },
+    });
+    expect(res.statusCode).toBe(403);
+    await app.close();
+  });
+});

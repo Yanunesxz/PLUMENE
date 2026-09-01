@@ -563,6 +563,12 @@ export async function setOrderDiscount(
  * até o já aprovado: "o gerente pode mudar o pedido do representante e do
  * cliente".
  *
+ * VENDA INTERNA (031): o teto dela é o CARIMBO, não o envio. Quem fatura o
+ * pedido dela é ela mesma (não há integração que avise), então enquanto o
+ * carimbo não veio o pedido continua na mão dela — inclusive já enviado à
+ * fábrica. Regra do Yan (01/09/2026): "ela tem que poder alterar esses
+ * pedidos, só trava depois de marcar como faturado".
+ *
  * Ninguém: pedido faturado ou já no ERP. A nota saiu por aquele valor; mexer
  * aqui criaria uma verdade diferente da do Control.
  */
@@ -572,14 +578,16 @@ function podeMexerNoPedido(
   user_id: string,
   vendaInterna = false,
 ): 'ok' | 'forbidden' | 'tarde_demais' {
+  // Antes do teto geral: para a venda interna, no PRÓPRIO pedido, o único
+  // teto é o faturamento — ela é quem carimba, então é ela quem fecha a porta.
+  if (role === 'rep' && vendaInterna && o.rep_id === user_id) {
+    return o.invoiced ? 'tarde_demais' : 'ok';
+  }
   if (o.invoiced || o.status === 'sent_erp' || o.status === 'rejected' || o.status === 'error_erp') {
     return 'tarde_demais';
   }
   if (role === 'rep') {
     if (o.rep_id !== user_id) return 'forbidden';
-    // VENDA INTERNA (031): o pedido dele NASCE aprovado — a janela de ajuste
-    // vai até o carimbo do faturamento (o teto lá em cima), como a do gerente.
-    if (vendaInterna && o.status === 'approved') return 'ok';
     return o.status === 'draft' || o.status === 'pending_rep' || o.status === 'pending_approval'
       ? 'ok'
       : 'tarde_demais';

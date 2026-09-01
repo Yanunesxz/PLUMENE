@@ -21,6 +21,7 @@ import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js'
 import { SeletorTamanho, type PickedSize } from '../../components/comercial/SeletorTamanho.js';
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
+import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -55,6 +56,12 @@ export function PaginaDetalhePedido() {
     ((user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
       podeFaturar) ||
     (ehVendaInterna && !!order && order.rep_id === user.id);
+  // DESMARCAR é do escritório. Para a venda interna o carimbo é sem volta — é
+  // ele que fecha o pedido, e por isso vem com pergunta antes (ver o diálogo
+  // lá embaixo). Erro de toque se resolve com o financeiro, não sozinha.
+  const podeDesmarcar =
+    (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') && podeFaturar;
+  const [confirmandoFatura, setConfirmandoFatura] = useState(false);
   const [invoicing, setInvoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -90,12 +97,13 @@ export function PaginaDetalhePedido() {
     (user?.role === 'rep'
       ? // Até a fábrica DECIDIR: o pedido do rep nasce direto na fila, e é lá
         // que ele corrige o que acabou de passar. Aprovado, fecha a mão dele —
-        // exceto na VENDA INTERNA, cujo pedido já NASCE aprovado: a janela de
-        // ajuste dela vai até o carimbo do faturamento.
+        // exceto na VENDA INTERNA, que carimba o próprio faturamento: enquanto
+        // o carimbo não vem, o pedido é dela para ajustar, em qualquer estado
+        // (inclusive já na fábrica). O `!order.invoiced` lá em cima é o teto.
+        (user.venda_interna === true && order.rep_id === user.id) ||
         order.status === 'draft' ||
         order.status === 'pending_rep' ||
-        order.status === 'pending_approval' ||
-        (user.venda_interna === true && order.status === 'approved' && order.rep_id === user.id)
+        order.status === 'pending_approval'
       : (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
         (order.status === 'pending_rep' ||
           order.status === 'pending_approval' ||
@@ -652,12 +660,16 @@ export function PaginaDetalhePedido() {
                   </span>
                 )}
               </span>
-              {canInvoice && (
+              {canInvoice && (!order.invoiced || podeDesmarcar) && (
                 <Button
                   variant="outline"
                   size="sm"
                   disabled={invoicing}
-                  onClick={() => void toggleInvoiced()}
+                  onClick={() => {
+                    // A venda interna confirma antes: o carimbo dela não volta.
+                    if (!order.invoiced && ehVendaInterna) setConfirmandoFatura(true);
+                    else void toggleInvoiced();
+                  }}
                 >
                   {order.invoiced ? 'Desmarcar' : 'Marcar faturado'}
                 </Button>
@@ -1030,6 +1042,20 @@ export function PaginaDetalhePedido() {
           colorGroup={pickerEdit.group.length > 1 ? pickerEdit.group : undefined}
           onClose={() => setPickerEdit(null)}
           onConfirm={(chosen, lines) => adicionarPecas(chosen, lines)}
+        />
+      )}
+
+      {confirmandoFatura && order && (
+        <ConfirmarFaturamento
+          numero={order.order_number}
+          cliente={nomeDoComprador(order, custName)}
+          total={order.total}
+          ocupado={invoicing}
+          onConfirmar={() => {
+            setConfirmandoFatura(false);
+            void toggleInvoiced();
+          }}
+          onCancelar={() => setConfirmandoFatura(false)}
         />
       )}
 
