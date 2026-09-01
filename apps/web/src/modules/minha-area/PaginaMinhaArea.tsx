@@ -13,6 +13,7 @@ import {
   CloudOff,
   MessageCircle,
   Sparkles,
+  CalendarCheck,
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
@@ -29,6 +30,7 @@ import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { situacaoDaCompra } from '../../lib/carteira.js';
+import { janelaDoFechamento, DIA_LIMITE_DO_FECHAMENTO } from '../../lib/fechamento.js';
 import { Link } from 'react-router-dom';
 import { valorDaVenda } from '@csb/shared';
 import type { TarefaDoRep } from '@csb/shared';
@@ -162,6 +164,12 @@ export function PaginaMinhaArea() {
     };
     const invoiced = list.filter((o) => o.invoiced && o.invoiced_at);
     const approved = list.filter((o) => o.status === 'approved');
+    // O fechamento do mês que terminou — só entre os dias 1 e 10.
+    const janela = janelaDoFechamento(now);
+    const faturadoMesPassado = invoiced
+      .filter((o) => janela.contem(o.invoiced_at))
+      .reduce((s, o) => s + valorDaVenda(o), 0);
+    const pedidosMesPassado = invoiced.filter((o) => janela.contem(o.invoiced_at)).length;
     // Pelo valor da NOTA quando o ERP informa: o financeiro corta o que faltou
     // no estoque, e mostrar o total do pedido faria o representante contar
     // dinheiro que a fábrica não faturou.
@@ -177,6 +185,10 @@ export function PaginaMinhaArea() {
         .reduce((s, o) => s + (o.total ?? 0), 0),
       faturadoMes,
       faturadoTotal,
+      // Fechamento do mês passado: valor, quantidade e a janela que o esconde.
+      faturadoMesPassado,
+      pedidosMesPassado,
+      janela,
       pedidosMes: list.filter((o) => thisMonth(o.created_at)).length,
       totalPedidos: list.length,
       ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
@@ -326,6 +338,32 @@ export function PaginaMinhaArea() {
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
+
+      {/* O fechamento do mês que terminou — a nota sai depois do pedido, então
+          o número só fica completo na virada. Fica à vista até o dia 10 e some
+          sozinho: passado isso, o mês corrente é o que importa, e dois números
+          lado a lado confundem quem bate meta. */}
+      {m.janela.visivel && m.faturadoMesPassado > 0 && (
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <CalendarCheck className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium capitalize text-foreground">
+                  Fechamento de {m.janela.mes}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {m.pedidosMesPassado} pedido{m.pedidosMesPassado > 1 ? 's' : ''} faturado
+                  {m.pedidosMesPassado > 1 ? 's' : ''} · fica aqui até o dia {DIA_LIMITE_DO_FECHAMENTO}
+                </p>
+              </div>
+            </div>
+            <p className="tnum text-xl font-bold text-foreground">{formatBRL(m.faturadoMesPassado)}</p>
+          </div>
+        </section>
+      )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
           O toque cai na lista de Clientes já filtrada nos parados. */}
