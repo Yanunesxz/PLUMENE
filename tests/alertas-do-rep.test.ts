@@ -42,6 +42,12 @@ function entradas(parcial: Partial<EntradasDosAlertas>): EntradasDosAlertas {
     instalacao: 'instalado',
     rascunhos: [],
     chegaram: [],
+    faturados: [],
+    filaOffline: [],
+    vitrines: [],
+    convites: [],
+    clientes: [],
+    meta: null,
     tarefas: [],
     agora: AGORA,
     ...parcial,
@@ -91,19 +97,93 @@ describe('os 3 degraus', () => {
     expect(lista.some((a) => a.id === 'rascunho-novo')).toBe(false);
   });
 
-  it('instalar o app e pedido chegado recente são NORMAIS; chegado velho sai da lista', () => {
+  it('chegado de hoje/ontem é NORMAL; parado 2+ dias na triagem SOBE para urgente', () => {
     const lista = montarAlertas(
       entradas({
         instalacao: 'pronto',
         chegaram: [
           { id: 'ontem', numero: 200, criadoEm: diasAtras(1) },
-          { id: 'antigo', numero: 201, criadoEm: diasAtras(6) },
+          { id: 'parado', numero: 201, criadoEm: diasAtras(3) },
         ],
       }),
     );
     expect(lista.find((a) => a.id === 'instalar')?.nivel).toBe('normal');
     expect(lista.find((a) => a.id === 'chegou-ontem')?.nivel).toBe('normal');
-    expect(lista.some((a) => a.id === 'chegou-antigo')).toBe(false);
+    expect(lista.find((a) => a.id === 'triagem-parado')?.nivel).toBe('urgente');
+    expect(lista.some((a) => a.id === 'chegou-parado')).toBe(false);
+  });
+
+  it('pedido preso na fila offline há 1h+ é URGENTE; recém-feito não apita', () => {
+    const preso = montarAlertas(
+      entradas({ filaOffline: [{ criadoEm: new Date(AGORA.getTime() - 2 * 3600_000).toISOString() }] }),
+    );
+    expect(preso.find((a) => a.id === 'fila-offline')?.nivel).toBe('urgente');
+    const recem = montarAlertas(
+      entradas({ filaOffline: [{ criadoEm: new Date(AGORA.getTime() - 600_000).toISOString() }] }),
+    );
+    expect(recem.some((a) => a.id === 'fila-offline')).toBe(false);
+  });
+
+  it('visita AMANHÃ é atenção', () => {
+    const lista = montarAlertas(
+      entradas({ tarefas: [tarefa({ id: 'am', prazo: diasAFrente(1) })] }),
+    );
+    expect(lista.find((a) => a.id === 'visita-amanha-am')?.nivel).toBe('atencao');
+  });
+
+  it('cliente a 1-3 dias de virar inativo é atenção; já inativo ou longe não aparece', () => {
+    const lista = montarAlertas(
+      entradas({
+        clientes: [
+          { id: 'quase', nome: 'Loja Quase', ultimaCompraEm: diasAtras(178) },
+          { id: 'ja', nome: 'Loja Já Era', ultimaCompraEm: diasAtras(181) },
+          { id: 'longe', nome: 'Loja Ativa', ultimaCompraEm: diasAtras(100) },
+        ],
+      }),
+    );
+    expect(lista.find((a) => a.id === 'cliente-expira-quase')?.nivel).toBe('atencao');
+    expect(lista.some((a) => a.id.includes('ja'))).toBe(false);
+    expect(lista.some((a) => a.id.includes('longe'))).toBe(false);
+  });
+
+  it('link da vitrine que expira HOJE sem pedido é atenção', () => {
+    const lista = montarAlertas(
+      entradas({
+        vitrines: [
+          { id: 'v1', clienteNome: 'Loja X', expiraEm: new Date(AGORA.getTime() + 3 * 3600_000).toISOString(), status: 'ativo' },
+          { id: 'v2', clienteNome: null, expiraEm: diasAFrente(2), status: 'ativo' },
+        ],
+      }),
+    );
+    expect(lista.find((a) => a.id === 'vitrine-hoje-v1')?.nivel).toBe('atencao');
+    expect(lista.some((a) => a.id === 'vitrine-hoje-v2')).toBe(false);
+  });
+
+  it('faturado ontem é normal; convite expirado sem abrir também', () => {
+    const lista = montarAlertas(
+      entradas({
+        faturados: [{ id: 'f1', numero: 300, faturadoEm: diasAtras(1) }],
+        convites: [
+          { id: 'c1', clienteNome: 'Loja Y', expiraEm: diasAtras(2), status: 'expirado' },
+          { id: 'c2', clienteNome: 'Loja Z', expiraEm: diasAtras(30), status: 'expirado' },
+        ],
+      }),
+    );
+    expect(lista.find((a) => a.id === 'faturado-f1')?.nivel).toBe('normal');
+    expect(lista.find((a) => a.id === 'convite-venceu-c1')?.nivel).toBe('normal');
+    // convite arqueológico (30 dias) fica quieto
+    expect(lista.some((a) => a.id === 'convite-venceu-c2')).toBe(false);
+  });
+
+  it('a régua da meta aparece com o id DO DIA (visto hoje, volta amanhã)', () => {
+    const lista = montarAlertas(
+      entradas({ meta: { enviado: 5000, faixas: [{ meta: 8000, bonus: 300 }] } }),
+    );
+    const meta = lista.find((a) => a.id.startsWith('meta-'));
+    expect(meta?.id).toBe('meta-2026-08-31');
+    expect(meta?.titulo).toContain('faltam');
+    // agosto/2026 acaba HOJE (dia 31): última semana → sobe para atenção
+    expect(meta?.nivel).toBe('atencao');
   });
 
   it('tudo em dia = lista vazia', () => {
