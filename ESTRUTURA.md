@@ -102,7 +102,9 @@ apps/api/src/
 │       ├── 034_notificacoes_push.sql → push_subscriptions (avisos no celular, Web Push)
 │       ├── 035_vitrine_com_cliente.sql → showcase_links.customer_id (link temporário amarrado)
 │       ├── 036_historico_de_compra.sql → customers.last_purchase_at/total_purchased/overdue_amount
-│       └── 037_tarefas_do_representante.sql → rep_tasks (o que o escritório pede ao rep)
+│       ├── 037_tarefas_do_representante.sql → rep_tasks (o que o escritório pede ao rep; com local e observacoes)
+│       ├── 038_perfil_relacionamento.sql → role 'relacionamento' no CHECK de users (a conta da Bruna)
+│       └── 039_controle_de_inatividade.sql → customers.inactivity_* (motivo + observação do cliente vermelho)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

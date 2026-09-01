@@ -148,5 +148,11 @@ Já cobertas pelo `.gitignore`, mas confira antes de commitar:
 
 Migration é arquivo numerado em `apps/api/src/config/migrations/`, rodado à mão no
 SQL Editor do Supabase. **O código pode subir antes da migration rodar** — então
-mudança que depende de coluna nova só vai para o `main` depois que o SQL estiver
-aplicado, senão a API quebra em produção. A última é a `025_tabela_do_pedido.sql`.
+mudança que depende de coluna nova usa guarda `detectar*()` no serviço, ou só vai
+para o `main` depois do SQL aplicado. A lista viva está no ESTRUTURA.md — este
+arquivo não repete o número da última de propósito, porque desatualiza.
+
+**Número de migração é reservado POR MENSAGEM entre as sessões antes do commit**
+(combinado de 31/08/2026, depois que duas sessões criaram 033/034 ao mesmo
+tempo). Confira o maior número no ESTRUTURA.md E avise as outras sessões qual
+você vai usar.
