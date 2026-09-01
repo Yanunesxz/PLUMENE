@@ -146,8 +146,9 @@ export async function enviarParaUsuarios(
  *   reps            → só os representantes
  *   lojas           → só as contas de loja
  *   lojas_compraram → lojas cujo cliente fez pedido nos últimos N dias
+ *   escritorio      → só a gerência comercial e o financeiro
  */
-export type PublicoDoAviso = 'todos' | 'reps' | 'lojas' | 'lojas_compraram';
+export type PublicoDoAviso = 'todos' | 'reps' | 'lojas' | 'lojas_compraram' | 'escritorio';
 
 export async function resolverPublico(
   company_id: string,
@@ -180,7 +181,9 @@ export async function resolverPublico(
       ? ['rep']
       : publico === 'lojas'
         ? ['store']
-        : ['rep', 'store', 'manager', 'admin', 'financeiro', 'relacionamento'];
+        : publico === 'escritorio'
+          ? ['manager', 'financeiro']
+          : ['rep', 'store', 'manager', 'admin', 'financeiro', 'relacionamento'];
   const { data } = await supabase
     .from('users')
     .select('id')

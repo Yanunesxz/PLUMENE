@@ -131,6 +131,16 @@ describe('resolverPublico — quem recebe o aviso manual', () => {
     const filtro = fake.filtrosDe('users', 'in').find((f) => f.args[0] === 'role');
     expect(filtro?.args[1]).toEqual(['rep']);
   });
+
+  it('escritorio: só gerência e financeiro — nem admin, nem rep, nem loja', async () => {
+    const { service, fake } = await carregar({
+      users: { data: [{ id: 'fabian' }, { id: 'fin-1' }], error: null },
+    });
+    const ids = await service.resolverPublico(EMPRESA, 'escritorio');
+    expect(ids).toEqual(['fabian', 'fin-1']);
+    const filtro = fake.filtrosDe('users', 'in').find((f) => f.args[0] === 'role');
+    expect(filtro?.args[1]).toEqual(['manager', 'financeiro']);
+  });
 });
 
 describe('avisos do fluxo', () => {

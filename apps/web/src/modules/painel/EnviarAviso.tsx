@@ -16,13 +16,14 @@ import type { ApiResponse } from '@csb/shared';
  * confirmação nomeando o público — sem popup, o próprio botão vira a pergunta.
  */
 
-type Publico = 'todos' | 'reps' | 'lojas' | 'lojas_compraram';
+type Publico = 'todos' | 'reps' | 'lojas' | 'lojas_compraram' | 'escritorio';
 
 const PUBLICOS: Array<{ valor: Publico; rotulo: string }> = [
   { valor: 'todos', rotulo: 'Todo mundo com o app' },
   { valor: 'reps', rotulo: 'Só os representantes' },
   { valor: 'lojas', rotulo: 'Só as lojas' },
   { valor: 'lojas_compraram', rotulo: 'Lojas que compraram nos últimos 90 dias' },
+  { valor: 'escritorio', rotulo: 'Só gerência comercial e financeiro' },
 ];
 
 const DESTINOS = [

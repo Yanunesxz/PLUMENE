@@ -79,6 +79,16 @@ function mesmoDia(a: Date, b: Date): boolean {
   );
 }
 
+/**
+ * Dias de CALENDÁRIO entre hoje e o prazo (0 = hoje, 7 = daqui uma semana).
+ * Por hora do relógio, uma visita "daqui 7 dias às 8h" vista ao meio-dia
+ * daria 6.8 e o lembrete do dia 7 nunca dispararia.
+ */
+function diasDeCalendario(prazo: Date, agora: Date): number {
+  const zerar = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  return Math.round((zerar(prazo) - zerar(agora)) / DIA);
+}
+
 function nomeDoPedido(numero: number | null): string {
   return numero ? `Pedido #${numero}` : 'Pedido';
 }
@@ -159,22 +169,26 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
   }
 
   // ── ATENÇÃO ───────────────────────────────────────────────────────────────
-  // Visita AMANHÃ: hoje é urgência, amanhã é preparação.
-  const amanha = new Date(e.agora.getTime() + DIA);
+  // Lembretes de visita SEM encher a tela todo dia (regra do Yan): aparecem
+  // em 14 e 10 dias (normais), em 7 e 3 dias (atenção) e depois SÓ no dia
+  // (urgente, lá em cima). O id carrega o marco — cada lembrete é um "já vi"
+  // próprio.
   for (const t of visitasAbertas) {
+    const faltamDias = diasDeCalendario(new Date(t.prazo!), e.agora);
+    if (faltamDias !== 7 && faltamDias !== 3) continue;
     const prazo = new Date(t.prazo!);
-    if (mesmoDia(prazo, amanha)) {
-      const hora = prazo.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      alertas.push({
-        id: `visita-amanha-${t.id}`,
-        nivel: 'atencao',
-        titulo: `Visita amanhã: ${nomeDaVisita(t)}`,
-        detalhe: [`Amanhã às ${hora}`, t.local?.trim() ? `em ${t.local.trim()}` : null]
-          .filter(Boolean)
-          .join(' · '),
-        acao: { rotulo: 'Ver a visita', tipo: 'ir', para: '/minha-area' },
-      });
-    }
+    alertas.push({
+      id: `visita-${faltamDias}d-${t.id}`,
+      nivel: 'atencao',
+      titulo: `Visita em ${faltamDias} dias: ${nomeDaVisita(t)}`,
+      detalhe: [
+        `${prazo.toLocaleDateString('pt-BR')} às ${prazo.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+        t.local?.trim() ? `em ${t.local.trim()}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      acao: { rotulo: 'Ver a visita', tipo: 'ir', para: '/minha-area' },
+    });
   }
 
   // Cliente a até 3 dias de virar INATIVO (180 sem comprar): a última chance
@@ -245,18 +259,18 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
     });
   }
 
+  // Os marcos distantes da visita: 14 e 10 dias antes, um lembrete de cada.
   for (const t of visitasAbertas) {
+    const faltamDias = diasDeCalendario(new Date(t.prazo!), e.agora);
+    if (faltamDias !== 14 && faltamDias !== 10) continue;
     const prazo = new Date(t.prazo!);
-    const emDias = Math.floor((prazo.getTime() - e.agora.getTime()) / DIA);
-    if (emDias >= 14) {
-      alertas.push({
-        id: `visita-longe-${t.id}`,
-        nivel: 'normal',
-        titulo: `Visita marcada: ${nomeDaVisita(t)}`,
-        detalhe: `Para ${prazo.toLocaleDateString('pt-BR')} — daqui a ${emDias} dias.`,
-        acao: { rotulo: 'Ver a visita', tipo: 'ir', para: '/minha-area' },
-      });
-    }
+    alertas.push({
+      id: `visita-${faltamDias}d-${t.id}`,
+      nivel: 'normal',
+      titulo: `Visita marcada: ${nomeDaVisita(t)}`,
+      detalhe: `Para ${prazo.toLocaleDateString('pt-BR')} — daqui a ${faltamDias} dias.`,
+      acao: { rotulo: 'Ver a visita', tipo: 'ir', para: '/minha-area' },
+    });
   }
 
   // Só o que chegou HOJE/ONTEM — com 2+ dias parado já subiu para urgente.
@@ -338,4 +352,15 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
  */
 export function contarNaoVistos(alertas: Alerta[], vistos: ReadonlySet<string>): number {
   return alertas.filter((a) => a.nivel === 'urgente' || !vistos.has(a.id)).length;
+}
+
+/**
+ * Quem pode ser marcada como "resolvida" na mão: só amarelas e brancas — e
+ * mesmo entre elas, NÃO as de ação direta (atualizar, ativar avisos,
+ * instalar): essas saem RESOLVENDO, não marcando. Urgente idem — regra do
+ * Yan: "só sai quando estiver resolvida".
+ */
+export function podeMarcarResolvida(a: Alerta): boolean {
+  if (a.nivel === 'urgente') return false;
+  return !a.acao || a.acao.tipo === 'ir';
 }

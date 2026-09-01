@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { montarAlertas, contarNaoVistos, type EntradasDosAlertas } from '../apps/web/src/lib/alertas.js';
+import {
+  montarAlertas,
+  contarNaoVistos,
+  podeMarcarResolvida,
+  type EntradasDosAlertas,
+} from '../apps/web/src/lib/alertas.js';
 import type { TarefaDoRep } from '@csb/shared';
 
 /**
@@ -61,19 +66,30 @@ describe('os 3 degraus', () => {
     expect(a?.acao?.tipo).toBe('atualizar');
   });
 
-  it('visita HOJE é urgente; para 14+ dias é normal; no meio não vira alerta', () => {
+  it('visita: lembretes SÓ nos marcos 14/10 (normal), 7/3 (atenção) e no dia (urgente)', () => {
     const lista = montarAlertas(
       entradas({
         tarefas: [
           tarefa({ id: 'hoje', prazo: new Date(AGORA.getTime() + 3600_000).toISOString() }),
-          tarefa({ id: 'semana', prazo: diasAFrente(5) }),
-          tarefa({ id: 'longe', prazo: diasAFrente(20) }),
+          tarefa({ id: 'd1', prazo: diasAFrente(1) }),
+          tarefa({ id: 'd3', prazo: diasAFrente(3) }),
+          tarefa({ id: 'd5', prazo: diasAFrente(5) }),
+          tarefa({ id: 'd7', prazo: diasAFrente(7) }),
+          tarefa({ id: 'd10', prazo: diasAFrente(10) }),
+          tarefa({ id: 'd14', prazo: diasAFrente(14) }),
+          tarefa({ id: 'd20', prazo: diasAFrente(20) }),
         ],
       }),
     );
     expect(lista.find((a) => a.id === 'visita-ja-hoje')?.nivel).toBe('urgente');
-    expect(lista.find((a) => a.id === 'visita-longe-longe')?.nivel).toBe('normal');
-    expect(lista.some((a) => a.id.includes('semana'))).toBe(false);
+    expect(lista.find((a) => a.id === 'visita-3d-d3')?.nivel).toBe('atencao');
+    expect(lista.find((a) => a.id === 'visita-7d-d7')?.nivel).toBe('atencao');
+    expect(lista.find((a) => a.id === 'visita-10d-d10')?.nivel).toBe('normal');
+    expect(lista.find((a) => a.id === 'visita-14d-d14')?.nivel).toBe('normal');
+    // fora dos marcos, silêncio — a tela não pode encher todo dia
+    for (const quieto of ['d1', 'd5', 'd20']) {
+      expect(lista.some((a) => a.id.endsWith(`-${quieto}`))).toBe(false);
+    }
   });
 
   it('visita atrasada (pendente, prazo passado) continua URGENTE', () => {
@@ -124,11 +140,22 @@ describe('os 3 degraus', () => {
     expect(recem.some((a) => a.id === 'fila-offline')).toBe(false);
   });
 
-  it('visita AMANHÃ é atenção', () => {
+  it('urgente e alerta de AÇÃO não se marcam como resolvidos; amarela/branca de rota sim', () => {
     const lista = montarAlertas(
-      entradas({ tarefas: [tarefa({ id: 'am', prazo: diasAFrente(1) })] }),
+      entradas({
+        atualizacao: 'disponivel', // urgente + ação
+        avisos: 'inativo', // atenção + ação (ativar)
+        instalacao: 'pronto', // normal + ação (instalar)
+        rascunhos: [{ id: 'r1', numero: 1, atualizadoEm: diasAtras(10) }], // atenção + rota
+        faturados: [{ id: 'f1', numero: 2, faturadoEm: diasAtras(0) }], // normal + rota
+      }),
     );
-    expect(lista.find((a) => a.id === 'visita-amanha-am')?.nivel).toBe('atencao');
+    const porId = (id: string) => lista.find((a) => a.id === id)!;
+    expect(podeMarcarResolvida(porId('atualizar'))).toBe(false);
+    expect(podeMarcarResolvida(porId('ativar-avisos'))).toBe(false);
+    expect(podeMarcarResolvida(porId('instalar'))).toBe(false);
+    expect(podeMarcarResolvida(porId('rascunho-r1'))).toBe(true);
+    expect(podeMarcarResolvida(porId('faturado-f1'))).toBe(true);
   });
 
   it('cliente a 1-3 dias de virar inativo é atenção; já inativo ou longe não aparece', () => {

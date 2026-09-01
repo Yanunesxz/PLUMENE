@@ -11,6 +11,7 @@ import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
@@ -133,6 +134,8 @@ export function PaginaPedidos() {
   // novo que o pedido é DELA; desfazer um toque errado fica no detalhe.
   const ehVendaInterna = user?.role === 'rep' && user?.venda_interna === true;
   const [faturando, setFaturando] = useState<string | null>(null);
+  // O carimbo trava o pedido para sempre — ninguém fatura sem confirmar antes.
+  const [confirmandoFatura, setConfirmandoFatura] = useState<Order | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   const marcarFaturado = async (order: Order) => {
@@ -145,6 +148,7 @@ export function PaginaPedidos() {
         token,
       );
       await db.orders.put(res.data);
+      setConfirmandoFatura(null);
       setToast({ message: `Pedido #${order.order_number ?? ''} faturado.`, type: 'success' });
     } catch (err) {
       setToast({
@@ -612,7 +616,7 @@ export function PaginaPedidos() {
                       onClick={(e) => {
                         e.preventDefault();
                         e.stopPropagation();
-                        void marcarFaturado(order);
+                        setConfirmandoFatura(order);
                       }}
                       className="mt-2 rounded-lg border border-positive/40 px-2.5 py-1.5 text-xs font-semibold text-positive-soft-foreground transition-colors hover:bg-positive-soft disabled:opacity-50"
                     >
@@ -657,6 +661,17 @@ export function PaginaPedidos() {
             );
           })}
         </div>
+      )}
+
+      {confirmandoFatura && (
+        <ConfirmarFaturamento
+          numero={confirmandoFatura.order_number}
+          cliente={nomeDoComprador(confirmandoFatura, customerName)}
+          total={confirmandoFatura.total}
+          ocupado={faturando === confirmandoFatura.id}
+          onConfirmar={() => void marcarFaturado(confirmandoFatura)}
+          onCancelar={() => setConfirmandoFatura(null)}
+        />
       )}
 
       {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}

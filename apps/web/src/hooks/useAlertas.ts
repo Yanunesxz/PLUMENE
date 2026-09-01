@@ -7,7 +7,14 @@ import { useAtualizacao } from './useAtualizacao.js';
 import { useAvisosNoCelular } from './useAvisosNoCelular.js';
 import { useInstalarApp } from './useInstalarApp.js';
 import { useMinhaMeta } from './useMinhaMeta.js';
-import { montarAlertas, contarNaoVistos, type Alerta } from '../lib/alertas.js';
+import {
+  montarAlertas,
+  contarNaoVistos,
+  podeMarcarResolvida,
+  type Alerta,
+  type NivelDoAlerta,
+} from '../lib/alertas.js';
+import { jaInstalouNesteAparelho } from '../lib/instalarApp.js';
 import { contaParaAMeta } from '@csb/shared';
 import type { ApiResponse, TarefaDoRep, ShowcaseLink, StoreInvite } from '@csb/shared';
 
@@ -20,6 +27,7 @@ import type { ApiResponse, TarefaDoRep, ShowcaseLink, StoreInvite } from '@csb/s
  */
 
 const CHAVE_VISTOS = 'alertas-vistos-v1';
+const CHAVE_RESOLVIDAS = 'alertas-resolvidas-v1';
 
 function lerVistos(): Set<string> {
   try {
@@ -38,13 +46,52 @@ function gravarVistos(ids: Set<string>): void {
   }
 }
 
+/** Uma pendência que a pessoa marcou como resolvida/lida — vale só no DIA. */
+export interface AlertaResolvido {
+  id: string;
+  titulo: string;
+  detalhe: string;
+  nivel: NivelDoAlerta;
+  /** O dia (AAAA-MM-DD) e a hora da marcação, para a aba "Resolvidas". */
+  em: string;
+  hora: string;
+}
+
+function diaDe(data: Date): string {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, '0')}-${String(data.getDate()).padStart(2, '0')}`;
+}
+
+/** Lê só as de HOJE — resolvida de ontem volta a valer se a pendência seguir viva. */
+function lerResolvidas(): AlertaResolvido[] {
+  try {
+    const bruto = localStorage.getItem(CHAVE_RESOLVIDAS);
+    const todas = bruto ? (JSON.parse(bruto) as AlertaResolvido[]) : [];
+    return todas.filter((r) => r.em === diaDe(new Date()));
+  } catch {
+    return [];
+  }
+}
+
+function gravarResolvidas(lista: AlertaResolvido[]): void {
+  try {
+    localStorage.setItem(CHAVE_RESOLVIDAS, JSON.stringify(lista));
+  } catch {
+    /* sem storage: a marcação não fica, o alerta volta — nada quebra */
+  }
+}
+
 export interface Alertas {
+  /** As PENDENTES — sem as que a pessoa marcou como resolvidas hoje. */
   alertas: Alerta[];
-  /** O número do menu (urgentes + não vistos). */
+  /** O número do menu (urgentes + não vistos, só entre as pendentes). */
   contagem: number;
   temUrgente: boolean;
   /** A tela chama ao abrir: atenção e normal viram "vistos" neste aparelho. */
   marcarVistos: () => void;
+  /** Marca amarela/branca como resolvida (as de ação e as urgentes recusam). */
+  marcarResolvida: (alerta: Alerta) => void;
+  /** A aba "Resolvidas" — só as marcadas HOJE, mais recente primeiro. */
+  resolvidasHoje: AlertaResolvido[];
   carregando: boolean;
 }
 
@@ -103,7 +150,9 @@ export function useAlertas(): Alertas {
     return montarAlertas({
       atualizacao,
       avisos,
-      instalacao,
+      // Este aparelho já instalou? Vale mesmo se agora abriu pelo navegador —
+      // o Chrome não reoferece a instalação e o alerta ficava lá para sempre.
+      instalacao: jaInstalouNesteAparelho() ? 'instalado' : instalacao,
       rascunhos: (orders ?? [])
         .filter((o) => o.status === 'draft')
         .map((o) => ({
@@ -159,22 +208,60 @@ export function useAlertas(): Alertas {
     });
   }, [ehRep, atualizacao, avisos, instalacao, orders, tarefas, vitrines, convites, clientes, filaOffline, faixas]);
 
+  const [resolvidas, setResolvidas] = useState<AlertaResolvido[]>(() => lerResolvidas());
+
+  // As PENDENTES: o que a pessoa marcou como resolvida HOJE sai da lista —
+  // se a pendência seguir viva amanhã, ela volta (a marcação vale pelo dia).
+  const pendentes = useMemo(() => {
+    const hoje = diaDe(new Date());
+    const resolvidosHoje = new Set(resolvidas.filter((r) => r.em === hoje).map((r) => r.id));
+    return alertas.filter((a) => !resolvidosHoje.has(a.id));
+  }, [alertas, resolvidas]);
+
   const marcarVistos = useCallback(() => {
     // Guarda só os ids que EXISTEM agora — visto de alerta que sumiu é lixo.
     const novos = new Set(
-      alertas.filter((a) => a.nivel !== 'urgente').map((a) => a.id),
+      pendentes.filter((a) => a.nivel !== 'urgente').map((a) => a.id),
     );
     setVistos(novos);
     gravarVistos(novos);
-  }, [alertas]);
+  }, [pendentes]);
 
-  const contagem = useMemo(() => contarNaoVistos(alertas, vistos), [alertas, vistos]);
+  const marcarResolvida = useCallback(
+    (alerta: Alerta) => {
+      // Urgente e alerta de ação (atualizar/avisos/instalar) não se marcam:
+      // esses saem RESOLVENDO — regra do Yan.
+      if (!podeMarcarResolvida(alerta)) return;
+      const agora = new Date();
+      setResolvidas((atuais) => {
+        const semEla = atuais.filter((r) => r.id !== alerta.id);
+        const novas = [
+          {
+            id: alerta.id,
+            titulo: alerta.titulo,
+            detalhe: alerta.detalhe,
+            nivel: alerta.nivel,
+            em: diaDe(agora),
+            hora: agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          },
+          ...semEla,
+        ];
+        gravarResolvidas(novas);
+        return novas;
+      });
+    },
+    [],
+  );
+
+  const contagem = useMemo(() => contarNaoVistos(pendentes, vistos), [pendentes, vistos]);
 
   return {
-    alertas,
+    alertas: pendentes,
     contagem,
-    temUrgente: alertas.some((a) => a.nivel === 'urgente'),
+    temUrgente: pendentes.some((a) => a.nivel === 'urgente'),
     marcarVistos,
+    marcarResolvida,
+    resolvidasHoje: resolvidas,
     carregando: ehRep && orders === undefined,
   };
 }

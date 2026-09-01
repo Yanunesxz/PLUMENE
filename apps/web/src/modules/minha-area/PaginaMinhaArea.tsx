@@ -13,6 +13,7 @@ import {
   CloudOff,
   MessageCircle,
   Sparkles,
+  CalendarCheck,
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
@@ -29,6 +30,11 @@ import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { situacaoDaCompra } from '../../lib/carteira.js';
+import {
+  janelaDoFechamento,
+  comInicialMaiuscula,
+  DIA_LIMITE_DO_FECHAMENTO,
+} from '../../lib/fechamento.js';
 import { Link } from 'react-router-dom';
 import { valorDaVenda } from '@csb/shared';
 import type { TarefaDoRep } from '@csb/shared';
@@ -162,6 +168,12 @@ export function PaginaMinhaArea() {
     };
     const invoiced = list.filter((o) => o.invoiced && o.invoiced_at);
     const approved = list.filter((o) => o.status === 'approved');
+    // O fechamento do mês que terminou — só entre os dias 1 e 10.
+    const janela = janelaDoFechamento(now);
+    const faturadoMesPassado = invoiced
+      .filter((o) => janela.contem(o.invoiced_at))
+      .reduce((s, o) => s + valorDaVenda(o), 0);
+    const pedidosMesPassado = invoiced.filter((o) => janela.contem(o.invoiced_at)).length;
     // Pelo valor da NOTA quando o ERP informa: o financeiro corta o que faltou
     // no estoque, e mostrar o total do pedido faria o representante contar
     // dinheiro que a fábrica não faturou.
@@ -177,6 +189,10 @@ export function PaginaMinhaArea() {
         .reduce((s, o) => s + (o.total ?? 0), 0),
       faturadoMes,
       faturadoTotal,
+      // Fechamento do mês passado: valor, quantidade e a janela que o esconde.
+      faturadoMesPassado,
+      pedidosMesPassado,
+      janela,
       pedidosMes: list.filter((o) => thisMonth(o.created_at)).length,
       totalPedidos: list.length,
       ticket: approved.length ? approved.reduce((s, o) => s + (o.total ?? 0), 0) / approved.length : 0,
@@ -187,6 +203,7 @@ export function PaginaMinhaArea() {
 
   const clientes = customers?.length ?? 0;
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
+  const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
   // Pedidos que a loja (ou um link de vitrine) montou e que estão parados
   // esperando ele. É a única coisa da tela com prazo, então vem antes de tudo.
@@ -223,7 +240,9 @@ export function PaginaMinhaArea() {
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">
           Olá, {firstName}
         </h1>
-        <p className="text-sm text-muted-foreground">Seu desempenho</p>
+        {/* Nomeia o mês: os números logo abaixo são todos dele. Caixa alta só
+            na primeira letra — o `capitalize` do CSS viraria "Setembro De". */}
+        <p className="text-sm text-muted-foreground">{comInicialMaiuscula(mesAtual)}</p>
       </div>
 
       {/* O escritório manda, você executa: a visita que a Bruna marcou, a
@@ -320,12 +339,42 @@ export function PaginaMinhaArea() {
         </section>
       )}
 
+      {/* Tudo aqui é DESTE mês. O acumulado de sempre vive lá embaixo, em
+          "Desempenho": misturar o total de todos os tempos com o número do mês
+          na mesma fileira fazia o mesmo valor aparecer duas vezes com nomes
+          diferentes — foi confusão de verdade na tela da Simone (01/09/2026). */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={Receipt} tint="brand" value={formatBRL(m.faturadoMes)} label="Faturado no mês" />
-        <MetricCard icon={Wallet} tint="green" value={formatBRL(m.faturadoTotal)} label="Faturado total" />
+        <MetricCard icon={TrendingUp} tint="green" value={formatBRL(m.enviadoNoMes)} label="Enviado no mês" />
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>
+
+      {/* O fechamento do mês que terminou — a nota sai depois do pedido, então
+          o número só fica completo na virada. Fica à vista até o dia 10 e some
+          sozinho: passado isso, o mês corrente é o que importa, e dois números
+          lado a lado confundem quem bate meta. */}
+      {m.janela.visivel && m.faturadoMesPassado > 0 && (
+        <section>
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
+            <div className="flex min-w-0 items-center gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                <CalendarCheck className="h-5 w-5" strokeWidth={2} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">
+                  Fechamento de {comInicialMaiuscula(m.janela.mes)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  {m.pedidosMesPassado} pedido{m.pedidosMesPassado > 1 ? 's' : ''} faturado
+                  {m.pedidosMesPassado > 1 ? 's' : ''} · fica aqui até o dia {DIA_LIMITE_DO_FECHAMENTO}
+                </p>
+              </div>
+            </div>
+            <p className="tnum text-xl font-bold text-foreground">{formatBRL(m.faturadoMesPassado)}</p>
+          </div>
+        </section>
+      )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
           O toque cai na lista de Clientes já filtrada nos parados. */}
@@ -442,12 +491,15 @@ export function PaginaMinhaArea() {
         </div>
       </section>
 
+      {/* A seção do ACUMULADO — o único lugar da tela que soma todos os meses.
+          O título diz isso na cara, para ninguém ler um número daqui achando
+          que é do mês. */}
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-          Desempenho
+          Desde o começo
         </h2>
         <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-          <Row icon={Wallet} label="Faturado acumulado" value={formatBRL(m.faturadoTotal)} highlight />
+          <Row icon={Wallet} label="Faturado (todos os meses)" value={formatBRL(m.faturadoTotal)} highlight />
           <Row icon={TrendingUp} label="Vendas totais (todos os pedidos)" value={formatBRL(m.vendasTotais)} />
           <Row icon={Target} label="Ticket médio (pedidos aprovados)" value={formatBRL(m.ticket)} />
           <Row icon={Percent} label="Taxa de aprovação" value={`${m.taxaAprovacao}%`} />
