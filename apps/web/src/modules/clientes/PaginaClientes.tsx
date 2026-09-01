@@ -89,10 +89,10 @@ export function PaginaClientes() {
     return { visiveis, contagem };
   }, [customers, frescor]);
 
-  // As cores do Yan: verde ativo, amarelo atenção, vermelho desativado.
+  // As cores do Yan: verde ativo, amarelo atenção, vermelho inativo.
   const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
-    { valor: 'parado', rotulo: `Desativados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
     { valor: 'ativo', rotulo: 'Ativos', cor: 'bg-positive' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
