@@ -22,6 +22,7 @@ import {
   avisarTriagemDoRep,
   avisarMesaParaAceite,
   avisarDecisaoAoRep,
+  avisarMesaDaRecusa,
   avisarFaturadoAoRep,
 } from '../push/push.avisos.js';
 import { parseBody } from '../../lib/validation.js';
@@ -450,7 +451,11 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
     // Os avisos do fluxo: quem precisa saber, sabe na hora — sem e-mail.
     if (body.status === 'pending_approval') avisarMesaParaAceite(company_id, order, approverId);
     if (body.status === 'approved') avisarDecisaoAoRep(company_id, order, true, approverId);
-    if (body.status === 'rejected') avisarDecisaoAoRep(company_id, order, false, approverId);
+    if (body.status === 'rejected') {
+      avisarDecisaoAoRep(company_id, order, false, approverId);
+      // O Fabian entra em contato com o rep — recusa precisa de conversa.
+      avisarMesaDaRecusa(company_id, order, approverId);
+    }
 
     await reply.send({ data: order });
   } catch (err) {

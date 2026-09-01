@@ -91,6 +91,31 @@ export function avisarDecisaoAoRep(
   );
 }
 
+/**
+ * Pedido recusado também apita na MESA (Fabian): recusa não é fim de linha,
+ * é conversa — alguém do escritório liga para o representante e resolve.
+ * Pedido do Yan (31/08/2026).
+ */
+export function avisarMesaDaRecusa(
+  company_id: string,
+  pedido: PedidoParaAviso,
+  quemRecusou: string,
+): void {
+  engolir(
+    enviarParaPapeis(
+      company_id,
+      ['manager', 'admin'],
+      {
+        title: `${nomeDoPedido(pedido)} foi recusado`,
+        body: 'Fale com o representante — pedido recusado precisa de um retorno.',
+        url: rota(pedido),
+        tag: `pedido-${pedido.id}`,
+      },
+      quemRecusou,
+    ),
+  );
+}
+
 /** A nota saiu — a notícia que o representante mais espera. */
 export function avisarFaturadoAoRep(
   company_id: string,
