@@ -12,6 +12,16 @@
 /** Último dia do mês em que o fechamento anterior ainda aparece. */
 export const DIA_LIMITE_DO_FECHAMENTO = 10;
 
+/**
+ * "agosto" → "Agosto"; "setembro de 2026" → "Setembro de 2026".
+ *
+ * O `capitalize` do CSS sobe a caixa de TODA palavra e escreve "Agosto De
+ * 2026" — errado em português, e apareceu assim na tela.
+ */
+export function comInicialMaiuscula(texto: string): string {
+  return texto.charAt(0).toUpperCase() + texto.slice(1);
+}
+
 export interface JanelaDoFechamento {
   /** O card aparece? (dia 1 ao 10, inclusive) */
   visivel: boolean;

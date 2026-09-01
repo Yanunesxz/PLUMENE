@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { janelaDoFechamento, DIA_LIMITE_DO_FECHAMENTO } from '../apps/web/src/lib/fechamento.js';
+import {
+  janelaDoFechamento,
+  comInicialMaiuscula,
+  DIA_LIMITE_DO_FECHAMENTO,
+} from '../apps/web/src/lib/fechamento.js';
 
 /**
  * A janela do fechamento: o valor faturado no mês PASSADO fica à vista para o
@@ -44,6 +48,14 @@ describe('janela do fechamento', () => {
     expect(j.inicio.getFullYear()).toBe(2026);
     expect(j.contem('2026-12-20T12:00:00.000Z')).toBe(true);
     expect(j.contem('2027-01-02T12:00:00.000Z')).toBe(false);
+  });
+
+  it('a caixa alta é só na primeira letra — "de" e "2026" ficam como estão', () => {
+    expect(comInicialMaiuscula('agosto')).toBe('Agosto');
+    // O `capitalize` do CSS escrevia "Setembro De 2026"; foi por isso que a
+    // função existe.
+    expect(comInicialMaiuscula('setembro de 2026')).toBe('Setembro de 2026');
+    expect(comInicialMaiuscula('')).toBe('');
   });
 
   it('pedido sem data de faturamento nunca entra no fechamento', () => {
