@@ -4,6 +4,7 @@ import { Logo } from '../interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { usePedidosEsperando } from '../../hooks/usePedidosEsperando.js';
+import { useAlertas } from '../../hooks/useAlertas.js';
 import { navItemsForRole } from './navItems.js';
 import { USER_ROLE_LABELS } from '@csb/shared';
 import { cn } from '../../lib/utils.js';
@@ -15,6 +16,7 @@ export function SideNav() {
   const isOnline = useOnlineStatus();
   const items = navItemsForRole(user?.role, user?.permissions ?? null);
   const esperando = usePedidosEsperando();
+  const alertas = useAlertas();
   const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
 
   const handleLogout = () => {
@@ -43,7 +45,8 @@ export function SideNav() {
       {/* Navegação */}
       <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-2">
         {items.map(({ to, label, icon: Icon, end, fila }) => {
-          const aguardando = fila ? esperando[fila] : 0;
+          const aguardando = fila === 'alertas' ? alertas.contagem : fila ? esperando[fila] : 0;
+          const urgente = fila === 'alertas' && alertas.temUrgente;
           return (
             <NavLink
               key={to}
@@ -65,7 +68,12 @@ export function SideNav() {
                   {aguardando > 0 && (
                     <span
                       aria-label={`${aguardando} aguardando você`}
-                      className="flex h-5 min-w-[20px] items-center justify-center rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground"
+                      className={cn(
+                        'flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-[11px] font-bold text-primary-foreground',
+                        // Urgente pendente pinta o número de vermelho — ele só
+                        // sai quando a pessoa RESOLVE, não quando vê.
+                        urgente ? 'bg-danger' : 'bg-primary',
+                      )}
                     >
                       {aguardando > 99 ? '99+' : aguardando}
                     </span>

@@ -1,9 +1,6 @@
-import { useEffect, useState } from 'react';
 import { Bell, BellOff, BellRing } from 'lucide-react';
-import { useAuthStore } from '../../store/authStore.js';
-import { api } from '../../services/api.js';
+import { useAvisosNoCelular } from '../../hooks/useAvisosNoCelular.js';
 import { Button } from './Button.js';
-import type { ApiResponse } from '@csb/shared';
 
 /**
  * Avisos no celular (Web Push), na "Minha área".
@@ -16,119 +13,12 @@ import type { ApiResponse } from '@csb/shared';
  * O cartão só aparece quando dá para cumprir o que promete: navegador com
  * suporte E servidor com as chaves configuradas. iPhone só suporta com o app
  * na tela de início — sem isso, o cartão nem aparece por lá.
+ *
+ * A regra inteira (permissão, chave, assinatura) mora em `useAvisosNoCelular`,
+ * compartilhada com a tela de Alertas.
  */
-
-/** A chave pública VAPID vem em base64url; o navegador quer bytes. */
-function chaveParaBytes(base64: string): Uint8Array {
-  const preenchida = base64 + '='.repeat((4 - (base64.length % 4)) % 4);
-  const binario = atob(preenchida.replace(/-/g, '+').replace(/_/g, '/'));
-  return Uint8Array.from(binario, (c) => c.charCodeAt(0));
-}
-
-type Estado = 'carregando' | 'indisponivel' | 'inativo' | 'ativo' | 'negado';
-
 export function CartaoAvisos() {
-  const { token } = useAuthStore();
-  const [estado, setEstado] = useState<Estado>('carregando');
-  const [chave, setChave] = useState<string | null>(null);
-  const [ocupado, setOcupado] = useState(false);
-  const [aviso, setAviso] = useState<string | null>(null);
-
-  const suporte =
-    typeof window !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window;
-
-  useEffect(() => {
-    let vivo = true;
-    const descobrir = async () => {
-      if (!suporte || !token) {
-        if (vivo) setEstado('indisponivel');
-        return;
-      }
-      try {
-        const res = await api.get<ApiResponse<{ chave: string | null }>>(
-          '/push/chave-publica',
-          token,
-        );
-        if (!vivo) return;
-        if (!res.data.chave) {
-          setEstado('indisponivel');
-          return;
-        }
-        setChave(res.data.chave);
-        if (Notification.permission === 'denied') {
-          setEstado('negado');
-          return;
-        }
-        const reg = await navigator.serviceWorker.getRegistration();
-        const assinatura = await reg?.pushManager.getSubscription();
-        if (vivo) setEstado(assinatura ? 'ativo' : 'inativo');
-      } catch {
-        if (vivo) setEstado('indisponivel');
-      }
-    };
-    void descobrir();
-    return () => {
-      vivo = false;
-    };
-  }, [suporte, token]);
-
-  const ativar = async () => {
-    if (!token || !chave || ocupado) return;
-    setOcupado(true);
-    setAviso(null);
-    try {
-      const permissao = await Notification.requestPermission();
-      if (permissao !== 'granted') {
-        setEstado(permissao === 'denied' ? 'negado' : 'inativo');
-        return;
-      }
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (!reg) throw new Error('O app ainda está terminando de instalar — tente de novo.');
-      const assinatura = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: chaveParaBytes(chave) as BufferSource,
-      });
-      const json = assinatura.toJSON();
-      await api.post<ApiResponse<{ ok: boolean }>>(
-        '/push/assinar',
-        { endpoint: assinatura.endpoint, keys: json.keys },
-        token,
-      );
-      setEstado('ativo');
-      // O teste sai na hora: a primeira notificação É a prova de que funciona.
-      await api.post<ApiResponse<{ entregues: number }>>('/push/teste', {}, token);
-    } catch (err) {
-      setAviso(err instanceof Error ? err.message : 'Não deu para ativar agora.');
-    } finally {
-      setOcupado(false);
-    }
-  };
-
-  const desativar = async () => {
-    if (!token || ocupado) return;
-    setOcupado(true);
-    setAviso(null);
-    try {
-      const reg = await navigator.serviceWorker.getRegistration();
-      const assinatura = await reg?.pushManager.getSubscription();
-      if (assinatura) {
-        await api.post<ApiResponse<{ ok: boolean }>>(
-          '/push/desassinar',
-          { endpoint: assinatura.endpoint },
-          token,
-        );
-        await assinatura.unsubscribe();
-      }
-      setEstado('inativo');
-    } catch (err) {
-      setAviso(err instanceof Error ? err.message : 'Não deu para desativar agora.');
-    } finally {
-      setOcupado(false);
-    }
-  };
+  const { estado, ocupado, aviso, ativar, desativar } = useAvisosNoCelular();
 
   // Sem suporte ou sem chave no servidor: o cartão não promete o que não tem.
   if (estado === 'carregando' || estado === 'indisponivel') return null;

@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -14,15 +14,17 @@ export interface NavItem {
   /**
    * Fila de decisão que este item abre. Quando há pedido parado nela, o menu
    * mostra o número — é assim que o representante descobre que chegou algo sem
-   * precisar abrir a tela para conferir.
+   * precisar abrir a tela para conferir. `alertas` é o número da central de
+   * Alertas do rep (urgentes + não vistos).
    */
-  fila?: 'triagem' | 'aprovacao';
+  fila?: 'triagem' | 'aprovacao' | 'alertas';
   /** Tecla do gerente que abre esta tela. Sem isto, todo gerente vê o item. */
   permissao?: PermissaoGerente;
 }
 
 const repItems: NavItem[] = [
-  { to: '/minha-area', label: 'Minha área', icon: Gauge, fila: 'triagem' },
+  { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Gauge, fila: 'triagem' },
+  { to: '/alertas', label: 'Alertas', icon: BellRing, fila: 'alertas' },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },

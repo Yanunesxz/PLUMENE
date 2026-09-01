@@ -10,6 +10,7 @@ import { Input } from '../../components/interface/Input.js';
 import { Select } from '../../components/interface/Select.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
+import { Toast } from '../../components/interface/Toast.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
@@ -127,6 +128,33 @@ export function PaginaPedidos() {
   const isManager = hasRole('manager', 'admin', 'financeiro');
   const ehFinanceiro = hasRole('financeiro');
   const ehLoja = hasRole('store');
+  // A venda interna (Simone e Nicoli) fecha a própria venda: carimba o
+  // faturado direto do cartão, sem abrir pedido por pedido. A API confere de
+  // novo que o pedido é DELA; desfazer um toque errado fica no detalhe.
+  const ehVendaInterna = user?.role === 'rep' && user?.venda_interna === true;
+  const [faturando, setFaturando] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  const marcarFaturado = async (order: Order) => {
+    if (!token || faturando) return;
+    setFaturando(order.id);
+    try {
+      const res = await api.patch<ApiResponse<Order>>(
+        `/orders/${order.id}/invoice`,
+        { invoiced: true },
+        token,
+      );
+      await db.orders.put(res.data);
+      setToast({ message: `Pedido #${order.order_number ?? ''} faturado.`, type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível marcar o faturamento.',
+        type: 'error',
+      });
+    } finally {
+      setFaturando(null);
+    }
+  };
   const STATUS_FILTERS = useMemo(
     () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep'),
     [ehLoja, isManager],
@@ -567,6 +595,30 @@ export function PaginaPedidos() {
                     year: 'numeric',
                   })}
                 </p>
+                {/* O balcão da venda interna: o campo do faturamento à mão, no
+                    próprio cartão. Faturou, trava — desfazer é no detalhe. */}
+                {ehVendaInterna &&
+                  (order.invoiced ? (
+                    <p className="mt-2 text-xs font-semibold text-positive-soft-foreground">
+                      ✓ Faturado
+                      {order.invoiced_at
+                        ? ` em ${new Date(order.invoiced_at).toLocaleDateString('pt-BR')}`
+                        : ''}
+                    </p>
+                  ) : order.status === 'approved' || order.status === 'sent_erp' ? (
+                    <button
+                      type="button"
+                      disabled={faturando === order.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        void marcarFaturado(order);
+                      }}
+                      className="mt-2 rounded-lg border border-positive/40 px-2.5 py-1.5 text-xs font-semibold text-positive-soft-foreground transition-colors hover:bg-positive-soft disabled:opacity-50"
+                    >
+                      {faturando === order.id ? 'Marcando…' : 'Marcar faturado'}
+                    </button>
+                  ) : null)}
               </>
             );
 
@@ -606,6 +658,8 @@ export function PaginaPedidos() {
           })}
         </div>
       )}
+
+      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

@@ -38,19 +38,20 @@ export function situacaoDaCompra(lastPurchaseAt: string | null | undefined): Sit
   if (Number.isNaN(dias)) {
     return { nivel: 'sem_registro', rotulo: 'Sem compra registrada', dias: null };
   }
-  if (dias >= PARADO_APOS_DIAS) return { nivel: 'parado', rotulo: `Desativado — parado ${rotuloDeTempo(dias)}`, dias };
+  if (dias >= PARADO_APOS_DIAS) return { nivel: 'parado', rotulo: `Inativo — parado ${rotuloDeTempo(dias)}`, dias };
   if (dias >= ESFRIANDO_APOS_DIAS) return { nivel: 'esfriando', rotulo: `Atenção — sem comprar ${rotuloDeTempo(dias)}`, dias };
   return { nivel: 'ativo', rotulo: `Comprou ${rotuloDeTempo(dias)}`, dias };
 }
 
 /**
- * O vocabulário do Yan para as cores (31/08/2026): "verde de ativo, amarelo de
- * atenção, vermelho de desativado". Nome curto para chips e títulos.
+ * O vocabulário do Yan para as cores (31/08/2026): verde de ativo, amarelo de
+ * atenção, vermelho de INATIVO (nasceu "desativado", renomeado a pedido dele
+ * no mesmo dia). Nome curto para chips e títulos.
  */
 export const NOME_DO_NIVEL: Record<Frescor, string> = {
   ativo: 'Ativo',
   esfriando: 'Atenção',
-  parado: 'Desativado',
+  parado: 'Inativo',
   sem_registro: 'Sem registro',
 };
 
