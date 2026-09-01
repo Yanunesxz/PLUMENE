@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { api } from '../services/api.js';
 import type { ApiResponse } from '@csb/shared';
@@ -6,8 +6,11 @@ import type { ApiResponse } from '@csb/shared';
 /**
  * O estado dos avisos push NESTE aparelho, com as ações de ligar e desligar.
  *
- * Extraído do CartaoAvisos para os Alertas usarem o MESMO botão "Ativar" —
- * a regra (permissão, chave do servidor, assinatura) mora aqui uma vez só.
+ * O ESTADO é global (módulo + useSyncExternalStore), de propósito: o alerta
+ * "ative os avisos", o número do sino no menu e o cartão da Minha área olham
+ * todos para a mesma verdade — ativou em qualquer lugar, os três reagem na
+ * hora. Estado por instância era o bug: o botão do alerta ativava, mas o
+ * alerta continuava na tela até recarregar.
  */
 
 /** A chave pública VAPID vem em base64url; o navegador quer bytes. */
@@ -18,6 +21,58 @@ function chaveParaBytes(base64: string): Uint8Array {
 }
 
 export type EstadoAvisos = 'carregando' | 'indisponivel' | 'inativo' | 'ativo' | 'negado';
+
+// ─── O estado global ──────────────────────────────────────────────────────────
+let estadoGlobal: EstadoAvisos = 'carregando';
+let chaveGlobal: string | null = null;
+let descobrindoPara: string | null = null;
+const ouvintes = new Set<() => void>();
+
+function mudarEstado(novo: EstadoAvisos): void {
+  estadoGlobal = novo;
+  for (const avisar of ouvintes) avisar();
+}
+
+function assinar(avisar: () => void): () => void {
+  ouvintes.add(avisar);
+  return () => ouvintes.delete(avisar);
+}
+
+const lerEstado = (): EstadoAvisos => estadoGlobal;
+
+const suporte =
+  typeof window !== 'undefined' &&
+  'serviceWorker' in navigator &&
+  'PushManager' in window &&
+  'Notification' in window;
+
+/** Descobre uma vez por login: chave do servidor + assinatura deste aparelho. */
+async function descobrir(token: string): Promise<void> {
+  if (descobrindoPara === token) return;
+  descobrindoPara = token;
+  if (!suporte) {
+    mudarEstado('indisponivel');
+    return;
+  }
+  try {
+    const res = await api.get<ApiResponse<{ chave: string | null }>>('/push/chave-publica', token);
+    if (!res.data.chave) {
+      mudarEstado('indisponivel');
+      return;
+    }
+    chaveGlobal = res.data.chave;
+    if (Notification.permission === 'denied') {
+      mudarEstado('negado');
+      return;
+    }
+    const reg = await navigator.serviceWorker.getRegistration();
+    const assinatura = await reg?.pushManager.getSubscription();
+    mudarEstado(assinatura ? 'ativo' : 'inativo');
+  } catch {
+    mudarEstado('indisponivel');
+    descobrindoPara = null; // sem rede: a próxima tela tenta de novo
+  }
+}
 
 export interface AvisosNoCelular {
   estado: EstadoAvisos;
@@ -30,67 +85,29 @@ export interface AvisosNoCelular {
 
 export function useAvisosNoCelular(): AvisosNoCelular {
   const { token } = useAuthStore();
-  const [estado, setEstado] = useState<EstadoAvisos>('carregando');
-  const [chave, setChave] = useState<string | null>(null);
+  const estado = useSyncExternalStore(assinar, lerEstado);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
-  const suporte =
-    typeof window !== 'undefined' &&
-    'serviceWorker' in navigator &&
-    'PushManager' in window &&
-    'Notification' in window;
-
   useEffect(() => {
-    let vivo = true;
-    const descobrir = async () => {
-      if (!suporte || !token) {
-        if (vivo) setEstado('indisponivel');
-        return;
-      }
-      try {
-        const res = await api.get<ApiResponse<{ chave: string | null }>>(
-          '/push/chave-publica',
-          token,
-        );
-        if (!vivo) return;
-        if (!res.data.chave) {
-          setEstado('indisponivel');
-          return;
-        }
-        setChave(res.data.chave);
-        if (Notification.permission === 'denied') {
-          setEstado('negado');
-          return;
-        }
-        const reg = await navigator.serviceWorker.getRegistration();
-        const assinatura = await reg?.pushManager.getSubscription();
-        if (vivo) setEstado(assinatura ? 'ativo' : 'inativo');
-      } catch {
-        if (vivo) setEstado('indisponivel');
-      }
-    };
-    void descobrir();
-    return () => {
-      vivo = false;
-    };
-  }, [suporte, token]);
+    if (token) void descobrir(token);
+  }, [token]);
 
   const ativar = async () => {
-    if (!token || !chave || ocupado) return;
+    if (!token || !chaveGlobal || ocupado) return;
     setOcupado(true);
     setAviso(null);
     try {
       const permissao = await Notification.requestPermission();
       if (permissao !== 'granted') {
-        setEstado(permissao === 'denied' ? 'negado' : 'inativo');
+        mudarEstado(permissao === 'denied' ? 'negado' : 'inativo');
         return;
       }
       const reg = await navigator.serviceWorker.getRegistration();
       if (!reg) throw new Error('O app ainda está terminando de instalar — tente de novo.');
       const assinatura = await reg.pushManager.subscribe({
         userVisibleOnly: true,
-        applicationServerKey: chaveParaBytes(chave) as BufferSource,
+        applicationServerKey: chaveParaBytes(chaveGlobal) as BufferSource,
       });
       const json = assinatura.toJSON();
       await api.post<ApiResponse<{ ok: boolean }>>(
@@ -98,7 +115,7 @@ export function useAvisosNoCelular(): AvisosNoCelular {
         { endpoint: assinatura.endpoint, keys: json.keys },
         token,
       );
-      setEstado('ativo');
+      mudarEstado('ativo');
       // O teste sai na hora: a primeira notificação É a prova de que funciona.
       await api.post<ApiResponse<{ entregues: number }>>('/push/teste', {}, token);
     } catch (err) {
@@ -123,7 +140,7 @@ export function useAvisosNoCelular(): AvisosNoCelular {
         );
         await assinatura.unsubscribe();
       }
-      setEstado('inativo');
+      mudarEstado('inativo');
     } catch (err) {
       setAviso(err instanceof Error ? err.message : 'Não deu para desativar agora.');
     } finally {
