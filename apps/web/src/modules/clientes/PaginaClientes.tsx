@@ -1,6 +1,6 @@
-import { useState, useEffect, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Users,
@@ -24,6 +24,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
+import { situacaoDaCompra, type Frescor } from '../../lib/carteira.js';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
 const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
@@ -31,9 +32,13 @@ const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: ''
 export function PaginaClientes() {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
   const [search, setSearch] = useState('');
-  const [showForm, setShowForm] = useState(false);
+  // "Sem cliente criado" no link temporário cai aqui com o formulário aberto;
+  // depois de salvar, `voltarPara` devolve à criação do link com o cliente novo.
+  const [showForm, setShowForm] = useState(params.get('novo') === '1');
+  const voltarPara = params.get('voltar');
   const [form, setForm] = useState({ ...EMPTY_CUST });
   const [tabelaEscolhida, setTabelaEscolhida] = useState('');
   const [confirmando, setConfirmando] = useState(false);
@@ -56,6 +61,42 @@ export function PaginaClientes() {
         : db.customers.orderBy('name').toArray(),
     [search],
   );
+
+  // ─── A carteira por frescor ────────────────────────────────────────────────
+  // A Minha Área manda para cá com ?frescor=parado — o rep cai direto na lista
+  // de quem precisa de visita. (O `params` é o mesmo lá de cima, do ?novo.)
+  const frescorDaUrl = params.get('frescor');
+  const [frescor, setFrescor] = useState<Frescor | 'all'>(
+    frescorDaUrl === 'parado' || frescorDaUrl === 'esfriando' || frescorDaUrl === 'ativo'
+      ? frescorDaUrl
+      : 'all',
+  );
+
+  const { visiveis, contagem } = useMemo(() => {
+    const decorados = (customers ?? []).map((c) => ({
+      cliente: c,
+      situacao: situacaoDaCompra(c.last_purchase_at),
+    }));
+    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
+    for (const d of decorados) contagem[d.situacao.nivel]++;
+    let visiveis = frescor === 'all' ? decorados : decorados.filter((d) => d.situacao.nivel === frescor);
+    // Filtrando por frescor, quem está há MAIS tempo sem comprar vem primeiro —
+    // é a ordem de prioridade da visita. Sem filtro, a ordem alfabética de
+    // sempre (a busca por nome depende dela).
+    if (frescor !== 'all') {
+      visiveis = [...visiveis].sort((a, b) => (b.situacao.dias ?? 0) - (a.situacao.dias ?? 0));
+    }
+    return { visiveis, contagem };
+  }, [customers, frescor]);
+
+  // As cores do Yan: verde ativo, amarelo atenção, vermelho desativado.
+  const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
+    { valor: 'all', rotulo: 'Todos' },
+    { valor: 'parado', rotulo: `Desativados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
+    { valor: 'ativo', rotulo: 'Ativos', cor: 'bg-positive' },
+    { valor: 'sem_registro', rotulo: 'Sem registro' },
+  ];
 
   useEffect(() => {
     if (!token) return;
@@ -148,6 +189,12 @@ export function PaginaClientes() {
       setTabelaEscolhida('');
       setConfirmando(false);
       setShowForm(false);
+      // Veio do link temporário: devolve à criação do link com o cliente
+      // recém-cadastrado já escolhido.
+      if (voltarPara === 'vitrine') {
+        void navigate(`/acessos?aba=vitrine&cliente=${res.data.id}`);
+        return;
+      }
       setToast({ message: 'Cliente cadastrado!', type: 'success' });
     } catch (err) {
       setConfirmando(false);
@@ -161,8 +208,9 @@ export function PaginaClientes() {
     <div className="p-4 md:p-6">
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Clientes</h1>
-        {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. */}
-        {user?.role !== 'financeiro' && (
+        {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. O
+            relacionamento (Bruna) também não cadastra: seleciona e encaminha. */}
+        {user?.role !== 'financeiro' && user?.role !== 'relacionamento' && (
           <Button size="md" onClick={() => setShowForm((s) => !s)}>
             {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
             {showForm ? 'Cancelar' : 'Novo cliente'}
@@ -242,13 +290,34 @@ export function PaginaClientes() {
         />
       </div>
 
+      {/* O frescor da carteira: quem parou, quem está esfriando. É o filtro que
+          transforma a lista num roteiro de visita. */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        {FILTROS.map((f) => (
+          <button
+            key={f.valor}
+            type="button"
+            onClick={() => setFrescor(f.valor)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              frescor === f.valor
+                ? 'border-primary bg-primary text-primary-foreground'
+                : 'border-border bg-background text-muted-foreground hover:bg-sunken',
+            )}
+          >
+            {f.cor && <span className={cn('mr-1.5 inline-block h-2 w-2 rounded-full align-middle', f.cor)} />}
+            {f.rotulo}
+          </button>
+        ))}
+      </div>
+
       {customers === undefined ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-20 w-full rounded-xl" />
           ))}
         </div>
-      ) : customers.length === 0 ? (
+      ) : visiveis.length === 0 ? (
         <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
             <Users className="h-7 w-7" strokeWidth={1.5} />
@@ -257,7 +326,7 @@ export function PaginaClientes() {
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-          {customers.map((customer) => (
+          {visiveis.map(({ cliente: customer, situacao }) => (
             <div
               key={customer.id}
               className={cn(
@@ -289,13 +358,46 @@ export function PaginaClientes() {
                   {customer.blocked && customer.block_reason && (
                     <p className="truncate text-xs text-danger">{customer.block_reason}</p>
                   )}
+                  {/* O frescor: a data está escrita, então retrato velho nunca engana. */}
+                  {situacao.nivel !== 'sem_registro' && (
+                    <p
+                      className={cn(
+                        'truncate text-xs font-medium',
+                        situacao.nivel === 'parado' && 'text-danger',
+                        situacao.nivel === 'esfriando' && 'text-warn-soft-foreground',
+                        situacao.nivel === 'ativo' && 'text-positive-soft-foreground',
+                      )}
+                    >
+                      {situacao.rotulo}
+                      {customer.last_purchase_at
+                        ? ` · ${new Date(customer.last_purchase_at).toLocaleDateString('pt-BR')}`
+                        : ''}
+                    </p>
+                  )}
+                  {(customer.overdue_amount ?? 0) > 0 && (
+                    <p className="truncate text-xs text-danger">
+                      Vencido: {formatBRL(customer.overdue_amount ?? 0)}
+                    </p>
+                  )}
+                  {/* Vermelho pede um porquê: com motivo, mostra; sem, cobra.
+                      É a pendência que o rep e a Bruna vão preenchendo. */}
+                  {situacao.nivel === 'parado' &&
+                    (customer.inactivity_reason ? (
+                      <p className="truncate text-xs text-muted-foreground">
+                        Motivo: {customer.inactivity_reason}
+                      </p>
+                    ) : (
+                      <p className="truncate text-xs font-medium text-danger">
+                        Falta o motivo — toque para preencher
+                      </p>
+                    ))}
                 </div>
               </button>
 
               {/* Atalho para vender direto, sem passar pela ficha. A tabela e o
                   botão de trocar vivem na ficha: aqui já são três alvos de
                   toque, e um quarto no celular vira erro de dedo. */}
-              {!customer.blocked && (
+              {!customer.blocked && user?.role !== 'relacionamento' && (
                 <button
                   type="button"
                   onClick={() => void navigate(`/orders/new?customer_id=${customer.id}`)}

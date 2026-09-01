@@ -85,6 +85,10 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Os ouvidos do push moram num arquivo próprio (public/push-sw.js) que
+        // o service worker gerado importa — assim os avisos existem sem trocar
+        // a estratégia de atualização, que já custou a aprender.
+        importScripts: ['push-sw.js'],
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         // O cache da versão anterior é apagado quando a nova assume. É isto que
         // dispensa "limpar o cache" a cada publicação: a faxina é do próprio

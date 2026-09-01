@@ -21,9 +21,12 @@ import { ordersRouter } from './modules/orders/orders.router.js';
 import { repsRouter } from './modules/reps/reps.router.js';
 import { syncRouter } from './modules/sync/sync.router.js';
 import { partnerRouter } from './modules/partner/partner.router.js';
+import { tarefasRouter } from './modules/tarefas/tarefas.router.js';
 import { companyRouter } from './modules/company/company.router.js';
 import { accessRouter } from './modules/access/access.router.js';
 import { usersRouter } from './modules/users/users.router.js';
+import { pushRouter } from './modules/push/push.router.js';
+import { iaRouter } from './modules/ia/ia.router.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -113,6 +116,9 @@ export async function buildApp(): Promise<FastifyInstance> {
   await server.register(companyRouter);
   await server.register(accessRouter);
   await server.register(usersRouter);
+  await server.register(pushRouter);
+  await server.register(tarefasRouter);
+  await server.register(iaRouter);
 
   return server;
 }

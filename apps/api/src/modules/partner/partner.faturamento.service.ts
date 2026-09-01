@@ -17,6 +17,7 @@
  * para usar e devolve a lista do que foi ignorado e por quê.
  */
 import { supabase } from '../../config/supabase.js';
+import { registrarCompraDoCliente } from '../orders/orders.service.js';
 
 export interface FaturamentoParceiro {
   /** Número do pedido no ERP — a chave preferida. */
@@ -76,7 +77,10 @@ export async function receberFaturamento(
 
     // Sempre dentro da empresa da chave: um parceiro nunca fatura pedido de
     // outra fábrica, mesmo acertando o número por acaso.
-    let busca = supabase.from('orders').select('id, invoiced, total').eq('company_id', company_id);
+    let busca = supabase
+      .from('orders')
+      .select('id, invoiced, total, customer_id')
+      .eq('company_id', company_id);
     busca = pedidoErp ? busca.eq('erp_order_id', pedidoErp) : busca.eq('id', id as string);
 
     const { data: pedido, error: erroBusca } = await busca.maybeSingle();
@@ -124,6 +128,15 @@ export async function receberFaturamento(
       continue;
     }
     atualizados += 1;
+
+    // O faturamento do ERP também empurra a última compra do cliente — a
+    // carteira do representante fica viva pelos dois caminhos.
+    if (faturado) {
+      await registrarCompraDoCliente(
+        (pedido as { customer_id?: string | null }).customer_id,
+        (patch['invoiced_at'] as string | null) ?? undefined,
+      );
+    }
   }
 
   return { recebidos: lista.length, atualizados, ignorados };

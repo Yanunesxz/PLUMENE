@@ -74,16 +74,17 @@ export type CriarConviteResultado =
   | { ok: false; motivo: 'cliente_nao_encontrado' | 'ja_tem_login' | 'convite_pendente' | 'erro' };
 
 /**
- * O representante só convida cliente da própria carteira. A checagem repete a
- * regra de `getCustomers`: dono no app (`rep_id`) OU carteira do ERP
- * (`rep_erp_id`). Gerente e admin passam por qualquer cliente da empresa.
+ * O cliente é da carteira DESTE representante? Mesma regra de `getCustomers`:
+ * dono no app (`rep_id`) OU carteira do ERP (`rep_erp_id`). Gerente e admin
+ * passam por qualquer cliente da empresa. Compartilhada entre o convite e a
+ * vitrine — as duas portas amarram link a cliente.
  */
-export async function criarConvite(
+export async function clienteDaCarteira(
   company_id: string,
   rep_id: string,
   customer_id: string,
   opcoes: { erp_rep_id?: string | null; irrestrito?: boolean } = {},
-): Promise<CriarConviteResultado> {
+): Promise<boolean> {
   let consulta = supabase
     .from('customers')
     .select('id')
@@ -97,7 +98,18 @@ export async function criarConvite(
   }
 
   const { data: cliente } = await consulta.maybeSingle();
-  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+  return Boolean(cliente);
+}
+
+/** O representante só convida cliente da própria carteira. */
+export async function criarConvite(
+  company_id: string,
+  rep_id: string,
+  customer_id: string,
+  opcoes: { erp_rep_id?: string | null; irrestrito?: boolean } = {},
+): Promise<CriarConviteResultado> {
+  const daCarteira = await clienteDaCarteira(company_id, rep_id, customer_id, opcoes);
+  if (!daCarteira) return { ok: false, motivo: 'cliente_nao_encontrado' };
 
   // Uma loja tem no máximo um login (índice único na 014, checado aqui para dar
   // mensagem em vez de erro 500).

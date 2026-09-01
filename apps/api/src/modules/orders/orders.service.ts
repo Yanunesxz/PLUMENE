@@ -253,10 +253,11 @@ export async function createOrder(
     throw new Error('ACESSO_INDISPONIVEL');
   }
 
-  // Pedido de vitrine não tem cliente: quem pediu é um visitante identificado
-  // só por nome e WhatsApp. Nos outros caminhos, o cliente é obrigatório e
-  // precisa estar liberado.
-  if (!daVitrine) {
+  // Cliente do pedido: obrigatório e liberado em todo caminho, MENOS na
+  // vitrine antiga de visitante (link sem cliente atrelado, anterior à 035) —
+  // ali quem pediu se identifica só por nome e WhatsApp. Vitrine com cliente
+  // (o link novo) passa pela mesma checagem dos outros.
+  if (!daVitrine || body.customer_id) {
     if (!body.customer_id) return null;
     const { data: customer } = await supabase
       .from('customers')
@@ -377,7 +378,9 @@ export async function createOrder(
       .insert({
         company_id,
         rep_id,
-        customer_id: daVitrine ? null : body.customer_id,
+        // Vitrine COM cliente (link novo, 035) grava o cliente; a de visitante
+        // (link antigo) segue sem — o contato fica nos campos guest_*.
+        customer_id: body.customer_id ?? null,
         status,
         total,
         notes: body.notes ?? null,
@@ -787,6 +790,42 @@ export async function setOrderPayment(
   return { ok: true, order: data as Order };
 }
 
+/** `customers.last_purchase_at` vem da migração 036 — mesmo cuidado das outras. */
+let temUltimaCompra: boolean | null = null;
+
+async function detectarUltimaCompra(): Promise<boolean> {
+  if (temUltimaCompra !== null) return temUltimaCompra;
+  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
+  temUltimaCompra = !error;
+  return temUltimaCompra;
+}
+
+/**
+ * O carimbo do faturamento empurra a última compra do cliente para FRENTE — é
+ * o que mantém o selo da carteira vivo para quem vende pelo app.
+ *
+ * Só para frente, nunca para trás: desfazer um faturamento não apaga a compra
+ * que existiu, e um carimbo retroativo não rejuvenesce o retrato. Falha aqui
+ * não derruba o faturamento — o selo é acessório do carimbo, não o contrário.
+ */
+export async function registrarCompraDoCliente(
+  customer_id: string | null | undefined,
+  quando: string | null | undefined,
+): Promise<void> {
+  if (!customer_id || !quando) return;
+  if (!(await detectarUltimaCompra())) return;
+  const dia = quando.slice(0, 10);
+  try {
+    await supabase
+      .from('customers')
+      .update({ last_purchase_at: dia, updated_at: new Date().toISOString() })
+      .eq('id', customer_id)
+      .or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
+  } catch {
+    /* acessório — nunca derruba o carimbo */
+  }
+}
+
 export async function setOrderInvoiced(
   id: string,
   company_id: string,
@@ -811,7 +850,9 @@ export async function setOrderInvoiced(
   const { data, error } = await query.select().maybeSingle();
 
   if (error || !data) return null;
-  return data as Order;
+  const order = data as Order;
+  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? undefined);
+  return order;
 }
 
 export async function updateOrderStatus(

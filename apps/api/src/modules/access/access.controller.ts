@@ -6,6 +6,7 @@ import { parseBody } from '../../lib/validation.js';
 import { criarConviteSchema, criarVitrineSchema, aceitarConviteSchema } from './access.schema.js';
 import {
   criarConvite,
+  clienteDaCarteira,
   abrirConvite,
   usarConvite,
   listarConvites,
@@ -18,7 +19,7 @@ import {
   revogarVitrine,
 } from './showcase.service.js';
 import { montarMinhaArea } from './loja.service.js';
-import { resolverTabelaEscolhida } from '../reps/reps.service.js';
+import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { buildAuthPayload, getTokenConfig } from '../auth/auth.service.js';
 import type { User } from '@csb/shared';
 
@@ -82,33 +83,33 @@ export async function revogarConviteHandler(request: FastifyRequest, reply: Fast
 // ─── Vitrine (representante) ─────────────────────────────────────────────────
 
 export async function criarVitrineHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub, role, price_table_id } = request.user;
+  const { company_id, sub, role, price_table_id, erp_rep_id } = request.user;
   const body = await parseBody(criarVitrineSchema, request.body, reply);
   if (!body) return;
 
-  // Mesma revalidação do cadastro de cliente: o link mostra preço, e mostrar o
-  // preço errado a um desconhecido é o mesmo estrago sem ninguém para conferir.
-  const tabela = await resolverTabelaEscolhida(company_id, sub, role, body.price_table_id);
-  if (!tabela.ok) {
-    if (tabela.motivo === 'escolha_obrigatoria') {
-      await reply.status(400).send({
-        error: 'Escolha a tabela de preço do link.',
-        code: 'PRICE_TABLE_REQUIRED',
-        statusCode: 400,
-      });
-      return;
-    }
-    await reply.status(403).send({
-      error: 'Esta tabela de preço não está disponível para você.',
-      code: 'FORBIDDEN',
-      statusCode: 403,
+  // "Mesmo temporário tem que ter algum cliente atrelado" (Yan, 31/08/2026):
+  // o link nasce amarrado a um cliente DA CARTEIRA — mesma checagem do convite.
+  const daCarteira = await clienteDaCarteira(company_id, sub, body.customer_id, {
+    erp_rep_id: erp_rep_id ?? null,
+    irrestrito: role === 'manager' || role === 'admin',
+  });
+  if (!daCarteira) {
+    await reply.status(404).send({
+      error: 'Cliente não encontrado na sua carteira',
+      code: 'CLIENTE_NAO_ENCONTRADO',
+      statusCode: 404,
     });
     return;
   }
 
+  // O preço é o do CADASTRO do cliente — igual à conta de loja. Sem tabela no
+  // cadastro, `tabelaDaLoja` já cai na do representante; o último recurso é a
+  // tabela do token.
+  const tabelaDoLink = (await tabelaDaLoja(body.customer_id, sub)) ?? price_table_id ?? null;
+
   let vitrine;
   try {
-    vitrine = await criarVitrine(company_id, sub, tabela.price_table_id ?? price_table_id ?? null, body.hours);
+    vitrine = await criarVitrine(company_id, sub, tabelaDoLink, body.hours, body.customer_id);
   } catch (err) {
     if (err instanceof Error && err.message === 'ACESSO_INDISPONIVEL') {
       request.log.error('Vitrine indisponível: migração 014 não aplicada');
@@ -269,6 +270,19 @@ export async function abrirVitrineHandler(request: FastifyRequest, reply: Fastif
     .eq('id', link.rep_id)
     .maybeSingle();
 
+  // Link amarrado a um cliente (035): a vitrine cumprimenta pelo nome e o
+  // pedido nasce no cadastro certo — o customer_id viaja no token, assinado.
+  let clienteNome: string | null = null;
+  if (link.customer_id) {
+    const { data: cliente } = await supabase
+      .from('customers')
+      .select('name, trade_name')
+      .eq('id', link.customer_id)
+      .maybeSingle();
+    const c = cliente as { name: string; trade_name: string | null } | null;
+    clienteNome = c ? c.trade_name?.trim() || c.name : null;
+  }
+
   // O token morre junto com o link: `exp` é o próprio `expires_at`. Assim um
   // token já emitido não sobrevive ao vencimento nem à revogação do link.
   const segundos = Math.max(60, Math.floor((new Date(link.expires_at).getTime() - Date.now()) / 1000));
@@ -280,7 +294,7 @@ export async function abrirVitrineHandler(request: FastifyRequest, reply: Fastif
     name: 'Visitante',
     price_table_id: link.price_table_id,
     rep_id: link.rep_id,
-    customer_id: null,
+    customer_id: link.customer_id ?? null,
   };
 
   await reply.send({
@@ -288,6 +302,7 @@ export async function abrirVitrineHandler(request: FastifyRequest, reply: Fastif
       token: request.server.jwt.sign(payload, { expiresIn: segundos }),
       expires_at: link.expires_at,
       rep_name: (rep as { name: string } | null)?.name ?? '',
+      cliente_nome: clienteNome,
     },
   });
 }

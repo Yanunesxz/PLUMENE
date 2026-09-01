@@ -13,6 +13,10 @@ export const criarVitrineSchema = z.object({
     z.literal(SHOWCASE_DURATIONS[2]),
     z.literal(SHOWCASE_DURATIONS[3]),
   ]),
+  // "Mesmo temporário tem que ter algum cliente atrelado" (Yan, 31/08/2026):
+  // o link nasce amarrado, como a conta de loja — o pedido cai no cadastro
+  // certo e no preço certo. Cliente novo se cadastra primeiro.
+  customer_id: z.string().uuid('Escolha o cliente do link'),
   // Com qual tabela o link abre. Omitido, o servidor usa a do representante —
   // quem tem duas ou mais precisa escolher, e essa regra é do controller.
   price_table_id: z.string().uuid('Tabela de preço inválida').nullable().optional(),

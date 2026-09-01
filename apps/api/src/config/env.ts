@@ -44,4 +44,30 @@ export const env = {
   EMAIL_FROM_NAME: process.env['EMAIL_FROM_NAME'] ?? 'Corpo Sensual',
   /** Base pública do app, para montar o link do pedido no e-mail. */
   APP_PUBLIC_URL: process.env['APP_PUBLIC_URL'] ?? 'https://setorx-web-web.vercel.app',
+
+  // ── IA (relatório da carteira sob demanda) ───────────────────────────────────
+  /** Chave da API da Anthropic (console.anthropic.com → API keys, crédito
+   *  pré-pago). Vazia = IA desligada: a rota responde 503 e o app avisa. */
+  ANTHROPIC_API_KEY: process.env['ANTHROPIC_API_KEY'] ?? '',
+  /** Modelo dos relatórios no Claude. O Haiku custa centavos por relatório e
+   *  resolve; trocar por um maior é só mudar esta variável no Railway. */
+  IA_MODELO: process.env['IA_MODELO'] ?? 'claude-haiku-4-5-20251001',
+  /** Chave da API da OpenAI (platform.openai.com → API keys, crédito pré-pago).
+   *  ATENÇÃO: a assinatura do ChatGPT (chatgpt.com, inclusive a Pro) NÃO dá
+   *  chave de API — a cobrança da plataforma é separada. */
+  OPENAI_API_KEY: process.env['OPENAI_API_KEY'] ?? '',
+  /** Modelo dos relatórios no ChatGPT — o mini é o equivalente barato do Haiku. */
+  OPENAI_MODELO: process.env['OPENAI_MODELO'] ?? 'gpt-4o-mini',
+  /** Com as DUAS chaves no ar, quem pensa: 'anthropic' (padrão) ou 'openai'. */
+  IA_PROVEDOR: process.env['IA_PROVEDOR'] ?? '',
+
+  // ── Notificações push (Web Push / VAPID) ─────────────────────────────────────
+  // Par de chaves gerado UMA vez (npx web-push generate-vapid-keys) e colado no
+  // Railway. Vazio = push desligado: o app esconde o botão e a API responde 503.
+  /** Chave pública — vai para o navegador assinar o aparelho. */
+  VAPID_PUBLIC_KEY: process.env['VAPID_PUBLIC_KEY'] ?? '',
+  /** Chave privada — NUNCA sai do servidor. */
+  VAPID_PRIVATE_KEY: process.env['VAPID_PRIVATE_KEY'] ?? '',
+  /** Contato do responsável, exigido pelo padrão (mailto:...). */
+  VAPID_SUBJECT: process.env['VAPID_SUBJECT'] ?? 'mailto:pedidoscorposensual@gmail.com',
 } as const;

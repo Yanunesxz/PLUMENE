@@ -4,6 +4,7 @@ export * from './types/customer.js';
 export * from './types/order.js';
 export * from './types/paymentCondition.js';
 export * from './types/product.js';
+export * from './types/tarefa.js';
 export * from './types/user.js';
 export * from './constants/bonus.js';
 export * from './constants/orderStatus.js';

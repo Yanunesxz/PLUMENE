@@ -42,6 +42,23 @@ export interface Customer {
   email: string | null;
   /** Endereço completo */
   address: string | null;
+  /**
+   * Última compra (migração 036): retrato do Control (Curva ABC) empurrado
+   * para frente por todo pedido FATURADO no app. NULL = sem registro.
+   */
+  last_purchase_at?: string | null;
+  /** R$ Total Comprado do Control — retrato, o app não atualiza. */
+  total_purchased?: number | null;
+  /** R$ Vencido do Control — retrato, o app não atualiza. */
+  overdue_amount?: number | null;
+  /**
+   * Controle de inatividade (migração 039): quando o cliente fica VERMELHO
+   * (180+ dias sem comprar), o rep ou o relacionamento registram o porquê.
+   */
+  inactivity_reason?: string | null;
+  /** Observação com as palavras de quem apurou. */
+  inactivity_note?: string | null;
+  inactivity_updated_at?: string | null;
   updated_at: string;
 }
 
@@ -69,7 +86,21 @@ export interface CustomerListItem
     // O código do cliente NO CONTROL. Pesa ~5 caracteres e é o que o
     // financeiro confere no pedido antes de lançar no ERP.
     | 'erp_id'
+    // A carteira inteligente: a data diz quem parou de comprar, o vencido diz
+    // quem precisa de cobrança. ~15 caracteres por linha, e é o que transforma
+    // a lista de clientes numa ferramenta de trabalho do representante.
+    | 'last_purchase_at'
+    | 'overdue_amount'
+    // O controle por cores: cliente vermelho SEM motivo é pendência visível na
+    // lista — é o que cobra o preenchimento sem precisar de relatório.
+    | 'inactivity_reason'
   > {}
+
+/** O rep (ou o relacionamento) explica o cliente vermelho. */
+export interface MarcarInatividadeRequest {
+  motivo: string;
+  observacao?: string;
+}
 
 /** Dados mínimos para um representante cadastrar um cliente no app. */
 export interface CreateCustomerRequest {
@@ -128,6 +159,12 @@ export interface CustomerDetail {
   blocked: boolean;
   block_reason: string | null;
   price_table_id: string | null;
+  /** Última compra (migração 036) — a ficha mostra a cor do cliente. */
+  last_purchase_at?: string | null;
+  /** Controle de inatividade (migração 039). */
+  inactivity_reason?: string | null;
+  inactivity_note?: string | null;
+  inactivity_updated_at?: string | null;
   /** Do mais recente para o mais antigo. */
   pedidos: PedidoDoCliente[];
 }

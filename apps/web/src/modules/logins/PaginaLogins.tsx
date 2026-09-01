@@ -21,6 +21,7 @@ const GRUPOS: Array<{ papel: UserRole; titulo: string }> = [
   { papel: 'admin', titulo: 'Administradores' },
   { papel: 'manager', titulo: 'Gerentes' },
   { papel: 'financeiro', titulo: 'Financeiro' },
+  { papel: 'relacionamento', titulo: 'Relacionamento' },
   { papel: 'rep', titulo: 'Representantes' },
   { papel: 'store', titulo: 'Lojas' },
 ];
@@ -87,7 +88,8 @@ export function PaginaLogins() {
         const daFabrica =
           form.editando.role === 'admin' ||
           form.editando.role === 'manager' ||
-          form.editando.role === 'financeiro';
+          form.editando.role === 'financeiro' ||
+          form.editando.role === 'relacionamento';
         const corpo: AtualizarUsuarioRequest = {
           name: dados.name,
           email: dados.email,

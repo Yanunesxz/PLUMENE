@@ -4,10 +4,17 @@ import {
   createCustomer,
   atualizarTabelaDoCliente,
   obterCliente,
+  marcarInatividade,
 } from './customers.service.js';
+import { z } from 'zod';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
 import { createCustomerSchema, trocarTabelaDoClienteSchema } from './customers.schema.js';
+
+const inatividadeSchema = z.object({
+  motivo: z.string().trim().min(2).max(200),
+  observacao: z.string().trim().max(2000).optional(),
+});
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
@@ -40,7 +47,8 @@ export async function getCustomerHandler(request: FastifyRequest, reply: Fastify
   const cliente = await obterCliente(company_id, id, {
     rep_id,
     erp_rep_id: erp_rep_id ?? null,
-    irrestrito: role === 'manager' || role === 'admin' || role === 'financeiro',
+    irrestrito:
+      role === 'manager' || role === 'admin' || role === 'financeiro' || role === 'relacionamento',
   });
 
   if (!cliente) {
@@ -166,4 +174,54 @@ export async function trocarTabelaDoClienteHandler(
   }
 
   await reply.send({ data: resultado.cliente });
+}
+
+/** O porquê do cliente vermelho: motivo + observação de quem apurou. */
+export async function marcarInatividadeHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(inatividadeSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await marcarInatividade(
+    company_id,
+    id,
+    {
+      rep_id,
+      erp_rep_id: erp_rep_id ?? null,
+      // O rep explica os clientes DELE; relacionamento e gerência, qualquer um.
+      irrestrito: role === 'manager' || role === 'admin' || role === 'relacionamento',
+    },
+    rep_id,
+    body,
+  );
+
+  if (r.ok) {
+    await reply.send({ data: { ok: true } });
+    return;
+  }
+  if (r.motivo === 'sem_migracao') {
+    await reply.status(503).send({
+      error: 'O controle de inatividade precisa da migração 039',
+      code: 'INATIVIDADE_INDISPONIVEL',
+      statusCode: 503,
+    });
+    return;
+  }
+  if (r.motivo === 'cliente_nao_encontrado') {
+    await reply.status(404).send({
+      error: 'Cliente não encontrado na sua carteira',
+      code: 'NOT_FOUND',
+      statusCode: 404,
+    });
+    return;
+  }
+  await reply.status(500).send({
+    error: 'Não foi possível salvar o motivo',
+    code: 'UPDATE_FAILED',
+    statusCode: 500,
+  });
 }

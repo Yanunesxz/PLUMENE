@@ -36,14 +36,15 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
     editando !== null &&
     editando.role !== 'admin' &&
     editando.role !== 'manager' &&
-    editando.role !== 'financeiro';
+    editando.role !== 'financeiro' &&
+    editando.role !== 'relacionamento';
 
   const [form, setForm] = useState<DadosDoFormulario>({
     name: editando?.name ?? '',
     email: editando?.email ?? '',
     password: '',
     role:
-      editando?.role === 'admin' || editando?.role === 'financeiro'
+      editando?.role === 'admin' || editando?.role === 'financeiro' || editando?.role === 'relacionamento'
         ? editando.role
         : 'manager',
     permissions: editando
@@ -95,7 +96,7 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
         {!papelFixo && (
           <Campo label="Papel" obrigatorio>
             <div className="flex gap-2">
-              {(['manager', 'financeiro', 'admin'] as const).map((papel) => (
+              {(['manager', 'financeiro', 'relacionamento', 'admin'] as const).map((papel) => (
                 <button
                   key={papel}
                   type="button"

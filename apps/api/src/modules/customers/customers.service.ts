@@ -16,6 +16,37 @@ const PAGE_SIZE = 1000;
 const CUSTOMER_COLUMNS =
   'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id';
 
+/**
+ * As colunas da carteira inteligente vêm da migração 036 — pedi-las antes do
+ * SQL rodar derrubaria a lista INTEIRA de clientes. Sem elas, os selos de
+ * frescor simplesmente não aparecem, que é o comportamento de antes.
+ */
+let temHistoricoDeCompra: boolean | null = null;
+
+async function detectarHistoricoDeCompra(): Promise<boolean> {
+  if (temHistoricoDeCompra !== null) return temHistoricoDeCompra;
+  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
+  temHistoricoDeCompra = !error;
+  return temHistoricoDeCompra;
+}
+
+/** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
+let temInatividade: boolean | null = null;
+
+async function detectarInatividade(): Promise<boolean> {
+  if (temInatividade !== null) return temInatividade;
+  const { error } = await supabase.from('customers').select('inactivity_reason').limit(1);
+  temInatividade = !error;
+  return temInatividade;
+}
+
+async function colunasDaLista(): Promise<string> {
+  let colunas = CUSTOMER_COLUMNS;
+  if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at, overdue_amount';
+  if (await detectarInatividade()) colunas += ', inactivity_reason';
+  return colunas;
+}
+
 export async function getCustomers(
   company_id: string,
   role: AuthRole,
@@ -28,11 +59,12 @@ export async function getCustomers(
   // filtro `.or()` do PostgREST e quebrariam a query se digitados.
   const term = search ? search.replace(/[,()\\]/g, ' ').trim() : '';
 
+  const colunas = await colunasDaLista();
   const all: CustomerListItem[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     let query = supabase
       .from('customers')
-      .select(CUSTOMER_COLUMNS)
+      .select(colunas)
       .eq('company_id', company_id)
       .order('name')
       .range(from, from + PAGE_SIZE - 1);
@@ -51,7 +83,9 @@ export async function getCustomers(
 
     const { data, error } = await query;
     if (error || !data) break;
-    all.push(...(data as CustomerListItem[]));
+    // `as unknown`: o select dinâmico (com/sem as colunas da 036) tira do
+    // supabase-js a inferência do shape.
+    all.push(...(data as unknown as CustomerListItem[]));
     if (data.length < PAGE_SIZE) break; // última página
   }
 
@@ -132,6 +166,14 @@ const MAX_PEDIDOS_DA_FICHA = 50;
 const DETALHE_COLUNAS =
   'id, name, trade_name, cnpj, whatsapp, email, address, credit_limit, blocked, block_reason, price_table_id';
 
+/** A ficha soma o que as migrações 036/039 trouxerem — sem elas, vem como antes. */
+async function colunasDoDetalhe(): Promise<string> {
+  let colunas = DETALHE_COLUNAS;
+  if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
+  if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
+  return colunas;
+}
+
 /**
  * A ficha do cliente: cadastro, tabela de preço e histórico de pedidos.
  *
@@ -148,7 +190,7 @@ export async function obterCliente(
     company_id,
     customer_id,
     escopo,
-    DETALHE_COLUNAS,
+    await colunasDoDetalhe(),
   );
   if (!cliente) return null;
 
@@ -171,6 +213,41 @@ export async function obterCliente(
   }));
 
   return { ...cliente, pedidos };
+}
+
+export type MarcaDeInatividade =
+  | { ok: true }
+  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'erro' };
+
+/**
+ * O porquê do cliente vermelho — motivo + observação com as palavras de quem
+ * apurou. O rep escreve sobre a própria carteira; relacionamento e gerência,
+ * sobre qualquer cliente (o controller decide o escopo).
+ */
+export async function marcarInatividade(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+  quem: string,
+  body: { motivo: string; observacao?: string | undefined },
+): Promise<MarcaDeInatividade> {
+  if (!(await detectarInatividade())) return { ok: false, motivo: 'sem_migracao' };
+
+  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  const { error } = await supabase
+    .from('customers')
+    .update({
+      inactivity_reason: body.motivo.trim(),
+      inactivity_note: body.observacao?.trim() || null,
+      inactivity_updated_by: quem,
+      inactivity_updated_at: new Date().toISOString(),
+    })
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+
+  return error ? { ok: false, motivo: 'erro' } : { ok: true };
 }
 
 export type TrocaDeTabela =
