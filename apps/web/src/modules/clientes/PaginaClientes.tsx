@@ -90,11 +90,13 @@ export function PaginaClientes() {
   }, [customers, frescor]);
 
   // As cores do Yan: verde ativo, amarelo atenção, vermelho inativo.
+  // Ordem do Yan (02/09): ativo → atenção → inativo, e o ATIVO com o número —
+  // o rep precisa ver quantos clientes vivos tem, não só quantos parados.
   const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
-    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'ativo', rotulo: `Ativos${contagem.ativo ? ` (${contagem.ativo})` : ''}`, cor: 'bg-positive' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
-    { valor: 'ativo', rotulo: 'Ativos', cor: 'bg-positive' },
+    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
   ];
 
