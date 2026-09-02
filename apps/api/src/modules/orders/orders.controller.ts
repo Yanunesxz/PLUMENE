@@ -8,6 +8,7 @@ import {
   setOrderDiscount,
   setOrderItems,
   setOrderPayment,
+  setOrderNotes,
   deleteOrder,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
@@ -33,6 +34,7 @@ import {
   setDiscountSchema,
   setOrderItemsSchema,
   setPaymentSchema,
+  setNotesSchema,
 } from './orders.schema.js';
 
 /**
@@ -336,6 +338,38 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
         error: 'O desconto ainda não está disponível — falta aplicar a migração 029',
         code: 'DESCONTO_INDISPONIVEL',
         statusCode: 503,
+      });
+      return;
+    default:
+      await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+  }
+}
+
+export async function setNotesHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, role } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(setNotesSchema, request.body, reply);
+  if (!body) return;
+
+  const result = await setOrderNotes(id, company_id, sub, role, body.notes, request.user.venda_interna === true);
+  if (result.ok) {
+    await reply.send({ data: result.order });
+    return;
+  }
+
+  switch (result.reason) {
+    case 'forbidden':
+      await reply.status(403).send({
+        error: 'Você só pode alterar os seus próprios pedidos',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    case 'tarde_demais':
+      await reply.status(409).send({
+        error: 'Este pedido já saiu do seu alcance — a observação não pode mais mudar por aqui',
+        code: 'ORDER_JA_ENVIADO',
+        statusCode: 409,
       });
       return;
     default:

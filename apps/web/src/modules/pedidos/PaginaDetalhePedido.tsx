@@ -463,6 +463,36 @@ export function PaginaDetalhePedido() {
     };
   }, [id, token]);
 
+  // ─── A observação livre (o recado do rep) ───────────────────────────────────
+  // Editável pelo mesmo portão das peças: a venda interna mexe em qualquer
+  // estado até o carimbo. Só o texto livre vai — as linhas de cor o servidor
+  // preserva sozinho.
+  const [editandoObs, setEditandoObs] = useState(false);
+  const [textoObs, setTextoObs] = useState('');
+  const [salvandoObs, setSalvandoObs] = useState(false);
+
+  const salvarObs = async () => {
+    if (!id || !token || !order || salvandoObs) return;
+    setSalvandoObs(true);
+    try {
+      const res = await api.patch<ApiResponse<Order>>(
+        `/orders/${id}/observacao`,
+        { notes: textoObs.trim() },
+        token,
+      );
+      setOrder((prev) => (prev ? { ...prev, notes: res.data.notes ?? null } : prev));
+      setEditandoObs(false);
+      setToast({ message: 'Observação salva.', type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível salvar a observação.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoObs(false);
+    }
+  };
+
   const toggleInvoiced = async () => {
     if (!id || !token || !order) return;
     setInvoicing(true);
@@ -1013,11 +1043,58 @@ export function PaginaDetalhePedido() {
             )}
           </div>
 
-          {/* Só o recado do rep: as linhas de cor já aparecem em cada item. */}
-          {obsDoRep && (
+          {/* Só o recado do rep: as linhas de cor já aparecem em cada item.
+              Quem ainda pode mexer no pedido edita aqui — mesma janela das
+              peças e do desconto (para a venda interna, até o carimbo). */}
+          {(obsDoRep || podeMudarPedido) && (
             <div className="rounded-xl border border-border bg-card p-4 shadow-sm">
-              <h2 className="mb-1 text-sm font-semibold text-foreground">Observações</h2>
-              <p className="whitespace-pre-line text-sm text-muted-foreground">{obsDoRep}</p>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h2 className="text-sm font-semibold text-foreground">Observações</h2>
+                {podeMudarPedido && !editandoObs && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setTextoObs(obsDoRep);
+                      setEditandoObs(true);
+                    }}
+                  >
+                    <Pencil className="h-3.5 w-3.5" strokeWidth={2.5} />
+                    {obsDoRep ? 'Editar' : 'Escrever'}
+                  </Button>
+                )}
+              </div>
+              {editandoObs ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void salvarObs();
+                  }}
+                  className="grid gap-2"
+                >
+                  <textarea
+                    value={textoObs}
+                    onChange={(e) => setTextoObs(e.target.value)}
+                    rows={4}
+                    autoFocus
+                    placeholder="Remessa, boleto, recado para a fábrica…"
+                    className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                    aria-label="Observações do pedido"
+                  />
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setEditandoObs(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" size="sm" disabled={salvandoObs}>
+                      {salvandoObs ? 'Salvando…' : 'Salvar'}
+                    </Button>
+                  </div>
+                </form>
+              ) : obsDoRep ? (
+                <p className="whitespace-pre-line text-sm text-muted-foreground">{obsDoRep}</p>
+              ) : (
+                <p className="text-sm text-subtle">Nenhuma observação.</p>
+              )}
             </div>
           )}
 

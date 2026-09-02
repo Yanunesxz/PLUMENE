@@ -567,6 +567,45 @@ describe('a venda interna mexe no próprio pedido até o carimbo', () => {
     await app.close();
   });
 
+  it('edita a OBSERVAÇÃO do pedido já na fábrica — e as linhas de cor ficam', async () => {
+    // "Para vendedora a Obs pode ser editada em todos, menos no faturado"
+    // (Yan, 02/09/2026). O texto livre troca; a cor escolhida no catálogo é a
+    // única memória da cor no pedido e o servidor a preserva sozinho.
+    vi.resetModules();
+    const NA_FABRICA = { ...PEDIDO_NA_TRIAGEM, status: 'sent_erp', notes: 'mandar boleto\n\n0015 3M azul' };
+    const { app, fake } = await subir({
+      orders: [
+        { data: NA_FABRICA, error: null },
+        { data: { ...NA_FABRICA, notes: 'gravado' }, error: null },
+      ],
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/observacao',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { notes: 'entregar na loja nova' },
+    });
+    expect(res.statusCode).toBe(200);
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores;
+    expect(gravado).toMatchObject({ notes: 'entregar na loja nova\n\n0015 3M azul' });
+    await app.close();
+  });
+
+  it('a observação também trava no carimbo', async () => {
+    vi.resetModules();
+    const { app } = await subir({
+      orders: { data: { ...PEDIDO_NA_TRIAGEM, status: 'approved', invoiced: true }, error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/observacao',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { notes: 'tarde' },
+    });
+    expect(res.statusCode).toBe(409);
+    await app.close();
+  });
+
   it('pedido de OUTRO representante segue fora do alcance dela', async () => {
     vi.resetModules();
     const { app } = await subir({
