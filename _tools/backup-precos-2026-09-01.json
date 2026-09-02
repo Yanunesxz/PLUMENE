@@ -1,0 +1,4006 @@
+[
+ {
+  "id": "a3b6a0c1-1920-4f14-ab2e-95309370990d",
+  "tabela": 1,
+  "ref": "0095",
+  "nome": "CAMISOLA GESTANTE ALÇA LIGANETE",
+  "de": {
+   "price": 39.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 40.9,
+   "larger": 44.9
+  }
+ },
+ {
+  "id": "7b7b5966-8978-4da3-8816-f1e0321351f4",
+  "tabela": 1,
+  "ref": "0102",
+  "nome": "PIJAMA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 27.9,
+   "larger": null
+  },
+  "para": {
+   "price": 27.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "7cb73753-3632-49bf-b696-fce3141aad95",
+  "tabela": 1,
+  "ref": "0114",
+  "nome": "PIJAMA FAMILIA INFANTIL FEM.",
+  "de": {
+   "price": 26.9,
+   "larger": null
+  },
+  "para": {
+   "price": 29.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "98e8776e-3f6f-4e62-ad04-318f9bf081bd",
+  "tabela": 1,
+  "ref": "0115",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 24.9,
+   "larger": 27.9
+  },
+  "para": {
+   "price": 23.9,
+   "larger": 26.9
+  }
+ },
+ {
+  "id": "858ffd33-abe2-4743-8eff-ee62c8402d77",
+  "tabela": 1,
+  "ref": "0116",
+  "nome": "SHORT DOLL ALÇA MALHA BOLINHA",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 29.5,
+   "larger": 32.9
+  }
+ },
+ {
+  "id": "8c4de437-58e3-418d-b4da-573e908fcfd6",
+  "tabela": 1,
+  "ref": "0124",
+  "nome": "SHORT DOLL DE MANGA INFANTIL FEM.",
+  "de": {
+   "price": 19.9,
+   "larger": null
+  },
+  "para": {
+   "price": 20.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "fd6b4d89-bf6e-4645-a0cf-47dc846c8e05",
+  "tabela": 1,
+  "ref": "0135",
+  "nome": "SHORT ESTAM MASC MALHA PV",
+  "de": {
+   "price": 14.9,
+   "larger": 16.9
+  },
+  "para": {
+   "price": 16.5,
+   "larger": 18.5
+  }
+ },
+ {
+  "id": "334c7db1-fd2a-4253-9bbd-de330bad3a45",
+  "tabela": 1,
+  "ref": "0203",
+  "nome": "PIJAMA ESTAM INFAN MASC MALHA PV",
+  "de": {
+   "price": 20.9,
+   "larger": null
+  },
+  "para": {
+   "price": 27.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "637c5083-765a-403a-a652-a2bf0d4bba0e",
+  "tabela": 1,
+  "ref": "0216",
+  "nome": "SHORT DOLL ALÇA MALHA ONÇA",
+  "de": {
+   "price": 29.9,
+   "larger": 31.9
+  },
+  "para": {
+   "price": 27.5,
+   "larger": 29.5
+  }
+ },
+ {
+  "id": "cfe1b15b-388f-4588-820e-1507156456c2",
+  "tabela": 1,
+  "ref": "0239",
+  "nome": "PIJAMA ESTAMPADO REGATA INFANTIL MASC.",
+  "de": {
+   "price": 19.9,
+   "larger": null
+  },
+  "para": {
+   "price": 24.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "f7afbbba-7acd-4007-ad03-b2871f500e54",
+  "tabela": 1,
+  "ref": "0304",
+  "nome": "PIJAMA MASCULINO FAMILIA",
+  "de": {
+   "price": 40.9,
+   "larger": 44.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 51.5
+  }
+ },
+ {
+  "id": "ea684157-94d8-41c0-84cc-51692327644b",
+  "tabela": 1,
+  "ref": "0305",
+  "nome": "PIJAMA JUVENIL MASC. FAMILIA",
+  "de": {
+   "price": 29.9,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "052e37cf-5111-433e-9565-eb391c0c295a",
+  "tabela": 1,
+  "ref": "0306",
+  "nome": "PIJAMA INF. MASC. FAMILIA",
+  "de": {
+   "price": 24.9,
+   "larger": null
+  },
+  "para": {
+   "price": 27.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "dd2ee1d6-ad26-4cb3-91ac-9c0fa25e9bbe",
+  "tabela": 1,
+  "ref": "0307",
+  "nome": "PIJAMA FEMININO FAMILIA",
+  "de": {
+   "price": 32.9,
+   "larger": 35.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 41.9
+  }
+ },
+ {
+  "id": "9932f9c8-8d62-4cd6-ac61-83a2fc589629",
+  "tabela": 1,
+  "ref": "0308",
+  "nome": "PIJAMA JUVENIL FEM. FAMILIA",
+  "de": {
+   "price": 29.9,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "589aa82c-6f28-4450-b391-2547be9f8174",
+  "tabela": 1,
+  "ref": "0309",
+  "nome": "PIJAMA INFANTIL FEM. FAMILIA",
+  "de": {
+   "price": 24.9,
+   "larger": null
+  },
+  "para": {
+   "price": 27.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "d13e42bc-3c48-4646-a7d6-8db885656877",
+  "tabela": 1,
+  "ref": "0316",
+  "nome": "SHORT DOLL NADADOR DE ONÇA",
+  "de": {
+   "price": 29.9,
+   "larger": 31.9
+  },
+  "para": {
+   "price": 28.5,
+   "larger": 30.9
+  }
+ },
+ {
+  "id": "dec50290-f9a2-40d9-a8ee-20e38210770d",
+  "tabela": 1,
+  "ref": "0321",
+  "nome": "PIJAMA DE BERMUDA GESTANTE",
+  "de": {
+   "price": 35.9,
+   "larger": 37.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 41.9
+  }
+ },
+ {
+  "id": "ea48442f-9335-46e3-8a23-a8c6079915a0",
+  "tabela": 1,
+  "ref": "0325",
+  "nome": "CAMISOLA DE GESTANTE ESTAMPADA",
+  "de": {
+   "price": 35.9,
+   "larger": 37.9
+  },
+  "para": {
+   "price": 37.5,
+   "larger": 40.5
+  }
+ },
+ {
+  "id": "159fc1a4-8035-4db0-96c9-6ed35d8e6a0e",
+  "tabela": 1,
+  "ref": "0358",
+  "nome": "SHORT DOLL JOVEM ALÇA",
+  "de": {
+   "price": 33.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 35.9,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "42dc45c2-bf2d-4af8-9426-b0b3c2a8b1db",
+  "tabela": 1,
+  "ref": "0359",
+  "nome": "SHORT DOLL REGATA JOVEM",
+  "de": {
+   "price": 33.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 37.9,
+   "larger": 40.5
+  }
+ },
+ {
+  "id": "c45267a6-fdc1-432e-b904-4a6397110299",
+  "tabela": 1,
+  "ref": "0402",
+  "nome": "PIJAMA FAMILIA MANGA CURTA MASC.",
+  "de": {
+   "price": 44.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 49.9,
+   "larger": 54.9
+  }
+ },
+ {
+  "id": "61cc1b1c-0009-43d8-a37a-b364a4ac461d",
+  "tabela": 1,
+  "ref": "0403",
+  "nome": "PIJAMA FAMILIA REGATA MASC.",
+  "de": {
+   "price": 40.9,
+   "larger": null
+  },
+  "para": {
+   "price": 46.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "98ba964c-5ec5-44ef-8617-6a1e9018e327",
+  "tabela": 1,
+  "ref": "0404",
+  "nome": "PIJAMA FAMILIA JUVENIL MASC.",
+  "de": {
+   "price": 32.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "35e0f787-93bc-4024-aa94-f2ff62d96ec1",
+  "tabela": 1,
+  "ref": "0407",
+  "nome": "PIJAMA FAMILIA INFANTIL MASC.",
+  "de": {
+   "price": 26.9,
+   "larger": null
+  },
+  "para": {
+   "price": 29.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "17b673be-c616-4304-9fba-8367b37644e0",
+  "tabela": 1,
+  "ref": "0550",
+  "nome": "SHORT LIGANETE MASCULINO",
+  "de": {
+   "price": 15.9,
+   "larger": 17.9
+  },
+  "para": {
+   "price": 16.9,
+   "larger": 18.9
+  }
+ },
+ {
+  "id": "c94b5c51-1d3d-4e0f-955e-9b6fa1c25690",
+  "tabela": 1,
+  "ref": "0702",
+  "nome": "CAMISOLA DE ALÇA",
+  "de": {
+   "price": 26.9,
+   "larger": 29.9
+  },
+  "para": {
+   "price": 28.5,
+   "larger": 30.9
+  }
+ },
+ {
+  "id": "6c3cff2a-c432-4916-a1ad-481f732881a0",
+  "tabela": 1,
+  "ref": "0800",
+  "nome": "SHORT DOLL NADADOR MESCLA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 42.5
+  }
+ },
+ {
+  "id": "ed11b0d6-bafa-42a0-be09-9cb95b2472b2",
+  "tabela": 1,
+  "ref": "0810",
+  "nome": "SHORT DOLL REGATA MESCLA INFANTIL FEM.",
+  "de": {
+   "price": 16.9,
+   "larger": null
+  },
+  "para": {
+   "price": 19.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "af879364-c040-43ee-9a0d-9bcbcc8770d3",
+  "tabela": 1,
+  "ref": "0841",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 35.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 42.9
+  }
+ },
+ {
+  "id": "a3b4f15b-08a7-4607-b888-8b2fff88ae67",
+  "tabela": 1,
+  "ref": "0845",
+  "nome": "SHORT DOLL REGATA CÓS DUPLO",
+  "de": {
+   "price": 35.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "a61edf13-464e-4380-8392-2e439673be22",
+  "tabela": 1,
+  "ref": "0901",
+  "nome": "SHORT DOLL REGATA LISTRADO",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 29.5,
+   "larger": 32.9
+  }
+ },
+ {
+  "id": "a2e3bf63-0ba1-4b4b-b5e6-e6ba1c185b85",
+  "tabela": 1,
+  "ref": "0911",
+  "nome": "SHORT DOLL ALÇA LISTRADO",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 28.9,
+   "larger": 31.9
+  }
+ },
+ {
+  "id": "03aa6807-8263-4097-a62f-386457c620ff",
+  "tabela": 1,
+  "ref": "2131",
+  "nome": "PIJAMA REGATA MALHA",
+  "de": {
+   "price": 33.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 35.9
+  }
+ },
+ {
+  "id": "cf14fd81-a14d-4d0e-825e-9379be0c9f39",
+  "tabela": 1,
+  "ref": "2134",
+  "nome": "SHORT DOLL REGATA ESTAMPADO",
+  "de": {
+   "price": 33.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 30.9,
+   "larger": 33.9
+  }
+ },
+ {
+  "id": "cb6cd212-27bd-47b1-a077-48f9c43e922e",
+  "tabela": 2,
+  "ref": "0015",
+  "nome": "CAMISOLA DE ALÇA",
+  "de": {
+   "price": 24.9,
+   "larger": 26.9
+  },
+  "para": {
+   "price": 24.5,
+   "larger": 26.5
+  }
+ },
+ {
+  "id": "7f321414-0f7c-4a48-a9e6-a2ec176fa249",
+  "tabela": 2,
+  "ref": "0070",
+  "nome": "SHORT DOLL RENDA LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "826728d3-5b1c-4461-90e9-88c849e617d1",
+  "tabela": 2,
+  "ref": "0072",
+  "nome": "CAMISOLA RENDA LIGANETE",
+  "de": {
+   "price": 40.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 40.9,
+   "larger": 45.5
+  }
+ },
+ {
+  "id": "dc2bbe41-2f46-4c6f-b78d-2ba5011206ae",
+  "tabela": 2,
+  "ref": "0080",
+  "nome": "SHORT DOLL COM RENDA LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "e261b81e-7619-4970-ad88-7365e456eb48",
+  "tabela": 2,
+  "ref": "0083",
+  "nome": "CAMISOLA ABERTA REGATA LIGANETE",
+  "de": {
+   "price": 40.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 40.5,
+   "larger": 43.5
+  }
+ },
+ {
+  "id": "f5199df1-8c2d-41b5-af5a-9618df61a237",
+  "tabela": 2,
+  "ref": "0085",
+  "nome": "PIJAMA REGATA LIGANETE",
+  "de": {
+   "price": 36.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 40.5
+  }
+ },
+ {
+  "id": "586f4757-1c77-40fe-89ba-9f89a88e407a",
+  "tabela": 2,
+  "ref": "0086",
+  "nome": "PIJAMA MANGA CURTA COM CALÇA LIGANETE",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 53.9
+  }
+ },
+ {
+  "id": "720af9d7-0106-4c41-b926-fe398f459046",
+  "tabela": 2,
+  "ref": "0087",
+  "nome": "CAMISOLA ABERTA MANGA LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "d5e99486-a71a-4e76-b008-f01f9b35ea36",
+  "tabela": 2,
+  "ref": "0088",
+  "nome": "PIJAMA ABERTO LIGANETE",
+  "de": {
+   "price": 44.9,
+   "larger": 49
+  },
+  "para": {
+   "price": 44.9,
+   "larger": 49.5
+  }
+ },
+ {
+  "id": "10a8b840-82be-4661-a9cc-a8f6cad671cb",
+  "tabela": 2,
+  "ref": "0090",
+  "nome": "CAMISOLA GESTANTE LIGANETE",
+  "de": {
+   "price": 38.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 42.5
+  }
+ },
+ {
+  "id": "dbc28192-0e34-46bd-b677-eb2efcafd133",
+  "tabela": 2,
+  "ref": "0091",
+  "nome": "CAMISOLA ALÇA LIGANETE ESTAMPADA",
+  "de": {
+   "price": 41.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 41.5,
+   "larger": 45.5
+  }
+ },
+ {
+  "id": "d2c99086-b87e-495e-a403-8f9cfa0c9c99",
+  "tabela": 2,
+  "ref": "0092",
+  "nome": "CAMISOLA GESTANTE DE LIGANETE",
+  "de": {
+   "price": 38.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 42.5
+  }
+ },
+ {
+  "id": "0b495d0a-e138-44a0-b747-60d5fb3e0d96",
+  "tabela": 2,
+  "ref": "0093",
+  "nome": "CAMISOLA ALÇA LIGANETE LISA",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "2f98a75e-9195-4435-8d1a-b15af1bdec84",
+  "tabela": 2,
+  "ref": "0094",
+  "nome": "CAMISOLA DE LIGANETE",
+  "de": {
+   "price": 38.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 42.5
+  }
+ },
+ {
+  "id": "58c6aee0-c4be-4dc3-89c6-e3bbac2ca18f",
+  "tabela": 2,
+  "ref": "0095",
+  "nome": "CAMISOLA GESTANTE ALÇA LIGANETE",
+  "de": {
+   "price": 43.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 45.5,
+   "larger": 49.5
+  }
+ },
+ {
+  "id": "6f0596b3-a15c-415b-9be6-6098e9f76b85",
+  "tabela": 2,
+  "ref": "0102",
+  "nome": "PIJAMA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 30.9,
+   "larger": null
+  },
+  "para": {
+   "price": 30.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "22ef2677-c243-478b-a6f5-ac408e5443d5",
+  "tabela": 2,
+  "ref": "0103",
+  "nome": "PIJAMA DE MALHA INFANTIL MASC.",
+  "de": {
+   "price": 28.9,
+   "larger": null
+  },
+  "para": {
+   "price": 28.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "d663fc21-25fa-4018-966a-887992b74e8d",
+  "tabela": 2,
+  "ref": "0104",
+  "nome": "PIJAMA REGATA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 28.9,
+   "larger": null
+  },
+  "para": {
+   "price": 28.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "8a6f236c-9401-4aa8-83aa-5cdc1e66ebc2",
+  "tabela": 2,
+  "ref": "0107",
+  "nome": "PIJAMA FEMININO FAMILIA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 48.5
+  }
+ },
+ {
+  "id": "997fec58-8984-447d-aec2-8fefd82a2617",
+  "tabela": 2,
+  "ref": "0109",
+  "nome": "SHORT DOLL REGATA BOLINHA",
+  "de": {
+   "price": 34,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 34.5,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "cf22e309-6cf8-4852-9c8f-53244a7bdcdf",
+  "tabela": 2,
+  "ref": "0110",
+  "nome": "SHORT DOLL REGATA MALHA",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 29.9,
+   "larger": 32.5
+  }
+ },
+ {
+  "id": "2dbd50b9-21da-44ad-a21e-2bbb37400e09",
+  "tabela": 2,
+  "ref": "0111",
+  "nome": "CAMISOLA REGATA MALHA",
+  "de": {
+   "price": 25.9,
+   "larger": 27.9
+  },
+  "para": {
+   "price": 25.5,
+   "larger": 27.5
+  }
+ },
+ {
+  "id": "ad8f7edc-7f28-48d2-8b68-f777529f6b31",
+  "tabela": 2,
+  "ref": "0114",
+  "nome": "PIJAMA FAMILIA INFANTIL FEM.",
+  "de": {
+   "price": 29.9,
+   "larger": null
+  },
+  "para": {
+   "price": 32.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "fa08940d-d84d-469f-9b1d-2adbbb8bcdef",
+  "tabela": 2,
+  "ref": "0115",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 27.9,
+   "larger": 30.9
+  },
+  "para": {
+   "price": 26.5,
+   "larger": 29.9
+  }
+ },
+ {
+  "id": "d03bdb80-874a-489d-bdaf-b763f9dd9060",
+  "tabela": 2,
+  "ref": "0116",
+  "nome": "SHORT DOLL ALÇA MALHA BOLINHA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.5,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "b1bc0b1c-cae4-4531-a556-065ae9141a05",
+  "tabela": 2,
+  "ref": "0122",
+  "nome": "PIJAMA DE MANGA MALHA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "e2b1526b-d840-4552-94d8-f4bf7368eb17",
+  "tabela": 2,
+  "ref": "0123",
+  "nome": "PIJAMA ABERTO DE MANGA BORDADO",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "bf760302-1405-41d9-9953-755ce7569165",
+  "tabela": 2,
+  "ref": "0124",
+  "nome": "SHORT DOLL DE MANGA INFANTIL FEM.",
+  "de": {
+   "price": 21.9,
+   "larger": null
+  },
+  "para": {
+   "price": 23.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "6958ec16-eb31-4a05-afc8-e33ef16347c9",
+  "tabela": 2,
+  "ref": "0125",
+  "nome": "CAMISOLA BORDADA DE MANGA",
+  "de": {
+   "price": 43.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "738d9ad1-85ad-4d95-a72c-8a8a4d6bcbd1",
+  "tabela": 2,
+  "ref": "0126",
+  "nome": "CAMISOLA BORDADA ABERTA",
+  "de": {
+   "price": 41.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 41.9,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "79bb2fe1-6f8d-4e6a-a235-e7b6a6da5d63",
+  "tabela": 2,
+  "ref": "0128",
+  "nome": "PIJAMA ABERTO DE MANGA ESTAMPADO",
+  "de": {
+   "price": 42.9,
+   "larger": 45.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "c7c08ced-2cd8-44b3-92a2-d3d362b33ec8",
+  "tabela": 2,
+  "ref": "0129",
+  "nome": "PIJAMA BORDADO REGATA MASC.",
+  "de": {
+   "price": 45.9,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 45.9,
+   "larger": 49.5
+  }
+ },
+ {
+  "id": "334c0d7b-7522-423e-9745-03fdf966f751",
+  "tabela": 2,
+  "ref": "0130",
+  "nome": "PIJAMA BORDADO MANGA MASC.",
+  "de": {
+   "price": 48.9,
+   "larger": 59.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 59.5
+  }
+ },
+ {
+  "id": "48337470-782c-4402-b15b-352278962e87",
+  "tabela": 2,
+  "ref": "0131",
+  "nome": "SHORT DE MALHA MASCULINO",
+  "de": {
+   "price": 16.9,
+   "larger": 18.9
+  },
+  "para": {
+   "price": 16.5,
+   "larger": 18.5
+  }
+ },
+ {
+  "id": "20056253-fdbb-4056-9a7e-11ceab2810d4",
+  "tabela": 2,
+  "ref": "0135",
+  "nome": "SHORT ESTAM MASC MALHA PV",
+  "de": {
+   "price": 16.9,
+   "larger": 18.9
+  },
+  "para": {
+   "price": 18.5,
+   "larger": 20.5
+  }
+ },
+ {
+  "id": "ad6f0102-9520-4564-93d4-a1fbd2a11c8d",
+  "tabela": 2,
+  "ref": "0139",
+  "nome": "PIJAMA REGATA INFANTIL MASC.",
+  "de": {
+   "price": 25.9,
+   "larger": null
+  },
+  "para": {
+   "price": 25.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "19842cc8-e35f-405d-a2c7-4339522bcc36",
+  "tabela": 2,
+  "ref": "0141",
+  "nome": "PIJAMA LONGO MALHA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 38.9,
+   "larger": null
+  },
+  "para": {
+   "price": 38.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "ced48e9f-94ab-4293-b31d-501874751e8a",
+  "tabela": 2,
+  "ref": "0142",
+  "nome": "PIJAMA LONGO MALHA INFANTIL FEM.",
+  "de": {
+   "price": 31.9,
+   "larger": null
+  },
+  "para": {
+   "price": 31.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "e9b1c43b-2cfd-4809-887e-2dfff40cfeb2",
+  "tabela": 2,
+  "ref": "0143",
+  "nome": "PIJAMA LONGO MALHA INFANTIL MASC.",
+  "de": {
+   "price": 31.9,
+   "larger": null
+  },
+  "para": {
+   "price": 31.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "41ef20f8-d694-4d66-b45e-6a88341798f6",
+  "tabela": 2,
+  "ref": "0145",
+  "nome": "PIJAMA LONGO MALHA MASCULINO",
+  "de": {
+   "price": 54.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 54.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "f7042d72-d7c2-4742-a40f-35ae355b511a",
+  "tabela": 2,
+  "ref": "0160",
+  "nome": "PIJAMA LONGO MOLETINHO FLANELADO FEM.",
+  "de": {
+   "price": 75.9,
+   "larger": 82
+  },
+  "para": {
+   "price": 75.9,
+   "larger": 82.5
+  }
+ },
+ {
+  "id": "809950a2-e774-4214-a109-c31006ab3adf",
+  "tabela": 2,
+  "ref": "0161",
+  "nome": "PIJAMA LONGO MOLETINHO ABERTO FEM.",
+  "de": {
+   "price": 83.9,
+   "larger": 91.9
+  },
+  "para": {
+   "price": 83.5,
+   "larger": 91.9
+  }
+ },
+ {
+  "id": "7e7d4dcb-e353-425a-aca3-a6f242ca749c",
+  "tabela": 2,
+  "ref": "0162",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL FEM.",
+  "de": {
+   "price": 50.9,
+   "larger": null
+  },
+  "para": {
+   "price": 50.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "098269d3-5d09-4982-b001-975892222c27",
+  "tabela": 2,
+  "ref": "0163",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL MASC.",
+  "de": {
+   "price": 50.9,
+   "larger": null
+  },
+  "para": {
+   "price": 50.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "02a86f8a-5f88-46f5-9b2c-6d00065246d2",
+  "tabela": 2,
+  "ref": "0169",
+  "nome": "PIJAMA LONGO MOLETINHO FEM.",
+  "de": {
+   "price": 84.9,
+   "larger": 93
+  },
+  "para": {
+   "price": 84.9,
+   "larger": 93.5
+  }
+ },
+ {
+  "id": "8bb3366a-ebb8-4d0c-bfbd-c2a9bf6591cd",
+  "tabela": 2,
+  "ref": "0199",
+  "nome": "PIJAMA LONGO PLUSH LISO FEM.",
+  "de": {
+   "price": 80.9,
+   "larger": 87.9
+  },
+  "para": {
+   "price": 80.9,
+   "larger": 87.5
+  }
+ },
+ {
+  "id": "81d7b336-13a8-4c35-b8b2-6929ca192898",
+  "tabela": 2,
+  "ref": "0200",
+  "nome": "PIJAMA LONGO PLUSH MASCULINO",
+  "de": {
+   "price": 95.9,
+   "larger": 105.9
+  },
+  "para": {
+   "price": 95.9,
+   "larger": 105.5
+  }
+ },
+ {
+  "id": "a4eb075d-597f-4bd9-8b46-f31bf725c26c",
+  "tabela": 2,
+  "ref": "0202",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH MASC.",
+  "de": {
+   "price": 70.9,
+   "larger": null
+  },
+  "para": {
+   "price": 70.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "7bc1df9c-3f85-44f6-9ab7-150ed5e280e8",
+  "tabela": 2,
+  "ref": "0203",
+  "nome": "PIJAMA ESTAM INFAN MASC MALHA PV",
+  "de": {
+   "price": 23,
+   "larger": null
+  },
+  "para": {
+   "price": 30.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "a07c809e-9097-4ab6-b4f8-ad6eeda83761",
+  "tabela": 2,
+  "ref": "0204",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH FEM.",
+  "de": {
+   "price": 70.9,
+   "larger": null
+  },
+  "para": {
+   "price": 70.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "acee7248-6319-4102-90ae-63011189dae9",
+  "tabela": 2,
+  "ref": "0216",
+  "nome": "SHORT DOLL ALÇA MALHA ONÇA",
+  "de": {
+   "price": 32.9,
+   "larger": 35.9
+  },
+  "para": {
+   "price": 30.5,
+   "larger": 32.5
+  }
+ },
+ {
+  "id": "3c28c8ed-edbb-4888-9208-13b28391d6e7",
+  "tabela": 2,
+  "ref": "0220",
+  "nome": "PIJAMA LONGO SUEDE CANELADO LISO FEM.",
+  "de": {
+   "price": 60.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 60.5,
+   "larger": 65.9
+  }
+ },
+ {
+  "id": "9eb90dba-a0d0-436d-92b8-38379b07414e",
+  "tabela": 2,
+  "ref": "0221",
+  "nome": "PIJAMA LONGO SUEDE CANELADO EST. FEM.",
+  "de": {
+   "price": 60.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 60.5,
+   "larger": 65.9
+  }
+ },
+ {
+  "id": "95a015e6-1e84-47de-bac7-75db11f8bf8b",
+  "tabela": 2,
+  "ref": "0222",
+  "nome": "PIJAMA DE CALÇA CANELADO LISO",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "518ebee6-f905-4b05-8bee-8f2c9d54f019",
+  "tabela": 2,
+  "ref": "0223",
+  "nome": "PIJAMA DE CALÇA CANELADO ESTAMPADO",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "88914e73-8167-486b-8a3c-62c2d0828ff0",
+  "tabela": 2,
+  "ref": "0239",
+  "nome": "PIJAMA ESTAMPADO REGATA INFANTIL MASC.",
+  "de": {
+   "price": 21.9,
+   "larger": null
+  },
+  "para": {
+   "price": 27.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "e7de551b-3cee-4b11-b34f-e08e3190cc50",
+  "tabela": 2,
+  "ref": "0240",
+  "nome": "PIJAMA LONGO ESTAMPADO ABERTO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.9
+  }
+ },
+ {
+  "id": "a9347d6d-056f-4a4a-bea1-8001b4f221f0",
+  "tabela": 2,
+  "ref": "0242",
+  "nome": "PIJAMA LONGO ESTAMPADO INFANTIL FEM.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "1fc3ee32-da65-4ff5-af6e-fce2f42a4f72",
+  "tabela": 2,
+  "ref": "0245",
+  "nome": "PIJAMA LONGO ESTAMPADO FEM.",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 53.5
+  }
+ },
+ {
+  "id": "83e420eb-66e3-4c9e-97ef-e643badb3bf0",
+  "tabela": 2,
+  "ref": "0250",
+  "nome": "PIJAMA LONGO DE ONÇA FEM.",
+  "de": {
+   "price": 48.9,
+   "larger": null
+  },
+  "para": {
+   "price": 48.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "34bc8886-1964-4607-a584-c5909addbf38",
+  "tabela": 2,
+  "ref": "0260",
+  "nome": "PIJAMA LONGO SUEDE FELPADO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "e6cb2b89-d85e-4f0a-9a3f-117329f6bf8c",
+  "tabela": 2,
+  "ref": "0300",
+  "nome": "ROBE DE SEDA",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 36.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "ba171663-8f9b-48a9-8c24-1f2b2dcea5f2",
+  "tabela": 2,
+  "ref": "0301",
+  "nome": "ROBE DE LIGANETE",
+  "de": {
+   "price": 49.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 49.5,
+   "larger": 53.9
+  }
+ },
+ {
+  "id": "6ad3bedf-9a33-46c8-804c-876fa2385b2e",
+  "tabela": 2,
+  "ref": "0303",
+  "nome": "PIJAMA LONGO ESTAMPADO INFANTIL MASC.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "3847373a-c887-4187-9f70-cf2fc7736177",
+  "tabela": 2,
+  "ref": "0304",
+  "nome": "PIJAMA MASCULINO FAMILIA",
+  "de": {
+   "price": 45,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 51.9,
+   "larger": 56.9
+  }
+ },
+ {
+  "id": "a90b0075-131d-4e99-b0a7-d35486653888",
+  "tabela": 2,
+  "ref": "0305",
+  "nome": "PIJAMA JUVENIL MASC. FAMILIA",
+  "de": {
+   "price": 32.9,
+   "larger": null
+  },
+  "para": {
+   "price": 37.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "7b05f013-62cf-40ab-a6c6-222651143940",
+  "tabela": 2,
+  "ref": "0306",
+  "nome": "PIJAMA INF. MASC. FAMILIA",
+  "de": {
+   "price": 27.9,
+   "larger": null
+  },
+  "para": {
+   "price": 30.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "48ab4021-09cd-4018-aca8-3d04a5080715",
+  "tabela": 2,
+  "ref": "0307",
+  "nome": "PIJAMA FEMININO FAMILIA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "23d05c53-5ae3-4a42-94c9-0b033768a06d",
+  "tabela": 2,
+  "ref": "0308",
+  "nome": "PIJAMA JUVENIL FEM. FAMILIA",
+  "de": {
+   "price": 32.9,
+   "larger": null
+  },
+  "para": {
+   "price": 37.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "67be1d76-33de-4b9a-b7ce-f3c470969696",
+  "tabela": 2,
+  "ref": "0309",
+  "nome": "PIJAMA INFANTIL FEM. FAMILIA",
+  "de": {
+   "price": 27.9,
+   "larger": null
+  },
+  "para": {
+   "price": 30.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "32583763-f402-442d-9918-a73585ec7d40",
+  "tabela": 2,
+  "ref": "0310",
+  "nome": "PIJAMA REGATA MALHA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "dfc9bb30-989a-478c-a1fc-9b63c33168f6",
+  "tabela": 2,
+  "ref": "0316",
+  "nome": "SHORT DOLL NADADOR DE ONÇA",
+  "de": {
+   "price": 32.9,
+   "larger": 35.9
+  },
+  "para": {
+   "price": 31.5,
+   "larger": 34.5
+  }
+ },
+ {
+  "id": "0e9852c5-771f-437b-9197-06c2c82e5af0",
+  "tabela": 2,
+  "ref": "0321",
+  "nome": "PIJAMA DE BERMUDA GESTANTE",
+  "de": {
+   "price": 39.9,
+   "larger": 41.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "8f8b704a-bc56-46a2-8b1f-ea57ba953a94",
+  "tabela": 2,
+  "ref": "0325",
+  "nome": "CAMISOLA DE GESTANTE ESTAMPADA",
+  "de": {
+   "price": 39.9,
+   "larger": 41.9
+  },
+  "para": {
+   "price": 41.5,
+   "larger": 44.9
+  }
+ },
+ {
+  "id": "666e7321-6046-4ac0-99ee-fc257f1f8c0c",
+  "tabela": 2,
+  "ref": "0327",
+  "nome": "CAMISOLA GESTANTE ESTAMPADA",
+  "de": {
+   "price": 43.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "264d9ec6-afb5-4b33-9847-445363967266",
+  "tabela": 2,
+  "ref": "0328",
+  "nome": "CAMISOLA GESTANTE ALÇA MALHA",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 47.5,
+   "larger": 50.5
+  }
+ },
+ {
+  "id": "3b06c43e-4f1d-4589-8aa4-64bb202db79a",
+  "tabela": 2,
+  "ref": "0329",
+  "nome": "PIJAMA ESTAMPADO REGATA MASC.",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 53.5
+  }
+ },
+ {
+  "id": "f5c86a71-0f4a-447d-92a4-ee688cb4b1e4",
+  "tabela": 2,
+  "ref": "0330",
+  "nome": "PIJAMA ESTAMPADO MANGA MASC.",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "81480ff6-aae2-4e98-bb4d-110cb7adb848",
+  "tabela": 2,
+  "ref": "0350",
+  "nome": "CAMISOLA BORDADA ABERTA",
+  "de": {
+   "price": 44.9,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 44.9,
+   "larger": 49.5
+  }
+ },
+ {
+  "id": "1a905d25-8d16-402c-9db1-9ca0bb0814b7",
+  "tabela": 2,
+  "ref": "0352",
+  "nome": "CAMISOLA GESTANTE",
+  "de": {
+   "price": 47.9,
+   "larger": null
+  },
+  "para": {
+   "price": 47.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "3461b9da-861a-4c06-ab2e-ab900487d2b1",
+  "tabela": 2,
+  "ref": "0354",
+  "nome": "SHORT DOLL ALÇA CANELADO",
+  "de": {
+   "price": 42.9,
+   "larger": 45.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "13e2023d-7c29-4ebf-8020-f2882244a7ba",
+  "tabela": 2,
+  "ref": "0355",
+  "nome": "SHORT DOLL REGATA CANELADO",
+  "de": {
+   "price": 41.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 41.9,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "f205c99a-fa71-4739-bc11-9a74d98b5275",
+  "tabela": 2,
+  "ref": "0358",
+  "nome": "SHORT DOLL JOVEM ALÇA",
+  "de": {
+   "price": 37.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 43.5
+  }
+ },
+ {
+  "id": "36ec9f75-99f6-4eda-bd2a-a95dcdc08527",
+  "tabela": 2,
+  "ref": "0359",
+  "nome": "SHORT DOLL REGATA JOVEM",
+  "de": {
+   "price": 37.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 41.9,
+   "larger": 44.9
+  }
+ },
+ {
+  "id": "2dea823c-61d7-4290-befd-a6b15c82d988",
+  "tabela": 2,
+  "ref": "0380",
+  "nome": "CAMISOLA NADADOR",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 29.5,
+   "larger": 32.9
+  }
+ },
+ {
+  "id": "5b7b70ba-d759-4610-8292-eb1071569a42",
+  "tabela": 2,
+  "ref": "0390",
+  "nome": "SHORT DOLL NADADOR",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "a8f78e50-4b8e-491c-b9fa-a4b9dd5fc2f9",
+  "tabela": 2,
+  "ref": "0402",
+  "nome": "PIJAMA FAMILIA MANGA CURTA MASC.",
+  "de": {
+   "price": 49.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "33d3f35d-7f1f-4fbf-b4f0-47cd443ba3b4",
+  "tabela": 2,
+  "ref": "0403",
+  "nome": "PIJAMA FAMILIA REGATA MASC.",
+  "de": {
+   "price": 45,
+   "larger": null
+  },
+  "para": {
+   "price": 51.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "d759c4bb-da51-4a28-92ac-0b823d6cd5ee",
+  "tabela": 2,
+  "ref": "0404",
+  "nome": "PIJAMA FAMILIA JUVENIL MASC.",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 39.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "af045aee-07e5-470d-87e7-e2f8d7db287a",
+  "tabela": 2,
+  "ref": "0407",
+  "nome": "PIJAMA FAMILIA INFANTIL MASC.",
+  "de": {
+   "price": 29.9,
+   "larger": null
+  },
+  "para": {
+   "price": 32.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "5528f8cf-8530-41ea-9e01-962649aee3f5",
+  "tabela": 2,
+  "ref": "0430",
+  "nome": "PIJAMA MESCLA MASCULINO",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "462346b2-c1bd-449c-822b-5e3ae42f2082",
+  "tabela": 2,
+  "ref": "0499",
+  "nome": "PIJAMA BERMUDA LIGANETE",
+  "de": {
+   "price": 41.9,
+   "larger": 44.9
+  },
+  "para": {
+   "price": 41.5,
+   "larger": 44.9
+  }
+ },
+ {
+  "id": "46cb17d2-c35f-450d-8140-9427e8810e3f",
+  "tabela": 2,
+  "ref": "0500",
+  "nome": "CAMISOLA ALÇA LIGANETE",
+  "de": {
+   "price": 26.9,
+   "larger": 29.9
+  },
+  "para": {
+   "price": 26.5,
+   "larger": 29.5
+  }
+ },
+ {
+  "id": "dfd881bf-ce34-436e-bebd-a69f10a2fcb5",
+  "tabela": 2,
+  "ref": "0501",
+  "nome": "PIJAMA REGATA EST. LIGANETE",
+  "de": {
+   "price": 35.9,
+   "larger": 37.9
+  },
+  "para": {
+   "price": 35.5,
+   "larger": 37.5
+  }
+ },
+ {
+  "id": "f11045be-181a-4fb2-a92f-2a32c184ff90",
+  "tabela": 2,
+  "ref": "0502",
+  "nome": "SHORT DOLL ALÇA LIGANETE",
+  "de": {
+   "price": 30.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 30.5,
+   "larger": 32.5
+  }
+ },
+ {
+  "id": "51fe863e-85cd-47e4-a40c-7a16cdb727ac",
+  "tabela": 2,
+  "ref": "0550",
+  "nome": "SHORT LIGANETE MASCULINO",
+  "de": {
+   "price": 17.9,
+   "larger": 19.9
+  },
+  "para": {
+   "price": 18.9,
+   "larger": 20.9
+  }
+ },
+ {
+  "id": "665d58c3-0050-41b1-ac2a-fa668a41c614",
+  "tabela": 2,
+  "ref": "0570",
+  "nome": "PIJAMA LIGANETE MASCULINO",
+  "de": {
+   "price": 48.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 52.9
+  }
+ },
+ {
+  "id": "2008cee0-f90f-4f72-98d7-8ca42fe70074",
+  "tabela": 2,
+  "ref": "0582",
+  "nome": "PIJAMA REGATA RENDA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 48.5
+  }
+ },
+ {
+  "id": "0e27217d-06d5-4864-8697-7041bb265785",
+  "tabela": 2,
+  "ref": "0590",
+  "nome": "PIJAMA REGATA PESCADOR",
+  "de": {
+   "price": 42.9,
+   "larger": 45.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "a2ca32c2-3523-4cc8-804e-b66c7133a01d",
+  "tabela": 2,
+  "ref": "0595",
+  "nome": "JOGO DE ROBE BORDADO",
+  "de": {
+   "price": 76.9,
+   "larger": 83.9
+  },
+  "para": {
+   "price": 76.9,
+   "larger": 83.5
+  }
+ },
+ {
+  "id": "f975cc54-40f1-44a3-b89e-d2a8a9a44ba7",
+  "tabela": 2,
+  "ref": "0601",
+  "nome": "SHORT DOLL REGATA LIGANETE",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.5,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "9e8cdee7-2e40-4403-85fc-668491a655c8",
+  "tabela": 2,
+  "ref": "0605",
+  "nome": "CAMISOLA REGATA LIGANETE",
+  "de": {
+   "price": 29.9,
+   "larger": 31.9
+  },
+  "para": {
+   "price": 29.5,
+   "larger": 31.5
+  }
+ },
+ {
+  "id": "a50b9f0b-8859-4163-b9de-4f3dff0ba0f2",
+  "tabela": 2,
+  "ref": "0640",
+  "nome": "CAMISOLA GESTANTE",
+  "de": {
+   "price": 42.9,
+   "larger": 45.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "9b9dc07c-d549-483d-9337-4ed988cbbe95",
+  "tabela": 2,
+  "ref": "0650",
+  "nome": "CAMISOLA ESTAMPADA MANGA",
+  "de": {
+   "price": 39.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 43.5
+  }
+ },
+ {
+  "id": "c0021fb5-ec66-4bb1-be37-851b196944cc",
+  "tabela": 2,
+  "ref": "0690",
+  "nome": "PIJAMA MANGA PESCADOR",
+  "de": {
+   "price": 42.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "3f5cb08c-1c9a-48cc-b4db-7603405fac44",
+  "tabela": 2,
+  "ref": "0702",
+  "nome": "CAMISOLA DE ALÇA",
+  "de": {
+   "price": 29.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 31.5,
+   "larger": 34.5
+  }
+ },
+ {
+  "id": "953c6818-3bf7-4a24-8406-e99262d4f1a6",
+  "tabela": 2,
+  "ref": "0703",
+  "nome": "CAMISOLA REGATA",
+  "de": {
+   "price": 31.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 31.5,
+   "larger": 42.9
+  }
+ },
+ {
+  "id": "901b417a-f4a9-4f9b-ab96-0c302e52cbf9",
+  "tabela": 2,
+  "ref": "0704",
+  "nome": "SHORT DOLL DE ALÇA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "e3dba09a-c2d4-496d-abe7-bdc9c37aa24c",
+  "tabela": 2,
+  "ref": "0705",
+  "nome": "SHORT DOLL REGATA",
+  "de": {
+   "price": 38.9,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 38.5,
+   "larger": 49.5
+  }
+ },
+ {
+  "id": "63ef769a-5591-4477-9ffd-c02ab689996e",
+  "tabela": 2,
+  "ref": "0707",
+  "nome": "SHORT DOLL REGATA INFANTIL",
+  "de": {
+   "price": 30.9,
+   "larger": null
+  },
+  "para": {
+   "price": 30.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "a7769172-8f50-4489-9e16-8645fb0dfee7",
+  "tabela": 2,
+  "ref": "0710",
+  "nome": "CAMISOLA ALÇA ESTAMPADA",
+  "de": {
+   "price": 30.9,
+   "larger": 32.9
+  },
+  "para": {
+   "price": 30.5,
+   "larger": 32.5
+  }
+ },
+ {
+  "id": "0d11fcfb-5508-44f1-8afd-868d0c79afed",
+  "tabela": 2,
+  "ref": "0714",
+  "nome": "PIJAMA CROPPED",
+  "de": {
+   "price": 44.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 44.9,
+   "larger": 48.5
+  }
+ },
+ {
+  "id": "91b0de68-7bbc-4944-b514-a3ccdb71212b",
+  "tabela": 2,
+  "ref": "0715",
+  "nome": "CAMISÃO ESTAMPADO",
+  "de": {
+   "price": 41.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 41.9,
+   "larger": 46.5
+  }
+ },
+ {
+  "id": "dbe545fb-8576-4e15-8b37-ce8435d243ec",
+  "tabela": 2,
+  "ref": "0716",
+  "nome": "PIJAMA DE LIGANETE MASC.",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "f9a5f769-7c09-455d-974d-9dc68f2e692c",
+  "tabela": 2,
+  "ref": "0719",
+  "nome": "PIJAMA ABERTO ESTAMPADO MANGA",
+  "de": {
+   "price": 42.9,
+   "larger": 45.9
+  },
+  "para": {
+   "price": 42.5,
+   "larger": 45.9
+  }
+ },
+ {
+  "id": "13f6c87a-13bf-4db1-842a-d76cb79c6c00",
+  "tabela": 2,
+  "ref": "0720",
+  "nome": "SHORT DOLL ALÇA ESTAMPADO",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "4739afd6-5052-4b5b-a7e5-e618feed3589",
+  "tabela": 2,
+  "ref": "0730",
+  "nome": "SHORT DOLL NADADOR ESTAMPADO",
+  "de": {
+   "price": 39.9,
+   "larger": 42.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 42.5
+  }
+ },
+ {
+  "id": "a528b35d-0dcf-4664-8e1a-4ec341c3f8fb",
+  "tabela": 2,
+  "ref": "0750",
+  "nome": "SHORT DOLL ALÇA MESCLA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "3c877515-8d73-4d36-8d60-806044bf6740",
+  "tabela": 2,
+  "ref": "0760",
+  "nome": "SHORT DOLL NADADOR MESCLA",
+  "de": {
+   "price": 39.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 39.5,
+   "larger": 43.5
+  }
+ },
+ {
+  "id": "3986e51b-7d0e-4f91-bb95-8fddd1005a84",
+  "tabela": 2,
+  "ref": "0770",
+  "nome": "CAMISOLA NADADOR MESCLA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "0d2735b6-14c6-4241-89fe-aa27c14a9768",
+  "tabela": 2,
+  "ref": "0800",
+  "nome": "SHORT DOLL NADADOR MESCLA",
+  "de": {
+   "price": 40.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 46.9
+  }
+ },
+ {
+  "id": "67239592-351e-48d7-af85-97366c1332d1",
+  "tabela": 2,
+  "ref": "0810",
+  "nome": "SHORT DOLL REGATA MESCLA INFANTIL FEM.",
+  "de": {
+   "price": 18.9,
+   "larger": null
+  },
+  "para": {
+   "price": 19.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "6b6b614d-44bc-4d7e-86bd-705a20fd9cce",
+  "tabela": 2,
+  "ref": "0815",
+  "nome": "PIJAMA JUVENIL ALÇA FEM.",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 36.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "35fefb17-2cee-427d-8d7d-c2374cde9c70",
+  "tabela": 2,
+  "ref": "0816",
+  "nome": "PIJAMA JUVENIL CAMISETA FEM.",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 36.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "ce250de2-8c83-4141-9536-c6dc302d21ac",
+  "tabela": 2,
+  "ref": "0819",
+  "nome": "CONJUNTO SHORT TEEN",
+  "de": {
+   "price": 37.9,
+   "larger": null
+  },
+  "para": {
+   "price": 37.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "db66e0f2-b6d1-4364-8090-ece0f1cbaa01",
+  "tabela": 2,
+  "ref": "0841",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 39.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 47.5
+  }
+ },
+ {
+  "id": "e88e4276-9ec3-481f-9f8e-ae4f977783bd",
+  "tabela": 2,
+  "ref": "0845",
+  "nome": "SHORT DOLL REGATA CÓS DUPLO",
+  "de": {
+   "price": 39.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 47.5,
+   "larger": 50.5
+  }
+ },
+ {
+  "id": "dc0d0049-4ae5-4e23-bafc-2fd44468e0e4",
+  "tabela": 2,
+  "ref": "0848",
+  "nome": "PIJAMA REGATA CANELADO",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 48.5
+  }
+ },
+ {
+  "id": "5c2a22dc-1c4e-4f62-b4ff-10a832d1e12f",
+  "tabela": 2,
+  "ref": "0849",
+  "nome": "VESTIDO SUEDE CANELADO",
+  "de": {
+   "price": 46.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.5,
+   "larger": 50.5
+  }
+ },
+ {
+  "id": "585f2106-9b39-4c26-93f7-aad60db95ee2",
+  "tabela": 2,
+  "ref": "0851",
+  "nome": "PIJAMA AMERICANO LISO",
+  "de": {
+   "price": 54.9,
+   "larger": 60
+  },
+  "para": {
+   "price": 54.5,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "e4680e7f-afb4-44bd-841b-1dce6e7d483c",
+  "tabela": 2,
+  "ref": "0852",
+  "nome": "PIJAMA MANGA CURTA COM CALÇA",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "e8400213-dc0c-4625-81e9-d2e439d4ddff",
+  "tabela": 2,
+  "ref": "0853",
+  "nome": "PIJAMA AMERICANO CURTO",
+  "de": {
+   "price": 54.9,
+   "larger": 60
+  },
+  "para": {
+   "price": 54.5,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "2bf14cab-4e62-4388-9800-0317fb4a72bb",
+  "tabela": 2,
+  "ref": "0854",
+  "nome": "CAMISOLA AMERICANA DE MALHA",
+  "de": {
+   "price": 51.9,
+   "larger": 56
+  },
+  "para": {
+   "price": 51.9,
+   "larger": 56.5
+  }
+ },
+ {
+  "id": "605aee51-824f-4734-9419-575cfed4e41a",
+  "tabela": 2,
+  "ref": "0855",
+  "nome": "CAMISOLA AMERICANA MANGA COMPRIDA",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "a4783a86-8411-4666-b3ec-a7312a54252d",
+  "tabela": 2,
+  "ref": "0880",
+  "nome": "PIJAMA LONGO MALHA MESCLA FEM.",
+  "de": {
+   "price": 58.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.5
+  }
+ },
+ {
+  "id": "4e87eadd-49e3-43f9-a76b-d42065b181b9",
+  "tabela": 2,
+  "ref": "0901",
+  "nome": "SHORT DOLL REGATA LISTRADO",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.5,
+   "larger": 36.5
+  }
+ },
+ {
+  "id": "c057f815-ec91-4a16-baac-696eafd2b3d1",
+  "tabela": 2,
+  "ref": "0911",
+  "nome": "SHORT DOLL ALÇA LISTRADO",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 31.9,
+   "larger": 35.5
+  }
+ },
+ {
+  "id": "a06bc351-ac6f-491e-b818-78acf2d77a0d",
+  "tabela": 2,
+  "ref": "1010",
+  "nome": "PIJAMA JUVENIL MANGA MASC.",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 36.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "4c0c42b2-1335-4541-9711-aab93142658c",
+  "tabela": 2,
+  "ref": "1011",
+  "nome": "PIJAMA JUVENIL REGATA MASC.",
+  "de": {
+   "price": 34,
+   "larger": null
+  },
+  "para": {
+   "price": 34.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "b39df41e-3f6b-4386-ace4-523fbc376773",
+  "tabela": 2,
+  "ref": "1012",
+  "nome": "PIJAMA JUVENIL MESCLA REGATA MASC.",
+  "de": {
+   "price": 37.9,
+   "larger": null
+  },
+  "para": {
+   "price": 37.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "9907d973-609e-453c-be14-bfe359cd0720",
+  "tabela": 2,
+  "ref": "1013",
+  "nome": "PIJAMA JUVENIL MESCLA MANGA MASC.",
+  "de": {
+   "price": 39.9,
+   "larger": null
+  },
+  "para": {
+   "price": 39.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "cb4b3337-2543-431f-8f08-d7681c93f6c9",
+  "tabela": 2,
+  "ref": "1400",
+  "nome": "PIJAMA LONGO JUVENIL MALHA FEM.",
+  "de": {
+   "price": 40.9,
+   "larger": null
+  },
+  "para": {
+   "price": 40.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "443360fd-dd3c-42e8-92be-100d3aa09f04",
+  "tabela": 2,
+  "ref": "1460",
+  "nome": "PIJAMA LONGO JUVENIL MALHA MASC.",
+  "de": {
+   "price": 42.9,
+   "larger": null
+  },
+  "para": {
+   "price": 42.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "abc69e2c-5e04-47d1-a896-133f4e01dc2d",
+  "tabela": 2,
+  "ref": "2130",
+  "nome": "PIJAMA ABERTO BORDADO MANGA MASC.",
+  "de": {
+   "price": 54.9,
+   "larger": 59.9
+  },
+  "para": {
+   "price": 54.5,
+   "larger": 59.5
+  }
+ },
+ {
+  "id": "d2511f7e-ece7-430d-a2cb-81c3464f7dd8",
+  "tabela": 2,
+  "ref": "2131",
+  "nome": "PIJAMA REGATA MALHA",
+  "de": {
+   "price": 37.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 36.5,
+   "larger": 39.5
+  }
+ },
+ {
+  "id": "c7511f86-3369-44b7-bf2a-47f9f3902f9e",
+  "tabela": 2,
+  "ref": "2134",
+  "nome": "SHORT DOLL REGATA ESTAMPADO",
+  "de": {
+   "price": 37.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 34.5,
+   "larger": 37.5
+  }
+ },
+ {
+  "id": "751d3e56-2987-483e-a1f7-338475ed82dc",
+  "tabela": 2,
+  "ref": "2226",
+  "nome": "CAMISOLA ABERTA ESTAMPADA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.5,
+   "larger": 48.5
+  }
+ },
+ {
+  "id": "a54b6f2a-d9a7-4dc6-9015-4f005db3e6ff",
+  "tabela": 2,
+  "ref": "4130",
+  "nome": "PIJAMA ABERTO COM CALÇA MASC.",
+  "de": {
+   "price": 59.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 59.5,
+   "larger": 65.5
+  }
+ },
+ {
+  "id": "502334e6-ff52-4cfd-8796-61e732559af9",
+  "tabela": 3,
+  "ref": "0015",
+  "nome": "CAMISOLA DE ALÇA",
+  "de": {
+   "price": 27.9,
+   "larger": 29.9
+  },
+  "para": {
+   "price": 26.9,
+   "larger": 29.9
+  }
+ },
+ {
+  "id": "b7278f1a-8e8c-43d1-858f-b33e83981724",
+  "tabela": 3,
+  "ref": "0072",
+  "nome": "CAMISOLA RENDA LIGANETE",
+  "de": {
+   "price": 45,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 44.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "c3ccc88f-f914-417f-b2e2-a77c409895a1",
+  "tabela": 3,
+  "ref": "0083",
+  "nome": "CAMISOLA ABERTA REGATA LIGANETE",
+  "de": {
+   "price": 45,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 44.9,
+   "larger": 47.9
+  }
+ },
+ {
+  "id": "78e4d7a3-95ca-416c-904d-7d90525ff12f",
+  "tabela": 3,
+  "ref": "0085",
+  "nome": "PIJAMA REGATA LIGANETE",
+  "de": {
+   "price": 40.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 40.9,
+   "larger": 44.9
+  }
+ },
+ {
+  "id": "2a737aad-91ae-4293-adce-03247ea6ddd2",
+  "tabela": 3,
+  "ref": "0087",
+  "nome": "CAMISOLA ABERTA MANGA LIGANETE",
+  "de": {
+   "price": 47.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 52.9
+  }
+ },
+ {
+  "id": "936a6667-224a-411b-a9a5-c9785320b029",
+  "tabela": 3,
+  "ref": "0088",
+  "nome": "PIJAMA ABERTO LIGANETE",
+  "de": {
+   "price": 49.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 49.9,
+   "larger": 54.9
+  }
+ },
+ {
+  "id": "49257c93-161c-4932-91b5-7daf6f836c12",
+  "tabela": 3,
+  "ref": "0090",
+  "nome": "CAMISOLA GESTANTE LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 46.9
+  }
+ },
+ {
+  "id": "c328e477-e87d-4db1-a2c4-d727784d9fe3",
+  "tabela": 3,
+  "ref": "0091",
+  "nome": "CAMISOLA ALÇA LIGANETE ESTAMPADA",
+  "de": {
+   "price": 46.9,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 45.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "dfa4f666-c11d-456e-ac83-04e6298ab441",
+  "tabela": 3,
+  "ref": "0092",
+  "nome": "CAMISOLA GESTANTE DE LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 46.9
+  }
+ },
+ {
+  "id": "4ea980c1-b7f7-4542-974d-d029bff9ece4",
+  "tabela": 3,
+  "ref": "0094",
+  "nome": "CAMISOLA DE LIGANETE",
+  "de": {
+   "price": 42.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 42.9,
+   "larger": 46.9
+  }
+ },
+ {
+  "id": "02b8db76-1853-4f65-811a-90a3dbf29ac4",
+  "tabela": 3,
+  "ref": "0095",
+  "nome": "CAMISOLA GESTANTE ALÇA LIGANETE",
+  "de": {
+   "price": 48.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 50.9,
+   "larger": 54.9
+  }
+ },
+ {
+  "id": "ea68fba6-d84d-45a0-81eb-97e35c6f62f8",
+  "tabela": 3,
+  "ref": "0102",
+  "nome": "PIJAMA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 34,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "07e0935b-4d46-4d91-be2f-248affa2634b",
+  "tabela": 3,
+  "ref": "0110",
+  "nome": "SHORT DOLL REGATA MALHA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 35.9
+  }
+ },
+ {
+  "id": "ec37a42a-c391-4025-b85f-ee0c8af54ce9",
+  "tabela": 3,
+  "ref": "0114",
+  "nome": "PIJAMA FAMILIA INFANTIL FEM.",
+  "de": {
+   "price": 32.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "bfcda89c-ec07-46cf-8cdd-62d7139139f6",
+  "tabela": 3,
+  "ref": "0115",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 30.9,
+   "larger": 34
+  },
+  "para": {
+   "price": 29.9,
+   "larger": 32.9
+  }
+ },
+ {
+  "id": "f7c302a2-fa8e-4539-b203-3e81036cf6aa",
+  "tabela": 3,
+  "ref": "0116",
+  "nome": "SHORT DOLL ALÇA MALHA BOLINHA",
+  "de": {
+   "price": 36.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 35.9,
+   "larger": 40.9
+  }
+ },
+ {
+  "id": "3e0ea58a-b971-47e7-ae1c-7085e23fa568",
+  "tabela": 3,
+  "ref": "0124",
+  "nome": "SHORT DOLL DE MANGA INFANTIL FEM.",
+  "de": {
+   "price": 24.9,
+   "larger": null
+  },
+  "para": {
+   "price": 25.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "405f31f6-e0cc-494f-8ca5-a68ecb8bf23a",
+  "tabela": 3,
+  "ref": "0125",
+  "nome": "CAMISOLA BORDADA DE MANGA",
+  "de": {
+   "price": 48.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 52.9
+  }
+ },
+ {
+  "id": "fdce9130-aa58-465c-bdb7-86dfe630d4e5",
+  "tabela": 3,
+  "ref": "0128",
+  "nome": "PIJAMA ABERTO DE MANGA ESTAMPADO",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "7e683981-df06-4d0b-9995-f16dfd0458c2",
+  "tabela": 3,
+  "ref": "0135",
+  "nome": "SHORT ESTAM MASC MALHA PV",
+  "de": {
+   "price": 18.9,
+   "larger": 20.9
+  },
+  "para": {
+   "price": 20.9,
+   "larger": 22.9
+  }
+ },
+ {
+  "id": "d6348412-d1b2-42aa-86f6-a10b631d1fbe",
+  "tabela": 3,
+  "ref": "0142",
+  "nome": "PIJAMA LONGO MALHA INFANTIL FEM.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 34.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "9513d3b7-2390-4c40-90c9-7134ff290947",
+  "tabela": 3,
+  "ref": "0143",
+  "nome": "PIJAMA LONGO MALHA INFANTIL MASC.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 34.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "73f05149-ee31-4595-8070-a062fc96e641",
+  "tabela": 3,
+  "ref": "0145",
+  "nome": "PIJAMA LONGO MALHA MASCULINO",
+  "de": {
+   "price": 60.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 59.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "a1c90ef4-7d8a-4084-9773-9308477ff1f8",
+  "tabela": 3,
+  "ref": "0161",
+  "nome": "PIJAMA LONGO MOLETINHO ABERTO FEM.",
+  "de": {
+   "price": 92.9,
+   "larger": 101.9
+  },
+  "para": {
+   "price": 91.9,
+   "larger": 101.9
+  }
+ },
+ {
+  "id": "10f058b1-1e0b-4afe-b7f4-636b62d6d5a2",
+  "tabela": 3,
+  "ref": "0162",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL FEM.",
+  "de": {
+   "price": 56,
+   "larger": null
+  },
+  "para": {
+   "price": 55.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "01ee188f-a06f-43ae-8aa8-d45318f00c1a",
+  "tabela": 3,
+  "ref": "0163",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL MASC.",
+  "de": {
+   "price": 56,
+   "larger": null
+  },
+  "para": {
+   "price": 55.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "e7741041-7e6d-47ec-a8bc-f08c4a5029ad",
+  "tabela": 3,
+  "ref": "0199",
+  "nome": "PIJAMA LONGO PLUSH LISO FEM.",
+  "de": {
+   "price": 89,
+   "larger": 96.9
+  },
+  "para": {
+   "price": 88.9,
+   "larger": 96.9
+  }
+ },
+ {
+  "id": "5d3d0855-d794-4725-ac05-d3b6b0092334",
+  "tabela": 3,
+  "ref": "0202",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH MASC.",
+  "de": {
+   "price": 78,
+   "larger": null
+  },
+  "para": {
+   "price": 77.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "0efc0f96-dad9-47b2-88c0-7a3f498298da",
+  "tabela": 3,
+  "ref": "0203",
+  "nome": "PIJAMA ESTAM INFAN MASC MALHA PV",
+  "de": {
+   "price": 25.9,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "f1d2e6e4-e77d-43f3-9b4b-eb9c5065353f",
+  "tabela": 3,
+  "ref": "0204",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH FEM.",
+  "de": {
+   "price": 78,
+   "larger": null
+  },
+  "para": {
+   "price": 77.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "3d5b420d-1298-484c-87a0-e275b50b5dee",
+  "tabela": 3,
+  "ref": "0216",
+  "nome": "SHORT DOLL ALÇA MALHA ONÇA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 33.9,
+   "larger": 35.9
+  }
+ },
+ {
+  "id": "5c269eb1-e731-4702-b5d4-c103be4282e9",
+  "tabela": 3,
+  "ref": "0220",
+  "nome": "PIJAMA LONGO SUEDE CANELADO LISO FEM.",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 66.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "e8fa5c9a-71bb-4d64-a391-0b5764f4ff3b",
+  "tabela": 3,
+  "ref": "0221",
+  "nome": "PIJAMA LONGO SUEDE CANELADO EST. FEM.",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 66.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "b29e648b-6233-4f9c-9464-55330fb152a1",
+  "tabela": 3,
+  "ref": "0222",
+  "nome": "PIJAMA DE CALÇA CANELADO LISO",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "494b2265-9205-4277-8d00-f74f2bace614",
+  "tabela": 3,
+  "ref": "0223",
+  "nome": "PIJAMA DE CALÇA CANELADO ESTAMPADO",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "0479a2ac-8308-425d-b435-910c5420678b",
+  "tabela": 3,
+  "ref": "0239",
+  "nome": "PIJAMA ESTAMPADO REGATA INFANTIL MASC.",
+  "de": {
+   "price": 24.9,
+   "larger": null
+  },
+  "para": {
+   "price": 30.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "37d09786-6cb2-406f-90bc-c1582b2b0d87",
+  "tabela": 3,
+  "ref": "0240",
+  "nome": "PIJAMA LONGO ESTAMPADO ABERTO FEM.",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "db6a7d28-1051-4f5c-a94a-1f50abe26d64",
+  "tabela": 3,
+  "ref": "0245",
+  "nome": "PIJAMA LONGO ESTAMPADO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 59.9
+  },
+  "para": {
+   "price": 53.9,
+   "larger": 58.9
+  }
+ },
+ {
+  "id": "7bd2d342-52eb-40a2-863e-faba9142ad93",
+  "tabela": 3,
+  "ref": "0260",
+  "nome": "PIJAMA LONGO SUEDE FELPADO FEM.",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "e0ced046-e257-4511-9c3a-038419860192",
+  "tabela": 3,
+  "ref": "0304",
+  "nome": "PIJAMA MASCULINO FAMILIA",
+  "de": {
+   "price": 49.9,
+   "larger": 54.9
+  },
+  "para": {
+   "price": 57.9,
+   "larger": 62.9
+  }
+ },
+ {
+  "id": "e9faf5a9-86b7-443f-9555-12958da452f8",
+  "tabela": 3,
+  "ref": "0305",
+  "nome": "PIJAMA JUVENIL MASC. FAMILIA",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 41.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "7b5f58c9-70fe-43f2-a384-e255e34fb567",
+  "tabela": 3,
+  "ref": "0306",
+  "nome": "PIJAMA INF. MASC. FAMILIA",
+  "de": {
+   "price": 30.9,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "f52adba2-4571-43d4-8295-4418ccaecb83",
+  "tabela": 3,
+  "ref": "0307",
+  "nome": "PIJAMA FEMININO FAMILIA",
+  "de": {
+   "price": 40.9,
+   "larger": 43.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 51.9
+  }
+ },
+ {
+  "id": "d8c28b39-3b44-40fc-8fc2-fc04258d6608",
+  "tabela": 3,
+  "ref": "0308",
+  "nome": "PIJAMA JUVENIL FEM. FAMILIA",
+  "de": {
+   "price": 36.9,
+   "larger": null
+  },
+  "para": {
+   "price": 41.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "9d9b4d8d-d6b3-4181-a772-b3b5baab47f6",
+  "tabela": 3,
+  "ref": "0309",
+  "nome": "PIJAMA INFANTIL FEM. FAMILIA",
+  "de": {
+   "price": 30.9,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "e817b17f-5788-49f9-95be-9ec448c4bddd",
+  "tabela": 3,
+  "ref": "0316",
+  "nome": "SHORT DOLL NADADOR DE ONÇA",
+  "de": {
+   "price": 36.9,
+   "larger": 39.9
+  },
+  "para": {
+   "price": 34.9,
+   "larger": 37.9
+  }
+ },
+ {
+  "id": "5b17d7bc-a289-4c3b-b7e5-4527f06e611a",
+  "tabela": 3,
+  "ref": "0321",
+  "nome": "PIJAMA DE BERMUDA GESTANTE",
+  "de": {
+   "price": 43.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 51.9
+  }
+ },
+ {
+  "id": "3f639562-04ca-4c74-ba9a-9f0c63d8c962",
+  "tabela": 3,
+  "ref": "0325",
+  "nome": "CAMISOLA DE GESTANTE ESTAMPADA",
+  "de": {
+   "price": 43.9,
+   "larger": 46.9
+  },
+  "para": {
+   "price": 45.9,
+   "larger": 49.9
+  }
+ },
+ {
+  "id": "a61975a0-7420-4193-95ec-af8c117ec23e",
+  "tabela": 3,
+  "ref": "0327",
+  "nome": "CAMISOLA GESTANTE ESTAMPADA",
+  "de": {
+   "price": 48.9,
+   "larger": 52.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 52.9
+  }
+ },
+ {
+  "id": "da04d93f-a144-4abd-801b-fe575b82e634",
+  "tabela": 3,
+  "ref": "0328",
+  "nome": "CAMISOLA GESTANTE ALÇA MALHA",
+  "de": {
+   "price": 52.9,
+   "larger": 56
+  },
+  "para": {
+   "price": 52.9,
+   "larger": 55.9
+  }
+ },
+ {
+  "id": "edf8e7a9-d9fc-43fb-b502-fe3e7752da0b",
+  "tabela": 3,
+  "ref": "0329",
+  "nome": "PIJAMA ESTAMPADO REGATA MASC.",
+  "de": {
+   "price": 53.9,
+   "larger": 59.9
+  },
+  "para": {
+   "price": 53.9,
+   "larger": 58.9
+  }
+ },
+ {
+  "id": "9441dda0-7db2-43a9-b3fc-2ff40ff18d4b",
+  "tabela": 3,
+  "ref": "0330",
+  "nome": "PIJAMA ESTAMPADO MANGA MASC.",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "de3a12a1-6408-4e18-9237-4ecb6a11903e",
+  "tabela": 3,
+  "ref": "0354",
+  "nome": "SHORT DOLL ALÇA CANELADO",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "efae4429-d698-4a1b-b8f7-acc366a36988",
+  "tabela": 3,
+  "ref": "0358",
+  "nome": "SHORT DOLL JOVEM ALÇA",
+  "de": {
+   "price": 41.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 47.9
+  }
+ },
+ {
+  "id": "05f1aa3c-1733-43f4-9011-a1e7aafda76a",
+  "tabela": 3,
+  "ref": "0359",
+  "nome": "SHORT DOLL REGATA JOVEM",
+  "de": {
+   "price": 41.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 49.9
+  }
+ },
+ {
+  "id": "7c44ca35-d781-4150-9c88-efd757268075",
+  "tabela": 3,
+  "ref": "0402",
+  "nome": "PIJAMA FAMILIA MANGA CURTA MASC.",
+  "de": {
+   "price": 54.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "716b26d9-6714-4a11-8eaa-9789a7fe9f30",
+  "tabela": 3,
+  "ref": "0403",
+  "nome": "PIJAMA FAMILIA REGATA MASC.",
+  "de": {
+   "price": 49.9,
+   "larger": null
+  },
+  "para": {
+   "price": 57.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "336a8247-0aee-42aa-bbe6-5169417bb83e",
+  "tabela": 3,
+  "ref": "0404",
+  "nome": "PIJAMA FAMILIA JUVENIL MASC.",
+  "de": {
+   "price": 40.9,
+   "larger": null
+  },
+  "para": {
+   "price": 43.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "cbfa0cfc-26fa-421b-ae0e-0f29ee070cc9",
+  "tabela": 3,
+  "ref": "0407",
+  "nome": "PIJAMA FAMILIA INFANTIL MASC.",
+  "de": {
+   "price": 32.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "fb0853cd-2e17-40dc-aeb6-528bc6332b29",
+  "tabela": 3,
+  "ref": "0430",
+  "nome": "PIJAMA MESCLA MASCULINO",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "a48cb4ac-d019-4049-85d1-954659981465",
+  "tabela": 3,
+  "ref": "0499",
+  "nome": "PIJAMA BERMUDA LIGANETE",
+  "de": {
+   "price": 46.9,
+   "larger": 49.9
+  },
+  "para": {
+   "price": 45.9,
+   "larger": 49.9
+  }
+ },
+ {
+  "id": "a86c1257-e5b6-4d00-9be7-67c05c3ee304",
+  "tabela": 3,
+  "ref": "0502",
+  "nome": "SHORT DOLL ALÇA LIGANETE",
+  "de": {
+   "price": 34,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 33.9,
+   "larger": 35.9
+  }
+ },
+ {
+  "id": "07820a51-29f3-4345-8019-0c5a7c4ef938",
+  "tabela": 3,
+  "ref": "0550",
+  "nome": "SHORT LIGANETE MASCULINO",
+  "de": {
+   "price": 19.9,
+   "larger": 21.9
+  },
+  "para": {
+   "price": 20.9,
+   "larger": 22.9
+  }
+ },
+ {
+  "id": "6e515a98-ec2c-450e-a283-dd357496a92f",
+  "tabela": 3,
+  "ref": "0582",
+  "nome": "PIJAMA REGATA RENDA",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 53.9
+  }
+ },
+ {
+  "id": "21a0af33-9ec9-4ddc-8255-1d64bae68ecd",
+  "tabela": 3,
+  "ref": "0590",
+  "nome": "PIJAMA REGATA PESCADOR",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "c9455c63-445b-45e5-ab76-ea99dfefafa2",
+  "tabela": 3,
+  "ref": "0595",
+  "nome": "JOGO DE ROBE BORDADO",
+  "de": {
+   "price": 84.9,
+   "larger": 92.9
+  },
+  "para": {
+   "price": 84.9,
+   "larger": 91.9
+  }
+ },
+ {
+  "id": "80025b3f-20b0-48e5-9747-8142c6e1f601",
+  "tabela": 3,
+  "ref": "0601",
+  "nome": "SHORT DOLL REGATA LIGANETE",
+  "de": {
+   "price": 36.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 35.9,
+   "larger": 40.9
+  }
+ },
+ {
+  "id": "a10ca97f-26b1-4f01-816d-228ebdbcbd1b",
+  "tabela": 3,
+  "ref": "0605",
+  "nome": "CAMISOLA REGATA LIGANETE",
+  "de": {
+   "price": 32.9,
+   "larger": 35.9
+  },
+  "para": {
+   "price": 32.9,
+   "larger": 34.9
+  }
+ },
+ {
+  "id": "c7b7a1f4-2ea2-4407-aba2-fea8edb9460d",
+  "tabela": 3,
+  "ref": "0640",
+  "nome": "CAMISOLA GESTANTE",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "3fb18cb7-540d-4911-87ab-d82c06f43a71",
+  "tabela": 3,
+  "ref": "0650",
+  "nome": "CAMISOLA ESTAMPADA MANGA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 47.9
+  }
+ },
+ {
+  "id": "b73ea7fa-976a-4a0f-b5b9-bfe5c9e4125c",
+  "tabela": 3,
+  "ref": "0690",
+  "nome": "PIJAMA MANGA PESCADOR",
+  "de": {
+   "price": 47.9,
+   "larger": 51.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 51.9
+  }
+ },
+ {
+  "id": "5f4f8d09-e6ea-41b6-a69e-f1427efe5afe",
+  "tabela": 3,
+  "ref": "0702",
+  "nome": "CAMISOLA DE ALÇA",
+  "de": {
+   "price": 32.9,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 34.9,
+   "larger": 37.9
+  }
+ },
+ {
+  "id": "af9dda93-57c5-40d8-b4b4-545cd284dbb8",
+  "tabela": 3,
+  "ref": "0703",
+  "nome": "CAMISOLA REGATA",
+  "de": {
+   "price": 35.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 34.9,
+   "larger": 47.9
+  }
+ },
+ {
+  "id": "c6fa05cc-15f9-4a3c-836d-123442aa4b42",
+  "tabela": 3,
+  "ref": "0707",
+  "nome": "SHORT DOLL REGATA INFANTIL",
+  "de": {
+   "price": 34,
+   "larger": null
+  },
+  "para": {
+   "price": 33.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "35688115-a09b-481f-a5b7-701adb88b798",
+  "tabela": 3,
+  "ref": "0710",
+  "nome": "CAMISOLA ALÇA ESTAMPADA",
+  "de": {
+   "price": 34,
+   "larger": 36.9
+  },
+  "para": {
+   "price": 33.9,
+   "larger": 35.9
+  }
+ },
+ {
+  "id": "44ead460-91cb-4999-9170-c31198a1ef62",
+  "tabela": 3,
+  "ref": "0716",
+  "nome": "PIJAMA DE LIGANETE MASC.",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "74be6483-9cf4-4bac-91bf-8f119174f07f",
+  "tabela": 3,
+  "ref": "0719",
+  "nome": "PIJAMA ABERTO ESTAMPADO MANGA",
+  "de": {
+   "price": 47.9,
+   "larger": 50.9
+  },
+  "para": {
+   "price": 46.9,
+   "larger": 50.9
+  }
+ },
+ {
+  "id": "01c8a539-1292-4a73-8ffe-231c8cbf8842",
+  "tabela": 3,
+  "ref": "0730",
+  "nome": "SHORT DOLL NADADOR ESTAMPADO",
+  "de": {
+   "price": 43.9,
+   "larger": 47.9
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 46.9
+  }
+ },
+ {
+  "id": "81ba7dd4-3705-4652-977d-c7eac99c8afd",
+  "tabela": 3,
+  "ref": "0760",
+  "nome": "SHORT DOLL NADADOR MESCLA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 43.9,
+   "larger": 47.9
+  }
+ },
+ {
+  "id": "c40d769d-347c-4bc4-8375-a61daaa3cf93",
+  "tabela": 3,
+  "ref": "0800",
+  "nome": "SHORT DOLL NADADOR MESCLA",
+  "de": {
+   "price": 45,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 51.9
+  }
+ },
+ {
+  "id": "e823e018-0b1e-4174-8488-0894ad6a2540",
+  "tabela": 3,
+  "ref": "0810",
+  "nome": "SHORT DOLL REGATA MESCLA INFANTIL FEM.",
+  "de": {
+   "price": 20.9,
+   "larger": null
+  },
+  "para": {
+   "price": 21.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "dc921e33-1edb-48f7-bdf6-2b5534ccf7e0",
+  "tabela": 3,
+  "ref": "0841",
+  "nome": "SHORT DOLL ALÇA MALHA",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 52.9
+  }
+ },
+ {
+  "id": "e05fe153-5cb3-481b-a893-fe5167b5a32d",
+  "tabela": 3,
+  "ref": "0845",
+  "nome": "SHORT DOLL REGATA CÓS DUPLO",
+  "de": {
+   "price": 43.9,
+   "larger": 48.9
+  },
+  "para": {
+   "price": 52.9,
+   "larger": 55.9
+  }
+ },
+ {
+  "id": "1adf08e4-4232-441d-ab51-5a0121404690",
+  "tabela": 3,
+  "ref": "0849",
+  "nome": "VESTIDO SUEDE CANELADO",
+  "de": {
+   "price": 51.9,
+   "larger": 56
+  },
+  "para": {
+   "price": 51.9,
+   "larger": 55.9
+  }
+ },
+ {
+  "id": "89c80050-7cf6-4266-b66e-fa653073b6a6",
+  "tabela": 3,
+  "ref": "0851",
+  "nome": "PIJAMA AMERICANO LISO",
+  "de": {
+   "price": 60.9,
+   "larger": 66
+  },
+  "para": {
+   "price": 59.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "3c67921a-d166-48e9-acc1-7b37785dcbe3",
+  "tabela": 3,
+  "ref": "0852",
+  "nome": "PIJAMA MANGA CURTA COM CALÇA",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "9a4bced5-5c8f-4aa6-aa8d-0b2b9f162875",
+  "tabela": 3,
+  "ref": "0853",
+  "nome": "PIJAMA AMERICANO CURTO",
+  "de": {
+   "price": 60.9,
+   "larger": 66
+  },
+  "para": {
+   "price": 59.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "33b45853-1f59-49dd-950e-e27e5d64944b",
+  "tabela": 3,
+  "ref": "0854",
+  "nome": "CAMISOLA AMERICANA DE MALHA",
+  "de": {
+   "price": 57.9,
+   "larger": 61.9
+  },
+  "para": {
+   "price": 57.9,
+   "larger": 62.9
+  }
+ },
+ {
+  "id": "80d35efe-8d88-4f48-a861-bc26b1ee4f1b",
+  "tabela": 3,
+  "ref": "0855",
+  "nome": "CAMISOLA AMERICANA MANGA COMPRIDA",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "c02619ec-422e-4646-bdac-8fcfad627fff",
+  "tabela": 3,
+  "ref": "0880",
+  "nome": "PIJAMA LONGO MALHA MESCLA FEM.",
+  "de": {
+   "price": 64.9,
+   "larger": 71.9
+  },
+  "para": {
+   "price": 64.9,
+   "larger": 70.9
+  }
+ },
+ {
+  "id": "15d08678-7862-4df0-b19e-1a74ca3b43a8",
+  "tabela": 3,
+  "ref": "0901",
+  "nome": "SHORT DOLL REGATA LISTRADO",
+  "de": {
+   "price": 36.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 35.9,
+   "larger": 40.9
+  }
+ },
+ {
+  "id": "a3d15c6b-71d0-43d5-8bff-eedce185e05d",
+  "tabela": 3,
+  "ref": "0911",
+  "nome": "SHORT DOLL ALÇA LISTRADO",
+  "de": {
+   "price": 36.9,
+   "larger": 40.9
+  },
+  "para": {
+   "price": 35.9,
+   "larger": 39.9
+  }
+ },
+ {
+  "id": "26d44ecc-f8d1-4585-ba51-5b2ed333d5b8",
+  "tabela": 3,
+  "ref": "1007",
+  "nome": "PIJAMA LONGO FAMILIA INFANTIL FEMININO",
+  "de": {
+   "price": 67,
+   "larger": null
+  },
+  "para": {
+   "price": 67.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "0bc81296-72ff-42b2-b9e0-2462696dd8bc",
+  "tabela": 3,
+  "ref": "1023",
+  "nome": "PIJAMA LONGO FAMILIA INFANTIL MASCULINO",
+  "de": {
+   "price": 67,
+   "larger": null
+  },
+  "para": {
+   "price": 67.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "2b26928c-d569-455a-82ae-7e0871ccc86f",
+  "tabela": 3,
+  "ref": "1025",
+  "nome": "PIJAMA LISTRADO MASCULINO",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 67.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "a363320e-e34c-4456-ac43-c24d6b0a3dc2",
+  "tabela": 3,
+  "ref": "1031",
+  "nome": "PIJAMA LONGO MESCLA LISO FEMININO",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 67.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "ee8cd747-1615-46d7-8fd9-a49ef85c5510",
+  "tabela": 3,
+  "ref": "1033",
+  "nome": "PIJAMA LONGO CANELADO FEMININO",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 67.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "e9889c63-c9b9-4369-a232-16cfa9c09909",
+  "tabela": 3,
+  "ref": "1400",
+  "nome": "PIJAMA LONGO JUVENIL MALHA FEM.",
+  "de": {
+   "price": 45,
+   "larger": null
+  },
+  "para": {
+   "price": 44.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "27ce36e4-dd27-4151-9749-e1a89e00eeec",
+  "tabela": 3,
+  "ref": "1460",
+  "nome": "PIJAMA LONGO JUVENIL MALHA MASC.",
+  "de": {
+   "price": 47.9,
+   "larger": null
+  },
+  "para": {
+   "price": 46.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "8ac9a969-8f12-4a53-97c9-9f0b75984c9a",
+  "tabela": 3,
+  "ref": "2130",
+  "nome": "PIJAMA ABERTO BORDADO MANGA MASC.",
+  "de": {
+   "price": 60.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 59.9,
+   "larger": 65.9
+  }
+ },
+ {
+  "id": "31ee7138-7509-4256-86a3-31f068f6ab7c",
+  "tabela": 3,
+  "ref": "2131",
+  "nome": "PIJAMA REGATA MALHA",
+  "de": {
+   "price": 41.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 40.9,
+   "larger": 43.9
+  }
+ },
+ {
+  "id": "abf147eb-9169-491a-b3cd-2b6fcba057e8",
+  "tabela": 3,
+  "ref": "2134",
+  "nome": "SHORT DOLL REGATA ESTAMPADO",
+  "de": {
+   "price": 41.9,
+   "larger": 45
+  },
+  "para": {
+   "price": 37.9,
+   "larger": 41.9
+  }
+ },
+ {
+  "id": "ad748af9-add4-491e-9f75-b3fdcbeb857e",
+  "tabela": 3,
+  "ref": "2226",
+  "nome": "CAMISOLA ABERTA ESTAMPADA",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 47.9,
+   "larger": 53.9
+  }
+ }
+]
