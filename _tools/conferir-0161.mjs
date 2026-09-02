@@ -20,7 +20,9 @@ const EMPRESA = '4a9fccd7-6241-4b8e-9c0b-b18aca364fba';
 const { data: tabelas } = await db.from('price_tables').select('id, name').eq('company_id', EMPRESA);
 const nomeTab = new Map((tabelas ?? []).map((t) => [t.id, t.name]));
 
-for (const sku of ['0161', '0113', '0395']) {
+// Os SKUs vêm da linha de comando; sem nada, os de sempre.
+const skus = process.argv.slice(2).length ? process.argv.slice(2) : ['0161', '0113', '0395'];
+for (const sku of skus) {
   const { data: prods } = await db
     .from('products')
     .select('id, sku, name, active')
