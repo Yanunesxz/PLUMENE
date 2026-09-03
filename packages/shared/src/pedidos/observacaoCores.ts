@@ -75,19 +75,40 @@ export function semLinhasDeCor(
   skusDoPedido: ReadonlySet<string> | null,
 ): string {
   if (!texto) return '';
-  const ehRef = (sku: string) =>
-    skusDoPedido ? skusDoPedido.has(sku) : /^\d{3,4}$/.test(sku);
   return texto
     .split('\n')
-    .filter((linha) => {
-      const [sku, qtdTam, ...resto] = linha.trim().split(/\s+/);
-      // No modo genérico a linha precisa do texto da cor no fim — com o
-      // conjunto de SKUs em mãos, o critério é o MESMO de sempre (planilha).
-      const formatoOk = skusDoPedido ? true : resto.length > 0;
-      return !(sku && qtdTam && formatoOk && ehRef(sku) && /^\d+\S*$/.test(qtdTam));
-    })
+    .filter((linha) => !ehLinhaDeCor(linha, skusDoPedido))
     .join('\n')
     .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/** O critério único de "linha de cor" — o formato exato que `observacaoDeCores` escreve. */
+function ehLinhaDeCor(linha: string, skusDoPedido: ReadonlySet<string> | null): boolean {
+  const [sku, qtdTam, ...resto] = linha.trim().split(/\s+/);
+  const ehRef = (s: string) => (skusDoPedido ? skusDoPedido.has(s) : /^\d{3,4}$/.test(s));
+  // No modo genérico a linha precisa do texto da cor no fim — com o
+  // conjunto de SKUs em mãos, o critério é o MESMO de sempre (planilha).
+  const formatoOk = skusDoPedido ? true : resto.length > 0;
+  return !!(sku && qtdTam && formatoOk && ehRef(sku) && /^\d+\S*$/.test(qtdTam));
+}
+
+/**
+ * O complemento de `semLinhasDeCor`: SÓ as linhas de cor.
+ *
+ * É o que sobrevive quando alguém edita a observação do pedido depois de
+ * criado: o texto livre é trocado, as cores escolhidas no catálogo ficam —
+ * elas são a única memória que o pedido guarda da cor (ver o topo).
+ */
+export function apenasLinhasDeCor(
+  texto: string | null | undefined,
+  skusDoPedido: ReadonlySet<string> | null,
+): string {
+  if (!texto) return '';
+  return texto
+    .split('\n')
+    .filter((linha) => ehLinhaDeCor(linha, skusDoPedido))
+    .join('\n')
     .trim();
 }
 

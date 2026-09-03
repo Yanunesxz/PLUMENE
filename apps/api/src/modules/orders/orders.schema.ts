@@ -74,6 +74,11 @@ export const setDiscountSchema = z
   });
 
 /** Troca da condição de pagamento num pedido em aberto. `null` remove. */
+/** A observação LIVRE do pedido — as linhas de cor o servidor preserva sozinho. */
+export const setNotesSchema = z.object({
+  notes: z.string().max(4000),
+});
+
 export const setPaymentSchema = z.object({
   payment_condition_id: z.string().uuid().nullable(),
 });

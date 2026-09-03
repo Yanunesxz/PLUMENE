@@ -10,6 +10,7 @@ import {
   setDiscountHandler,
   setItemsHandler,
   setPaymentHandler,
+  setNotesHandler,
   deleteOrderHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
@@ -71,6 +72,9 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.patch('/orders/:id/desconto', decideOPedido, setDiscountHandler);
   fastify.patch('/orders/:id/items', decideOPedido, setItemsHandler);
   fastify.patch('/orders/:id/pagamento', decideOPedido, setPaymentHandler);
+  // A observação livre (o recado do rep) segue o MESMO portão — para a venda
+  // interna, vale até o carimbo do faturamento em qualquer estado.
+  fastify.patch('/orders/:id/observacao', decideOPedido, setNotesHandler);
   fastify.patch(
     '/orders/:id/invoice',
     {

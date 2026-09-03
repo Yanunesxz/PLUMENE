@@ -3,7 +3,7 @@ import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
 import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
-import { ORDER_STATUS_FLOW, precoDoTamanho } from '@csb/shared';
+import { ORDER_STATUS_FLOW, precoDoTamanho, apenasLinhasDeCor, juntarObservacao } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
 
 export async function getOrders(
@@ -789,6 +789,59 @@ export async function setOrderPayment(
   const { data, error } = await supabase
     .from('orders')
     .update({ payment_condition_id: gravar, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .select()
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, reason: 'not_found' };
+  return { ok: true, order: data as Order };
+}
+
+export type NotesResult =
+  | { ok: true; order: Order }
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' };
+
+/**
+ * Troca a observação do pedido — só o TEXTO LIVRE. As linhas de cor que o
+ * catálogo escreveu nas notas ficam como estão: são a única memória da cor
+ * escolhida (o item vai sortido para o ERP), e uma edição de recado não pode
+ * apagá-las por acidente.
+ *
+ * O portão é o mesmo das peças e do desconto (`podeMexerNoPedido`) — para a
+ * venda interna, portanto, vale em qualquer estado até o carimbo. Pedido do
+ * Yan (01/09/2026): "para vendedora a Obs pode ser editada em todos, menos no
+ * faturado".
+ */
+export async function setOrderNotes(
+  id: string,
+  company_id: string,
+  user_id: string,
+  role: AuthRole,
+  textoLivre: string,
+  vendaInterna = false,
+): Promise<NotesResult> {
+  const { data: order } = await supabase
+    .from('orders')
+    .select('id, rep_id, status, invoiced, notes')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  if (!order) return { ok: false, reason: 'not_found' };
+  const o = order as unknown as Order;
+
+  const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
+  if (acesso !== 'ok') return { ok: false, reason: acesso };
+
+  // Sem a lista de SKUs em mãos: o modo genérico reconhece a linha de cor pelo
+  // formato completo ("0015 3M azul"), que é o que `observacaoDeCores` grava.
+  const cores = apenasLinhasDeCor(o.notes, null);
+  const notes = juntarObservacao(textoLivre, cores) ?? null;
+
+  const { data, error } = await supabase
+    .from('orders')
+    .update({ notes, updated_at: new Date().toISOString() })
     .eq('id', id)
     .eq('company_id', company_id)
     .select()
