@@ -52,6 +52,13 @@ export interface ResultadoDaExportacao {
   avisos: string[];
   /** O usuário fechou a folha de compartilhamento. Nada foi entregue. */
   cancelado: boolean;
+  /**
+   * O arquivo que foi entregue. `zip` quando saíram várias planilhas num
+   * pacote só — a tela precisa contar isso ao operador: quem abre o .zip
+   * direto (no navegador, no Drive) vê "erro", quando na verdade é só
+   * extrair e abrir os .xlsx de dentro. `null` = nada foi gerado.
+   */
+  entrega: { nome: string; zip: boolean } | null;
 }
 
 const TIPO_XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -246,7 +253,7 @@ export async function exportarPedidosParaControl(
 
   if (arquivos.length === 0) {
     avisos.push('Nada foi exportado: nenhum item dos pedidos escolhidos cabe na planilha.');
-    return { arquivos: 0, avisos, cancelado: false };
+    return { arquivos: 0, avisos, cancelado: false, entrega: null };
   }
 
   const dia = new Date().toISOString().slice(0, 10);
@@ -254,13 +261,19 @@ export async function exportarPedidosParaControl(
   if (arquivos.length === 1) {
     const unico = arquivos[0]!;
     const entregue = await entregar(unico.nome, unico.bytes, TIPO_XLSX);
-    return { arquivos: 1, avisos, cancelado: !entregue };
+    return { arquivos: 1, avisos, cancelado: !entregue, entrega: { nome: unico.nome, zip: false } };
   }
 
+  const nomeDoPacote = `pedidos-control-${dia}.zip`;
   const pacote = zipSync(
     Object.fromEntries(arquivos.map((a) => [a.nome, a.bytes])),
     { level: 6 },
   );
-  const entregue = await entregar(`pedidos-control-${dia}.zip`, pacote, TIPO_ZIP);
-  return { arquivos: arquivos.length, avisos, cancelado: !entregue };
+  const entregue = await entregar(nomeDoPacote, pacote, TIPO_ZIP);
+  return {
+    arquivos: arquivos.length,
+    avisos,
+    cancelado: !entregue,
+    entrega: { nome: nomeDoPacote, zip: true },
+  };
 }

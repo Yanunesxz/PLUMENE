@@ -15,6 +15,7 @@ import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFatura
 import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
+import { LINHAS_POR_FOLHA } from '../../lib/planilha/linhas.js';
 import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { nomeDoComprador, origemParaExibir, seloDoPedido } from '../../lib/pedido.js';
@@ -176,6 +177,10 @@ export function PaginaPedidos() {
   // O que o operador precisa conferir antes de lançar no Control. Fica na tela
   // até ele fechar: um toast de 3s não dá tempo de ler uma lista de referências.
   const [avisosDaExportacao, setAvisosDaExportacao] = useState<string[]>([]);
+  // Saiu um .zip (várias planilhas num pacote)? Quem abre o pacote direto no
+  // navegador ou no Drive vê "erro" e acha que a exportação falhou — aconteceu
+  // na Plumene em 03/09/2026. A tela explica que é para extrair antes.
+  const [pacoteDaExportacao, setPacoteDaExportacao] = useState<{ nome: string; planilhas: number } | null>(null);
   const { tabelas } = useMinhasTabelas();
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
@@ -334,6 +339,7 @@ export function PaginaPedidos() {
     if (!token || selected.size === 0) return;
     setExporting(true);
     setAvisosDaExportacao([]);
+    setPacoteDaExportacao(null);
     try {
       const detailed = await Promise.all(
         Array.from(selected).map((id) =>
@@ -389,6 +395,11 @@ export function PaginaPedidos() {
         },
       });
       setAvisosDaExportacao(resultado.avisos);
+      setPacoteDaExportacao(
+        resultado.entrega?.zip && !resultado.cancelado
+          ? { nome: resultado.entrega.nome, planilhas: resultado.arquivos }
+          : null,
+      );
       // Com aviso na tela, sair do modo de seleção esconderia o que ele precisa
       // ler junto com os pedidos que escolheu.
       if (resultado.avisos.length === 0 && !resultado.cancelado) {
@@ -443,6 +454,26 @@ export function PaginaPedidos() {
             <FileSpreadsheet className="h-4 w-4" strokeWidth={2.5} />
             {exporting ? 'Gerando…' : 'Gerar planilha (.xlsx)'}
           </Button>
+        </div>
+      )}
+
+      {pacoteDaExportacao && (
+        <div className="mb-4 rounded-xl border border-primary/30 bg-primary/5 p-3">
+          <div className="flex items-start justify-between gap-3">
+            <p className="text-sm text-foreground">
+              <span className="font-semibold">Saiu um pacote .zip:</span> {pacoteDaExportacao.nome}, com{' '}
+              {pacoteDaExportacao.planilhas} planilhas dentro. <span className="font-semibold">Extraia o .zip antes de abrir no Excel</span>
+              {' '}— cada arquivo é um formulário do Control, e pedido com mais de {LINHAS_POR_FOLHA} linhas sai em mais de um.
+            </p>
+            <button
+              type="button"
+              onClick={() => setPacoteDaExportacao(null)}
+              aria-label="Fechar aviso do pacote"
+              className="text-muted-foreground hover:text-foreground"
+            >
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            </button>
+          </div>
         </div>
       )}
 
