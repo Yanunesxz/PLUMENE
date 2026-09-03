@@ -2,12 +2,31 @@ import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 
 // A marca desta instalação — as mesmas variáveis de `src/lib/marca.ts`, lidas
 // aqui no Node do build: o manifest do PWA e o <title> do index.html são
 // gerados antes de existir import.meta.env. Sem variável, é a Corpo Sensual.
 const NOME_DA_MARCA = process.env['VITE_BRAND_NAME'] || 'Corpo Sensual';
 const COR_DA_MARCA = process.env['VITE_BRAND_COLOR'] || '#0f766e';
+
+// A "versão" dos três modelos da exportação (public/modelos/pedido-cs-N.xlsx):
+// um hash do conteúdo deles no momento do build. Entra no NOME do cache que o
+// service worker usa para eles (ver runtimeCaching abaixo). O cache é
+// CacheFirst por 180 dias — sem isso, o aparelho que já exportou uma vez
+// continuaria preenchendo o modelo ANTIGO meses depois de a instalação trocar
+// o arquivo (foi o que aconteceu na PLUMENE em 03/09/2026: o modelo com a Plan2
+// da marca subiu, e quem já tinha exportado seguia com a Plan2 da Corpo
+// Sensual). Nome novo = cache novo = o próximo export baixa o arquivo certo.
+const VERSAO_DOS_MODELOS = createHash('md5')
+  .update(
+    Buffer.concat(
+      [1, 2, 3].map((n) => readFileSync(path.resolve(__dirname, `public/modelos/pedido-cs-${n}.xlsx`))),
+    ),
+  )
+  .digest('hex')
+  .slice(0, 8);
 
 // Troca "Corpo Sensual" no index.html (título e descrição) pela marca da
 // instalação. O index.html continua escrito com a marca da casa — é o padrão —
@@ -141,10 +160,14 @@ export default defineConfig({
             // causa de uma tela que ele não abre. CacheFirst resolve o resto —
             // a primeira exportação baixa, e da segunda em diante funciona
             // offline, que é quando o representante precisa.
+            //
+            // O nome do cache carrega a versão dos arquivos (VERSAO_DOS_MODELOS,
+            // no topo): modelo trocado no repositório = cache novo em todo
+            // aparelho, sem esperar os 180 dias nem pedir para limpar nada.
             urlPattern: /\/modelos\/pedido-cs-[123]\.xlsx$/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'modelos-de-planilha',
+              cacheName: `modelos-de-planilha-${VERSAO_DOS_MODELOS}`,
               expiration: { maxEntries: 6, maxAgeSeconds: 60 * 60 * 24 * 180 },
               cacheableResponse: { statuses: [0, 200] },
             },
