@@ -251,7 +251,15 @@ Trabalho nosso, antes de a instalação da marca poder subir:
    no Vercel + envs na API). **É o único bloqueio de verdade.**
 2. **Exportação por instalação** — o botão da planilha do Control aparece para
    qualquer gerente; na instalação da marca ele precisa sumir (ou virar o formato
-   do sistema dela, se houver — ver item 9 da Parte 1).
+   do sistema dela, se houver — ver item 9 da Parte 1). Quando a marca usa o
+   MESMO Control (caso da PLUMENE), o formulário é o mesmo arquivo da fábrica,
+   mas os três modelos em `apps/web/public/modelos/pedido-cs-N.xlsx` são
+   **trocados por instalação, como a logo**: a Plan1 (formulário, logo, fórmulas,
+   validações) fica byte a byte igual; só a Plan2 (lista ref → preço que o
+   VLOOKUP da coluna UNIT lê) recebe as refs e os preços da tabela vigente da
+   marca. Sem isso a exportação avisa "referência não existe na Tabela N" para
+   cada peça, porque a Plan2 original só conhece as refs da Corpo Sensual.
+   Regerar a Plan2 toda vez que a tabela de preço da marca mudar.
 
 Coisas que a instalação separada **resolveu sozinha** (não precisam mais de
 código): a trava do sincronizador do ERP (o banco novo não tem ERP), o remetente
