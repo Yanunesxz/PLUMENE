@@ -198,6 +198,19 @@ describe('quebra em folhas de 32', () => {
 describe('preenchimento do modelo oficial', () => {
   const modelo = () => new Uint8Array(readFileSync(MODELO));
 
+  /**
+   * Uma referência que a Plan2 do modelo DESTA instalação conhece — a primeira
+   * numérica da coluna A. O modelo é trocado por instalação (a Plan2 da PLUMENE
+   * lista as refs dela; a da Corpo Sensual, as dela), então o teste não pode
+   * apostar num número fixo: pergunta ao próprio arquivo.
+   */
+  const refConhecidaNaPlan2 = (): string => {
+    const sheet2 = new TextDecoder().decode(unzipSync(modelo())['xl/worksheets/sheet2.xml']!);
+    const ref = sheet2.match(/<c r="A\d+"(?![^>]*\st=")[^>]*><v>(\d+)<\/v>/)?.[1];
+    if (!ref) throw new Error('Plan2 do modelo sem referência numérica na coluna A');
+    return ref;
+  };
+
   const folhaComUmaLinha = () => {
     const { linhas } = montarLinhas([item('0130', 'M', 3, 53.9)]);
     return preencherModelo(modelo(), { linhas, numeroDoPedido: '14534' });
@@ -247,20 +260,25 @@ describe('preenchimento do modelo oficial', () => {
   });
 
   it('não confunde forma diferente com referência inexistente', () => {
-    // Escrevemos "0130", a Plan2 guarda "130" e "0130E". São a mesma peça, e o
-    // aviso só existe para a referência que a fábrica não tem de forma nenhuma.
-    const { linhas } = montarLinhas([item('0130', 'M', 1)]);
+    // Escrevemos a ref com zero à esquerda ("0015"); a Plan2 da Corpo Sensual
+    // guarda "15" e "0015E". São a mesma peça, e o aviso só existe para a
+    // referência que a fábrica não tem de forma nenhuma.
+    const ref = refConhecidaNaPlan2();
+    const { linhas } = montarLinhas([item(ref, 'M', 1)]);
+    expect(linhas[0]?.ref).toBe(refDaPlanilha(ref));
     expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
   });
 
   it('não acusa a linha plus, que na Plan2 é a mesma peça', () => {
-    const { linhas } = montarLinhas([item('0130', '52', 1)]);
-    expect(linhas[0]?.ref).toBe('0130 PLUS');
+    const ref = refConhecidaNaPlan2();
+    const { linhas } = montarLinhas([item(ref, '52', 1)]);
+    expect(linhas[0]?.ref).toBe(`${refDaPlanilha(ref)} PLUS`);
     expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
   });
 
   it('não reclama de referência que existe na Plan2', () => {
-    expect(folhaComUmaLinha().refsDesconhecidas).toEqual([]);
+    const { linhas } = montarLinhas([item(refConhecidaNaPlan2(), 'M', 3, 53.9)]);
+    expect(preencherModelo(modelo(), { linhas }).refsDesconhecidas).toEqual([]);
   });
 
   it('escreve a cor da peça na coluna OBSERVAÇÃO da linha (B)', () => {
