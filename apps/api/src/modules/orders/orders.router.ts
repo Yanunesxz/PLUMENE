@@ -12,6 +12,7 @@ import {
   setPaymentHandler,
   setNotesHandler,
   deleteOrderHandler,
+  listDeletedOrdersHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
 } from './orders.controller.js';
@@ -59,6 +60,14 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.get('/payment-conditions', daFabricaOuLoja, listPaymentConditions);
 
   fastify.get('/orders', daFabricaOuLoja, listOrders);
+  // A aba "Excluídos" (migração 040): a cópia de cada pedido apagado, com as
+  // peças e quem apagou. Só o admin — é auditoria, não operação. Fica antes
+  // do /orders/:id por clareza; o roteador já prefere a rota fixa.
+  fastify.get(
+    '/orders/excluidos',
+    { preHandler: [authenticate, requireRole(['admin'])] },
+    listDeletedOrdersHandler,
+  );
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);

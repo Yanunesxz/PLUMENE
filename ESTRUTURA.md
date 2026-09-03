@@ -104,7 +104,8 @@ apps/api/src/
 │       ├── 036_historico_de_compra.sql → customers.last_purchase_at/total_purchased/overdue_amount
 │       ├── 037_tarefas_do_representante.sql → rep_tasks (o que o escritório pede ao rep; com local e observacoes)
 │       ├── 038_perfil_relacionamento.sql → role 'relacionamento' no CHECK de users (a conta da Bruna)
-│       └── 039_controle_de_inatividade.sql → customers.inactivity_* (motivo + observação do cliente vermelho)
+│       ├── 039_controle_de_inatividade.sql → customers.inactivity_* (motivo + observação do cliente vermelho)
+│       └── 040_pedidos_excluidos.sql → deleted_orders (cópia do pedido antes do DELETE; a aba "Excluídos" do admin)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

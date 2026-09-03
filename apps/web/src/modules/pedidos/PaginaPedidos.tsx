@@ -19,6 +19,7 @@ import { LINHAS_POR_FOLHA } from '../../lib/planilha/linhas.js';
 import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { nomeDoComprador, origemParaExibir, seloDoPedido } from '../../lib/pedido.js';
+import { PedidosExcluidos } from './PedidosExcluidos.js';
 import type {
   Order,
   Customer,
@@ -48,9 +49,12 @@ const ALL_REPS = '__all__';
  * espera) e "Faturados". Para o representante são só INFORMAÇÃO: quem fatura
  * continua sendo o financeiro/fábrica (e a venda interna, nos próprios).
  */
-type FiltroDeStatus = OrderStatus | 'all' | 'a_faturar' | 'faturados';
+type FiltroDeStatus = OrderStatus | 'all' | 'a_faturar' | 'faturados' | 'excluidos';
 
-function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: FiltroDeStatus; label: string }[] {
+function filtrosDeStatus(
+  papel: 'store' | 'fabrica' | 'rep',
+  ehAdmin = false,
+): { value: FiltroDeStatus; label: string }[] {
   if (papel === 'store') {
     return [
       { value: 'all', label: 'Todos' },
@@ -78,12 +82,16 @@ function filtrosDeStatus(papel: 'store' | 'fabrica' | 'rep'): { value: FiltroDeS
     { value: 'faturados', label: 'Faturados' },
     { value: 'rejected', label: 'Recusados' },
     { value: 'draft', label: 'Rascunhos' },
+    // A cópia dos pedidos apagados (migração 040) — auditoria, só do admin.
+    ...(ehAdmin ? [{ value: 'excluidos' as const, label: 'Excluídos' }] : []),
   ];
 }
 
 /** O filtro composto resolve status + carimbo; o simples, só o status. */
 function pedidoNoFiltro(o: Order, filtro: FiltroDeStatus): boolean {
   if (filtro === 'all') return true;
+  // Excluído não está em `orders` — a aba lê outra fonte (PedidosExcluidos).
+  if (filtro === 'excluidos') return false;
   // Para gerente e rep, "a faturar" é todo aprovado sem nota — lançado no ERP
   // ou não. O detalhe do lançamento é mesa do financeiro, que tem fila própria.
   if (filtro === 'a_faturar') {
@@ -160,9 +168,10 @@ export function PaginaPedidos() {
       setFaturando(null);
     }
   };
+  const ehAdmin = hasRole('admin');
   const STATUS_FILTERS = useMemo(
-    () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep'),
-    [ehLoja, isManager],
+    () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep', ehAdmin),
+    [ehLoja, isManager, ehAdmin],
   );
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -564,7 +573,9 @@ export function PaginaPedidos() {
         </>
       )}
 
-      {isInitialLoading ? (
+      {status === 'excluidos' && ehAdmin && token ? (
+        <PedidosExcluidos token={token} />
+      ) : isInitialLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {Array.from({ length: 6 }).map((_, i) => (
             <Skeleton key={i} className="h-24 w-full rounded-xl" />

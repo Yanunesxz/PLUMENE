@@ -2,7 +2,13 @@ import { supabase } from '../../config/supabase.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
-import type { Order, OrderWithItems, CreateOrderRequest, UpdateOrderStatusRequest } from '@csb/shared';
+import type {
+  Order,
+  OrderWithItems,
+  PedidoExcluido,
+  CreateOrderRequest,
+  UpdateOrderStatusRequest,
+} from '@csb/shared';
 import { ORDER_STATUS_FLOW, precoDoTamanho, apenasLinhasDeCor, juntarObservacao } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
 
@@ -438,13 +444,84 @@ export async function createOrder(
 
 export type DeleteOrderResult =
   | { ok: true }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'sem_copia' };
+
+// ─── Pedidos excluídos (migração 040) ────────────────────────────────────────
+//
+// Excluir continua apagando o pedido de `orders` — listas, filas, metas e
+// relatórios não precisam saber de nada. O que muda é que, um instante antes
+// do DELETE, o pedido inteiro é copiado para `deleted_orders`, com quem apagou
+// e quando. É o que a aba "Excluídos" do admin lê. Pedido do Yan (03/09/2026),
+// depois de dois pedidos da CS sumirem sem rastro nenhum.
+
+/** `deleted_orders` vem da migração 040 — mesmo cuidado das outras. */
+let temPedidosExcluidos: boolean | null = null;
+
+async function detectarPedidosExcluidos(): Promise<boolean> {
+  if (temPedidosExcluidos !== null) return temPedidosExcluidos;
+  const { error } = await supabase.from('deleted_orders').select('id').limit(1);
+  temPedidosExcluidos = !error;
+  return temPedidosExcluidos;
+}
+
+/**
+ * A cópia leva o que a aba precisa mostrar sem consultar mais nada: as peças
+ * já com referência e tamanho, o cliente e o representante — porque, depois
+ * do DELETE, os itens não existem mais para serem resolvidos.
+ */
+const COLUNAS_DA_COPIA =
+  '*, items:order_items(*, product:products(sku, name), variant:product_variants(size)), ' +
+  'customer:customers(name, cnpj), rep:users!orders_rep_id_fkey(name)';
+
+type ResultadoDaCopia = 'guardada' | 'sem_tabela' | 'falhou';
+
+async function guardarCopiaAntesDeExcluir(
+  id: string,
+  company_id: string,
+  quem: { id: string; nome: string },
+): Promise<ResultadoDaCopia> {
+  if (!(await detectarPedidosExcluidos())) return 'sem_tabela';
+
+  // O select rico depende dos embeds; se algum faltar (banco antigo), a cópia
+  // sai sem eles — melhor um retrato incompleto do que nenhum.
+  let pedido: unknown = null;
+  const rico = await supabase
+    .from('orders')
+    .select(COLUNAS_DA_COPIA)
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!rico.error && rico.data) {
+    pedido = rico.data;
+  } else {
+    const simples = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    pedido = simples.data ?? null;
+  }
+  if (!pedido) return 'falhou';
+
+  const { error } = await supabase.from('deleted_orders').insert({
+    company_id,
+    order_id: id,
+    order_number: (pedido as { order_number?: number | null }).order_number ?? null,
+    deleted_by: quem.id,
+    deleted_by_name: quem.nome,
+    snapshot: pedido,
+  });
+  return error ? 'falhou' : 'guardada';
+}
 
 export async function deleteOrder(
   id: string,
   company_id: string,
   rep_id: string,
   role: AuthRole,
+  /** Nome de quem está excluindo — vai gravado na cópia, para a aba do admin. */
+  nome_de_quem_exclui = '',
 ): Promise<DeleteOrderResult> {
   const { data: order } = await supabase
     .from('orders')
@@ -458,10 +535,30 @@ export async function deleteOrder(
   if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
   if (o.invoiced) return { ok: false, reason: 'invoiced' };
 
+  // Com a tabela no ar, a cópia é obrigatória: se ela não gravou, o pedido não
+  // é apagado — é exatamente o "sumiu sem rastro" que a 040 existe para evitar.
+  // Sem a tabela (migração ainda não rodada), exclui como sempre excluiu.
+  const copia = await guardarCopiaAntesDeExcluir(id, company_id, { id: rep_id, nome: nome_de_quem_exclui });
+  if (copia === 'falhou') return { ok: false, reason: 'sem_copia' };
+
   // order_items tem ON DELETE CASCADE — somem junto.
   const { error } = await supabase.from('orders').delete().eq('id', id).eq('company_id', company_id);
   if (error) return { ok: false, reason: 'not_found' };
   return { ok: true };
+}
+
+/** A aba "Excluídos" do admin: os mais recentes primeiro. `null` = o banco falhou. */
+export async function listDeletedOrders(company_id: string): Promise<PedidoExcluido[] | null> {
+  // Sem a migração 040 não há o que listar — a aba fica vazia, sem erro.
+  if (!(await detectarPedidosExcluidos())) return [];
+  const { data, error } = await supabase
+    .from('deleted_orders')
+    .select('id, order_id, order_number, deleted_at, deleted_by_name, snapshot')
+    .eq('company_id', company_id)
+    .order('deleted_at', { ascending: false })
+    .limit(200);
+  if (error) return null;
+  return (data ?? []) as PedidoExcluido[];
 }
 
 export type DescontoResult =
