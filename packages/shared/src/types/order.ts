@@ -93,6 +93,32 @@ export interface OrderWithItems extends Order {
   rep_info?: { name: string; erp_rep_id: string | null } | null;
 }
 
+// ─── Pedido excluído (aba do admin) ──────────────────────────────────────────
+/**
+ * A cópia que a API guarda um instante antes de apagar um pedido (migração
+ * 040). O pedido em si some de `orders`; o que fica é isto — o cabeçalho, as
+ * peças já com referência e tamanho, o cliente e o representante —, mais quem
+ * apagou e quando. Só o admin lê (GET /orders/excluidos).
+ */
+export interface PedidoExcluido {
+  id: string;
+  /** O id que o pedido tinha em `orders`. */
+  order_id: string;
+  order_number: number | null;
+  deleted_at: string;
+  deleted_by_name: string | null;
+  snapshot: Order & {
+    items: Array<
+      OrderItem & {
+        product?: { sku: string; name: string } | null;
+        variant?: { size: string } | null;
+      }
+    >;
+    customer?: { name: string; cnpj: string | null } | null;
+    rep?: { name: string } | null;
+  };
+}
+
 // ─── Pedido na página pública (link do e-mail) ───────────────────────────────
 /** Uma referência do pedido, com a grade de tamanhos que o cliente comprou. */
 export interface ItemPedidoPublico {

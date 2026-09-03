@@ -10,6 +10,7 @@ import {
   setOrderPayment,
   setOrderNotes,
   deleteOrder,
+  listDeletedOrders,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
@@ -242,10 +243,10 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
 }
 
 export async function deleteOrderHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub: rep_id, role } = request.user;
+  const { company_id, sub: rep_id, role, name } = request.user;
   const { id } = request.params as { id: string };
 
-  const result = await deleteOrder(id, company_id, rep_id, role);
+  const result = await deleteOrder(id, company_id, rep_id, role, name ?? '');
   if (!result.ok) {
     if (result.reason === 'forbidden') {
       await reply.status(403).send({ error: 'Você só pode excluir seus próprios pedidos', code: 'FORBIDDEN', statusCode: 403 });
@@ -255,10 +256,29 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
       await reply.status(409).send({ error: 'Pedido faturado não pode ser excluído', code: 'ORDER_INVOICED', statusCode: 409 });
       return;
     }
+    if (result.reason === 'sem_copia') {
+      // A cópia para a aba "Excluídos" não gravou — o pedido fica onde está.
+      await reply.status(500).send({
+        error: 'Não deu para guardar a cópia do pedido; nada foi excluído. Tente de novo.',
+        code: 'SEM_COPIA',
+        statusCode: 500,
+      });
+      return;
+    }
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
   }
   await reply.send({ data: { ok: true } });
+}
+
+/** GET /orders/excluidos — a aba do admin (migração 040). */
+export async function listDeletedOrdersHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const lista = await listDeletedOrders(request.user.company_id);
+  if (lista === null) {
+    await reply.status(500).send({ error: 'Não deu para ler os pedidos excluídos', code: 'DB_ERROR', statusCode: 500 });
+    return;
+  }
+  await reply.send({ data: lista });
 }
 
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
