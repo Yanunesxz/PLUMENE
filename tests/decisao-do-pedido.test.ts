@@ -2,9 +2,17 @@ import { describe, it, expect } from 'vitest';
 import { decisaoDoPedido } from '../apps/web/src/lib/pedido.js';
 
 describe('decisaoDoPedido com a tecla de aprovar', () => {
-  it('gerente que pode aprovar vê a decisão — o comportamento de sempre', () => {
-    expect(decisaoDoPedido('manager', 'pending_approval')).not.toBeNull();
-    expect(decisaoDoPedido('manager', 'pending_approval', true)).not.toBeNull();
+  it('o pedido na fila é decidido pelo financeiro (e pelo admin) — não pelo gerente', () => {
+    // Yan, 02/09/2026: "nenhum pedido precisa passar pelo gerente — chega
+    // direto no financeiro". Mesmo com a tecla ligada, o gerente só olha.
+    expect(decisaoDoPedido('manager', 'pending_approval')).toBeNull();
+    expect(decisaoDoPedido('manager', 'pending_approval', true)).toBeNull();
+    expect(decisaoDoPedido('financeiro', 'pending_approval')).not.toBeNull();
+    expect(decisaoDoPedido('admin', 'pending_approval')).not.toBeNull();
+  });
+
+  it('o gerente continua triando: pedido parado no rep ele manda para a fila', () => {
+    expect(decisaoDoPedido('manager', 'pending_rep')).not.toBeNull();
   });
 
   it('gerente sem a tecla não vê botão de aprovar', () => {

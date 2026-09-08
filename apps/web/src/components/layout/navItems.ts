@@ -39,7 +39,8 @@ const storeItems: NavItem[] = [
 ];
 
 const managerItems: NavItem[] = [
-  { to: '/dashboard', label: 'Painel', icon: LayoutDashboard, fila: 'aprovacao' },
+  // Sem número no Painel: a fila de aceite é do financeiro, não do gerente.
+  { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },

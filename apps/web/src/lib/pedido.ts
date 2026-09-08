@@ -141,9 +141,12 @@ export function decisaoDoPedido(
   status: OrderStatus,
   podeAprovar = true,
 ): Decisao | null {
-  // O financeiro decide junto com a fábrica: ele é "quem aceita os pedidos" —
-  // o que o rep manda cai na mesa dele para aprovar (e depois faturar).
   const daFabrica = papel === 'manager' || papel === 'admin' || papel === 'financeiro';
+  // Quem DECIDE o pedido na fila é o financeiro ("quem aceita os pedidos"); o
+  // admin fica como válvula. O gerente saiu do caminho — Yan, 02/09/2026:
+  // "nenhum pedido precisa passar por ele, chega direto no financeiro". Ele
+  // continua vendo e organizando; só não aprova nem recusa.
+  const decideAFila = papel === 'admin' || papel === 'financeiro';
 
   // Triagem: o pedido chegou da loja ou de um link. O gerente também passa por
   // aqui — se o representante sumir, o pedido não fica preso.
@@ -152,11 +155,11 @@ export function decisaoDoPedido(
       aceitar: 'pending_approval',
       rotuloAceitar: 'Mandar para a fábrica',
       rotuloRecusar: 'Recusar',
-      explicacao: 'Este pedido chegou pronto. Ao mandar, ele entra na fila de aprovação da fábrica.',
+      explicacao: 'Este pedido chegou pronto. Ao mandar, ele cai direto na mesa do financeiro.',
     };
   }
 
-  if (status === 'pending_approval' && daFabrica && podeAprovar) {
+  if (status === 'pending_approval' && decideAFila && podeAprovar) {
     return {
       aceitar: 'approved',
       rotuloAceitar: 'Aprovar',

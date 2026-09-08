@@ -20,8 +20,6 @@ interface PedidoParaAviso {
   guest_name?: string | null;
 }
 
-const MESA = ['manager', 'admin', 'financeiro'];
-
 function nomeDoPedido(p: PedidoParaAviso): string {
   return p.order_number ? `Pedido #${p.order_number}` : 'Pedido novo';
 }
@@ -47,7 +45,11 @@ export function avisarTriagemDoRep(company_id: string, pedido: PedidoParaAviso):
   );
 }
 
-/** Foi para a fábrica — a mesa inteira fica sabendo (menos quem enviou). */
+/**
+ * Foi para a fábrica — quem DECIDE fica sabendo (menos quem enviou). O gerente
+ * não recebe: o pedido não passa mais por ele (Yan, 02/09/2026); ele acompanha
+ * pelo Painel quando quiser.
+ */
 export function avisarMesaParaAceite(
   company_id: string,
   pedido: PedidoParaAviso,
@@ -56,7 +58,7 @@ export function avisarMesaParaAceite(
   engolir(
     enviarParaPapeis(
       company_id,
-      MESA,
+      ['financeiro', 'admin'],
       {
         title: `${nomeDoPedido(pedido)} aguardando aceite`,
         body: 'Um pedido chegou para a fábrica. Toque para aprovar ou recusar.',

@@ -267,7 +267,7 @@ export async function createOrder(
     if (!body.customer_id) return null;
     const { data: customer } = await supabase
       .from('customers')
-      .select('id, blocked')
+      .select('id, blocked, price_table_id')
       .eq('id', body.customer_id)
       .eq('company_id', company_id)
       .single();
@@ -276,6 +276,14 @@ export async function createOrder(
     if ((customer as { blocked: boolean }).blocked) {
       throw new Error('CUSTOMER_BLOCKED');
     }
+
+    // A tabela do pedido é a do CADASTRO do cliente — aqui, no único lugar
+    // por onde todo pedido passa. O caminho online já resolvia isso no
+    // controller; o offline (fila de sync) mandava a tabela do REPRESENTANTE,
+    // e um cliente de tabela 3 nasceu em pedido de tabela 1 (#14637, Simone,
+    // 03/09/2026). Sem tabela no cadastro, vale a que o chamador mandou.
+    const tabelaDoCliente = (customer as { price_table_id: string | null }).price_table_id;
+    if (tabelaDoCliente) price_table_id = tabelaDoCliente;
   }
 
   // Recalcula o preço no servidor pela tabela do representante. Se algum item
@@ -1055,6 +1063,19 @@ export async function updateOrderStatus(
     if (forcandoAprovacao || recusandoForaDaTriagem || lancandoNoErp) {
       throw new Error('FORBIDDEN_ROLE');
     }
+  }
+
+  // O GERENTE não é mais porteiro (Yan, 02/09/2026): "nenhum pedido precisa
+  // passar por ele — todos chegam direto no financeiro". Ele continua vendo e
+  // organizando tudo (peças, desconto, condição, triagem de quem sumiu), mas a
+  // decisão do pedido na fila — aprovar ou recusar — é do financeiro. O admin
+  // fica como válvula de escape.
+  if (
+    role === 'manager' &&
+    row.status === 'pending_approval' &&
+    (body.status === 'approved' || body.status === 'rejected')
+  ) {
+    throw new Error('FORBIDDEN_ROLE');
   }
 
   const allowed = ORDER_STATUS_FLOW[row.status];

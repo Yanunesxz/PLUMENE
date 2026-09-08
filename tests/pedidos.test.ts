@@ -152,3 +152,38 @@ describe('transições de status', () => {
     expect(destinos).not.toContain('draft');
   });
 });
+
+/**
+ * O gerente saiu do caminho do pedido (Yan, 02/09/2026): "nenhum pedido precisa
+ * passar por ele — todos chegam direto no financeiro". Ele vê e organiza tudo,
+ * mas a decisão da fila (aprovar/recusar) é do financeiro; o admin é válvula.
+ */
+describe('quem decide o pedido na fila', () => {
+  const naFila = { data: { status: 'pending_approval', rep_id: REP }, error: null };
+  const decidido = { data: { id: 'o1', status: 'approved', rep_id: REP }, error: null };
+
+  it('o gerente NÃO aprova nem recusa o que está na fila', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [naFila] });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'approved', notes: '' }, 'manager'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'rejected', notes: '' }, 'manager'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
+  });
+
+  it('o financeiro aprova — é a mesa dele', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [naFila, decidido] });
+    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'approved', notes: '' }, 'financeiro');
+    expect(r?.status).toBe('approved');
+  });
+
+  it('o gerente ainda TRIA o pedido de quem sumiu (pending_rep → fila)', async () => {
+    // Organizar continua com ele; só a decisão final saiu.
+    const triagem = { data: { status: 'pending_rep', rep_id: REP }, error: null };
+    const mandado = { data: { id: 'o1', status: 'pending_approval', rep_id: REP }, error: null };
+    const { updateOrderStatus } = await carregarServico({ orders: [triagem, mandado] });
+    const r = await updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'pending_approval', notes: '' }, 'manager');
+    expect(r?.status).toBe('pending_approval');
+  });
+});

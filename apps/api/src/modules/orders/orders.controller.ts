@@ -519,7 +519,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
     }
     if (err instanceof Error && err.message === 'FORBIDDEN_ROLE') {
       await reply.status(403).send({
-        error: 'Apenas gerentes podem aprovar ou recusar pedidos',
+        error: 'Aprovar ou recusar pedido na fila é do financeiro',
         code: 'FORBIDDEN',
         statusCode: 403,
       });
