@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { Clock, Wallet, Inbox, TrendingUp, ShoppingCart, Crown, Hourglass } from 'lucide-react';
 import { db } from '../../offline/db.js';
@@ -99,7 +100,7 @@ export function PaginaPainel() {
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={TrendingUp} tint="green" value={formatBRL(metrics.vendasMes)} label="Vendas do mês" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(metrics.pedidosMes)} label="Pedidos no mês" />
-        <MetricCard icon={Clock} tint="yellow" value={String(metrics.pendingCount)} label="Aguardando aprovação" />
+        <MetricCard icon={Clock} tint="yellow" value={String(metrics.pendingCount)} label="Na mesa do financeiro" />
         <MetricCard icon={Wallet} tint="brand" value={formatBRL(metrics.ticket)} label="Ticket médio" />
       </div>
 
@@ -144,13 +145,37 @@ export function PaginaPainel() {
             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-muted text-muted-foreground">
               <Inbox className="h-7 w-7" strokeWidth={1.5} />
             </div>
-            <p className="text-sm text-muted-foreground">Nenhum pedido aguardando aprovação.</p>
+            <p className="text-sm text-muted-foreground">Nenhum pedido esperando o financeiro.</p>
           </div>
         ) : (
           <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
             {metrics.pending.map((order) => {
               const decisao = decisaoDoPedido(user?.role, order.status, podeAprovar);
-              if (!decisao) return null;
+              // Sem decisão a tomar (o gerente, desde 02/09/2026): o pedido
+              // continua à vista, só sem os botões — quem aprova é o financeiro.
+              if (!decisao) {
+                return (
+                  <li key={order.id}>
+                    <Link
+                      to={`/orders/${order.id}`}
+                      className="block rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow hover:border-primary/30 hover:shadow-md"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-mono text-xs text-muted-foreground">
+                          #{order.order_number ?? order.id.slice(0, 8)}
+                        </span>
+                        <span className="rounded bg-warn-soft px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-warn-soft-foreground">
+                          Com o financeiro
+                        </span>
+                      </div>
+                      <p className="mt-2 truncate text-sm font-medium text-foreground">
+                        {custName.get(order.customer_id ?? '') ?? order.guest_name ?? 'Cliente'}
+                      </p>
+                      <p className="mt-0.5 text-lg font-bold text-foreground">{formatBRL(order.total)}</p>
+                    </Link>
+                  </li>
+                );
+              }
               return (
                 <CartaoDecisao
                   key={order.id}

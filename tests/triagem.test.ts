@@ -187,17 +187,28 @@ describe('quem pode decidir o quê', () => {
     ).rejects.toThrow('FORBIDDEN_NOT_OWNER');
   });
 
-  it('o gerente aprova o que passou pela triagem', async () => {
+  it('o financeiro aprova o que passou pela triagem — o gerente não é mais porteiro', async () => {
+    // Yan, 02/09/2026: "nenhum pedido precisa passar por ele; todos chegam
+    // direto no financeiro". A fila é a mesa do financeiro; o gerente vê e
+    // organiza, mas não aprova nem recusa.
     const { updateOrderStatus, fake } = await carregarServico({ orders: [naFilaDoGerente, depois] });
 
-    await updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'approved' }, 'manager');
+    await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'approved' }, 'financeiro');
 
     const alterado = fake.ultimaGravacao('orders', 'update')!.valores as {
       status: string;
       approved_by: string;
     };
     expect(alterado.status).toBe('approved');
-    expect(alterado.approved_by).toBe('ger-1');
+    expect(alterado.approved_by).toBe('fin-1');
+  });
+
+  it('o gerente é barrado ao tentar aprovar a fila', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [naFilaDoGerente, depois] });
+
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'approved' }, 'manager'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
   });
 
   it('o gerente destrava o pedido quando o representante some', async () => {
