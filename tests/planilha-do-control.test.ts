@@ -224,7 +224,10 @@ describe('preenchimento do modelo oficial', () => {
   });
 
   it('põe a quantidade na coluna do tamanho', () => {
-    expect(sheet1(folhaComUmaLinha().arquivo)).toContain('<c r="N13" s="41"><v>3</v></c>');
+    // Sem fixar o índice de estilo (`s="41"`): ele é do MODELO, e o modelo
+    // oficial da Plumene (04/09/2026) numera os estilos diferente do da CS. O
+    // que o teste garante é o VALOR na célula certa — o estilo o modelo dita.
+    expect(sheet1(folhaComUmaLinha().arquivo)).toMatch(/<c r="N13"[^>]*><v>3<\/v><\/c>/);
   });
 
   it('mantém a fórmula de UNIT e só atualiza o valor guardado', () => {
