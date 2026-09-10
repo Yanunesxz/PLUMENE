@@ -1,5 +1,16 @@
 import { describe, it, expect } from 'vitest';
-import { decisaoDoPedido } from '../apps/web/src/lib/pedido.js';
+import { decisaoDoPedido, podeLancarNoErp } from '../apps/web/src/lib/pedido.js';
+
+describe('quem vê o botão "Lançar no ERP"', () => {
+  it('só o financeiro (e o admin), em pedido aceito e sem nota', () => {
+    expect(podeLancarNoErp('financeiro', 'approved', false)).toBe(true);
+    expect(podeLancarNoErp('admin', 'approved', false)).toBe(true);
+    expect(podeLancarNoErp('manager', 'approved', false)).toBe(false);
+    expect(podeLancarNoErp('rep', 'approved', false)).toBe(false);
+    expect(podeLancarNoErp('financeiro', 'pending_approval', false)).toBe(false);
+    expect(podeLancarNoErp('financeiro', 'approved', true)).toBe(false);
+  });
+});
 
 describe('decisaoDoPedido com a tecla de aprovar', () => {
   it('o pedido na fila é decidido pelo financeiro (e pelo admin) — não pelo gerente', () => {

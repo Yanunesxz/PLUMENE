@@ -40,8 +40,27 @@ export interface Customer {
   whatsapp: string | null;
   /** E-mail */
   email: string | null;
-  /** Endereço completo */
+  /** Endereço em UMA linha — montado dos campos abaixo (ver linhaDeEndereco). */
   address: string | null;
+  /**
+   * Cadastro real (migração 041): o endereço como o Control pede, em campos
+   * separados, mais a Inscrição Estadual e as observações que o Control
+   * insere no pedido. Opcionais no TIPO porque cliente vindo do ERP/cargas
+   * antigas não tem; obrigatórios no cadastro novo pelo app (schema da API).
+   */
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  inscricao_estadual?: string | null;
+  /** "Observações (será inserido no pedido)" — o campo do Control. */
+  observacoes?: string | null;
+  /** Quem atrelou o código do ERP a um cliente nascido no app, e quando. */
+  erp_linked_by?: string | null;
+  erp_linked_at?: string | null;
   /**
    * Última compra (migração 036): retrato do Control (Curva ABC) empurrado
    * para frente por todo pedido FATURADO no app. NULL = sem registro.
@@ -102,13 +121,28 @@ export interface MarcarInatividadeRequest {
   observacao?: string;
 }
 
-/** Dados mínimos para um representante cadastrar um cliente no app. */
+/**
+ * O cadastro de cliente pelo app — "mais real", igual ao do Control (Yan,
+ * 10/09/2026): CPF/CNPJ com dígito verificador, endereço estruturado com CEP
+ * obrigatório. Os campos ficam opcionais NO TIPO (o service é chamado por
+ * cargas e testes que não têm tudo); quem obriga é o schema da rota.
+ */
 export interface CreateCustomerRequest {
   name: string;
   trade_name?: string | null;
   cnpj?: string | null;
+  inscricao_estadual?: string | null;
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
   whatsapp?: string | null;
   email?: string | null;
+  observacoes?: string | null;
+  /** Linha pronta. Só para quem não tem os campos separados (cargas antigas). */
   address?: string | null;
   /**
    * Tabela do cliente. Só quem tem duas ou mais escolhe — para os outros o
@@ -126,6 +160,16 @@ export interface CreateCustomerRequest {
  */
 export interface UpdateCustomerTableRequest {
   price_table_id: string;
+}
+
+/**
+ * O financeiro atrela o número do cliente NO ERP a um cadastro nascido no app.
+ * "Quando conectar no sistema vai ter que ter número dos clientes, e esses
+ * números vão ter que ser incluídos e atrelados" (Yan, 10/09/2026). O código é
+ * normalizado no servidor: "#2225", "2225" e "02225" viram "02225".
+ */
+export interface AtrelarCodigoErpRequest {
+  erp_id: string;
 }
 
 /** Um pedido na ficha do cliente. Sem contagem de peças de propósito: somar
@@ -159,6 +203,19 @@ export interface CustomerDetail {
   blocked: boolean;
   block_reason: string | null;
   price_table_id: string | null;
+  /** O número do cliente no Control. Nulo = nasceu no app e ainda não foi atrelado. */
+  erp_id?: string | null;
+  /** Cadastro real (migração 041). */
+  cep?: string | null;
+  logradouro?: string | null;
+  numero?: string | null;
+  complemento?: string | null;
+  bairro?: string | null;
+  cidade?: string | null;
+  uf?: string | null;
+  inscricao_estadual?: string | null;
+  observacoes?: string | null;
+  erp_linked_at?: string | null;
   /** Última compra (migração 036) — a ficha mostra a cor do cliente. */
   last_purchase_at?: string | null;
   /** Controle de inatividade (migração 039). */

@@ -6,6 +6,7 @@ import type {
   PedidoDoCliente,
 } from '@csb/shared';
 import type { AuthRole } from '@csb/shared';
+import { documento, formatarDocumento, linhaDeEndereco, apenasDigitos } from '@csb/shared';
 
 // O PostgREST devolve no máximo 1000 linhas por requisição. Gerente/admin podem
 // ter milhares de clientes, então paginamos em blocos até pegar todos.
@@ -39,6 +40,19 @@ async function detectarInatividade(): Promise<boolean> {
   temInatividade = !error;
   return temInatividade;
 }
+
+/** E para o cadastro real (migração 041): endereço estruturado, IE, observações, cnpj_digits. */
+let temCadastroReal: boolean | null = null;
+
+async function detectarCadastroReal(): Promise<boolean> {
+  if (temCadastroReal !== null) return temCadastroReal;
+  const { error } = await supabase.from('customers').select('cep').limit(1);
+  temCadastroReal = !error;
+  return temCadastroReal;
+}
+
+const COLUNAS_DO_CADASTRO_REAL =
+  'cep, logradouro, numero, complemento, bairro, cidade, uf, inscricao_estadual, observacoes, erp_linked_at';
 
 async function colunasDaLista(): Promise<string> {
   let colunas = CUSTOMER_COLUMNS;
@@ -92,34 +106,164 @@ export async function getCustomers(
   return all;
 }
 
+/** O cadastro recusado porque o documento já está na base — com quem ele é. */
+export interface ClienteDuplicado {
+  duplicado: { id: string; name: string; erp_id: string | null };
+}
+
+/**
+ * Acha o cliente que já tem este CPF/CNPJ, se houver.
+ *
+ * Com a 041, `cnpj_digits` é gerada pelo banco e enxerga "22.518.613/0001-58"
+ * e "22518613000158" como o mesmo documento. Sem a 041, cobre as duas formas
+ * mais comuns (só dígitos e a máscara padrão) — o que as cargas gravaram.
+ */
+async function clienteComOMesmoDocumento(
+  company_id: string,
+  digitos: string,
+): Promise<ClienteDuplicado['duplicado'] | null> {
+  // A detecção vem ANTES de montar a consulta: é uma leitura à parte no banco,
+  // e a ordem das leituras é o contrato que o teste (e o fake) enxergam.
+  const temDigitos = await detectarCadastroReal();
+  let consulta = supabase
+    .from('customers')
+    .select('id, name, erp_id')
+    .eq('company_id', company_id)
+    .limit(1);
+  consulta = temDigitos
+    ? consulta.eq('cnpj_digits', digitos)
+    : consulta.in('cnpj', [digitos, formatarDocumento(digitos)]);
+  const { data } = await consulta;
+  const achado = (data ?? [])[0] as { id: string; name: string; erp_id: string | null } | undefined;
+  return achado ?? null;
+}
+
+/**
+ * O cliente nasce no app do jeito que o Control o quer (Yan, 10/09/2026):
+ * documento válido e normalizado (só dígitos), endereço em campos, e a linha
+ * `address` montada deles — a planilha do Control e as telas antigas leem a
+ * linha. Duplicidade por documento é recusada com o nome de quem já tem.
+ */
 export async function createCustomer(
   company_id: string,
   rep_id: string,
   body: CreateCustomerRequest,
   price_table_id: string | null,
-): Promise<CustomerListItem | { erro: string }> {
-  const { data, error } = await supabase
-    .from('customers')
-    .insert({
-      company_id,
-      rep_id,
-      name: body.name.trim(),
-      trade_name: body.trade_name?.trim() || null,
-      cnpj: body.cnpj?.trim() || null,
-      whatsapp: body.whatsapp?.trim() || null,
-      email: body.email?.trim() || null,
-      address: body.address?.trim() || null,
-      price_table_id,
-      blocked: false,
-    })
-    .select(CUSTOMER_COLUMNS)
-    .single();
+): Promise<CustomerListItem | { erro: string } | ClienteDuplicado> {
+  // O documento só em dígitos. Sem documento válido (cargas antigas chamando o
+  // service direto) grava o que veio, aparado — o schema da rota é quem obriga.
+  const doc = documento(body.cnpj);
+  const cnpj = doc ? doc.digitos : body.cnpj?.trim() || null;
+
+  if (doc) {
+    const existente = await clienteComOMesmoDocumento(company_id, doc.digitos);
+    if (existente) return { duplicado: existente };
+  }
+
+  const endereco = {
+    cep: apenasDigitos(body.cep) || null,
+    logradouro: body.logradouro?.trim() || null,
+    numero: body.numero?.trim() || null,
+    complemento: body.complemento?.trim() || null,
+    bairro: body.bairro?.trim() || null,
+    cidade: body.cidade?.trim() || null,
+    uf: body.uf?.trim().toUpperCase() || null,
+  };
+  const temCampos = Object.values(endereco).some(Boolean);
+  const address = temCampos ? linhaDeEndereco(endereco) : body.address?.trim() || null;
+
+  const linha: Record<string, unknown> = {
+    company_id,
+    rep_id,
+    name: body.name.trim(),
+    trade_name: body.trade_name?.trim() || null,
+    cnpj,
+    whatsapp: body.whatsapp?.trim() || null,
+    email: body.email?.trim() || null,
+    address,
+    price_table_id,
+    blocked: false,
+  };
+  // As colunas da 041 só vão se existem — sem o SQL aplicado o cadastro segue
+  // funcionando como antes (linha única), em vez de derrubar o POST inteiro.
+  if (await detectarCadastroReal()) {
+    Object.assign(linha, endereco, {
+      inscricao_estadual: body.inscricao_estadual?.trim() || null,
+      observacoes: body.observacoes?.trim() || null,
+    });
+  }
+
+  const { data, error } = await supabase.from('customers').insert(linha).select(CUSTOMER_COLUMNS).single();
 
   // O motivo do banco viaja na resposta, como no onboarding. Sem ele, um schema
   // fora do lugar numa instalação nova vira "não foi possível" mudo — foi
   // preciso uma semana de cegueira com a Simone (Plumene) para aprender isso.
   if (error || !data) return { erro: error?.message ?? 'insert sem retorno' };
   return data as CustomerListItem;
+}
+
+/**
+ * O código do cliente no Control, como o app o guarda: 5 dígitos com zeros à
+ * esquerda ("05836"). O Control exporta com "#" e as pessoas digitam sem os
+ * zeros; os três são o mesmo cliente. Nulo = não é um código.
+ */
+export function normalizarCodigoErp(v: string | null | undefined): string | null {
+  const d = apenasDigitos(v);
+  if (!d || d.length > 5 || Number(d) === 0) return null;
+  return d.padStart(5, '0');
+}
+
+export type AtrelamentoErp =
+  | { ok: true; erp_id: string }
+  | { ok: false; motivo: 'codigo_invalido' | 'cliente_nao_encontrado' | 'ja_tem_codigo' | 'codigo_em_uso' | 'erro'; detalhe?: string };
+
+/**
+ * O financeiro atrela o número do Control a um cliente nascido no app —
+ * "esses números vão ter que ser incluídos e atrelados aos do sistema" (Yan,
+ * 10/09/2026). Só em cliente SEM código: o que veio do ERP já tem o dele, e
+ * trocar código de cliente do ERP é assunto do ERP. Recusa código que já é de
+ * outro cliente, em qualquer grafia ("#2225", "2225", "02225").
+ */
+export async function atrelarCodigoErp(
+  company_id: string,
+  customer_id: string,
+  codigoDigitado: string,
+  quem: string,
+): Promise<AtrelamentoErp> {
+  const codigo = normalizarCodigoErp(codigoDigitado);
+  if (!codigo) return { ok: false, motivo: 'codigo_invalido' };
+
+  const { data: alvo } = await supabase
+    .from('customers')
+    .select('id, erp_id')
+    .eq('id', customer_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!alvo) return { ok: false, motivo: 'cliente_nao_encontrado' };
+  if ((alvo as { erp_id: string | null }).erp_id) return { ok: false, motivo: 'ja_tem_codigo' };
+
+  const semZeros = String(Number(codigo));
+  const { data: donos } = await supabase
+    .from('customers')
+    .select('id, name')
+    .eq('company_id', company_id)
+    .in('erp_id', [codigo, semZeros, `#${codigo}`, `#${semZeros}`])
+    .limit(1);
+  const dono = (donos ?? [])[0] as { id: string; name: string } | undefined;
+  if (dono && dono.id !== customer_id) return { ok: false, motivo: 'codigo_em_uso', detalhe: dono.name };
+
+  const update: Record<string, unknown> = { erp_id: codigo, updated_at: new Date().toISOString() };
+  if (await detectarCadastroReal()) {
+    update['erp_linked_by'] = quem;
+    update['erp_linked_at'] = new Date().toISOString();
+  }
+  const { error } = await supabase
+    .from('customers')
+    .update(update)
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+  if (error) return { ok: false, motivo: 'erro', detalhe: error.message };
+  return { ok: true, erp_id: codigo };
 }
 
 /** De quem é a carteira, para as duas metades da regra abaixo. */
@@ -168,7 +312,10 @@ const DETALHE_COLUNAS =
 
 /** A ficha soma o que as migrações 036/039 trouxerem — sem elas, vem como antes. */
 async function colunasDoDetalhe(): Promise<string> {
-  let colunas = DETALHE_COLUNAS;
+  // erp_id: a ficha mostra o número do Control (ou "sem código") — é o que o
+  // financeiro atrela. cadastro real: os campos da 041, quando existem.
+  let colunas = `${DETALHE_COLUNAS}, erp_id`;
+  if (await detectarCadastroReal()) colunas += `, ${COLUNAS_DO_CADASTRO_REAL}`;
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
   if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
   return colunas;

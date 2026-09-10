@@ -14,7 +14,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp, podeLancarNoErp } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
@@ -747,12 +747,10 @@ export function PaginaDetalhePedido() {
 
           {/* Aceito, mas ainda fora do Control. Este botão registra o LANÇAMENTO:
               a fábrica importou a planilha no ERP e o pedido passa a esperar só a
-              nota. É mesa do financeiro/fábrica — o representante (venda interna
-              inclusa) não lança, e a API recusa se tentar. */}
-          {order.status === 'approved' &&
-            !order.invoiced &&
-            (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
-            podeAprovar && (
+              nota. É mesa do financeiro — "os pedidos só vão ser incluídos pela
+              Larissa" (Yan, 10/09/2026); o admin fica como válvula. Gerente e
+              representante não lançam, e a API recusa se tentarem. */}
+          {podeLancarNoErp(user?.role, order.status, order.invoiced) && (
               <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
                 <p className="mb-3 text-sm text-foreground">
                   Pedido aceito. Depois de importar a planilha no Control, marque aqui que ele foi

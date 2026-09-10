@@ -105,7 +105,8 @@ apps/api/src/
 │       ├── 037_tarefas_do_representante.sql → rep_tasks (o que o escritório pede ao rep; com local e observacoes)
 │       ├── 038_perfil_relacionamento.sql → role 'relacionamento' no CHECK de users (a conta da Bruna)
 │       ├── 039_controle_de_inatividade.sql → customers.inactivity_* (motivo + observação do cliente vermelho)
-│       └── 040_pedidos_excluidos.sql → deleted_orders (cópia do pedido antes do DELETE; a aba "Excluídos" do admin)
+│       ├── 040_pedidos_excluidos.sql → deleted_orders (cópia do pedido antes do DELETE; a aba "Excluídos" do admin)
+│       └── 041_cadastro_real.sql → customers.cep/logradouro/numero/complemento/bairro/cidade/uf, inscricao_estadual, observacoes, erp_linked_by/at, cnpj_digits (gerada)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

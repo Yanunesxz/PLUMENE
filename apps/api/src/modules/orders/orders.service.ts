@@ -1078,6 +1078,12 @@ export async function updateOrderStatus(
     throw new Error('FORBIDDEN_ROLE');
   }
 
+  // "Os pedidos só vão ser incluídos pela Larissa" (Yan, 10/09/2026): lançar
+  // no ERP é do financeiro. O gerente vê e organiza; o admin fica como válvula.
+  if (role === 'manager' && body.status === 'sent_erp') {
+    throw new Error('FORBIDDEN_ROLE');
+  }
+
   const allowed = ORDER_STATUS_FLOW[row.status];
   if (!allowed.includes(body.status)) {
     throw new Error('INVALID_STATUS_TRANSITION');

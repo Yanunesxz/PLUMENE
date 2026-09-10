@@ -14,3 +14,5 @@ export * from './constants/userRole.js';
 export * from './pricing/faixaDeTamanho.js';
 export * from './pricing/priceTier.js';
 export * from './pedidos/observacaoCores.js';
+export * from './cadastro/documento.js';
+export * from './cadastro/endereco.js';

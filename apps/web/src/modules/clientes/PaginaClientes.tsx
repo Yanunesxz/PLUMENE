@@ -25,9 +25,39 @@ import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { situacaoDaCompra, type Frescor } from '../../lib/carteira.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import {
+  documento,
+  formatarDocumento,
+  cepValido,
+  formatarCep,
+  apenasDigitos,
+  ufValida,
+  UFS,
+} from '@csb/shared';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
-const EMPTY_CUST = { name: '', cnpj: '', trade_name: '', whatsapp: '', email: '', address: '' };
+// O cadastro "mais real" (Yan, 10/09/2026): igual ao do Control — documento
+// com dígito verificador, endereço em campos com CEP obrigatório.
+const EMPTY_CUST = {
+  name: '',
+  trade_name: '',
+  cnpj: '',
+  inscricao_estadual: '',
+  cep: '',
+  logradouro: '',
+  numero: '',
+  complemento: '',
+  bairro: '',
+  cidade: '',
+  uf: '',
+  whatsapp: '',
+  email: '',
+  observacoes: '',
+};
+
+const campoClasse =
+  'flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground';
 
 export function PaginaClientes() {
   const { token, user } = useAuthStore();
@@ -47,6 +77,33 @@ export function PaginaClientes() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
   const setF = (k: keyof typeof EMPTY_CUST) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
+  const isOnline = useOnlineStatus();
+  const [buscandoCep, setBuscandoCep] = useState(false);
+
+  // O CEP preenche o endereço (ViaCEP) — só online; sem rede a pessoa digita.
+  // Nunca sobrescreve o que já foi digitado: é ajuda, não dono do formulário.
+  const buscarCep = async (cep: string) => {
+    if (!isOnline || !cepValido(cep) || buscandoCep) return;
+    setBuscandoCep(true);
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${apenasDigitos(cep)}/json/`, {
+        signal: AbortSignal.timeout(6000),
+      });
+      const j = (await res.json()) as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
+      if (j.erro) return;
+      setForm((f) => ({
+        ...f,
+        logradouro: f.logradouro || j.logradouro || '',
+        bairro: f.bairro || j.bairro || '',
+        cidade: f.cidade || j.localidade || '',
+        uf: f.uf || j.uf || '',
+      }));
+    } catch {
+      /* sem rede ou ViaCEP fora: a pessoa digita */
+    } finally {
+      setBuscandoCep(false);
+    }
+  };
 
   const customers = useLiveQuery(
     () =>
@@ -72,22 +129,28 @@ export function PaginaClientes() {
       : 'all',
   );
 
-  const { visiveis, contagem } = useMemo(() => {
+  // Cliente nascido no app sem o número do Control: é a fila do financeiro
+  // para atrelar ("esses números vão ter que ser incluídos e atrelados").
+  const [soSemCodigo, setSoSemCodigo] = useState(false);
+
+  const { visiveis, contagem, semCodigo } = useMemo(() => {
     const decorados = (customers ?? []).map((c) => ({
       cliente: c,
       situacao: situacaoDaCompra(c.last_purchase_at),
     }));
     const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
     for (const d of decorados) contagem[d.situacao.nivel]++;
+    const semCodigo = decorados.filter((d) => !d.cliente.erp_id).length;
     let visiveis = frescor === 'all' ? decorados : decorados.filter((d) => d.situacao.nivel === frescor);
+    if (soSemCodigo) visiveis = visiveis.filter((d) => !d.cliente.erp_id);
     // Filtrando por frescor, quem está há MAIS tempo sem comprar vem primeiro —
     // é a ordem de prioridade da visita. Sem filtro, a ordem alfabética de
     // sempre (a busca por nome depende dela).
     if (frescor !== 'all') {
       visiveis = [...visiveis].sort((a, b) => (b.situacao.dias ?? 0) - (a.situacao.dias ?? 0));
     }
-    return { visiveis, contagem };
-  }, [customers, frescor]);
+    return { visiveis, contagem, semCodigo };
+  }, [customers, frescor, soSemCodigo]);
 
   // As cores do Yan: verde ativo, amarelo atenção, vermelho inativo.
   // Ordem do Yan (02/09): ativo → atenção → inativo, e o ATIVO com o número —
@@ -132,25 +195,46 @@ export function PaginaClientes() {
   const handleCreate = (e: FormEvent) => {
     e.preventDefault();
     setError('');
-    const digitos = (v: string) => v.replace(/\D/g, '');
-    if (!form.name.trim()) {
+    if (form.name.trim().length < 2) {
       setError('Informe o nome / razão social do cliente.');
       return;
     }
-    // Obrigatórios: nome e CPF/CNPJ. O resto é opcional — cliente cadastrado no
-    // app não vai para o Control, então WhatsApp, e-mail e endereço não travam a
-    // venda. Mas o que estiver preenchido continua validado.
-    const cnpjLen = digitos(form.cnpj).length;
-    if (cnpjLen === 0) {
+    // Igual ao Control (Yan, 10/09/2026): documento de verdade e endereço com
+    // CEP. A mesma régua da API (packages/shared) — avisa aqui antes de mandar.
+    if (!apenasDigitos(form.cnpj)) {
       setError('Informe o CPF ou CNPJ do cliente.');
       return;
     }
-    if (cnpjLen !== 11 && cnpjLen !== 14) {
-      setError('CPF tem 11 dígitos e CNPJ 14.');
+    if (!documento(form.cnpj)) {
+      setError('CPF / CNPJ inválido — confira os números.');
+      return;
+    }
+    if (!cepValido(form.cep)) {
+      setError('Informe o CEP (8 números).');
+      return;
+    }
+    if (!form.logradouro.trim()) {
+      setError('Informe o endereço (rua, avenida…).');
+      return;
+    }
+    if (!form.numero.trim()) {
+      setError('Informe o número do endereço.');
+      return;
+    }
+    if (!form.bairro.trim()) {
+      setError('Informe o bairro.');
+      return;
+    }
+    if (!form.cidade.trim()) {
+      setError('Informe a cidade.');
+      return;
+    }
+    if (!ufValida(form.uf)) {
+      setError('Escolha a UF.');
       return;
     }
     if (form.whatsapp.trim()) {
-      const zapLen = digitos(form.whatsapp).length;
+      const zapLen = apenasDigitos(form.whatsapp).length;
       if (zapLen < 10 || zapLen > 11) {
         setError('WhatsApp precisa do DDD (10 ou 11 dígitos). Deixe em branco se não tiver.');
         return;
@@ -176,12 +260,20 @@ export function PaginaClientes() {
     setSaving(true);
     try {
       const payload: CreateCustomerRequest = {
-        name: form.name,
-        trade_name: form.trade_name || null,
-        cnpj: form.cnpj || null,
-        whatsapp: form.whatsapp || null,
-        email: form.email || null,
-        address: form.address || null,
+        name: form.name.trim(),
+        trade_name: form.trade_name.trim() || null,
+        cnpj: apenasDigitos(form.cnpj),
+        inscricao_estadual: form.inscricao_estadual.trim() || null,
+        cep: apenasDigitos(form.cep),
+        logradouro: form.logradouro.trim(),
+        numero: form.numero.trim(),
+        complemento: form.complemento.trim() || null,
+        bairro: form.bairro.trim(),
+        cidade: form.cidade.trim(),
+        uf: form.uf.trim().toUpperCase(),
+        whatsapp: form.whatsapp.trim() || null,
+        email: form.email.trim() || null,
+        observacoes: form.observacoes.trim() || null,
         // Sem escolha, o servidor usa a única tabela do representante.
         ...(tabelaEscolhida ? { price_table_id: tabelaEscolhida } : {}),
       };
@@ -229,19 +321,93 @@ export function PaginaClientes() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-sm font-medium text-foreground">
-                Nome / Razão social <span className="text-danger">*</span>
+                Razão social <span className="text-danger">*</span>
               </label>
-              <Input value={form.name} onChange={setF('name')} placeholder="Nome do cliente" />
+              <Input value={form.name} onChange={setF('name')} placeholder="Como está no CNPJ" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Nome fantasia</label>
-              <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Opcional" />
+              <Input value={form.trade_name} onChange={setF('trade_name')} placeholder="Como a loja é conhecida" />
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">
                 CPF / CNPJ <span className="text-danger">*</span>
               </label>
-              <Input value={form.cnpj} onChange={setF('cnpj')} placeholder="00.000.000/0000-00" inputMode="numeric" />
+              <Input
+                value={form.cnpj}
+                onChange={setF('cnpj')}
+                onBlur={() => setForm((f) => ({ ...f, cnpj: formatarDocumento(f.cnpj) }))}
+                placeholder="00.000.000/0000-00"
+                inputMode="numeric"
+              />
+              {apenasDigitos(form.cnpj).length >= 11 && !documento(form.cnpj) && (
+                <p className="text-xs text-danger">Este número não é um CPF/CNPJ válido.</p>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">Inscrição Estadual</label>
+              <Input value={form.inscricao_estadual} onChange={setF('inscricao_estadual')} placeholder="Opcional (ou ISENTO)" />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                CEP <span className="text-danger">*</span>
+              </label>
+              <Input
+                value={form.cep}
+                onChange={setF('cep')}
+                onBlur={() => {
+                  setForm((f) => ({ ...f, cep: formatarCep(f.cep) }));
+                  void buscarCep(form.cep);
+                }}
+                placeholder="00000-000"
+                inputMode="numeric"
+              />
+              {buscandoCep && <p className="text-xs text-muted-foreground">Buscando o endereço…</p>}
+            </div>
+            <div className="space-y-1.5 sm:col-span-2">
+              <label className="text-sm font-medium text-foreground">
+                Endereço <span className="text-danger">*</span>
+              </label>
+              <Input value={form.logradouro} onChange={setF('logradouro')} placeholder="Rua, avenida…" />
+            </div>
+            <div className="grid grid-cols-[1fr_2fr] gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  Número <span className="text-danger">*</span>
+                </label>
+                <Input value={form.numero} onChange={setF('numero')} placeholder="123" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">Complemento</label>
+                <Input value={form.complemento} onChange={setF('complemento')} placeholder="Sala, loja, fundos…" />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-sm font-medium text-foreground">
+                Bairro <span className="text-danger">*</span>
+              </label>
+              <Input value={form.bairro} onChange={setF('bairro')} placeholder="Bairro" />
+            </div>
+            <div className="grid grid-cols-[2fr_1fr] gap-3">
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  Cidade <span className="text-danger">*</span>
+                </label>
+                <Input value={form.cidade} onChange={setF('cidade')} placeholder="Cidade" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium text-foreground">
+                  UF <span className="text-danger">*</span>
+                </label>
+                <select value={form.uf} onChange={setF('uf')} className={campoClasse} aria-label="UF">
+                  <option value="">UF</option>
+                  {UFS.map((u) => (
+                    <option key={u} value={u}>
+                      {u}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">WhatsApp</label>
@@ -252,8 +418,14 @@ export function PaginaClientes() {
               <Input type="email" value={form.email} onChange={setF('email')} placeholder="cliente@email.com" autoComplete="off" />
             </div>
             <div className="space-y-1.5 sm:col-span-2">
-              <label className="text-sm font-medium text-foreground">Endereço</label>
-              <Input value={form.address} onChange={setF('address')} placeholder="Rua, número, bairro, cidade - UF" />
+              <label className="text-sm font-medium text-foreground">Observações</label>
+              <textarea
+                value={form.observacoes}
+                onChange={setF('observacoes')}
+                rows={2}
+                placeholder="Vão junto no pedido, como no Control — horário de entrega, referência, recado da loja"
+                className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+              />
             </div>
             <div className="sm:col-span-2">
               <SeletorDeTabela
@@ -311,6 +483,20 @@ export function PaginaClientes() {
             {f.rotulo}
           </button>
         ))}
+        {semCodigo > 0 && (
+          <button
+            type="button"
+            onClick={() => setSoSemCodigo((v) => !v)}
+            className={cn(
+              'rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors',
+              soSemCodigo
+                ? 'border-warn bg-warn-soft text-warn-soft-foreground'
+                : 'border-border bg-background text-muted-foreground hover:bg-sunken',
+            )}
+          >
+            Sem código no ERP ({semCodigo})
+          </button>
+        )}
       </div>
 
       {customers === undefined ? (
@@ -350,7 +536,16 @@ export function PaginaClientes() {
                     <p className="truncate text-xs text-muted-foreground">{customer.trade_name}</p>
                   )}
                   {customer.cnpj && (
-                    <p className="truncate text-xs text-muted-foreground">CNPJ: {customer.cnpj}</p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {apenasDigitos(customer.cnpj).length === 11 ? 'CPF' : 'CNPJ'}: {formatarDocumento(customer.cnpj)}
+                    </p>
+                  )}
+                  {/* O número do Control: quem nasceu no app fica "sem código"
+                      até o financeiro atrelar — visível, para ninguém esquecer. */}
+                  {customer.erp_id ? (
+                    <p className="truncate text-xs text-muted-foreground">Cód. ERP {customer.erp_id}</p>
+                  ) : (
+                    <p className="truncate text-xs text-warn-soft-foreground">Sem código no ERP</p>
                   )}
                   {customer.credit_limit != null && (
                     <p className="truncate text-xs text-muted-foreground">

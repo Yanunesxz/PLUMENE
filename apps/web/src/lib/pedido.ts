@@ -172,6 +172,19 @@ export function decisaoDoPedido(
 }
 
 /**
+ * Quem vê o botão "Lançar no ERP": o financeiro (a Larissa — "os pedidos só
+ * vão ser incluídos por ela", Yan 10/09/2026) e o admin como válvula. Pedido
+ * aceito e ainda sem nota. Função pura para o teste trancar a regra.
+ */
+export function podeLancarNoErp(
+  papel: AuthRole | undefined,
+  status: OrderStatus,
+  invoiced: boolean | null | undefined,
+): boolean {
+  return status === 'approved' && !invoiced && (papel === 'financeiro' || papel === 'admin');
+}
+
+/**
  * O link "wa.me" que abre o WhatsApp com a mensagem pronta.
  *
  * O cadastro guarda o número como o Control mandou — "(11) 1734-0709",

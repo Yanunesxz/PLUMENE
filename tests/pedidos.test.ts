@@ -178,6 +178,21 @@ describe('quem decide o pedido na fila', () => {
     expect(r?.status).toBe('approved');
   });
 
+  it('lançar no ERP é do financeiro — o gerente não inclui pedido no Control', async () => {
+    // "Os pedidos só vão ser incluídos pela Larissa" (Yan, 10/09/2026).
+    const aprovado = { data: { status: 'approved', rep_id: REP }, error: null };
+    const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP }, error: null };
+    // O fake pré-busca a resposta seguinte a cada consulta terminada: a leitura
+    // do gerente consome duas, a do financeiro mais uma, e o update pega a
+    // última (que fica "grudada").
+    const { updateOrderStatus } = await carregarServico({ orders: [aprovado, aprovado, aprovado, lancado] });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '' }, 'manager'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
+    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '' }, 'financeiro');
+    expect(r?.status).toBe('sent_erp');
+  });
+
   it('o gerente ainda TRIA o pedido de quem sumiu (pending_rep → fila)', async () => {
     // Organizar continua com ele; só a decisão final saiu.
     const triagem = { data: { status: 'pending_rep', rep_id: REP }, error: null };
