@@ -1,0 +1,660 @@
+[
+ {
+  "id": "19842cc8-e35f-405d-a2c7-4339522bcc36",
+  "tabela": 2,
+  "ref": "0141",
+  "nome": "PIJAMA LONGO MALHA MESCLA INFANTIL MASC.",
+  "de": {
+   "price": 38.9,
+   "larger": null
+  },
+  "para": {
+   "price": 38.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "ced48e9f-94ab-4293-b31d-501874751e8a",
+  "tabela": 2,
+  "ref": "0142",
+  "nome": "PIJAMA LONGO MALHA INFANTIL FEM.",
+  "de": {
+   "price": 31.9,
+   "larger": null
+  },
+  "para": {
+   "price": 31.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "e9b1c43b-2cfd-4809-887e-2dfff40cfeb2",
+  "tabela": 2,
+  "ref": "0143",
+  "nome": "PIJAMA LONGO MALHA INFANTIL MASC.",
+  "de": {
+   "price": 31.9,
+   "larger": null
+  },
+  "para": {
+   "price": 31.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "41ef20f8-d694-4d66-b45e-6a88341798f6",
+  "tabela": 2,
+  "ref": "0145",
+  "nome": "PIJAMA LONGO MALHA MASCULINO",
+  "de": {
+   "price": 54.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 54.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "f7042d72-d7c2-4742-a40f-35ae355b511a",
+  "tabela": 2,
+  "ref": "0160",
+  "nome": "PIJAMA LONGO MOLETINHO FLANELADO FEM.",
+  "de": {
+   "price": 75.9,
+   "larger": 82
+  },
+  "para": {
+   "price": 75.9,
+   "larger": 82.5
+  }
+ },
+ {
+  "id": "809950a2-e774-4214-a109-c31006ab3adf",
+  "tabela": 2,
+  "ref": "0161",
+  "nome": "PIJAMA LONGO MOLETINHO ABERTO FEM.",
+  "de": {
+   "price": 83.9,
+   "larger": 91.9
+  },
+  "para": {
+   "price": 83.5,
+   "larger": 91.9
+  }
+ },
+ {
+  "id": "7e7d4dcb-e353-425a-aca3-a6f242ca749c",
+  "tabela": 2,
+  "ref": "0162",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL FEM.",
+  "de": {
+   "price": 50.9,
+   "larger": null
+  },
+  "para": {
+   "price": 50.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "098269d3-5d09-4982-b001-975892222c27",
+  "tabela": 2,
+  "ref": "0163",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL MASC.",
+  "de": {
+   "price": 50.9,
+   "larger": null
+  },
+  "para": {
+   "price": 50.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "02a86f8a-5f88-46f5-9b2c-6d00065246d2",
+  "tabela": 2,
+  "ref": "0169",
+  "nome": "PIJAMA LONGO MOLETINHO FEM.",
+  "de": {
+   "price": 84.9,
+   "larger": 93
+  },
+  "para": {
+   "price": 84.9,
+   "larger": 93.5
+  }
+ },
+ {
+  "id": "8bb3366a-ebb8-4d0c-bfbd-c2a9bf6591cd",
+  "tabela": 2,
+  "ref": "0199",
+  "nome": "PIJAMA LONGO PLUSH LISO FEM.",
+  "de": {
+   "price": 80.9,
+   "larger": 87.9
+  },
+  "para": {
+   "price": 80.9,
+   "larger": 87.5
+  }
+ },
+ {
+  "id": "81d7b336-13a8-4c35-b8b2-6929ca192898",
+  "tabela": 2,
+  "ref": "0200",
+  "nome": "PIJAMA LONGO PLUSH MASCULINO",
+  "de": {
+   "price": 95.9,
+   "larger": 105.9
+  },
+  "para": {
+   "price": 95.9,
+   "larger": 105.5
+  }
+ },
+ {
+  "id": "a4eb075d-597f-4bd9-8b46-f31bf725c26c",
+  "tabela": 2,
+  "ref": "0202",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH MASC.",
+  "de": {
+   "price": 70.9,
+   "larger": null
+  },
+  "para": {
+   "price": 70.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "a07c809e-9097-4ab6-b4f8-ad6eeda83761",
+  "tabela": 2,
+  "ref": "0204",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH FEM.",
+  "de": {
+   "price": 70.9,
+   "larger": null
+  },
+  "para": {
+   "price": 70.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "3c28c8ed-edbb-4888-9208-13b28391d6e7",
+  "tabela": 2,
+  "ref": "0220",
+  "nome": "PIJAMA LONGO SUEDE CANELADO LISO FEM.",
+  "de": {
+   "price": 60.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 60.5,
+   "larger": 65.9
+  }
+ },
+ {
+  "id": "9eb90dba-a0d0-436d-92b8-38379b07414e",
+  "tabela": 2,
+  "ref": "0221",
+  "nome": "PIJAMA LONGO SUEDE CANELADO EST. FEM.",
+  "de": {
+   "price": 60.9,
+   "larger": 65.9
+  },
+  "para": {
+   "price": 60.5,
+   "larger": 65.9
+  }
+ },
+ {
+  "id": "e7de551b-3cee-4b11-b34f-e08e3190cc50",
+  "tabela": 2,
+  "ref": "0240",
+  "nome": "PIJAMA LONGO ESTAMPADO ABERTO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.9
+  }
+ },
+ {
+  "id": "a9347d6d-056f-4a4a-bea1-8001b4f221f0",
+  "tabela": 2,
+  "ref": "0242",
+  "nome": "PIJAMA LONGO ESTAMPADO INFANTIL FEM.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "1fc3ee32-da65-4ff5-af6e-fce2f42a4f72",
+  "tabela": 2,
+  "ref": "0245",
+  "nome": "PIJAMA LONGO ESTAMPADO FEM.",
+  "de": {
+   "price": 48.9,
+   "larger": 53.9
+  },
+  "para": {
+   "price": 48.5,
+   "larger": 53.5
+  }
+ },
+ {
+  "id": "83e420eb-66e3-4c9e-97ef-e643badb3bf0",
+  "tabela": 2,
+  "ref": "0250",
+  "nome": "PIJAMA LONGO DE ONÇA FEM.",
+  "de": {
+   "price": 48.9,
+   "larger": null
+  },
+  "para": {
+   "price": 48.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "34bc8886-1964-4607-a584-c5909addbf38",
+  "tabela": 2,
+  "ref": "0260",
+  "nome": "PIJAMA LONGO SUEDE FELPADO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 58.9
+  },
+  "para": {
+   "price": 53.5,
+   "larger": 58.5
+  }
+ },
+ {
+  "id": "6ad3bedf-9a33-46c8-804c-876fa2385b2e",
+  "tabela": 2,
+  "ref": "0303",
+  "nome": "PIJAMA LONGO ESTAMPADO INFANTIL MASC.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 35.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "605aee51-824f-4734-9419-575cfed4e41a",
+  "tabela": 2,
+  "ref": "0855",
+  "nome": "CAMISOLA AMERICANA MANGA COMPRIDA",
+  "de": {
+   "price": 54.9,
+   "larger": 60.9
+  },
+  "para": {
+   "price": 54.9,
+   "larger": 60.5
+  }
+ },
+ {
+  "id": "a4783a86-8411-4666-b3ec-a7312a54252d",
+  "tabela": 2,
+  "ref": "0880",
+  "nome": "PIJAMA LONGO MALHA MESCLA FEM.",
+  "de": {
+   "price": 58.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.5
+  }
+ },
+ {
+  "id": "cb4b3337-2543-431f-8f08-d7681c93f6c9",
+  "tabela": 2,
+  "ref": "1400",
+  "nome": "PIJAMA LONGO JUVENIL MALHA FEM.",
+  "de": {
+   "price": 40.9,
+   "larger": null
+  },
+  "para": {
+   "price": 40.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "443360fd-dd3c-42e8-92be-100d3aa09f04",
+  "tabela": 2,
+  "ref": "1460",
+  "nome": "PIJAMA LONGO JUVENIL MALHA MASC.",
+  "de": {
+   "price": 42.9,
+   "larger": null
+  },
+  "para": {
+   "price": 42.5,
+   "larger": null
+  }
+ },
+ {
+  "id": "d6348412-d1b2-42aa-86f6-a10b631d1fbe",
+  "tabela": 3,
+  "ref": "0142",
+  "nome": "PIJAMA LONGO MALHA INFANTIL FEM.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 34.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "9513d3b7-2390-4c40-90c9-7134ff290947",
+  "tabela": 3,
+  "ref": "0143",
+  "nome": "PIJAMA LONGO MALHA INFANTIL MASC.",
+  "de": {
+   "price": 35.9,
+   "larger": null
+  },
+  "para": {
+   "price": 34.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "73f05149-ee31-4595-8070-a062fc96e641",
+  "tabela": 3,
+  "ref": "0145",
+  "nome": "PIJAMA LONGO MALHA MASCULINO",
+  "de": {
+   "price": 60.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 59.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "a1c90ef4-7d8a-4084-9773-9308477ff1f8",
+  "tabela": 3,
+  "ref": "0161",
+  "nome": "PIJAMA LONGO MOLETINHO ABERTO FEM.",
+  "de": {
+   "price": 92.9,
+   "larger": 101.9
+  },
+  "para": {
+   "price": 91.9,
+   "larger": 101.9
+  }
+ },
+ {
+  "id": "10f058b1-1e0b-4afe-b7f4-636b62d6d5a2",
+  "tabela": 3,
+  "ref": "0162",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL FEM.",
+  "de": {
+   "price": 56,
+   "larger": null
+  },
+  "para": {
+   "price": 55.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "01ee188f-a06f-43ae-8aa8-d45318f00c1a",
+  "tabela": 3,
+  "ref": "0163",
+  "nome": "PIJAMA LONGO MOLETINHO INFANTIL MASC.",
+  "de": {
+   "price": 56,
+   "larger": null
+  },
+  "para": {
+   "price": 55.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "e7741041-7e6d-47ec-a8bc-f08c4a5029ad",
+  "tabela": 3,
+  "ref": "0199",
+  "nome": "PIJAMA LONGO PLUSH LISO FEM.",
+  "de": {
+   "price": 89,
+   "larger": 96.9
+  },
+  "para": {
+   "price": 88.9,
+   "larger": 96.9
+  }
+ },
+ {
+  "id": "5d3d0855-d794-4725-ac05-d3b6b0092334",
+  "tabela": 3,
+  "ref": "0202",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH MASC.",
+  "de": {
+   "price": 78,
+   "larger": null
+  },
+  "para": {
+   "price": 77.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "f1d2e6e4-e77d-43f3-9b4b-eb9c5065353f",
+  "tabela": 3,
+  "ref": "0204",
+  "nome": "PIJAMA LONGO JUVENIL PLUSH FEM.",
+  "de": {
+   "price": 78,
+   "larger": null
+  },
+  "para": {
+   "price": 77.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "5c269eb1-e731-4702-b5d4-c103be4282e9",
+  "tabela": 3,
+  "ref": "0220",
+  "nome": "PIJAMA LONGO SUEDE CANELADO LISO FEM.",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 66.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "e8fa5c9a-71bb-4d64-a391-0b5764f4ff3b",
+  "tabela": 3,
+  "ref": "0221",
+  "nome": "PIJAMA LONGO SUEDE CANELADO EST. FEM.",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 66.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "37d09786-6cb2-406f-90bc-c1582b2b0d87",
+  "tabela": 3,
+  "ref": "0240",
+  "nome": "PIJAMA LONGO ESTAMPADO ABERTO FEM.",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "db6a7d28-1051-4f5c-a94a-1f50abe26d64",
+  "tabela": 3,
+  "ref": "0245",
+  "nome": "PIJAMA LONGO ESTAMPADO FEM.",
+  "de": {
+   "price": 53.9,
+   "larger": 59.9
+  },
+  "para": {
+   "price": 53.9,
+   "larger": 58.9
+  }
+ },
+ {
+  "id": "7bd2d342-52eb-40a2-863e-faba9142ad93",
+  "tabela": 3,
+  "ref": "0260",
+  "nome": "PIJAMA LONGO SUEDE FELPADO FEM.",
+  "de": {
+   "price": 59.9,
+   "larger": 64.9
+  },
+  "para": {
+   "price": 58.9,
+   "larger": 64.9
+  }
+ },
+ {
+  "id": "80d35efe-8d88-4f48-a861-bc26b1ee4f1b",
+  "tabela": 3,
+  "ref": "0855",
+  "nome": "CAMISOLA AMERICANA MANGA COMPRIDA",
+  "de": {
+   "price": 60.9,
+   "larger": 67
+  },
+  "para": {
+   "price": 60.9,
+   "larger": 66.9
+  }
+ },
+ {
+  "id": "c02619ec-422e-4646-bdac-8fcfad627fff",
+  "tabela": 3,
+  "ref": "0880",
+  "nome": "PIJAMA LONGO MALHA MESCLA FEM.",
+  "de": {
+   "price": 64.9,
+   "larger": 71.9
+  },
+  "para": {
+   "price": 64.9,
+   "larger": 70.9
+  }
+ },
+ {
+  "id": "26d44ecc-f8d1-4585-ba51-5b2ed333d5b8",
+  "tabela": 3,
+  "ref": "1007",
+  "nome": "PIJAMA LONGO FAMILIA INFANTIL FEMININO",
+  "de": {
+   "price": 67,
+   "larger": null
+  },
+  "para": {
+   "price": 67.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "0bc81296-72ff-42b2-b9e0-2462696dd8bc",
+  "tabela": 3,
+  "ref": "1023",
+  "nome": "PIJAMA LONGO FAMILIA INFANTIL MASCULINO",
+  "de": {
+   "price": 67,
+   "larger": null
+  },
+  "para": {
+   "price": 67.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "a363320e-e34c-4456-ac43-c24d6b0a3dc2",
+  "tabela": 3,
+  "ref": "1031",
+  "nome": "PIJAMA LONGO MESCLA LISO FEMININO",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 67.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "ee8cd747-1615-46d7-8fd9-a49ef85c5510",
+  "tabela": 3,
+  "ref": "1033",
+  "nome": "PIJAMA LONGO CANELADO FEMININO",
+  "de": {
+   "price": 67,
+   "larger": 72.9
+  },
+  "para": {
+   "price": 67.9,
+   "larger": 72.9
+  }
+ },
+ {
+  "id": "e9889c63-c9b9-4369-a232-16cfa9c09909",
+  "tabela": 3,
+  "ref": "1400",
+  "nome": "PIJAMA LONGO JUVENIL MALHA FEM.",
+  "de": {
+   "price": 45,
+   "larger": null
+  },
+  "para": {
+   "price": 44.9,
+   "larger": null
+  }
+ },
+ {
+  "id": "27ce36e4-dd27-4151-9749-e1a89e00eeec",
+  "tabela": 3,
+  "ref": "1460",
+  "nome": "PIJAMA LONGO JUVENIL MALHA MASC.",
+  "de": {
+   "price": 47.9,
+   "larger": null
+  },
+  "para": {
+   "price": 46.9,
+   "larger": null
+  }
+ }
+]
