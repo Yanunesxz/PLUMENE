@@ -34,6 +34,16 @@ interface LinhaEdit {
   unit_price: number;
 }
 
+/**
+ * Preço de um produto NA TABELA DO PEDIDO. Vive só em memória, nesta tela: no
+ * cache do aparelho cabe um preço por produto, sem dizer de que tabela ele
+ * veio, e era isso que fazia a peça nova nascer com o preço de outra tabela.
+ */
+interface PrecoNaTabela {
+  price: number | null;
+  price_larger: number | null;
+}
+
 export function PaginaDetalhePedido() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -180,6 +190,9 @@ export function PaginaDetalhePedido() {
   const [buscaPeca, setBuscaPeca] = useState('');
   const [pickerEdit, setPickerEdit] = useState<{ product: ProductWithPrice; group: ProductWithPrice[] } | null>(null);
   const [salvandoPecas, setSalvandoPecas] = useState(false);
+  /** produto → preço na tabela DESTE pedido. null = não deu para buscar. */
+  const [precosDaTabela, setPrecosDaTabela] = useState<Map<string, PrecoNaTabela> | null>(null);
+  const [carregandoPrecos, setCarregandoPrecos] = useState(false);
 
   const podeEditarPecas = podeMudarPedido;
 
@@ -211,8 +224,13 @@ export function PaginaDetalhePedido() {
   const adicionarPecas = (chosen: ProductWithPrice, lines: PickedSize[]) => {
     setLinhasEdit((ls) => {
       const novas = [...ls];
+      // O preço na tela tem que ser o da tabela DESTE pedido. O do `chosen` vem
+      // do cache do aparelho, que guarda o preço da última tela a baixar o
+      // catálogo — a lista de pedidos pede /products sem tabela, então é a de
+      // quem está logado. Sem a busca por tabela, cai no cache, como era.
+      const daTabela = precosDaTabela?.get(chosen.id) ?? chosen;
       for (const l of lines) {
-        const preco = precoDoTamanho(l.size, chosen.price, chosen.price_larger) ?? 0;
+        const preco = precoDoTamanho(l.size, daTabela.price, daTabela.price_larger) ?? 0;
         const idx = novas.findIndex(
           (n) => n.product_id === chosen.id && n.variant_id === l.variant_id,
         );
@@ -304,6 +322,71 @@ export function PaginaDetalhePedido() {
       ? (condicoes.find((c) => c.id === order.payment_condition_id)?.description ?? null)
       : null);
 
+  // ─── O preço que a EDIÇÃO mostra sai da tabela DO PEDIDO ───────────────────
+  /**
+   * Qual tabela precifica este pedido, na mesma ordem do servidor (setOrderItems):
+   * a gravada no pedido, senão a do cadastro do cliente, senão a do
+   * representante — esta última só quando o dono é quem está logado, que é o
+   * único caso em que esta tela sabe qual é.
+   */
+  const tabelaDoPedido = useMemo(() => {
+    if (!order) return null;
+    const doCliente = order.customer_id
+      ? ((customers ?? []).find((c) => c.id === order.customer_id)?.price_table_id ?? null)
+      : null;
+    return (
+      order.price_table_id ??
+      doCliente ??
+      (order.rep_id === user?.id ? (user?.price_table_id ?? null) : null)
+    );
+  }, [order, customers, user]);
+
+  /**
+   * Ao entrar em edição, baixa o catálogo NA TABELA DO PEDIDO e guarda só em
+   * memória. Nada disso vai para o Dexie: gravar ali trocaria o preço de todas
+   * as outras telas — é a mesma precaução que o seletor de tabela do catálogo
+   * já toma. Falhou (sem sinal, ou 403 de tabela que o representante não vê)?
+   * A tela segue com o cache do aparelho, como era antes desta correção.
+   */
+  useEffect(() => {
+    if (!editando || !token || !tabelaDoPedido) {
+      setPrecosDaTabela(null);
+      return;
+    }
+    let vivo = true;
+    setCarregandoPrecos(true);
+    void api
+      .getLista<ApiResponse<ProductWithPrice[]>>(
+        `/products?price_table_id=${encodeURIComponent(tabelaDoPedido)}`,
+        token,
+      )
+      .then((res) => {
+        if (!vivo) return;
+        const mapa = new Map<string, PrecoNaTabela>();
+        // Só o que TEM preço nesta tabela: peça sem preço aqui derruba a edição
+        // inteira no salvar, com "preço não encontrado" e sem dizer qual ref.
+        for (const p of res.data) {
+          if (p.price != null) mapa.set(p.id, { price: p.price, price_larger: p.price_larger });
+        }
+        setPrecosDaTabela(mapa);
+      })
+      .catch(() => {
+        if (vivo) setPrecosDaTabela(null);
+      })
+      .finally(() => {
+        if (vivo) setCarregandoPrecos(false);
+      });
+    return () => {
+      vivo = false;
+    };
+  }, [editando, token, tabelaDoPedido]);
+
+  /** O produto com o preço da tabela do pedido — só para mostrar e escolher. */
+  const naTabelaDoPedido = (p: ProductWithPrice): ProductWithPrice => {
+    const daTabela = precosDaTabela?.get(p.id);
+    return daTabela ? { ...p, price: daTabela.price, price_larger: daTabela.price_larger } : p;
+  };
+
   const prodMap = useMemo(() => {
     const m = new Map<string, ProductWithPrice>();
     for (const p of products ?? []) m.set(p.id, p);
@@ -322,8 +405,12 @@ export function PaginaDetalhePedido() {
       .filter(
         (p) => p.active && (p.sku.toLowerCase().includes(q) || p.name.toLowerCase().includes(q)),
       )
+      // Peça sem preço na tabela DESTE pedido não pode entrar: ao salvar, o
+      // servidor recusa a edição inteira com "preço não encontrado" e sem dizer
+      // qual referência. Enquanto a busca não respondeu, a lista fica como era.
+      .filter((p) => !precosDaTabela || precosDaTabela.has(p.id))
       .slice(0, 6);
-  }, [buscaPeca, products]);
+  }, [buscaPeca, products, precosDaTabela]);
 
   const abrirPickerEdit = (p: ProductWithPrice) => {
     const group = p.variant_group
@@ -859,8 +946,13 @@ export function PaginaDetalhePedido() {
                   <input
                     value={buscaPeca}
                     onChange={(e) => setBuscaPeca(e.target.value)}
-                    placeholder="Adicionar peça — referência ou nome"
-                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-subtle"
+                    disabled={carregandoPrecos}
+                    placeholder={
+                      carregandoPrecos
+                        ? 'Buscando o preço da tabela deste pedido…'
+                        : 'Adicionar peça — referência ou nome'
+                    }
+                    className="w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-subtle disabled:opacity-60"
                   />
                   {resultadosBusca.length > 0 && (
                     <ul className="mt-2 overflow-hidden rounded-lg border border-border">
@@ -1145,8 +1237,10 @@ export function PaginaDetalhePedido() {
 
       {pickerEdit && (
         <SeletorTamanho
-          product={pickerEdit.product}
-          colorGroup={pickerEdit.group.length > 1 ? pickerEdit.group : undefined}
+          product={naTabelaDoPedido(pickerEdit.product)}
+          colorGroup={
+            pickerEdit.group.length > 1 ? pickerEdit.group.map(naTabelaDoPedido) : undefined
+          }
           onClose={() => setPickerEdit(null)}
           onConfirm={(chosen, lines) => adicionarPecas(chosen, lines)}
         />
