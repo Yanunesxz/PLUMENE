@@ -131,7 +131,8 @@ export function PaginaClientes() {
 
   // Cliente nascido no app sem o número do Control: é a fila do financeiro
   // para atrelar ("esses números vão ter que ser incluídos e atrelados").
-  const [soSemCodigo, setSoSemCodigo] = useState(false);
+  // ?erp=sem: o card da Minha Área do financeiro cai aqui já filtrado.
+  const [soSemCodigo, setSoSemCodigo] = useState(params.get('erp') === 'sem');
 
   const { visiveis, contagem, semCodigo } = useMemo(() => {
     const decorados = (customers ?? []).map((c) => ({

@@ -202,6 +202,8 @@ export function PaginaMinhaArea() {
   }, [orders]);
 
   const clientes = customers?.length ?? 0;
+  // Nascidos no app e ainda sem o número do Control — a fila de inclusão.
+  const clientesSemCodigo = useMemo(() => (customers ?? []).filter((c) => !c.erp_id).length, [customers]);
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
   const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
@@ -374,6 +376,23 @@ export function PaginaMinhaArea() {
             <p className="tnum text-xl font-bold text-foreground">{formatBRL(m.faturadoMesPassado)}</p>
           </div>
         </section>
+      )}
+
+      {/* A fila da Larissa: cliente cadastrado pelo app ainda sem o número do
+          Control. Ela inclui lá e volta pra atrelar — o toque abre a lista já
+          filtrada. Só pra quem inclui (financeiro; admin como válvula). */}
+      {(user?.role === 'financeiro' || user?.role === 'admin') && clientesSemCodigo > 0 && (
+        <Link
+          to="/customers?erp=sem"
+          className="block rounded-xl border border-primary/30 bg-primary-soft p-4 transition-colors hover:border-primary/60"
+        >
+          <p className="text-sm font-semibold text-primary-soft-foreground">
+            {clientesSemCodigo} cliente{clientesSemCodigo > 1 ? 's' : ''} para incluir no Control
+          </p>
+          <p className="mt-0.5 text-xs text-primary-soft-foreground/80">
+            Cadastrados pelo app, ainda sem código do ERP. Toque para ver e atrelar os números.
+          </p>
+        </Link>
       )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.

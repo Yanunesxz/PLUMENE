@@ -10,6 +10,7 @@ import {
 import { z } from 'zod';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
+import { avisarClienteNovoParaIncluir } from '../push/push.avisos.js';
 import {
   createCustomerSchema,
   trocarTabelaDoClienteSchema,
@@ -142,6 +143,9 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
     });
     return;
   }
+  // O cadastro novo CHEGA pra Larissa: ela inclui no Control e atrela o código.
+  // Carona, nunca condição — o push falhando não desfaz o cadastro.
+  avisarClienteNovoParaIncluir(company_id, { id: customer.id, name: customer.name }, rep_id);
   await reply.status(201).send({ data: customer });
 }
 

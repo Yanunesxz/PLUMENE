@@ -46,6 +46,32 @@ export function avisarTriagemDoRep(company_id: string, pedido: PedidoParaAviso):
 }
 
 /**
+ * Cliente novo cadastrado pelo app — chega pra quem INCLUI no Control (a
+ * Larissa, financeiro; admin como válvula). É ela quem cadastra o cliente no
+ * ERP e volta ao app pra atrelar o código (Yan, 10/09/2026: "tem que ter o
+ * botão pra chegar pra Larissa"). Quem cadastrou não recebe o próprio aviso.
+ */
+export function avisarClienteNovoParaIncluir(
+  company_id: string,
+  cliente: { id: string; name: string },
+  quemCadastrou: string,
+): void {
+  engolir(
+    enviarParaPapeis(
+      company_id,
+      ['financeiro', 'admin'],
+      {
+        title: 'Cliente novo para incluir no Control',
+        body: `${cliente.name} foi cadastrado pelo app. Inclua no Control e atrele o código.`,
+        url: `/customers/${cliente.id}`,
+        tag: `cliente-${cliente.id}`,
+      },
+      quemCadastrou,
+    ),
+  );
+}
+
+/**
  * Foi para a fábrica — quem DECIDE fica sabendo (menos quem enviou). O gerente
  * não recebe: o pedido não passa mais por ele (Yan, 02/09/2026); ele acompanha
  * pelo Painel quando quiser.
