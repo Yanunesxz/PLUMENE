@@ -16,7 +16,12 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
   const { token } = useAuthStore();
   const [decidindo, setDecidindo] = useState<string | null>(null);
 
-  const decidir = async (orderId: string, status: OrderStatus): Promise<boolean> => {
+  /** `extra`: o que o passo precisa além do status — o número do Control ao lançar. */
+  const decidir = async (
+    orderId: string,
+    status: OrderStatus,
+    extra?: { erp_order_id?: string },
+  ): Promise<boolean> => {
     if (!token || decidindo) return false;
 
     // Decidir é irreversível e vale para outras pessoas — não entra na fila
@@ -29,8 +34,11 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
 
     setDecidindo(orderId);
     try {
-      await api.patch<ApiResponse<Order>>(`/orders/${orderId}/status`, { status }, token);
-      await db.orders.update(orderId, { status });
+      const res = await api.patch<ApiResponse<Order>>(`/orders/${orderId}/status`, { status, ...(extra ?? {}) }, token);
+      await db.orders.update(orderId, {
+        status,
+        ...(res.data.erp_order_id ? { erp_order_id: res.data.erp_order_id } : {}),
+      });
       aoTerminar?.(
         status === 'rejected'
           ? 'Pedido recusado.'

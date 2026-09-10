@@ -6,6 +6,7 @@ import {
   createCustomerHandler,
   trocarTabelaDoClienteHandler,
   marcarInatividadeHandler,
+  atrelarCodigoErpHandler,
 } from './customers.controller.js';
 
 export async function customersRouter(fastify: FastifyInstance): Promise<void> {
@@ -33,5 +34,12 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
     '/customers/:id/inatividade',
     { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'relacionamento'])] },
     marcarInatividadeHandler,
+  );
+  // O número do cliente no Control, atrelado ao cadastro nascido no app. É a
+  // Larissa (financeiro) quem inclui e atrela — o admin fica como válvula.
+  fastify.patch(
+    '/customers/:id/codigo-erp',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    atrelarCodigoErpHandler,
   );
 }

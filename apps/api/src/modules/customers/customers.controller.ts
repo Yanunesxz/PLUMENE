@@ -5,11 +5,17 @@ import {
   atualizarTabelaDoCliente,
   obterCliente,
   marcarInatividade,
+  atrelarCodigoErp,
 } from './customers.service.js';
 import { z } from 'zod';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
-import { createCustomerSchema, trocarTabelaDoClienteSchema } from './customers.schema.js';
+import { avisarClienteNovoParaIncluir } from '../push/push.avisos.js';
+import {
+  createCustomerSchema,
+  trocarTabelaDoClienteSchema,
+  atrelarCodigoErpSchema,
+} from './customers.schema.js';
 
 const inatividadeSchema = z.object({
   motivo: z.string().trim().min(2).max(200),
@@ -105,13 +111,30 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
     {
       name: body.name,
       trade_name: body.trade_name ?? null,
-      cnpj: body.cnpj ?? null,
+      cnpj: body.cnpj,
+      inscricao_estadual: body.inscricao_estadual ?? null,
+      cep: body.cep,
+      logradouro: body.logradouro,
+      numero: body.numero,
+      complemento: body.complemento ?? null,
+      bairro: body.bairro,
+      cidade: body.cidade,
+      uf: body.uf,
       whatsapp: body.whatsapp ?? null,
       email: body.email ?? null,
-      address: body.address ?? null,
+      observacoes: body.observacoes ?? null,
     },
     tabela.price_table_id,
   );
+  if ('duplicado' in customer) {
+    const d = customer.duplicado;
+    await reply.status(409).send({
+      error: `Este CPF/CNPJ já está cadastrado: ${d.name}${d.erp_id ? ` (cód. ${d.erp_id})` : ''}`,
+      code: 'CLIENTE_DUPLICADO',
+      statusCode: 409,
+    });
+    return;
+  }
   if ('erro' in customer) {
     await reply.status(500).send({
       error: `Não foi possível criar o cliente: ${customer.erro}`,
@@ -120,6 +143,9 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
     });
     return;
   }
+  // O cadastro novo CHEGA pra Larissa: ela inclui no Control e atrela o código.
+  // Carona, nunca condição — o push falhando não desfaz o cadastro.
+  avisarClienteNovoParaIncluir(company_id, { id: customer.id, name: customer.name }, rep_id);
   await reply.status(201).send({ data: customer });
 }
 
@@ -224,4 +250,30 @@ export async function marcarInatividadeHandler(
     code: 'UPDATE_FAILED',
     statusCode: 500,
   });
+}
+
+/** O financeiro atrela o número do Control a um cliente nascido no app. */
+export async function atrelarCodigoErpHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id, sub } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(atrelarCodigoErpSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await atrelarCodigoErp(company_id, id, body.erp_id, sub);
+  if (r.ok) {
+    await reply.send({ data: { erp_id: r.erp_id } });
+    return;
+  }
+  const respostas: Record<typeof r.motivo, { status: number; error: string; code: string }> = {
+    codigo_invalido: { status: 422, error: 'Código inválido — o Control usa até 5 números (ex.: 05836)', code: 'CODIGO_INVALIDO' },
+    cliente_nao_encontrado: { status: 404, error: 'Cliente não encontrado', code: 'NOT_FOUND' },
+    ja_tem_codigo: { status: 409, error: 'Este cliente já tem código do ERP — quem muda é o Control', code: 'JA_TEM_CODIGO' },
+    codigo_em_uso: { status: 409, error: `Este código já é de outro cliente: ${r.detalhe ?? ''}`, code: 'CODIGO_EM_USO' },
+    erro: { status: 500, error: `Não foi possível atrelar o código: ${r.detalhe ?? ''}`, code: 'UPDATE_FAILED' },
+  };
+  const resp = respostas[r.motivo];
+  await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
 }

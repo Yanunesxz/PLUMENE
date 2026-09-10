@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { numeroErpValido } from '@csb/shared';
 
 export const createOrderSchema = z.object({
   // Opcional no schema porque o controller decide quem é o cliente: o
@@ -37,6 +38,14 @@ export const updateOrderStatusSchema = z.object({
   // Ele só nasce assim, quando a loja ou a vitrine monta o pedido.
   status: z.enum(['draft', 'pending_approval', 'approved', 'rejected', 'sent_erp', 'error_erp']),
   notes: z.string().default(''),
+  // O número do Control ao lançar ("SX14627"). Se vier, tem de ter o formato;
+  // se É obrigatório (sent_erp) quem cobra é o service, que conhece o passo.
+  erp_order_id: z
+    .string()
+    .trim()
+    .max(12)
+    .optional()
+    .refine((v) => v == null || v === '' || numeroErpValido(v), 'Número do Control inválido — são duas letras e a numeração, ex.: SX14627'),
 });
 
 export const setInvoicedSchema = z.object({

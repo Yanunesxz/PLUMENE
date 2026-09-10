@@ -14,7 +14,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp } from '../../lib/pedido.js';
+import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp, podeLancarNoErp } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
@@ -22,6 +22,7 @@ import { SeletorTamanho, type PickedSize } from '../../components/comercial/Sele
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
+import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -74,9 +75,33 @@ export function PaginaDetalhePedido() {
   // uma lista para apertar o botão é o tipo de caminho que ninguém descobre.
   const decisao = order ? decisaoDoPedido(user?.role, order.status, podeAprovar) : null;
 
-  const handleDecisao = async (status: OrderStatus) => {
+  const handleDecisao = async (status: OrderStatus, extra?: { erp_order_id?: string }) => {
     if (!id || !order) return;
-    if (await decidir(id, status)) setOrder({ ...order, status });
+    if (await decidir(id, status, extra)) setOrder({ ...order, status, ...(extra ?? {}) });
+  };
+
+  // ─── Lançar no Control: o número que o ERP deu ─────────────────────────────
+  const [lancando, setLancando] = useState(false);
+  const [ultimoErp, setUltimoErp] = useState<string | null>(null);
+  const [carregandoUltimo, setCarregandoUltimo] = useState(false);
+
+  const abrirLancamento = async () => {
+    setLancando(true);
+    if (!token) return;
+    setCarregandoUltimo(true);
+    try {
+      const res = await api.get<ApiResponse<{ ultimo: string | null }>>('/orders/ultimo-numero-erp', token);
+      setUltimoErp(res.data.ultimo);
+    } catch {
+      setUltimoErp(null); // sem sugestão; ela digita
+    } finally {
+      setCarregandoUltimo(false);
+    }
+  };
+
+  const lancarNoErp = async (numeroErp: string) => {
+    await handleDecisao('sent_erp', { erp_order_id: numeroErp });
+    setLancando(false);
   };
 
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
@@ -554,6 +579,13 @@ export function PaginaDetalhePedido() {
             <div className="flex items-start justify-between gap-2">
               <span className="flex min-w-0 items-center gap-1.5">
                 <span className="font-mono text-xs text-muted-foreground">#{order.order_number ?? order.id.slice(0, 8)}</span>
+                {/* O número do Control, quando já foi lançado: é por ele que a
+                    fábrica e o financeiro falam do pedido. */}
+                {order.erp_order_id && !ehLoja && (
+                  <span className="shrink-0 rounded bg-primary-soft px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary-soft-foreground">
+                    Control {order.erp_order_id}
+                  </span>
+                )}
                 {origemParaExibir(order) && (
                   <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                     {origemParaExibir(order)}
@@ -747,22 +779,20 @@ export function PaginaDetalhePedido() {
 
           {/* Aceito, mas ainda fora do Control. Este botão registra o LANÇAMENTO:
               a fábrica importou a planilha no ERP e o pedido passa a esperar só a
-              nota. É mesa do financeiro/fábrica — o representante (venda interna
-              inclusa) não lança, e a API recusa se tentar. */}
-          {order.status === 'approved' &&
-            !order.invoiced &&
-            (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') &&
-            podeAprovar && (
+              nota. É mesa do financeiro — "os pedidos só vão ser incluídos pela
+              Larissa" (Yan, 10/09/2026); o admin fica como válvula. Gerente e
+              representante não lançam, e a API recusa se tentarem. */}
+          {podeLancarNoErp(user?.role, order.status, order.invoiced) && (
               <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
                 <p className="mb-3 text-sm text-foreground">
-                  Pedido aceito. Depois de importar a planilha no Control, marque aqui que ele foi
-                  lançado — ele sai da fila &quot;A lançar&quot; e fica aguardando a nota.
+                  Pedido aceito. Depois de importar a planilha no Control, lance aqui com o número
+                  que o Control deu — ele sai da fila &quot;A lançar&quot; e fica aguardando a nota.
                 </p>
                 <Button
                   size="lg"
                   className="w-full"
                   disabled={decidindo !== null}
-                  onClick={() => void handleDecisao('sent_erp')}
+                  onClick={() => void abrirLancamento()}
                 >
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                   Lançar no ERP
@@ -1119,6 +1149,17 @@ export function PaginaDetalhePedido() {
           colorGroup={pickerEdit.group.length > 1 ? pickerEdit.group : undefined}
           onClose={() => setPickerEdit(null)}
           onConfirm={(chosen, lines) => adicionarPecas(chosen, lines)}
+        />
+      )}
+
+      {lancando && order && (
+        <LancarNoErp
+          numeroDoPedido={order.order_number}
+          ultimo={ultimoErp}
+          carregandoUltimo={carregandoUltimo}
+          ocupado={decidindo !== null}
+          onConfirmar={(n) => void lancarNoErp(n)}
+          onCancelar={() => setLancando(false)}
         />
       )}
 

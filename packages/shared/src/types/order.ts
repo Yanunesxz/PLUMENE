@@ -197,6 +197,11 @@ export interface CreateOrderRequest {
 export interface UpdateOrderStatusRequest {
   status: OrderStatus;
   notes?: string;
+  /**
+   * Ao LANÇAR (sent_erp): o número que o Control deu ao pedido — duas letras
+   * e a numeração ("SX14627"). Obrigatório nesse passo; quem cunha é o ERP.
+   */
+  erp_order_id?: string;
 }
 
 export interface OfflineSyncOrder extends CreateOrderRequest {

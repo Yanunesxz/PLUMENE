@@ -23,6 +23,7 @@ import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { seloDoPedido } from '../../lib/pedido.js';
 import { situacaoDaCompra, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
+import { formatarDocumento, formatarCep, apenasDigitos } from '@csb/shared';
 import type { ApiResponse, CustomerDetail } from '@csb/shared';
 
 /**
@@ -69,6 +70,37 @@ export function PaginaCliente() {
   const [obsMotivo, setObsMotivo] = useState('');
   const [editandoMotivo, setEditandoMotivo] = useState(false);
   const [salvandoMotivo, setSalvandoMotivo] = useState(false);
+
+  // ─── O número do cliente no Control (atrelar, financeiro/admin) ───────────
+  // "Quando conectar no sistema vai ter que ter número dos clientes, e esses
+  // números vão ter que ser incluídos e atrelados" (Yan, 10/09/2026). Quem
+  // inclui no Control é a Larissa; ela digita o número aqui e o cadastro do
+  // app passa a ser o mesmo cliente do ERP.
+  const podeAtrelar = user?.role === 'financeiro' || user?.role === 'admin';
+  const [codigoErp, setCodigoErp] = useState('');
+  const [atrelando, setAtrelando] = useState(false);
+
+  const atrelarCodigo = async () => {
+    if (!token || !id || atrelando || !codigoErp.trim()) return;
+    setAtrelando(true);
+    try {
+      const res = await api.patch<ApiResponse<{ erp_id: string }>>(
+        `/customers/${id}/codigo-erp`,
+        { erp_id: codigoErp.trim() },
+        token,
+      );
+      setCliente((c) => (c ? { ...c, erp_id: res.data.erp_id } : c));
+      setCodigoErp('');
+      setToast({ message: `Código ${res.data.erp_id} atrelado.`, type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível atrelar o código.',
+        type: 'error',
+      });
+    } finally {
+      setAtrelando(false);
+    }
+  };
 
   const salvarMotivo = async () => {
     if (!token || !id || salvandoMotivo) return;
@@ -209,8 +241,45 @@ export function PaginaCliente() {
           </div>
         </div>
 
+        {/* O número do Control: é o que amarra este cadastro ao cliente do ERP.
+            Quem nasceu no app fica "sem código" até o financeiro atrelar. */}
+        <div className="mt-4 rounded-lg bg-sunken p-3">
+          <p className="text-xs text-muted-foreground">Código no ERP (Control)</p>
+          {cliente.erp_id ? (
+            <p className="mt-0.5 font-mono text-sm font-medium text-foreground">{cliente.erp_id}</p>
+          ) : podeAtrelar ? (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                void atrelarCodigo();
+              }}
+              className="mt-2 flex items-center gap-2"
+            >
+              <input
+                value={codigoErp}
+                onChange={(e) => setCodigoErp(e.target.value)}
+                placeholder="Nº no Control (ex.: 05836)"
+                inputMode="numeric"
+                className="h-9 w-44 rounded-lg border border-border bg-background px-3 text-sm text-foreground"
+                aria-label="Código do cliente no ERP"
+              />
+              <Button type="submit" size="sm" disabled={atrelando || !codigoErp.trim()}>
+                {atrelando ? 'Atrelando…' : 'Atrelar'}
+              </Button>
+            </form>
+          ) : (
+            <p className="mt-0.5 text-sm text-warn-soft-foreground">
+              Sem código — o financeiro atrela quando incluir no Control.
+            </p>
+          )}
+        </div>
+
         <dl className="mt-4 grid gap-x-6 gap-y-2.5 sm:grid-cols-2">
-          <Dado rotulo="CNPJ / CPF" valor={cliente.cnpj} />
+          <Dado
+            rotulo={apenasDigitos(cliente.cnpj).length === 11 ? 'CPF' : 'CNPJ'}
+            valor={cliente.cnpj ? formatarDocumento(cliente.cnpj) : null}
+          />
+          <Dado rotulo="Inscrição Estadual" valor={cliente.inscricao_estadual ?? null} />
           <Dado rotulo="Limite de crédito" valor={cliente.credit_limit != null ? formatBRL(cliente.credit_limit) : null} />
           <Dado
             rotulo="WhatsApp"
@@ -219,9 +288,35 @@ export function PaginaCliente() {
             href={cliente.whatsapp ? `https://wa.me/${cliente.whatsapp.replace(/\D/g, '')}` : undefined}
           />
           <Dado rotulo="E-mail" valor={cliente.email} icone={Mail} />
-          <div className="sm:col-span-2">
-            <Dado rotulo="Endereço" valor={cliente.address} icone={MapPin} />
-          </div>
+          {cliente.logradouro ? (
+            <>
+              <div className="sm:col-span-2">
+                <Dado
+                  rotulo="Endereço"
+                  valor={[cliente.logradouro, [cliente.numero, cliente.complemento].filter(Boolean).join(' ')]
+                    .filter(Boolean)
+                    .join(', ')}
+                  icone={MapPin}
+                />
+              </div>
+              <Dado rotulo="Bairro" valor={cliente.bairro ?? null} />
+              <Dado
+                rotulo="Cidade / UF"
+                valor={[cliente.cidade, cliente.uf].filter(Boolean).join(' / ') || null}
+              />
+              <Dado rotulo="CEP" valor={cliente.cep ? formatarCep(cliente.cep) : null} />
+            </>
+          ) : (
+            <div className="sm:col-span-2">
+              <Dado rotulo="Endereço" valor={cliente.address} icone={MapPin} />
+            </div>
+          )}
+          {cliente.observacoes && (
+            <div className="sm:col-span-2">
+              <dt className="text-xs text-muted-foreground">Observações (vão no pedido)</dt>
+              <dd className="mt-0.5 whitespace-pre-wrap text-sm text-foreground">{cliente.observacoes}</dd>
+            </div>
+          )}
         </dl>
 
         {!cliente.blocked && (

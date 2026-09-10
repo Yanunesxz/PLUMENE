@@ -9,6 +9,7 @@ import {
   setOrderItems,
   setOrderPayment,
   setOrderNotes,
+  ultimoNumeroErp,
   deleteOrder,
   listDeletedOrders,
 } from './orders.service.js';
@@ -489,6 +490,12 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
   }
 }
 
+/** O último número do Control lançado — a tela sugere o próximo a partir dele. */
+export async function ultimoNumeroErpHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id } = request.user;
+  await reply.send({ data: { ultimo: await ultimoNumeroErp(company_id) } });
+}
+
 export async function updateStatusHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: approverId, role } = request.user;
   const { id } = request.params as { id: string };
@@ -496,7 +503,14 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
   if (!body) return;
 
   try {
-    const order = await updateOrderStatus(id, company_id, approverId, { status: body.status, notes: body.notes ?? '' }, role, request.user.venda_interna === true);
+    const order = await updateOrderStatus(
+      id,
+      company_id,
+      approverId,
+      { status: body.status, notes: body.notes ?? '', ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}) },
+      role,
+      request.user.venda_interna === true,
+    );
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
       return;
@@ -519,9 +533,25 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
     }
     if (err instanceof Error && err.message === 'FORBIDDEN_ROLE') {
       await reply.status(403).send({
-        error: 'Aprovar ou recusar pedido na fila é do financeiro',
+        error: 'Aprovar, recusar e lançar pedido no ERP é do financeiro',
         code: 'FORBIDDEN',
         statusCode: 403,
+      });
+      return;
+    }
+    if (err instanceof Error && err.message === 'ERP_NUMBER_REQUIRED') {
+      await reply.status(422).send({
+        error: 'Informe o número que o Control deu ao pedido (duas letras e a numeração, ex.: SX14627)',
+        code: 'ERP_NUMBER_REQUIRED',
+        statusCode: 422,
+      });
+      return;
+    }
+    if (err instanceof Error && err.message === 'ERP_NUMBER_IN_USE') {
+      await reply.status(409).send({
+        error: 'Este número do Control já está em outro pedido — confira no ERP',
+        code: 'ERP_NUMBER_IN_USE',
+        statusCode: 409,
       });
       return;
     }
