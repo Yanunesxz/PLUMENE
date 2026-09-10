@@ -11,6 +11,7 @@ import {
   setItemsHandler,
   setPaymentHandler,
   setNotesHandler,
+  ultimoNumeroErpHandler,
   deleteOrderHandler,
   listDeletedOrdersHandler,
   pedidoPublicoHandler,
@@ -60,6 +61,12 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.get('/payment-conditions', daFabricaOuLoja, listPaymentConditions);
 
   fastify.get('/orders', daFabricaOuLoja, listOrders);
+  // O último número do Control lançado — para a Larissa seguir a ordem de lá.
+  fastify.get(
+    '/orders/ultimo-numero-erp',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    ultimoNumeroErpHandler,
+  );
   // A aba "Excluídos" (migração 040): a cópia de cada pedido apagado, com as
   // peças e quem apagou. Só o admin — é auditoria, não operação. Fica antes
   // do /orders/:id por clareza; o roteador já prefere a rota fixa.

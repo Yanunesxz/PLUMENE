@@ -9,7 +9,14 @@ import type {
   CreateOrderRequest,
   UpdateOrderStatusRequest,
 } from '@csb/shared';
-import { ORDER_STATUS_FLOW, precoDoTamanho, apenasLinhasDeCor, juntarObservacao } from '@csb/shared';
+import {
+  ORDER_STATUS_FLOW,
+  precoDoTamanho,
+  apenasLinhasDeCor,
+  juntarObservacao,
+  normalizarNumeroErp,
+  numeroErpValido,
+} from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
 
 export async function getOrders(
@@ -903,6 +910,22 @@ export async function setOrderPayment(
   return { ok: true, order: data as Order };
 }
 
+/**
+ * O último número do Control lançado nesta empresa — é dele que a tela sugere
+ * o próximo, para a Larissa seguir a ordem de lá sem consultar o ERP.
+ */
+export async function ultimoNumeroErp(company_id: string): Promise<string | null> {
+  const { data } = await supabase
+    .from('orders')
+    .select('erp_order_id')
+    .eq('company_id', company_id)
+    .not('erp_order_id', 'is', null)
+    .order('synced_at', { ascending: false, nullsFirst: false })
+    .limit(1);
+  const linha = (data ?? [])[0] as { erp_order_id: string | null } | undefined;
+  return linha?.erp_order_id ?? null;
+}
+
 export type NotesResult =
   | { ok: true; order: Order }
   | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' };
@@ -1096,6 +1119,24 @@ export async function updateOrderStatus(
 
   if (body.status === 'approved' || body.status === 'rejected') {
     update.approved_by = approverId;
+  }
+
+  // LANÇAR exige o número que o Control deu ao pedido (Yan, 10/09/2026: "toda
+  // vez que ela for lançar tem que carregar e seguir o padrão da fábrica"). O
+  // app nunca inventa esse número; e um número do Control é de UM pedido só.
+  if (body.status === 'sent_erp') {
+    const numero = normalizarNumeroErp(body.erp_order_id);
+    if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
+    const { data: dono } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('company_id', company_id)
+      .eq('erp_order_id', numero)
+      .neq('id', id)
+      .limit(1);
+    if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
+    update.erp_order_id = numero;
+    update.synced_at = new Date().toISOString();
   }
 
   if (body.notes) {

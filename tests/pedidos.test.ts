@@ -178,19 +178,46 @@ describe('quem decide o pedido na fila', () => {
     expect(r?.status).toBe('approved');
   });
 
-  it('lançar no ERP é do financeiro — o gerente não inclui pedido no Control', async () => {
-    // "Os pedidos só vão ser incluídos pela Larissa" (Yan, 10/09/2026).
-    const aprovado = { data: { status: 'approved', rep_id: REP }, error: null };
-    const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP }, error: null };
-    // O fake pré-busca a resposta seguinte a cada consulta terminada: a leitura
-    // do gerente consome duas, a do financeiro mais uma, e o update pega a
-    // última (que fica "grudada").
-    const { updateOrderStatus } = await carregarServico({ orders: [aprovado, aprovado, aprovado, lancado] });
+  // "Os pedidos só vão ser incluídos pela Larissa" (Yan, 10/09/2026) — e ao
+  // lançar ela digita o número que o Control deu ("duas letras e a numeração").
+  const aprovado = { data: { status: 'approved', rep_id: REP }, error: null };
+  const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: 'SX14627' }, error: null };
+  const ninguem = { data: [], error: null };
+
+  it('o gerente não inclui pedido no Control', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [aprovado] });
     await expect(
-      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '' }, 'manager'),
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '', erp_order_id: 'SX14627' }, 'manager'),
     ).rejects.toThrow('FORBIDDEN_ROLE');
-    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '' }, 'financeiro');
+  });
+
+  it('o financeiro lança COM o número do Control, que fica gravado', async () => {
+    // O fake pré-busca a resposta seguinte a cada consulta terminada — por isso
+    // as respostas vão em pares; a última fica "grudada" para o update.
+    const { updateOrderStatus, fake } = await carregarServico({
+      orders: [aprovado, aprovado, ninguem, ninguem, lancado],
+    });
+    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'sx 14627' }, 'financeiro');
     expect(r?.status).toBe('sent_erp');
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado.erp_order_id).toBe('SX14627');
+    expect(gravado.synced_at).toBeTruthy();
+  });
+
+  it('sem o número do Control não lança — o app nunca inventa esse número', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [aprovado] });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '' }, 'financeiro'),
+    ).rejects.toThrow('ERP_NUMBER_REQUIRED');
+  });
+
+  it('número do Control que já é de outro pedido é recusado', async () => {
+    const { updateOrderStatus } = await carregarServico({
+      orders: [aprovado, aprovado, { data: [{ id: 'o2' }], error: null }],
+    });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'SX14627' }, 'financeiro'),
+    ).rejects.toThrow('ERP_NUMBER_IN_USE');
   });
 
   it('o gerente ainda TRIA o pedido de quem sumiu (pending_rep → fila)', async () => {
