@@ -29,6 +29,8 @@ export interface Customer {
   cnpj: string | null;
   /** Código do representante vinculado — CLIENTE.REPRESENTANTE */
   rep_erp_id: string | null;
+  /** Quem cadastrou no app (migração 007). Nulo = veio do ERP ou de carga. */
+  rep_id?: string | null;
   price_table_id: string | null;
   /** CLIENTE.BLOQUEADO = 'S' */
   blocked: boolean;
@@ -113,7 +115,16 @@ export interface CustomerListItem
     // O controle por cores: cliente vermelho SEM motivo é pendência visível na
     // lista — é o que cobra o preenchimento sem precisar de relatório.
     | 'inactivity_reason'
-  > {}
+  > {
+  /**
+   * Quem CADASTROU no app. Custa um UUID por linha e separa as duas famílias
+   * de cliente sem código do ERP: os 29 que nasceram aqui (fila real da
+   * Larissa: incluir no Control) e os ~1.225 que vieram das cargas da Curva
+   * ABC — esses já existem no Control, só chegaram sem o código. Sem esta
+   * coluna o aviso "para incluir" contaria 1.254 e viraria ruído.
+   */
+  rep_id?: string | null;
+}
 
 /** O rep (ou o relacionamento) explica o cliente vermelho. */
 export interface MarcarInatividadeRequest {

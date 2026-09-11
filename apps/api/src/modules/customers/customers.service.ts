@@ -14,8 +14,11 @@ const PAGE_SIZE = 1000;
 
 // Só o que as telas usam. `select('*')` + o embed da tabela de preço (que nada
 // no app lia) tornava a lista de 1.353 clientes ~5× maior do que precisa.
+// `rep_id` entra porque separa as duas famílias de cliente sem código do ERP:
+// quem nasceu no app (fila da Larissa) e quem veio das cargas da Curva ABC (já
+// está no Control, só chegou sem código). Ver CustomerListItem.
 const CUSTOMER_COLUMNS =
-  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id';
+  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id, rep_id';
 
 /**
  * As colunas da carteira inteligente vêm da migração 036 — pedi-las antes do

@@ -141,9 +141,12 @@ export function PaginaClientes() {
     }));
     const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
     for (const d of decorados) contagem[d.situacao.nivel]++;
-    const semCodigo = decorados.filter((d) => !d.cliente.erp_id).length;
+    // Só quem nasceu no app: cliente de carga da Curva ABC também está sem
+    // código, mas já existe no Control — ver PaginaMinhaArea.
+    const nascidoNoApp = (c: CustomerListItem) => !c.erp_id && !!c.rep_id;
+    const semCodigo = decorados.filter((d) => nascidoNoApp(d.cliente)).length;
     let visiveis = frescor === 'all' ? decorados : decorados.filter((d) => d.situacao.nivel === frescor);
-    if (soSemCodigo) visiveis = visiveis.filter((d) => !d.cliente.erp_id);
+    if (soSemCodigo) visiveis = visiveis.filter((d) => nascidoNoApp(d.cliente));
     // Filtrando por frescor, quem está há MAIS tempo sem comprar vem primeiro —
     // é a ordem de prioridade da visita. Sem filtro, a ordem alfabética de
     // sempre (a busca por nome depende dela).
@@ -495,7 +498,7 @@ export function PaginaClientes() {
                 : 'border-border bg-background text-muted-foreground hover:bg-sunken',
             )}
           >
-            Sem código no ERP ({semCodigo})
+            Para incluir no Control ({semCodigo})
           </button>
         )}
       </div>
@@ -541,13 +544,15 @@ export function PaginaClientes() {
                       {apenasDigitos(customer.cnpj).length === 11 ? 'CPF' : 'CNPJ'}: {formatarDocumento(customer.cnpj)}
                     </p>
                   )}
-                  {/* O número do Control: quem nasceu no app fica "sem código"
-                      até o financeiro atrelar — visível, para ninguém esquecer. */}
+                  {/* O número do Control. Quem NASCEU no app e ainda não tem
+                      código é pendência da Larissa — o aviso só aparece nesses;
+                      cliente de carga sem código já existe no Control e o selo
+                      viraria ruído em 1.225 cartões. */}
                   {customer.erp_id ? (
                     <p className="truncate text-xs text-muted-foreground">Cód. ERP {customer.erp_id}</p>
-                  ) : (
-                    <p className="truncate text-xs text-warn-soft-foreground">Sem código no ERP</p>
-                  )}
+                  ) : customer.rep_id ? (
+                    <p className="truncate text-xs text-warn-soft-foreground">Falta incluir no Control</p>
+                  ) : null}
                   {customer.credit_limit != null && (
                     <p className="truncate text-xs text-muted-foreground">
                       Limite: {formatBRL(customer.credit_limit)}

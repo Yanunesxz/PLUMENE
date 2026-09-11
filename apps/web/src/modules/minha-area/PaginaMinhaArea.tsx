@@ -202,8 +202,14 @@ export function PaginaMinhaArea() {
   }, [orders]);
 
   const clientes = customers?.length ?? 0;
-  // Nascidos no app e ainda sem o número do Control — a fila de inclusão.
-  const clientesSemCodigo = useMemo(() => (customers ?? []).filter((c) => !c.erp_id).length, [customers]);
+  // A fila de inclusão é só quem NASCEU no app (tem rep_id) e ainda não tem
+  // código. Os ~1.225 clientes que vieram das cargas da Curva ABC também estão
+  // sem código, mas já existem no Control — contá-los aqui transformaria o
+  // aviso num número que ninguém consegue zerar.
+  const clientesSemCodigo = useMemo(
+    () => (customers ?? []).filter((c) => !c.erp_id && c.rep_id).length,
+    [customers],
+  );
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
   const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
