@@ -156,14 +156,15 @@ export function PaginaClientes() {
     return { visiveis, contagem, semCodigo };
   }, [customers, frescor, soSemCodigo]);
 
-  // As cores do Yan: verde ativo, amarelo atenção, vermelho inativo.
-  // Ordem do Yan (02/09): ativo → atenção → inativo, e o ATIVO com o número —
-  // o rep precisa ver quantos clientes vivos tem, não só quantos parados.
+  // As cores do Yan: verde ativo, amarelo atenção, vermelho ESFRIADO — o nome
+  // que ele passou a usar em 11/09/2026 para o cliente que sumiu.
+  // Ordem do Yan (02/09): ativo → atenção → esfriado, e o ATIVO com o número —
+  // o rep precisa ver quantos clientes vivos tem, não só quantos pararam.
   const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
     { valor: 'ativo', rotulo: `Ativos${contagem.ativo ? ` (${contagem.ativo})` : ''}`, cor: 'bg-positive' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
-    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'parado', rotulo: `Esfriados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
   ];
 

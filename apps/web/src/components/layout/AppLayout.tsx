@@ -10,12 +10,16 @@ import { Toast } from '../interface/Toast.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
+import { useReguaDaCarteira } from '../../hooks/useReguaDaCarteira.js';
 import { MARCA } from '../../lib/marca.js';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
+  // A régua da carteira (043) vale para o app inteiro: uma busca por sessão,
+  // aqui, em vez de cada tela medir o cliente com a régua que quiser.
+  useReguaDaCarteira();
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [reconnect, setReconnect] = useState<{ title: string; detail?: string } | null>(null);
   const dismissReconnect = useCallback(() => setReconnect(null), []);

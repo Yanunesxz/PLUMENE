@@ -29,7 +29,7 @@ import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
-import { situacaoDaCompra } from '../../lib/carteira.js';
+import { situacaoDaCompra, reguaDaCarteira } from '../../lib/carteira.js';
 import {
   janelaDoFechamento,
   comInicialMaiuscula,
@@ -225,6 +225,9 @@ export function PaginaMinhaArea() {
     return m;
   }, [customers]);
 
+  // A régua da fábrica (043): os dias que acendem cada cor.
+  const regua = reguaDaCarteira();
+
   // A saúde da carteira, para o aviso lá embaixo.
   const carteira = useMemo(() => {
     let parados = 0;
@@ -402,7 +405,7 @@ export function PaginaMinhaArea() {
       )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
-          O toque cai na lista de Clientes já filtrada nos parados. */}
+          O toque cai na lista de Clientes já filtrada nos esfriados. */}
       {(carteira.parados > 0 || carteira.esfriando > 0) && (
         <Link
           to="/customers?frescor=parado"
@@ -410,12 +413,12 @@ export function PaginaMinhaArea() {
         >
           <p className="text-sm font-semibold text-warn-soft-foreground">
             {carteira.parados > 0
-              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} sem comprar há 6+ meses`
-              : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} esfriando`}
+              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} esfriado${carteira.parados > 1 ? 's' : ''} — sem comprar há ${regua.esfriado}+ dias`
+              : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} em atenção`}
           </p>
           <p className="mt-0.5 text-xs text-warn-soft-foreground/80">
             {carteira.parados > 0 && carteira.esfriando > 0
-              ? `E mais ${carteira.esfriando} esfriando (3–6 meses). `
+              ? `E mais ${carteira.esfriando} em atenção (${regua.atencao} a ${regua.esfriado} dias). `
               : ''}
             {carteira.vencido > 0 ? `${formatBRL(carteira.vencido)} vencidos na carteira. ` : ''}
             Toque para ver quem visitar primeiro.

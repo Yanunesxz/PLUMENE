@@ -10,6 +10,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { EnviarAviso } from './EnviarAviso.js';
+import { ReguaDaCarteira } from './ReguaDaCarteira.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -105,6 +106,9 @@ export function PaginaPainel() {
       </div>
 
       <EnviarAviso />
+
+      {/* A régua das cores é do dono da fábrica, não do gerente. */}
+      {user?.role === 'admin' && <ReguaDaCarteira />}
 
       {metrics.topClientes.length > 0 && (
         <section>

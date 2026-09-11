@@ -118,7 +118,7 @@ describe('relatório local (o app escreve sozinho, custo zero)', () => {
       { alcance: 'minha carteira' },
       HOJE,
     );
-    expect(texto).toContain('Sua carteira tem 5 clientes: 2 parados');
+    expect(texto).toContain('Sua carteira tem 5 clientes: 2 esfriados (180+ dias sem comprar)');
     // Parado grande vem antes do parado pequeno E antes do esfriando gigante:
     // primeiro o grupo (parado), depois o tamanho da compra.
     const ordem = [texto.indexOf('GRANDE PARADA'), texto.indexOf('PEQUENA PARADA'), texto.indexOf('ESFRIANDO SO')];
@@ -152,7 +152,7 @@ describe('relatório local (o app escreve sozinho, custo zero)', () => {
       HOJE,
     );
     expect(texto).toContain('A empresa tem 3 clientes');
-    expect(texto).toContain('- SILVIO: 2 parados de 2');
+    expect(texto).toContain('- SILVIO: 2 esfriados de 2');
     expect(texto).not.toContain('Rep 00779'); // carteira sem parado não vira cobrança
   });
 });
@@ -173,7 +173,7 @@ describe('montarPedido', () => {
   it('o resumo com os números vai junto dos dados', () => {
     const resumo = resumirCarteira([cliente({ last_purchase_at: '2025-01-01' })], HOJE);
     const pedido = montarPedido('minha carteira', resumo, ['LINHA 1']);
-    expect(pedido).toContain('1 parados (180+ dias sem comprar)');
+    expect(pedido).toContain('1 esfriados (180+ dias sem comprar)');
     expect(pedido).toContain('LINHA 1');
   });
 });

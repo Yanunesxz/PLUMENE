@@ -2,7 +2,7 @@
  * Tarefas do representante — o escritório manda, o rep executa.
  *
  * O Fabian (gerência) marca o que fazer; a Bruna (interna, dona da carteira de
- * inativos) liga para o cliente parado e marca a visita COM HORÁRIO — e o
+ * esfriados) liga para o cliente que sumiu e marca a visita COM HORÁRIO — e o
  * representante dá o OK. Ciclo: pendente → confirmada (OK no horário) → feita.
  *
  * Tolera a migração 037 não aplicada: leitura devolve vazio, escrita falha com

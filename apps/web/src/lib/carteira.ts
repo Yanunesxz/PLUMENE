@@ -5,17 +5,60 @@
  * todo pedido FATURADO no app — ver a migração 036. Por isso o selo sempre
  * mostra a data junto ("última compra em 12/03/26"): um retrato velho nunca
  * engana, está escrito de quando é.
+ *
+ * Os DIAS de cada faixa são da fábrica, não do código (migração 043). Quem
+ * muda é o admin, no Painel. Enquanto a resposta da API não chega — primeira
+ * abertura, celular sem sinal — vale a última régua guardada no aparelho, e
+ * antes disso a de sempre (90/180).
  */
+import {
+  REGUA_PADRAO,
+  reguaValida,
+  frescorPorDias,
+  diasSemComprar,
+  type ReguaDaCarteira,
+  type Frescor,
+} from '@csb/shared';
 
-export type Frescor = 'ativo' | 'esfriando' | 'parado' | 'sem_registro';
+export type { Frescor, ReguaDaCarteira };
 
-/** Dias sem comprar que separam as faixas. */
-const ESFRIANDO_APOS_DIAS = 90;
-const PARADO_APOS_DIAS = 180;
+const CHAVE_GUARDADA = 'csb.regua-da-carteira';
+
+function lerDoAparelho(): ReguaDaCarteira {
+  try {
+    const bruto = localStorage.getItem(CHAVE_GUARDADA);
+    return bruto ? reguaValida(JSON.parse(bruto) as Partial<ReguaDaCarteira>) : REGUA_PADRAO;
+  } catch {
+    return REGUA_PADRAO;
+  }
+}
+
+let regua: ReguaDaCarteira = lerDoAparelho();
+
+/** A régua em vigor — o que as telas usam sem precisar receber por props. */
+export function reguaDaCarteira(): ReguaDaCarteira {
+  return regua;
+}
+
+/**
+ * Troca a régua (a API respondeu, ou o admin acabou de salvar) e guarda no
+ * aparelho. Devolve `true` quando algo mudou, para a tela se redesenhar.
+ */
+export function definirReguaDaCarteira(nova: Partial<ReguaDaCarteira> | null | undefined): boolean {
+  const arrumada = reguaValida(nova);
+  if (arrumada.atencao === regua.atencao && arrumada.esfriado === regua.esfriado) return false;
+  regua = arrumada;
+  try {
+    localStorage.setItem(CHAVE_GUARDADA, JSON.stringify(arrumada));
+  } catch {
+    // Aparelho com armazenamento cheio ou aba anônima: a régua vale só nesta sessão.
+  }
+  return true;
+}
 
 export interface SituacaoDaCompra {
   nivel: Frescor;
-  /** Pronto para a tela: "Parado há 8 meses", "Comprou há 12 dias"… */
+  /** Pronto para a tela: "Esfriado — sem comprar há 8 meses", "Comprou há 12 dias"… */
   rotulo: string;
   /** Dias desde a última compra. `null` sem registro. */
   dias: number | null;
@@ -30,28 +73,38 @@ function rotuloDeTempo(dias: number): string {
   return `há ${Math.floor(meses / 12)} anos`;
 }
 
-export function situacaoDaCompra(lastPurchaseAt: string | null | undefined): SituacaoDaCompra {
-  if (!lastPurchaseAt) {
+export function situacaoDaCompra(
+  lastPurchaseAt: string | null | undefined,
+  comRegua: ReguaDaCarteira = regua,
+): SituacaoDaCompra {
+  const dias = diasSemComprar(lastPurchaseAt);
+  if (dias === null) {
     return { nivel: 'sem_registro', rotulo: 'Sem compra registrada', dias: null };
   }
-  const dias = Math.floor((Date.now() - new Date(lastPurchaseAt).getTime()) / 86_400_000);
-  if (Number.isNaN(dias)) {
-    return { nivel: 'sem_registro', rotulo: 'Sem compra registrada', dias: null };
-  }
-  if (dias >= PARADO_APOS_DIAS) return { nivel: 'parado', rotulo: `Inativo — parado ${rotuloDeTempo(dias)}`, dias };
-  if (dias >= ESFRIANDO_APOS_DIAS) return { nivel: 'esfriando', rotulo: `Atenção — sem comprar ${rotuloDeTempo(dias)}`, dias };
+  const nivel = frescorPorDias(dias, comRegua);
+  if (nivel === 'parado') return { nivel, rotulo: `Esfriado — sem comprar ${rotuloDeTempo(dias)}`, dias };
+  if (nivel === 'esfriando') return { nivel, rotulo: `Atenção — sem comprar ${rotuloDeTempo(dias)}`, dias };
   return { nivel: 'ativo', rotulo: `Comprou ${rotuloDeTempo(dias)}`, dias };
 }
 
 /**
- * O vocabulário do Yan para as cores (31/08/2026): verde de ativo, amarelo de
- * atenção, vermelho de INATIVO (nasceu "desativado", renomeado a pedido dele
- * no mesmo dia). Nome curto para chips e títulos.
+ * O vocabulário do Yan para as cores: verde de ativo, amarelo de atenção,
+ * vermelho de ESFRIADO — nasceu "desativado" (31/08/2026), virou "inativo" no
+ * mesmo dia e virou "esfriado" em 11/09/2026, que é como ele fala do cliente
+ * que sumiu. Nome curto para chips e títulos.
  */
 export const NOME_DO_NIVEL: Record<Frescor, string> = {
   ativo: 'Ativo',
   esfriando: 'Atenção',
-  parado: 'Inativo',
+  parado: 'Esfriado',
+  sem_registro: 'Sem registro',
+};
+
+/** O mesmo nome no plural, para o chip que conta ("Esfriados (37)"). */
+export const NOME_DO_NIVEL_PLURAL: Record<Frescor, string> = {
+  ativo: 'Ativos',
+  esfriando: 'Atenção',
+  parado: 'Esfriados',
   sem_registro: 'Sem registro',
 };
 
@@ -62,3 +115,11 @@ export const VARIANTE_DO_FRESCOR: Record<Frescor, 'gray' | 'yellow' | 'green' | 
   parado: 'red',
   sem_registro: 'gray',
 };
+
+/** "90 a 180 dias sem comprar" — para explicar a faixa na tela do admin. */
+export function faixaEmPalavras(nivel: Frescor, r: ReguaDaCarteira = regua): string {
+  if (nivel === 'ativo') return `comprou nos últimos ${r.atencao} dias`;
+  if (nivel === 'esfriando') return `${r.atencao} a ${r.esfriado} dias sem comprar`;
+  if (nivel === 'parado') return `${r.esfriado} dias ou mais sem comprar`;
+  return 'sem compra registrada';
+}
