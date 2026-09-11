@@ -108,7 +108,8 @@ apps/api/src/
 │       ├── 040_pedidos_excluidos.sql → deleted_orders (cópia do pedido antes do DELETE; a aba "Excluídos" do admin)
 │       ├── 041_cadastro_real.sql → customers.cep/logradouro/numero/complemento/bairro/cidade/uf, inscricao_estadual, observacoes, erp_linked_by/at, cnpj_digits (gerada)
 │       ├── 042_numero_do_control_unico.sql → índice único orders(company_id, erp_order_id): dois pedidos nunca com o mesmo número do Control
-│       └── 043_regua_da_carteira.sql → companies.carteira_atencao_dias/carteira_esfriado_dias (o admin muda os 90/180 no Painel)
+│       ├── 043_regua_da_carteira.sql → companies.carteira_atencao_dias/carteira_esfriado_dias (o admin muda os 90/180 no Painel)
+│       └── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

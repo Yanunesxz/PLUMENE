@@ -1,5 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
+import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -83,7 +84,13 @@ export async function getOrderById(
   if (error || !order) return null;
   // `as unknown`: o select dinâmico (com/sem embed) tira do supabase-js a
   // inferência do shape — mesmo caso do getPriceMap logo abaixo.
-  return order as unknown as OrderWithItems;
+  const pedido = order as unknown as OrderWithItems;
+  // A cópia do original (044), quando existe: é ela que deixa a tela mostrar
+  // "o pedido veio assim, foi faturado assado". Só existe em pedido que
+  // encolheu — no resto, ausente, e a tela não mostra bloco nenhum.
+  const original = await lerOriginal(pedido.id, company_id);
+  if (original) pedido.original = original;
+  return pedido;
 }
 
 interface PrecoDoProduto {
@@ -740,6 +747,11 @@ export async function setOrderItems(
   const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
+  // ANTES de trocar qualquer peça: a foto do que o representante fechou (044).
+  // Só a primeira vale, e rascunho não entra — quem está montando o pedido não
+  // está cortando nada. É acessório: falhar aqui não impede a edição.
+  await guardarOriginal(o, 'edicao', user_id);
+
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
   let tabela: string | null = o.price_table_id ?? null;
@@ -1049,6 +1061,19 @@ export async function setOrderInvoiced(
     somenteDoRep?: string | null;
   } = {},
 ): Promise<Order | null> {
+  // O carimbo fecha o pedido para sempre. Se ninguém tinha cortado peça, esta
+  // é a hora da foto (044): daí em diante todo pedido faturado tem o original
+  // registrado, e o "veio assim, foi faturado assado" sempre tem as duas metades.
+  if (invoiced) {
+    const { data: antes } = await supabase
+      .from('orders')
+      .select('id, company_id, status')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (antes) await guardarOriginal(antes as Pick<Order, 'id' | 'company_id' | 'status'>, 'faturamento');
+  }
+
   let query = supabase
     .from('orders')
     .update({

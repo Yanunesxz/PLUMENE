@@ -19,6 +19,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { registrarCompraDoCliente } from '../orders/orders.service.js';
+import { guardarOriginal } from '../orders/pedidoOriginal.service.js';
 import { normalizarNumeroErp } from '@csb/shared';
 
 export interface FaturamentoParceiro {
@@ -80,7 +81,7 @@ export async function receberFaturamento(
     // outra fábrica, mesmo acertando o número por acaso.
     let busca = supabase
       .from('orders')
-      .select('id, invoiced, total, customer_id')
+      .select('id, invoiced, total, customer_id, status')
       .eq('company_id', company_id);
     busca = pedidoErp
       // As duas grafias: o normalizado (app) e o texto cru que o parceiro
@@ -120,6 +121,15 @@ export async function receberFaturamento(
       // Cancelou? O valor faturado some junto — deixá-lo para trás faria o
       // painel somar uma nota que não existe mais.
       patch['invoiced_total'] = faturado ? (item.valor_faturado ?? null) : null;
+    }
+
+    // A foto do original (044) antes de o carimbo fechar o pedido: se
+    // ninguém tinha cortado peça, é agora que ela vale.
+    if (faturado) {
+      await guardarOriginal(
+        { id: pedido.id as string, company_id, status: pedido.status as never },
+        'faturamento',
+      );
     }
 
     const { error } = await supabase

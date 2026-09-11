@@ -23,6 +23,7 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
 import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
+import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -518,6 +519,22 @@ export function PaginaDetalhePedido() {
     return [...porProduto.values()];
   }, [itensOrdenados]);
 
+  // As peças de HOJE com referência e tamanho — é o que a comparação com o
+  // original precisa, e a foto do original já vem assim do servidor.
+  const itensComRef = useMemo(
+    () =>
+      itensOrdenados.map((i) => ({
+        ...i,
+        product: prodMap.get(i.product_id)
+          ? { sku: prodMap.get(i.product_id)!.sku, name: prodMap.get(i.product_id)!.name }
+          : null,
+        variant: i.variant_id && variantSize.get(i.variant_id)
+          ? { size: variantSize.get(i.variant_id)! }
+          : null,
+      })),
+    [itensOrdenados, prodMap, variantSize],
+  );
+
   // A cor escolhida mora nas linhas "0015 3M azul" das notas (o item vai
   // sortido para o ERP) — aqui ela volta para a linha do produto, onde quem
   // confere olha. O que sobra das notas é o recado que o rep digitou.
@@ -963,6 +980,18 @@ export function PaginaDetalhePedido() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* Veio assim, foi faturado assado (044). Só aparece quando há o
+              que comparar — e para quem trabalha o pedido, não para a loja. */}
+          {order.original && !ehLoja && (
+            <PedidoOriginal
+              original={order.original}
+              itensAtuais={itensComRef}
+              totalAtual={order.total}
+              invoicedTotal={order.invoiced_total}
+              faturado={!!order.invoiced}
+            />
           )}
 
           <div className="rounded-xl border border-border bg-card shadow-sm">
