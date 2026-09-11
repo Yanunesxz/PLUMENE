@@ -24,8 +24,16 @@ import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
 import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
+import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
-import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
+import type {
+  Order,
+  OrderWithItems,
+  ApiResponse,
+  OrderStatus,
+  ProductWithPrice,
+  SincroniaComOErp,
+} from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
 interface LinhaEdit {
@@ -59,6 +67,8 @@ export function PaginaDetalhePedido() {
   // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
   // dois), então os botões não aparecem em vez de responder 403 no toque.
   const ehLoja = user?.role === 'store';
+  // Quem mexe no Control de verdade: é quem confirma que já atualizou lá.
+  const ehEscritorioDoErp = user?.role === 'financeiro' || user?.role === 'admin';
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
 
@@ -148,6 +158,38 @@ export function PaginaDetalhePedido() {
       setErroDaCorrecao(err instanceof Error ? err.message : 'Não foi possível corrigir.');
     } finally {
       setSalvandoNumero(false);
+    }
+  };
+
+  // ─── Atualizar no ERP (046) ───────────────────────────────────────────────
+  // A venda interna mexe no próprio pedido até o carimbo, inclusive depois de
+  // lançado. Quando mexe, o Control fica com a versão velha, e é daqui que a
+  // fábrica fica sabendo.
+  const [sincronizando, setSincronizando] = useState(false);
+  const [erroDaSincronia, setErroDaSincronia] = useState<string | null>(null);
+
+  const mexerNaSincronia = async (acao: 'pedir' | 'confirmar', observacao?: string) => {
+    if (!id || !token || sincronizando) return;
+    setSincronizando(true);
+    setErroDaSincronia(null);
+    try {
+      const res = await api.patch<ApiResponse<SincroniaComOErp>>(
+        `/orders/${id}/erp-sync`,
+        { acao, ...(observacao?.trim() ? { observacao: observacao.trim() } : {}) },
+        token,
+      );
+      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data } : prev));
+      setToast({
+        message:
+          acao === 'pedir'
+            ? 'A fábrica foi avisada de que o pedido mudou.'
+            : 'Control atualizado — o aviso saiu deste pedido.',
+        type: 'success',
+      });
+    } catch (err) {
+      setErroDaSincronia(err instanceof Error ? err.message : 'Não foi possível registrar.');
+    } finally {
+      setSincronizando(false);
     }
   };
 
@@ -980,6 +1022,21 @@ export function PaginaDetalhePedido() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* O Control ficou para trás (046). Só aparece quando as peças de hoje
+              divergem do que a fábrica tem na mão. */}
+          {order.erp_sync && !ehLoja && (
+            <AtualizarNoErp
+              sincronia={order.erp_sync}
+              itensAtuais={itensComRef}
+              podePedir={podeEditarPecas || ehEscritorioDoErp}
+              podeConfirmar={ehEscritorioDoErp}
+              ocupado={sincronizando}
+              erro={erroDaSincronia}
+              onPedir={(obs) => void mexerNaSincronia('pedir', obs)}
+              onConfirmar={() => void mexerNaSincronia('confirmar')}
+            />
           )}
 
           {/* Veio assim, foi faturado assado (044). Só aparece quando há o

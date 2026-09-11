@@ -17,7 +17,7 @@ export interface RespostaTabela {
 
 export interface Gravacao {
   tabela: string;
-  operacao: 'insert' | 'update' | 'delete';
+  operacao: 'insert' | 'update' | 'delete' | 'upsert';
   valores: unknown;
 }
 
@@ -62,6 +62,12 @@ export function criarSupabaseFake(respostas: Respostas) {
 
     query['insert'] = (valores: unknown) => {
       gravacoes.push({ tabela, operacao: 'insert', valores });
+      return query;
+    };
+    // O upsert do PostgREST: grava por cima quando a chave ja existe. Fica
+    // separado do insert para o teste conseguir distinguir os dois.
+    query['upsert'] = (valores: unknown) => {
+      gravacoes.push({ tabela, operacao: 'upsert', valores });
       return query;
     };
     query['update'] = (valores: unknown) => {

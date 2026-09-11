@@ -160,3 +160,35 @@ export function avisarFaturadoAoRep(
     }),
   );
 }
+
+/**
+ * O pedido MUDOU depois de ir para o Control (046).
+ *
+ * A venda interna edita o próprio pedido até o carimbo de faturado, inclusive
+ * depois de lançado. Quando ela mexe, o Control fica com a versão velha e a
+ * nota sairia errada — então quem mexe no Control é avisado na hora, com o
+ * número de lá no título para ela achar o pedido sem procurar.
+ */
+export function avisarPedidoMudouNoErp(
+  company_id: string,
+  pedido: { id: string; order_number: number | null; erp_order_id: string | null },
+  quemPediu: string,
+  observacao?: string | null,
+): void {
+  const noControl = pedido.erp_order_id ? ` (${pedido.erp_order_id} no Control)` : '';
+  engolir(
+    enviarParaPapeis(
+      company_id,
+      ['financeiro', 'admin'],
+      {
+        title: `Pedido #${pedido.order_number ?? ''} mudou depois de ir para o Control`,
+        body: observacao?.trim()
+          ? `${observacao.trim()} — atualize no Control${noControl}.`
+          : `As peças mudaram${noControl}. Veja o que mudou e atualize no Control.`,
+        url: `/orders/${pedido.id}`,
+        tag: `erp-sync-${pedido.id}`,
+      },
+      quemPediu,
+    ),
+  );
+}

@@ -1,6 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
+import { registrarNoErp, lerSincronia } from './erpSync.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -90,6 +91,10 @@ export async function getOrderById(
   // encolheu — no resto, ausente, e a tela não mostra bloco nenhum.
   const original = await lerOriginal(pedido.id, company_id);
   if (original) pedido.original = original;
+  // E o que o Control conhece (046): é comparando com isto que a tela descobre
+  // que a fábrica está com a versão velha depois de a venda interna editar.
+  const sincronia = await lerSincronia(pedido.id, company_id);
+  if (sincronia) pedido.erp_sync = sincronia;
   return pedido;
 }
 
@@ -1208,6 +1213,13 @@ export async function updateOrderStatus(
     throw new Error('ERP_NUMBER_IN_USE');
   }
   if (error || !data) return null;
+
+  // Lançou no Control: a fábrica passa a conhecer o pedido COMO ELE ESTÁ AGORA.
+  // É desta foto que sai o aviso de "mudou depois de ir para o ERP" quando a
+  // venda interna editar as peças mais tarde. Acessório: não derruba o lançamento.
+  if (body.status === 'sent_erp') {
+    await registrarNoErp(id, company_id, approverId);
+  }
 
   // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido
   // nascia direto na fila, o create disparava; agora o pedido do representante

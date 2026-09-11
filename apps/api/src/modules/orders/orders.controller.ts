@@ -15,6 +15,7 @@ import {
   listDeletedOrders,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
+import { pedirAtualizacao, confirmarAtualizacao } from './erpSync.service.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { getPedidoPublico } from './publicOrder.service.js';
 import { tokenDoPedido } from './publicToken.js';
@@ -28,6 +29,7 @@ import {
   avisarDecisaoAoRep,
   avisarMesaDaRecusa,
   avisarFaturadoAoRep,
+  avisarPedidoMudouNoErp,
 } from '../push/push.avisos.js';
 import { parseBody } from '../../lib/validation.js';
 import {
@@ -39,6 +41,7 @@ import {
   setPaymentSchema,
   setNotesSchema,
   corrigirNumeroErpSchema,
+  erpSyncSchema,
 } from './orders.schema.js';
 
 /**
@@ -590,4 +593,103 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
     }
     throw err;
   }
+}
+
+/**
+ * PATCH /orders/:id/erp-sync — o botão "Atualizar no ERP" (046).
+ *
+ * Duas ações na mesma rota porque são os dois lados da mesma conversa:
+ *
+ *   pedir     → quem editou as peças de um pedido já lançado avisa que o
+ *               Control está com a versão velha. Chega como push na mesa de
+ *               quem mexe no Control.
+ *   confirmar → quem mexeu no Control diz que já atualizou lá. A fotografia é
+ *               tirada de novo e a divergência some sozinha.
+ *
+ * Quem PEDE é quem pode mexer no pedido (a venda interna dona dele, ou o
+ * escritório). Quem CONFIRMA é só quem mexe no Control — financeiro e admin.
+ */
+export async function erpSyncHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, role } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(erpSyncSchema, request.body, reply);
+  if (!body) return;
+
+  const doEscritorio = role === 'financeiro' || role === 'admin';
+
+  if (body.acao === 'confirmar' && !doEscritorio) {
+    await reply.status(403).send({
+      error: 'Só quem lança no Control confirma que atualizou lá',
+      code: 'FORBIDDEN_ROLE',
+      statusCode: 403,
+    });
+    return;
+  }
+
+  // Pedir a atualização é de quem pode MEXER no pedido. O dono do pedido é
+  // conferido aqui porque o service trabalha com a fotografia, não com o portão
+  // de edição: sem isto, um representante qualquer pediria atualização do
+  // pedido alheio.
+  if (body.acao === 'pedir' && !doEscritorio) {
+    const { data: dono } = await supabase
+      .from('orders')
+      .select('rep_id')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!dono || (dono as { rep_id: string }).rep_id !== sub) {
+      await reply.status(403).send({
+        error: 'Este pedido não é seu',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    }
+  }
+
+  const r =
+    body.acao === 'pedir'
+      ? await pedirAtualizacao(id, company_id, sub, body.observacao ?? null)
+      : await confirmarAtualizacao(id, company_id, sub);
+
+  if (!r.ok) {
+    const respostas = {
+      sem_tabela: {
+        status: 503,
+        error: 'A migração 046 ainda não rodou neste banco — o aviso de "atualizar no Control" ainda não funciona aqui',
+        code: 'MIGRACAO_PENDENTE',
+      },
+      nao_lancado: {
+        status: 409,
+        error: 'Este pedido ainda não foi lançado no Control — não há o que atualizar lá',
+        code: 'NAO_LANCADO',
+      },
+      not_found: { status: 404, error: 'Pedido não encontrado', code: 'NOT_FOUND' },
+      erro: { status: 500, error: 'Não foi possível registrar', code: 'UPDATE_FAILED' },
+    } as const;
+    const resp = respostas[r.motivo] ?? respostas.erro;
+    await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
+    return;
+  }
+
+  // O aviso é carona do pedido, nunca condição dele: push falhando não pode
+  // desfazer o registro de que alguém pediu a atualização.
+  if (body.acao === 'pedir') {
+    const { data: pedido } = await supabase
+      .from('orders')
+      .select('id, order_number, erp_order_id')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (pedido) {
+      avisarPedidoMudouNoErp(
+        company_id,
+        pedido as { id: string; order_number: number | null; erp_order_id: string | null },
+        sub,
+        body.observacao ?? null,
+      );
+    }
+  }
+
+  await reply.send({ data: r.sincronia });
 }
