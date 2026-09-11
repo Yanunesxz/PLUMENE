@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -95,13 +96,8 @@ interface PrecoDoProduto {
  * detecções deste arquivo. Sem a coluna, a faixa maior fica null e todo tamanho
  * paga o preço normal: é o comportamento anterior à migração, não um erro.
  */
-let temColunaDaFaixaMaior: boolean | null = null;
-
 async function detectarColunaDaFaixaMaior(): Promise<boolean> {
-  if (temColunaDaFaixaMaior !== null) return temColunaDaFaixaMaior;
-  const { error } = await supabase.from('product_prices').select('price_larger').limit(1);
-  temColunaDaFaixaMaior = !error;
-  return temColunaDaFaixaMaior;
+  return detectar('product_prices', 'price_larger');
 }
 
 // Preço dos produtos na tabela de preço do representante. É a fonte autoritativa:
@@ -160,33 +156,18 @@ async function getSizeMap(variantIds: string[]): Promise<Map<string, string>> {
  * alguém rodar o SQL. Detecta uma vez e guarda, para o deploy não depender da
  * ordem. (Mesmo padrão de `reps.service.ts` e `partner.service.ts`.)
  */
-let temColunasDeOrigem: boolean | null = null;
-
 async function detectarColunasDeOrigem(): Promise<boolean> {
-  if (temColunasDeOrigem !== null) return temColunasDeOrigem;
-  const { error } = await supabase.from('orders').select('source').limit(1);
-  temColunasDeOrigem = !error;
-  return temColunasDeOrigem;
+  return detectar('orders', 'source');
 }
 
 /** `orders.price_table_id` vem da migração 025 — mesmo cuidado da 014 acima. */
-let temColunaDaTabela: boolean | null = null;
-
 async function detectarColunaDaTabela(): Promise<boolean> {
-  if (temColunaDaTabela !== null) return temColunaDaTabela;
-  const { error } = await supabase.from('orders').select('price_table_id').limit(1);
-  temColunaDaTabela = !error;
-  return temColunaDaTabela;
+  return detectar('orders', 'price_table_id');
 }
 
 /** `orders.discount_percent` vem da migração 029 — mesmo cuidado das outras. */
-let temColunaDoDesconto: boolean | null = null;
-
 async function detectarColunaDoDesconto(): Promise<boolean> {
-  if (temColunaDoDesconto !== null) return temColunaDoDesconto;
-  const { error } = await supabase.from('orders').select('discount_percent').limit(1);
-  temColunaDoDesconto = !error;
-  return temColunaDoDesconto;
+  return detectar('orders', 'discount_percent');
 }
 
 /**
@@ -470,13 +451,8 @@ export type DeleteOrderResult =
 // depois de dois pedidos da CS sumirem sem rastro nenhum.
 
 /** `deleted_orders` vem da migração 040 — mesmo cuidado das outras. */
-let temPedidosExcluidos: boolean | null = null;
-
 async function detectarPedidosExcluidos(): Promise<boolean> {
-  if (temPedidosExcluidos !== null) return temPedidosExcluidos;
-  const { error } = await supabase.from('deleted_orders').select('id').limit(1);
-  temPedidosExcluidos = !error;
-  return temPedidosExcluidos;
+  return detectar('deleted_orders', 'id');
 }
 
 /**
@@ -980,13 +956,8 @@ export async function setOrderNotes(
 }
 
 /** `customers.last_purchase_at` vem da migração 036 — mesmo cuidado das outras. */
-let temUltimaCompra: boolean | null = null;
-
 async function detectarUltimaCompra(): Promise<boolean> {
-  if (temUltimaCompra !== null) return temUltimaCompra;
-  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
-  temUltimaCompra = !error;
-  return temUltimaCompra;
+  return detectar('customers', 'last_purchase_at');
 }
 
 /**

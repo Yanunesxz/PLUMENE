@@ -17,6 +17,7 @@
  * para usar e devolve a lista do que foi ignorado e por quê.
  */
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { registrarCompraDoCliente } from '../orders/orders.service.js';
 
 export interface FaturamentoParceiro {
@@ -47,13 +48,8 @@ export interface ResultadoFaturamento {
  * update INTEIRO — e o ERP receberia erro num faturamento que existe. Sem a
  * coluna, o valor corrigido é ignorado e o resto grava normalmente.
  */
-let temColunaDoValor: boolean | null = null;
-
 async function detectarColunaDoValor(): Promise<boolean> {
-  if (temColunaDoValor !== null) return temColunaDoValor;
-  const { error } = await supabase.from('orders').select('invoiced_total').limit(1);
-  temColunaDoValor = !error;
-  return temColunaDoValor;
+  return detectar('orders', 'invoiced_total');
 }
 
 export async function receberFaturamento(

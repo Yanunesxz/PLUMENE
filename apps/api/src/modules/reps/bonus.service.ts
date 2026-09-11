@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import {
   MAX_FAIXAS_DE_BONUS,
   competenciaDe,
@@ -16,13 +17,8 @@ import {
  * tela de representantes ficaria quebrada até alguém rodar o SQL. Aqui a falta
  * da migração significa "ninguém tem meta cadastrada", que é verdade.
  */
-let temTabela: boolean | null = null;
-
 async function detectarTabela(): Promise<boolean> {
-  if (temTabela !== null) return temTabela;
-  const { error } = await supabase.from('rep_bonus_tiers').select('id').limit(1);
-  temTabela = !error;
-  return temTabela;
+  return detectar('rep_bonus_tiers', 'id');
 }
 
 /** A migração 021 já está no banco? A tela usa isto para avisar o gerente. */

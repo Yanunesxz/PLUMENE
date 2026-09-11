@@ -9,15 +9,11 @@
  * motivo — o app continua vendendo sem depender da ordem do deploy.
  */
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import type { TarefaDoRep } from '@csb/shared';
 
-let temTarefas: boolean | null = null;
-
 export async function detectarTarefas(): Promise<boolean> {
-  if (temTarefas !== null) return temTarefas;
-  const { error } = await supabase.from('rep_tasks').select('id').limit(1);
-  temTarefas = !error;
-  return temTarefas;
+  return detectar('rep_tasks', 'id');
 }
 
 /** Nomes de usuários e clientes, resolvidos à parte — rep_id e created_by são

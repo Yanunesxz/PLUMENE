@@ -14,6 +14,7 @@
  */
 import { webpush } from './webpush.js';
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { env } from '../../config/env.js';
 
 export interface AvisoPush {
@@ -45,12 +46,8 @@ function garantirVapid(): void {
 
 // A tabela vem da migração 034, que pode não estar aplicada — mesmo cuidado
 // das outras: o deploy pode chegar antes do SQL, e nada pode quebrar por isso.
-let temTabela: boolean | null = null;
 async function detectarTabela(): Promise<boolean> {
-  if (temTabela !== null) return temTabela;
-  const { error } = await supabase.from('push_subscriptions').select('id').limit(1);
-  temTabela = !error;
-  return temTabela;
+  return detectar('push_subscriptions', 'id');
 }
 
 export interface AssinaturaRecebida {

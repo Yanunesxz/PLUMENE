@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { buscarPorIds, buscarTudo } from '../../lib/paginacao.js';
 import type { CatalogColor, CatalogVariant, ProductWithPrice } from '@csb/shared';
 
@@ -37,13 +38,8 @@ export async function priceTableBelongsToCompany(
  * poder vender. Enquanto a coluna não existe, o preço da faixa maior fica null e
  * todo mundo paga o preço normal, que é exatamente o comportamento de hoje.
  */
-let temColunaDaFaixaMaior: boolean | null = null;
-
 async function temFaixaMaior(): Promise<boolean> {
-  if (temColunaDaFaixaMaior !== null) return temColunaDaFaixaMaior;
-  const { error } = await supabase.from('product_prices').select('price_larger').limit(1);
-  temColunaDaFaixaMaior = !error;
-  return temColunaDaFaixaMaior;
+  return detectar('product_prices', 'price_larger');
 }
 
 export interface CatalogOptions {

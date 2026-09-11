@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { hashPassword } from '../../lib/password.js';
 import { deleteRep } from '../reps/reps.service.js';
 import { TODAS_PERMISSOES } from '@csb/shared';
@@ -37,13 +38,8 @@ const ORDEM_PAPEL: Record<UserRole, number> = { admin: 0, manager: 1, financeiro
  * que traz o que existir, e só a ESCRITA precisa saber. Mesmo padrão do
  * `detectarErpRepId` em reps.service.
  */
-let temColunasDeControle: boolean | null = null;
-
 async function detectarColunasDeControle(): Promise<boolean> {
-  if (temColunasDeControle !== null) return temColunasDeControle;
-  const { error } = await supabase.from('users').select('permissions, last_login_at').limit(1);
-  temColunasDeControle = !error;
-  return temColunasDeControle;
+  return detectar('users', 'permissions, last_login_at');
 }
 
 interface LinhaUsuario {

@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import type {
   CustomerListItem,
   CreateCustomerRequest,
@@ -25,33 +26,18 @@ const CUSTOMER_COLUMNS =
  * SQL rodar derrubaria a lista INTEIRA de clientes. Sem elas, os selos de
  * frescor simplesmente não aparecem, que é o comportamento de antes.
  */
-let temHistoricoDeCompra: boolean | null = null;
-
 async function detectarHistoricoDeCompra(): Promise<boolean> {
-  if (temHistoricoDeCompra !== null) return temHistoricoDeCompra;
-  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
-  temHistoricoDeCompra = !error;
-  return temHistoricoDeCompra;
+  return detectar('customers', 'last_purchase_at');
 }
 
 /** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
-let temInatividade: boolean | null = null;
-
 async function detectarInatividade(): Promise<boolean> {
-  if (temInatividade !== null) return temInatividade;
-  const { error } = await supabase.from('customers').select('inactivity_reason').limit(1);
-  temInatividade = !error;
-  return temInatividade;
+  return detectar('customers', 'inactivity_reason');
 }
 
 /** E para o cadastro real (migração 041): endereço estruturado, IE, observações, cnpj_digits. */
-let temCadastroReal: boolean | null = null;
-
 async function detectarCadastroReal(): Promise<boolean> {
-  if (temCadastroReal !== null) return temCadastroReal;
-  const { error } = await supabase.from('customers').select('cep').limit(1);
-  temCadastroReal = !error;
-  return temCadastroReal;
+  return detectar('customers', 'cep');
 }
 
 const COLUNAS_DO_CADASTRO_REAL =

@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { hashPassword } from '../../lib/password.js';
 import { priceTableBelongsToCompany } from '../catalog/catalog.service.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
@@ -37,23 +38,13 @@ const REP_BASE =
 // Pedir uma coluna inexistente faz o PostgREST recusar a query INTEIRA — a tela
 // de representantes ficaria vazia até alguém rodar o SQL. Detecta uma vez e
 // guarda, para o deploy não depender da ordem. (Mesmo padrão do partner.service.)
-let temErpRepId: boolean | null = null;
-
 async function detectarErpRepId(): Promise<boolean> {
-  if (temErpRepId !== null) return temErpRepId;
-  const { error } = await supabase.from('users').select('erp_rep_id').limit(1);
-  temErpRepId = !error;
-  return temErpRepId;
+  return detectar('users', 'erp_rep_id');
 }
 
 /** `users.venda_interna` vem da migração 031 — mesmo cuidado da 012 acima. */
-let temVendaInterna: boolean | null = null;
-
 async function detectarVendaInterna(): Promise<boolean> {
-  if (temVendaInterna !== null) return temVendaInterna;
-  const { error } = await supabase.from('users').select('venda_interna').limit(1);
-  temVendaInterna = !error;
-  return temVendaInterna;
+  return detectar('users', 'venda_interna');
 }
 
 async function repSelect(): Promise<string> {
@@ -65,13 +56,8 @@ async function repSelect(): Promise<string> {
 
 // rep_price_tables vem da migração 018 — mesmo cuidado do erp_rep_id acima: até
 // o Yan rodar o SQL, o conjunto de cada rep é a tabela única que ele já tem.
-let temRepPriceTables: boolean | null = null;
-
 async function detectarRepPriceTables(): Promise<boolean> {
-  if (temRepPriceTables !== null) return temRepPriceTables;
-  const { error } = await supabase.from('rep_price_tables').select('user_id').limit(1);
-  temRepPriceTables = !error;
-  return temRepPriceTables;
+  return detectar('rep_price_tables', 'user_id');
 }
 
 /**
