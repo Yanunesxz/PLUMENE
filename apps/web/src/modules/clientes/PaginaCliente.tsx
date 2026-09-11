@@ -13,7 +13,8 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
-import { api } from '../../services/api.js';
+import { api, esquecerCache } from '../../services/api.js';
+import { db } from '../../offline/db.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
@@ -90,6 +91,11 @@ export function PaginaCliente() {
         token,
       );
       setCliente((c) => (c ? { ...c, erp_id: res.data.erp_id } : c));
+      // A lista de Clientes e o card da Larissa leem o cache do aparelho: sem
+      // isto o cliente recém-atrelado continuaria na fila "para incluir no
+      // Control" até a próxima sincronização, e ela o incluiria duas vezes.
+      await db.customers.update(id, { erp_id: res.data.erp_id }).catch(() => {});
+      esquecerCache('/customers');
       setCodigoErp('');
       setToast({ message: `Código ${res.data.erp_id} atrelado.`, type: 'success' });
     } catch (err) {

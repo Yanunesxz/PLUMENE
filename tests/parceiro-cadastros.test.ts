@@ -64,6 +64,36 @@ describe('clientes', () => {
     expect(filtroPorId?.args[1]).toBe('existe-1');
   });
 
+
+  it('enxerga o cliente que esta DEPOIS da linha 1.000 — senao a carga o duplicaria', async () => {
+    // O PostgREST corta em 1.000 linhas sem avisar, e a CS tem 2.604 clientes.
+    // Aqui a primeira pagina vem cheia (1.000) e o alvo esta na segunda.
+    const primeiraPagina = Array.from({ length: 1000 }, (_, i) => ({
+      id: `c-${i}`,
+      erp_id: `X${i}`,
+      cnpj: null,
+    }));
+    const { service, fake } = await carregar({
+      price_tables: { data: [{ id: 't-uuid', erp_code: '01' }], error: null },
+      customers: [
+        { data: primeiraPagina, error: null },
+        // O dublê adianta a próxima resposta a cada consulta; esta linha é o
+        // espaço dessa antecipação, para a 2ª página cair na 2ª ida ao banco.
+        { data: [], error: null },
+        { data: [{ id: 'la-no-fim', erp_id: 'C9999', cnpj: null }], error: null },
+        { data: null, error: null },
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: 'C9999', razao_social: 'LOJA DA PAGINA 2' },
+    ]);
+
+    expect(r.criados).toBe(0);
+    expect(r.atualizados).toBe(1);
+    const filtroPorId = fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id');
+    expect(filtroPorId?.args[1]).toBe('la-no-fim');
+  });
   it('ADOTA pelo CNPJ o cliente que existia sem código — a mesma loja não vira duas', async () => {
     // O cliente veio da carga de carteira (relatório Curva ABC, sem código do
     // Control). Quando o ERP manda o mesmo CNPJ COM código, tem de atualizar

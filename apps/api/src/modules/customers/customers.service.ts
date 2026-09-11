@@ -97,7 +97,7 @@ export async function getCustomers(
 
 /** O cadastro recusado porque o documento já está na base — com quem ele é. */
 export interface ClienteDuplicado {
-  duplicado: { id: string; name: string; erp_id: string | null };
+  duplicado: { id: string; name: string; erp_id: string | null; rep_id: string | null };
 }
 
 /**
@@ -116,14 +116,14 @@ async function clienteComOMesmoDocumento(
   const temDigitos = await detectarCadastroReal();
   let consulta = supabase
     .from('customers')
-    .select('id, name, erp_id')
+    .select('id, name, erp_id, rep_id')
     .eq('company_id', company_id)
     .limit(1);
   consulta = temDigitos
     ? consulta.eq('cnpj_digits', digitos)
     : consulta.in('cnpj', [digitos, formatarDocumento(digitos)]);
   const { data } = await consulta;
-  const achado = (data ?? [])[0] as { id: string; name: string; erp_id: string | null } | undefined;
+  const achado = (data ?? [])[0] as ClienteDuplicado['duplicado'] | undefined;
   return achado ?? null;
 }
 
@@ -195,9 +195,17 @@ export async function createCustomer(
  * O código do cliente no Control, como o app o guarda: 5 dígitos com zeros à
  * esquerda ("05836"). O Control exporta com "#" e as pessoas digitam sem os
  * zeros; os três são o mesmo cliente. Nulo = não é um código.
+ *
+ * LETRA é recusada, não descartada. Os 1.350 códigos da CS são cinco dígitos
+ * e nada mais (conferido em 11/09/2026), mas jogar fora a letra de um "C0001"
+ * digitado gravaria "00001" em silêncio — o cliente ficaria atrelado ao
+ * cadastro errado, e ninguém descobriria antes do faturamento. Recusar é
+ * barulhento; corromper, não.
  */
 export function normalizarCodigoErp(v: string | null | undefined): string | null {
-  const d = apenasDigitos(v);
+  const texto = (v ?? '').trim();
+  if (/[a-z]/i.test(texto)) return null;
+  const d = apenasDigitos(texto);
   if (!d || d.length > 5 || Number(d) === 0) return null;
   return d.padStart(5, '0');
 }
