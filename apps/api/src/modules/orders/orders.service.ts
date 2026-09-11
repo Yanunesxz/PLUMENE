@@ -886,6 +886,60 @@ export async function setOrderPayment(
   return { ok: true, order: data as Order };
 }
 
+export type CorrigirNumeroErpResult =
+  | { ok: true; erp_order_id: string }
+  | { ok: false; motivo: 'not_found' | 'formato' | 'em_uso' | 'nao_lancado' | 'ja_faturado' | 'erro' };
+
+/**
+ * Corrige o número do Control de um pedido já lançado.
+ *
+ * Existe porque errar o número é fácil (o diálogo sugere o próximo da
+ * sequência, e a sugestão pode não ser o que o Control deu) e o estrago é
+ * grande: é por esse número que o faturamento do ERP acha o pedido. Sem
+ * conserto, o pedido ficaria esperando uma nota que nunca chega.
+ *
+ * Depois da NOTA o número não muda mais: aí ele é o que está no documento
+ * fiscal, e divergir disso seria criar uma segunda verdade.
+ */
+export async function corrigirNumeroErp(
+  id: string,
+  company_id: string,
+  numeroDigitado: string,
+): Promise<CorrigirNumeroErpResult> {
+  const numero = normalizarNumeroErp(numeroDigitado);
+  if (!numero || !numeroErpValido(numero)) return { ok: false, motivo: 'formato' };
+
+  const { data: pedido } = await supabase
+    .from('orders')
+    .select('id, status, invoiced, erp_order_id')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!pedido) return { ok: false, motivo: 'not_found' };
+  const o = pedido as { status: Order['status']; invoiced: boolean | null; erp_order_id: string | null };
+  if (o.status !== 'sent_erp' || !o.erp_order_id) return { ok: false, motivo: 'nao_lancado' };
+  if (o.invoiced) return { ok: false, motivo: 'ja_faturado' };
+
+  const { data: dono } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('company_id', company_id)
+    .eq('erp_order_id', numero)
+    .neq('id', id)
+    .limit(1);
+  if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ erp_order_id: numero, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id);
+  if (error) {
+    return { ok: false, motivo: (error as { code?: string }).code === CHAVE_DUPLICADA ? 'em_uso' : 'erro' };
+  }
+  return { ok: true, erp_order_id: numero };
+}
+
 /**
  * O último número do Control lançado nesta empresa — é dele que a tela sugere
  * o próximo, para a Larissa seguir a ordem de lá sem consultar o ERP.
@@ -1122,6 +1176,12 @@ export async function updateOrderStatus(
     .select()
     .single();
 
+  // Duas pessoas lançando ao mesmo tempo leem "número livre" e gravam as duas;
+  // quem chega depois bate no índice único da 042. Vira o mesmo 409 da leitura
+  // — a Larissa vê "já está em outro pedido" em vez de um erro cru.
+  if (error && (error as { code?: string }).code === CHAVE_DUPLICADA) {
+    throw new Error('ERP_NUMBER_IN_USE');
+  }
   if (error || !data) return null;
 
   // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido

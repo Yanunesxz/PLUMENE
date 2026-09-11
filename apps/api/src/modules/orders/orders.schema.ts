@@ -112,3 +112,12 @@ export const setOrderItemsSchema = z.object({
     .min(1)
     .max(500),
 });
+
+/** A correção do número do Control, quando a Larissa digitou errado ao lançar. */
+export const corrigirNumeroErpSchema = z.object({
+  erp_order_id: z
+    .string()
+    .trim()
+    .max(12)
+    .refine(numeroErpValido, 'Número do Control inválido — são duas letras e a numeração, ex.: CS17379'),
+});

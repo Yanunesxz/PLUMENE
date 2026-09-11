@@ -10,6 +10,12 @@ interface Props {
   ultimo: string | null;
   carregandoUltimo: boolean;
   ocupado: boolean;
+  /** 'corrigir' = o pedido já foi lançado e o número saiu errado. */
+  modo?: 'lancar' | 'corrigir';
+  /** O número gravado hoje, quando está corrigindo. */
+  atual?: string | null;
+  /** O que a API respondeu ao recusar — o diálogo fica aberto mostrando. */
+  erro?: string | null;
   onConfirmar: (numeroErp: string) => void;
   onCancelar: () => void;
 }
@@ -21,13 +27,26 @@ interface Props {
  * para trás — "tem que seguir a ordem de lá" (Yan, 10/09/2026). Quem cunha o
  * número é sempre o ERP; o app só guarda.
  */
-export function LancarNoErp({ numeroDoPedido, ultimo, carregandoUltimo, ocupado, onConfirmar, onCancelar }: Props) {
+export function LancarNoErp({
+  numeroDoPedido,
+  ultimo,
+  carregandoUltimo,
+  ocupado,
+  modo = 'lancar',
+  atual,
+  erro,
+  onConfirmar,
+  onCancelar,
+}: Props) {
+  const corrigindo = modo === 'corrigir';
   const [numero, setNumero] = useState('');
 
-  // A sugestão entra quando o último chega — e só se a pessoa ainda não digitou.
+  // A sugestão entra quando o último chega — e só se a pessoa ainda não
+  // digitou. Corrigindo, ninguém sugere nada: o número errado costuma ser
+  // justamente um palpite aceito sem conferir.
   useEffect(() => {
-    if (ultimo) setNumero((n) => n || proximoNumeroErp(ultimo));
-  }, [ultimo]);
+    if (!corrigindo && ultimo) setNumero((n) => n || proximoNumeroErp(ultimo));
+  }, [ultimo, corrigindo]);
 
   const limpo = normalizarNumeroErp(numero);
   const valido = numeroErpValido(limpo);
@@ -50,10 +69,14 @@ export function LancarNoErp({ numeroDoPedido, ultimo, carregandoUltimo, ocupado,
           </div>
           <div className="min-w-0 flex-1">
             <p className="text-[15px] font-semibold leading-snug text-foreground">
-              Lançar o pedido #{numeroDoPedido ?? ''} no Control
+              {corrigindo
+                ? `Corrigir o número do pedido #${numeroDoPedido ?? ''}`
+                : `Lançar o pedido #${numeroDoPedido ?? ''} no Control`}
             </p>
             <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              Digite o número que o Control deu ao pedido — duas letras e a numeração.
+              {corrigindo
+                ? `Hoje está gravado ${atual ?? ''}. Digite o número que o Control realmente deu — é por ele que o faturamento acha este pedido.`
+                : 'Digite o número que o Control deu ao pedido — duas letras e a numeração.'}
             </p>
             <input
               value={numero}
@@ -63,13 +86,20 @@ export function LancarNoErp({ numeroDoPedido, ultimo, carregandoUltimo, ocupado,
               className="mt-3 h-11 w-full rounded-lg border border-border bg-background px-3 font-mono text-base uppercase text-foreground"
               aria-label="Número do pedido no Control"
             />
-            <p className="mt-1.5 text-xs text-muted-foreground">
-              {carregandoUltimo
-                ? 'Buscando o último lançado…'
-                : ultimo
-                  ? `Último lançado: ${ultimo} · sugerido: ${proximoNumeroErp(ultimo)}`
-                  : 'Nenhum lançado ainda — este será o primeiro da sequência.'}
-            </p>
+            {!corrigindo && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {carregandoUltimo
+                  ? 'Buscando o último lançado…'
+                  : ultimo
+                    ? `Último lançado: ${ultimo} · sugerido: ${proximoNumeroErp(ultimo)}`
+                    : 'Nenhum lançado ainda — este será o primeiro da sequência.'}
+              </p>
+            )}
+            {erro && (
+              <p className="mt-1.5 rounded-lg bg-danger-soft px-2.5 py-1.5 text-xs text-danger-soft-foreground">
+                {erro}
+              </p>
+            )}
             {numero && !valido && (
               <p className="mt-1 text-xs text-danger">Formato: duas letras e números, ex.: SX14627.</p>
             )}
@@ -90,8 +120,10 @@ export function LancarNoErp({ numeroDoPedido, ultimo, carregandoUltimo, ocupado,
             {ocupado ? (
               <>
                 <Spinner />
-                Lançando…
+                {corrigindo ? 'Corrigindo…' : 'Lançando…'}
               </>
+            ) : corrigindo ? (
+              'Corrigir número'
             ) : foraDaOrdem ? (
               'Lançar mesmo assim'
             ) : (

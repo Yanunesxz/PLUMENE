@@ -19,6 +19,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { registrarCompraDoCliente } from '../orders/orders.service.js';
+import { normalizarNumeroErp } from '@csb/shared';
 
 export interface FaturamentoParceiro {
   /** Número do pedido no ERP — a chave preferida. */
@@ -62,7 +63,11 @@ export async function receberFaturamento(
   const comValor = await detectarColunaDoValor();
 
   for (const item of lista) {
-    const pedidoErp = item.pedido_erp?.trim();
+    // O MESMO numero, escrito de dois jeitos: o app grava normalizado
+    // ("SX14627") desde 10/09/2026, e o ERP pode mandar "sx-14627" ou
+    // "SX 14627". Sem normalizar aqui, o pedido lancado nunca fatura.
+    const pedidoErpCru = item.pedido_erp?.trim();
+    const pedidoErp = pedidoErpCru ? normalizarNumeroErp(pedidoErpCru) : undefined;
     const id = item.id?.trim();
     const referencia = pedidoErp || id || '(sem identificação)';
 
@@ -77,7 +82,11 @@ export async function receberFaturamento(
       .from('orders')
       .select('id, invoiced, total, customer_id')
       .eq('company_id', company_id);
-    busca = pedidoErp ? busca.eq('erp_order_id', pedidoErp) : busca.eq('id', id as string);
+    busca = pedidoErp
+      // As duas grafias: o normalizado (app) e o texto cru que o parceiro
+      // gravou antes de 10/09 pelo confirmOrderImport.
+      ? busca.in('erp_order_id', [...new Set([pedidoErp, pedidoErpCru as string])])
+      : busca.eq('id', id as string);
 
     const { data: pedido, error: erroBusca } = await busca.maybeSingle();
     if (erroBusca) {
