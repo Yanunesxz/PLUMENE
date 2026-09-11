@@ -19,6 +19,7 @@ import {
   relatorioLocal,
   type ClienteParaRelatorio,
 } from './ia.relatorio.js';
+import { lerRegua } from '../company/carteira.service.js';
 
 const PAGE_SIZE = 1000;
 
@@ -72,6 +73,9 @@ export async function relatorioDaCarteira(
     );
   }
 
+  // A regua da fabrica (043): o mesmo 90/180 que o app usa nas cores.
+  const regua = await lerRegua(company_id);
+
   // Sem chave nenhuma, o app escreve sozinho — é o caminho padrão e sem custo.
   const provedor = escolherProvedor({
     anthropic: env.ANTHROPIC_API_KEY,
@@ -81,16 +85,18 @@ export async function relatorioDaCarteira(
   if (!provedor) {
     return {
       ok: true,
-      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep }),
+      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep, regua }),
       clientes: clientes.length,
       motor: 'app',
     };
   }
 
-  const resumo = resumirCarteira(clientes);
-  const linhas = escopo.irrestrito ? linhasDaEmpresa(clientes, nomeDoRep) : linhasDaCarteira(clientes);
+  const resumo = resumirCarteira(clientes, new Date(), regua);
+  const linhas = escopo.irrestrito
+    ? linhasDaEmpresa(clientes, nomeDoRep, new Date(), regua)
+    : linhasDaCarteira(clientes);
   const instrucoes = instrucoesDoRelatorio(env.EMAIL_FROM_NAME);
-  const pedido = montarPedido(alcance, resumo, linhas);
+  const pedido = montarPedido(alcance, resumo, linhas, regua);
   const texto =
     provedor === 'openai'
       ? await perguntarAoChatGPT(instrucoes, pedido)
@@ -99,7 +105,7 @@ export async function relatorioDaCarteira(
   if (!texto) {
     return {
       ok: true,
-      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep }),
+      relatorio: relatorioLocal(clientes, { alcance, nomeDoRep, regua }),
       clientes: clientes.length,
       motor: 'app',
     };

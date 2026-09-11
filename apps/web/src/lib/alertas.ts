@@ -1,4 +1,4 @@
-import type { TarefaDoRep } from '@csb/shared';
+import { REGUA_PADRAO, type ReguaDaCarteira, type TarefaDoRep } from '@csb/shared';
 import { formatBRL } from './utils.js';
 
 /**
@@ -55,13 +55,18 @@ export interface EntradasDosAlertas {
   vitrines: Array<{ id: string; clienteNome: string | null; expiraEm: string; status: string }>;
   /** Convites de conta de loja do representante. */
   convites: Array<{ id: string; clienteNome: string; expiraEm: string; status: string }>;
-  /** A carteira: quem está a poucos dias de virar inativo (180 sem comprar). */
+  /** A carteira: quem está a poucos dias de esfriar (o prazo da régua da fábrica). */
   clientes: Array<{ id: string; nome: string; ultimaCompraEm: string | null }>;
   /** A régua da meta do mês. Nulo = sem faixas cadastradas, sem alerta. */
   meta: { enviado: number; faixas: Array<{ meta: number; bonus: number }> } | null;
   /** As tarefas/visitas que o escritório marcou para ele. */
   tarefas: TarefaDoRep[];
   agora: Date;
+  /**
+   * A régua da fábrica (migração 043). Ausente = a de sempre, 90/180 — é o
+   * que vale no aparelho que ainda não recebeu a configuração.
+   */
+  regua?: ReguaDaCarteira;
 }
 
 const DIA = 86_400_000;
@@ -191,17 +196,19 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
     });
   }
 
-  // Cliente a até 3 dias de virar INATIVO (180 sem comprar): a última chance
-  // de uma visita segurar. Quando vira (ou compra), o alerta sai sozinho.
+  // Cliente a até 3 dias de ESFRIAR (o prazo do vermelho na régua da fábrica):
+  // a última chance de uma visita segurar. Quando vira (ou compra), o alerta
+  // sai sozinho.
+  const prazoDeEsfriar = (e.regua ?? REGUA_PADRAO).esfriado;
   for (const c of e.clientes) {
     if (!c.ultimaCompraEm) continue;
     const semComprar = diasDesde(c.ultimaCompraEm, e.agora);
-    const faltam = 180 - semComprar;
+    const faltam = prazoDeEsfriar - semComprar;
     if (faltam >= 1 && faltam <= 3) {
       alertas.push({
         id: `cliente-expira-${c.id}`,
         nivel: 'atencao',
-        titulo: `${c.nome} vira inativo em ${faltam} dia${faltam === 1 ? '' : 's'}`,
+        titulo: `${c.nome} esfria em ${faltam} dia${faltam === 1 ? '' : 's'}`,
         detalhe: `Sem compra há ${semComprar} dias — uma visita agora segura o cliente.`,
         acao: { rotulo: 'Abrir a ficha', tipo: 'ir', para: `/customers/${c.id}` },
       });

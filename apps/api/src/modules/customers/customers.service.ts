@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import type {
   CustomerListItem,
   CreateCustomerRequest,
@@ -14,41 +15,29 @@ const PAGE_SIZE = 1000;
 
 // Só o que as telas usam. `select('*')` + o embed da tabela de preço (que nada
 // no app lia) tornava a lista de 1.353 clientes ~5× maior do que precisa.
+// `rep_id` entra porque separa as duas famílias de cliente sem código do ERP:
+// quem nasceu no app (fila da Larissa) e quem veio das cargas da Curva ABC (já
+// está no Control, só chegou sem código). Ver CustomerListItem.
 const CUSTOMER_COLUMNS =
-  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id';
+  'id, name, trade_name, cnpj, blocked, block_reason, credit_limit, whatsapp, price_table_id, erp_id, rep_id';
 
 /**
  * As colunas da carteira inteligente vêm da migração 036 — pedi-las antes do
  * SQL rodar derrubaria a lista INTEIRA de clientes. Sem elas, os selos de
  * frescor simplesmente não aparecem, que é o comportamento de antes.
  */
-let temHistoricoDeCompra: boolean | null = null;
-
 async function detectarHistoricoDeCompra(): Promise<boolean> {
-  if (temHistoricoDeCompra !== null) return temHistoricoDeCompra;
-  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
-  temHistoricoDeCompra = !error;
-  return temHistoricoDeCompra;
+  return detectar('customers', 'last_purchase_at');
 }
 
 /** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
-let temInatividade: boolean | null = null;
-
 async function detectarInatividade(): Promise<boolean> {
-  if (temInatividade !== null) return temInatividade;
-  const { error } = await supabase.from('customers').select('inactivity_reason').limit(1);
-  temInatividade = !error;
-  return temInatividade;
+  return detectar('customers', 'inactivity_reason');
 }
 
 /** E para o cadastro real (migração 041): endereço estruturado, IE, observações, cnpj_digits. */
-let temCadastroReal: boolean | null = null;
-
 async function detectarCadastroReal(): Promise<boolean> {
-  if (temCadastroReal !== null) return temCadastroReal;
-  const { error } = await supabase.from('customers').select('cep').limit(1);
-  temCadastroReal = !error;
-  return temCadastroReal;
+  return detectar('customers', 'cep');
 }
 
 const COLUNAS_DO_CADASTRO_REAL =
@@ -108,7 +97,7 @@ export async function getCustomers(
 
 /** O cadastro recusado porque o documento já está na base — com quem ele é. */
 export interface ClienteDuplicado {
-  duplicado: { id: string; name: string; erp_id: string | null };
+  duplicado: { id: string; name: string; erp_id: string | null; rep_id: string | null };
 }
 
 /**
@@ -127,14 +116,14 @@ async function clienteComOMesmoDocumento(
   const temDigitos = await detectarCadastroReal();
   let consulta = supabase
     .from('customers')
-    .select('id, name, erp_id')
+    .select('id, name, erp_id, rep_id')
     .eq('company_id', company_id)
     .limit(1);
   consulta = temDigitos
     ? consulta.eq('cnpj_digits', digitos)
     : consulta.in('cnpj', [digitos, formatarDocumento(digitos)]);
   const { data } = await consulta;
-  const achado = (data ?? [])[0] as { id: string; name: string; erp_id: string | null } | undefined;
+  const achado = (data ?? [])[0] as ClienteDuplicado['duplicado'] | undefined;
   return achado ?? null;
 }
 
@@ -206,9 +195,17 @@ export async function createCustomer(
  * O código do cliente no Control, como o app o guarda: 5 dígitos com zeros à
  * esquerda ("05836"). O Control exporta com "#" e as pessoas digitam sem os
  * zeros; os três são o mesmo cliente. Nulo = não é um código.
+ *
+ * LETRA é recusada, não descartada. Os 1.350 códigos da CS são cinco dígitos
+ * e nada mais (conferido em 11/09/2026), mas jogar fora a letra de um "C0001"
+ * digitado gravaria "00001" em silêncio — o cliente ficaria atrelado ao
+ * cadastro errado, e ninguém descobriria antes do faturamento. Recusar é
+ * barulhento; corromper, não.
  */
 export function normalizarCodigoErp(v: string | null | undefined): string | null {
-  const d = apenasDigitos(v);
+  const texto = (v ?? '').trim();
+  if (/[a-z]/i.test(texto)) return null;
+  const d = apenasDigitos(texto);
   if (!d || d.length > 5 || Number(d) === 0) return null;
   return d.padStart(5, '0');
 }

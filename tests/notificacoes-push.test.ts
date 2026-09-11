@@ -164,3 +164,51 @@ describe('avisos do fluxo', () => {
     expect(JSON.parse(enviadas[0]!.corpo).title).toContain('#10');
   });
 });
+
+/**
+ * O aviso para uma LISTA escolhida na mão (Yan, 11/09/2026): "cria uma forma
+ * que eu possa escolher mandar notificação apenas para alguns clientes, e
+ * colocar apenas uma lista tipo CNPJ".
+ */
+describe('publicoPorDocumentos', () => {
+  it('acha os clientes pelo documento e devolve as contas de loja deles', async () => {
+    const { service } = await carregar({
+      customers: {
+        data: [
+          { id: 'c1', cnpj: '22.518.613/0001-58', cnpj_digits: '22518613000158' },
+          { id: 'c2', cnpj: '11222333000181', cnpj_digits: '11222333000181' },
+        ],
+        error: null,
+      },
+      users: { data: [{ id: 'loja-1', customer_id: 'c1' }], error: null },
+    });
+
+    const r = await service.publicoPorDocumentos(EMPRESA, ['22.518.613/0001-58', '11222333000181']);
+
+    expect(r.usuarios).toEqual(['loja-1']);
+    // c2 existe mas ainda não tem conta no app — e isso é DITO, não engolido.
+    expect(r.clientesSemConta).toBe(1);
+    expect(r.naoEncontrados).toEqual([]);
+  });
+
+  it('documento que não é de nenhum cliente volta escrito, em vez de sumir', async () => {
+    const { service } = await carregar({
+      customers: { data: [], error: null },
+      users: { data: [], error: null },
+    });
+
+    const r = await service.publicoPorDocumentos(EMPRESA, ['11222333000181']);
+
+    expect(r.usuarios).toEqual([]);
+    expect(r.naoEncontrados).toEqual(['11222333000181']);
+  });
+
+  it('lista vazia (ou só lixo) não vira consulta ao banco', async () => {
+    const { service, fake } = await carregar({ customers: { data: [], error: null } });
+
+    const r = await service.publicoPorDocumentos(EMPRESA, ['123', 'abc', '']);
+
+    expect(r).toEqual({ usuarios: [], naoEncontrados: [], clientesSemConta: 0 });
+    expect(fake.filtrosDe('customers')).toHaveLength(0);
+  });
+});

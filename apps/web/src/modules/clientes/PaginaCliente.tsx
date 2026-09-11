@@ -13,7 +13,8 @@ import {
   CalendarClock,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
-import { api } from '../../services/api.js';
+import { api, esquecerCache } from '../../services/api.js';
+import { db } from '../../offline/db.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
@@ -90,6 +91,11 @@ export function PaginaCliente() {
         token,
       );
       setCliente((c) => (c ? { ...c, erp_id: res.data.erp_id } : c));
+      // A lista de Clientes e o card da Larissa leem o cache do aparelho: sem
+      // isto o cliente recém-atrelado continuaria na fila "para incluir no
+      // Control" até a próxima sincronização, e ela o incluiria duas vezes.
+      await db.customers.update(id, { erp_id: res.data.erp_id }).catch(() => {});
+      esquecerCache('/customers');
       setCodigoErp('');
       setToast({ message: `Código ${res.data.erp_id} atrelado.`, type: 'success' });
     } catch (err) {
@@ -390,13 +396,13 @@ export function PaginaCliente() {
 
       {/* ─── O porquê do cliente vermelho (controle de inatividade) ────────
           Vermelho SEM motivo é pendência: o rep (ou a Bruna) registra por que
-          o cliente está inativo e uma observação com as próprias palavras. */}
+          o cliente esfriou e uma observação com as próprias palavras. */}
       {situacao.nivel === 'parado' && (
         <div className="mt-3 rounded-xl border border-danger/30 bg-danger-soft/40 p-4 shadow-sm">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-danger-soft-foreground">
-                Cliente inativo — {situacao.rotulo.replace('Inativo — ', '')}
+                Cliente esfriado — {situacao.rotulo.replace('Esfriado — ', '')}
               </p>
               {cliente.inactivity_reason ? (
                 <>
@@ -441,7 +447,7 @@ export function PaginaCliente() {
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Motivo — fechou, trocou de fornecedor, sem retorno no contato…"
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                aria-label="Motivo de o cliente estar inativo"
+                aria-label="Motivo de o cliente ter esfriado"
               />
               <textarea
                 value={obsMotivo}

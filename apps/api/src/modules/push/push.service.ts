@@ -14,7 +14,9 @@
  */
 import { webpush } from './webpush.js';
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { env } from '../../config/env.js';
+import { apenasDigitos, formatarDocumento } from '@csb/shared';
 
 export interface AvisoPush {
   /** Título da notificação (ex.: "Pedido #14620 faturado"). */
@@ -45,12 +47,8 @@ function garantirVapid(): void {
 
 // A tabela vem da migração 034, que pode não estar aplicada — mesmo cuidado
 // das outras: o deploy pode chegar antes do SQL, e nada pode quebrar por isso.
-let temTabela: boolean | null = null;
 async function detectarTabela(): Promise<boolean> {
-  if (temTabela !== null) return temTabela;
-  const { error } = await supabase.from('push_subscriptions').select('id').limit(1);
-  temTabela = !error;
-  return temTabela;
+  return detectar('push_subscriptions', 'id');
 }
 
 export interface AssinaturaRecebida {
@@ -147,8 +145,15 @@ export async function enviarParaUsuarios(
  *   lojas           → só as contas de loja
  *   lojas_compraram → lojas cujo cliente fez pedido nos últimos N dias
  *   escritorio      → só a gerência comercial e o financeiro
+ *   clientes        → SÓ as lojas escolhidas na mão, por CPF/CNPJ
  */
-export type PublicoDoAviso = 'todos' | 'reps' | 'lojas' | 'lojas_compraram' | 'escritorio';
+export type PublicoDoAviso =
+  | 'todos'
+  | 'reps'
+  | 'lojas'
+  | 'lojas_compraram'
+  | 'escritorio'
+  | 'clientes';
 
 export async function resolverPublico(
   company_id: string,
@@ -191,6 +196,75 @@ export async function resolverPublico(
     .eq('active', true)
     .in('role', papeis);
   return ((data ?? []) as Array<{ id: string }>).map((u) => u.id);
+}
+
+/**
+ * LISTA ESCOLHIDA: os clientes que o admin apontou, por CPF/CNPJ.
+ *
+ * Pedido do Yan (11/09/2026): "cria uma forma que eu possa escolher mandar
+ * notificação apenas para alguns clientes, e colocar apenas uma lista tipo
+ * CNPJ". O documento é a chave porque é o que ele tem na mão (planilha do
+ * Control, lista do financeiro) — nome de loja repete, id do app ele não sabe.
+ *
+ * Devolve também o que NÃO deu certo: documento que não existe na base e
+ * cliente sem conta no app. Um aviso que some em silêncio é pior do que um
+ * aviso que não foi enviado.
+ */
+export interface PublicoEscolhido {
+  /** Os usuários (contas de loja) que vão receber. */
+  usuarios: string[];
+  /** Documentos que não casaram com nenhum cliente desta empresa. */
+  naoEncontrados: string[];
+  /** Clientes achados que ainda não têm conta de loja no app. */
+  clientesSemConta: number;
+}
+
+export async function publicoPorDocumentos(
+  company_id: string,
+  documentos: string[],
+): Promise<PublicoEscolhido> {
+  const pedidos = [...new Set(documentos.map(apenasDigitos).filter((d) => d.length >= 11))];
+  if (pedidos.length === 0) return { usuarios: [], naoEncontrados: [], clientesSemConta: 0 };
+
+  // Com a 041 o banco tem a coluna gerada e enxerga máscara e dígito como o
+  // mesmo documento; sem ela, procura as duas formas que as cargas gravaram.
+  const temDigitos = await detectar('customers', 'cnpj_digits');
+  let consulta = supabase
+    .from('customers')
+    .select(temDigitos ? 'id, cnpj, cnpj_digits' : 'id, cnpj')
+    .eq('company_id', company_id);
+  consulta = temDigitos
+    ? consulta.in('cnpj_digits', pedidos)
+    : consulta.in('cnpj', [...pedidos, ...pedidos.map(formatarDocumento)]);
+  const { data } = await consulta.limit(1000);
+
+  // `as unknown as`: o select muda de forma conforme a 041 ter rodado ou não,
+  // e o tipo do PostgREST não acompanha a coluna escolhida em tempo de execução.
+  const achados = (data ?? []) as unknown as Array<{
+    id: string;
+    cnpj: string | null;
+    cnpj_digits?: string | null;
+  }>;
+  const digitosAchados = new Set(achados.map((c) => c.cnpj_digits ?? apenasDigitos(c.cnpj ?? '')));
+  const naoEncontrados = pedidos.filter((d) => !digitosAchados.has(d));
+  if (achados.length === 0) return { usuarios: [], naoEncontrados, clientesSemConta: 0 };
+
+  const ids = achados.map((c) => c.id);
+  const { data: contas } = await supabase
+    .from('users')
+    .select('id, customer_id')
+    .eq('company_id', company_id)
+    .eq('active', true)
+    .eq('role', 'store')
+    .in('customer_id', ids);
+  const linhas = (contas ?? []) as Array<{ id: string; customer_id: string | null }>;
+  const comConta = new Set(linhas.map((u) => u.customer_id));
+
+  return {
+    usuarios: linhas.map((u) => u.id),
+    naoEncontrados,
+    clientesSemConta: ids.filter((id) => !comConta.has(id)).length,
+  };
 }
 
 /** Envia para todos os usuários ativos destes papéis (ex.: a mesa do financeiro). */

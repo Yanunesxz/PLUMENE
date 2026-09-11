@@ -6,6 +6,7 @@ import {
   removerAssinatura,
   enviarParaUsuarios,
   resolverPublico,
+  publicoPorDocumentos,
   type AssinaturaRecebida,
   type PublicoDoAviso,
 } from './push.service.js';
@@ -86,7 +87,17 @@ export async function testeHandler(request: FastifyRequest, reply: FastifyReply)
   await reply.send({ data: { entregues } });
 }
 
-const PUBLICOS: PublicoDoAviso[] = ['todos', 'reps', 'lojas', 'lojas_compraram', 'escritorio'];
+const PUBLICOS: PublicoDoAviso[] = [
+  'todos',
+  'reps',
+  'lojas',
+  'lojas_compraram',
+  'escritorio',
+  'clientes',
+];
+
+/** Teto da lista colada: mais que isso é lista errada, não campanha. */
+const MAXIMO_DE_DOCUMENTOS = 500;
 
 /**
  * POST /push/enviar — o aviso manual da fábrica (promoção, coleção nova,
@@ -110,6 +121,8 @@ export async function enviarAvisoHandler(request: FastifyRequest, reply: Fastify
     url?: string;
     publico?: string;
     dias?: number;
+    /** Só para o público 'clientes': os CPF/CNPJ escolhidos pelo admin. */
+    documentos?: unknown;
   } | null;
 
   const titulo = body?.title?.trim() ?? '';
@@ -132,7 +145,37 @@ export async function enviarAvisoHandler(request: FastifyRequest, reply: Fastify
   const url = body?.url && body.url.startsWith('/') ? body.url : '/catalog';
   const dias = Math.min(365, Math.max(1, Math.round(body?.dias ?? 90)));
 
-  const pessoas = await resolverPublico(company_id, body!.publico as PublicoDoAviso, dias);
+  // Lista escolhida: o público sai dos documentos, e o que não casou volta
+  // escrito para o admin — aviso que some em silêncio é o pior desfecho.
+  let pessoas: string[];
+  let escolhidos: { naoEncontrados: string[]; clientesSemConta: number } | null = null;
+  if (body?.publico === 'clientes') {
+    const lista = Array.isArray(body.documentos)
+      ? (body.documentos as unknown[]).filter((d): d is string => typeof d === 'string')
+      : [];
+    if (lista.length === 0) {
+      await reply.status(400).send({
+        error: 'Escolha ao menos um cliente (CPF ou CNPJ) para receber o aviso',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      });
+      return;
+    }
+    if (lista.length > MAXIMO_DE_DOCUMENTOS) {
+      await reply.status(400).send({
+        error: `Lista grande demais — no máximo ${MAXIMO_DE_DOCUMENTOS} clientes por aviso`,
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      });
+      return;
+    }
+    const r = await publicoPorDocumentos(company_id, lista);
+    pessoas = r.usuarios;
+    escolhidos = { naoEncontrados: r.naoEncontrados, clientesSemConta: r.clientesSemConta };
+  } else {
+    pessoas = await resolverPublico(company_id, body!.publico as PublicoDoAviso, dias);
+  }
+
   const aparelhos = await enviarParaUsuarios(company_id, pessoas, {
     title: titulo,
     body: mensagem,
@@ -140,5 +183,5 @@ export async function enviarAvisoHandler(request: FastifyRequest, reply: Fastify
     tag: `aviso-${Date.now()}`,
   });
 
-  await reply.send({ data: { pessoas: pessoas.length, aparelhos } });
+  await reply.send({ data: { pessoas: pessoas.length, aparelhos, ...(escolhidos ?? {}) } });
 }

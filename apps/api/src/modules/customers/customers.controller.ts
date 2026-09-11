@@ -128,8 +128,16 @@ export async function createCustomerHandler(request: FastifyRequest, reply: Fast
   );
   if ('duplicado' in customer) {
     const d = customer.duplicado;
+    // Cliente de OUTRA carteira: o representante não o enxerga na lista dele,
+    // então dizer o nome e o código não o ajuda em nada e entrega o cadastro
+    // do colega. O que resolve é o escritório transferir — e é isso que a
+    // mensagem manda fazer. Escritório continua vendo tudo, porque é quem vai
+    // procurar o cadastro.
+    const daCarteiraDele = role === 'rep' && d.rep_id !== rep_id;
     await reply.status(409).send({
-      error: `Este CPF/CNPJ já está cadastrado: ${d.name}${d.erp_id ? ` (cód. ${d.erp_id})` : ''}`,
+      error: daCarteiraDele
+        ? 'Este CPF/CNPJ já está cadastrado na empresa, em outra carteira. Fale com o escritório para transferir o cliente.'
+        : `Este CPF/CNPJ já está cadastrado: ${d.name}${d.erp_id ? ` (cód. ${d.erp_id})` : ''}`,
       code: 'CLIENTE_DUPLICADO',
       statusCode: 409,
     });
@@ -268,7 +276,11 @@ export async function atrelarCodigoErpHandler(
     return;
   }
   const respostas: Record<typeof r.motivo, { status: number; error: string; code: string }> = {
-    codigo_invalido: { status: 422, error: 'Código inválido — o Control usa até 5 números (ex.: 05836)', code: 'CODIGO_INVALIDO' },
+    codigo_invalido: {
+      status: 422,
+      error: 'Código inválido — o Control usa até 5 números, sem letras (ex.: 05836)',
+      code: 'CODIGO_INVALIDO',
+    },
     cliente_nao_encontrado: { status: 404, error: 'Cliente não encontrado', code: 'NOT_FOUND' },
     ja_tem_codigo: { status: 409, error: 'Este cliente já tem código do ERP — quem muda é o Control', code: 'JA_TEM_CODIGO' },
     codigo_em_uso: { status: 409, error: `Este código já é de outro cliente: ${r.detalhe ?? ''}`, code: 'CODIGO_EM_USO' },

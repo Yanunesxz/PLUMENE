@@ -12,6 +12,7 @@ import {
   setPaymentHandler,
   setNotesHandler,
   ultimoNumeroErpHandler,
+  corrigirNumeroErpHandler,
   deleteOrderHandler,
   listDeletedOrdersHandler,
   pedidoPublicoHandler,
@@ -91,6 +92,13 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // A observação livre (o recado do rep) segue o MESMO portão — para a venda
   // interna, vale até o carimbo do faturamento em qualquer estado.
   fastify.patch('/orders/:id/observacao', decideOPedido, setNotesHandler);
+  // Corrigir o número do Control digitado errado no lançamento — de quem lança
+  // (financeiro; admin como válvula), e só antes de a nota sair.
+  fastify.patch(
+    '/orders/:id/numero-erp',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    corrigirNumeroErpHandler,
+  );
   fastify.patch(
     '/orders/:id/invoice',
     {

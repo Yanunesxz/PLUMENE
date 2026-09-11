@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { generateToken, hashToken } from '../../lib/tokens.js';
 import { hashPassword } from '../../lib/password.js';
 import { INVITE_EXPIRY_DAYS, type StoreInvite } from '@csb/shared';
@@ -187,13 +188,8 @@ export type UsoConvite =
  * convite até alguém rodar o SQL. Detecta uma vez e guarda. (Mesmo padrão de
  * `orders.service.ts` e `reps.service.ts`.)
  */
-let temColunaDono: boolean | null = null;
-
 async function detectarColunaDono(): Promise<boolean> {
-  if (temColunaDono !== null) return temColunaDono;
-  const { error } = await supabase.from('users').select('rep_id').limit(1);
-  temColunaDono = !error;
-  return temColunaDono;
+  return detectar('users', 'rep_id');
 }
 
 /**

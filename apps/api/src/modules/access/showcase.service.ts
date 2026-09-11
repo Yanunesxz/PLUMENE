@@ -1,4 +1,5 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import { generateToken, hashToken } from '../../lib/tokens.js';
 import type { ShowcaseDuration, ShowcaseLink } from '@csb/shared';
 
@@ -26,12 +27,8 @@ interface LinhaVitrine {
 
 // showcase_links.customer_id vem da migração 035, que pode não estar aplicada.
 // Detecta uma vez; sem a coluna, o link nasce sem cliente (como sempre foi).
-let temColunaCliente: boolean | null = null;
 async function detectarColunaCliente(): Promise<boolean> {
-  if (temColunaCliente !== null) return temColunaCliente;
-  const { error } = await supabase.from('showcase_links').select('customer_id').limit(1);
-  temColunaCliente = !error;
-  return temColunaCliente;
+  return detectar('showcase_links', 'customer_id');
 }
 
 function statusDe(l: Pick<LinhaVitrine, 'revoked_at' | 'expires_at'>): ShowcaseLink['status'] {

@@ -9,6 +9,7 @@ import {
   ufValida,
   linhaDeEndereco,
 } from '@csb/shared';
+import crypto from 'node:crypto';
 import { criarSupabaseFake } from './supabaseFake.js';
 
 /**
@@ -128,6 +129,42 @@ beforeEach(() => {
   vi.resetModules();
 });
 
+// O app de verdade, para conferir o que a ROTA responde — o service sozinho
+// não sabe quem está perguntando, e é disso que depende o 409 desta tela.
+const SEGREDO = 'segredo-de-teste-nao-usar-em-producao'; // igual ao tests/setup.ts
+
+const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
+
+function assinar(payload: Record<string, unknown>): string {
+  const cabecalho = b64({ alg: 'HS256', typ: 'JWT' });
+  const agora = Math.floor(Date.now() / 1000);
+  const corpo = b64({ ...payload, iat: agora, exp: agora + 3600 });
+  const assinatura = crypto
+    .createHmac('sha256', SEGREDO)
+    .update(`${cabecalho}.${corpo}`)
+    .digest('base64url');
+  return `${cabecalho}.${corpo}.${assinatura}`;
+}
+
+const TOKEN_REP = assinar({
+  sub: 'rep-1',
+  email: 'rep@csb.com',
+  company_id: EMPRESA,
+  name: 'SIMONE',
+  role: 'rep',
+  price_table_id: 'tabela-1',
+});
+
+async function subirApp(respostas: Record<string, unknown>) {
+  const fake = criarSupabaseFake(respostas as never);
+  vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+  const { buildApp } = await import('../apps/api/src/app.js');
+  const app = await buildApp();
+  await app.ready();
+  return { app, fake };
+}
+
+
 describe('createCustomer — o cadastro real', () => {
   const body = {
     name: 'LOJA NOVA LTDA',
@@ -195,6 +232,15 @@ describe('atrelar o número do Control (financeiro)', () => {
     expect(normalizarCodigoErp('123456')).toBeNull();
   });
 
+  it('código com LETRA é recusado, não tem a letra jogada fora', async () => {
+    const { normalizarCodigoErp } = await carregarServico({});
+    // Os 1.350 códigos da CS são cinco dígitos. Se um dia alguém digitar
+    // "C0001", virar "00001" em silêncio atrelaria o cliente ao cadastro
+    // errado — e só o faturamento descobriria.
+    expect(normalizarCodigoErp('C0001')).toBeNull();
+    expect(normalizarCodigoErp('2225A')).toBeNull();
+  });
+
   it('grava o código normalizado em cliente SEM código, com quem e quando', async () => {
     const { atrelarCodigoErp, fake } = await carregarServico({
       customers: [
@@ -228,5 +274,66 @@ describe('atrelar o número do Control (financeiro)', () => {
     });
     const r = await atrelarCodigoErp(EMPRESA, 'c1', '1', 'fin-1');
     expect(r).toEqual({ ok: false, motivo: 'ja_tem_codigo' });
+  });
+});
+
+/**
+ * O 409 de documento repetido, visto de fora (pela rota).
+ *
+ * O representante só enxerga a carteira dele. Quando o CNPJ que ele digitou já
+ * é de um cliente de OUTRA carteira, dizer o nome não o ajuda (ele não vai
+ * achar o cadastro) e entrega a loja do colega. O escritório, que é quem vai
+ * procurar, continua recebendo o nome e o código.
+ */
+describe('POST /customers — o duplicado de outra carteira', () => {
+  const CORPO = {
+    name: 'LOJA NOVA LTDA',
+    cnpj: '11.222.333/0001-81',
+    cep: '36000-000',
+    logradouro: 'Rua das Flores',
+    numero: '123',
+    bairro: 'Centro',
+    cidade: 'Juiz de Fora',
+    uf: 'MG',
+  };
+
+  const respostas = (dono: string | null) => ({
+    users: { data: { id: 'rep-1', price_table_id: 'tabela-1' }, error: null },
+    rep_price_tables: { data: [], error: null },
+    customers: [
+      { data: [], error: null }, // detecção da 041
+      { data: [{ id: 'c-velho', name: 'LOJA DO COLEGA', erp_id: '05836', rep_id: dono }], error: null },
+    ],
+  });
+
+  it('não diz de quem é quando o cliente está fora da carteira do representante', async () => {
+    const { app } = await subirApp(respostas('rep-2'));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: CORPO,
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(409);
+    const corpo = res.json() as { error: string };
+    expect(corpo.error).not.toContain('LOJA DO COLEGA');
+    expect(corpo.error).not.toContain('05836');
+    expect(corpo.error).toContain('outra carteira');
+  });
+
+  it('diz o nome e o código quando o cliente É da carteira dele — aí ele acha', async () => {
+    const { app } = await subirApp(respostas('rep-1'));
+    const res = await app.inject({
+      method: 'POST',
+      url: '/customers',
+      headers: { authorization: `Bearer ${TOKEN_REP}` },
+      payload: CORPO,
+    });
+    await app.close();
+
+    expect(res.statusCode).toBe(409);
+    expect((res.json() as { error: string }).error).toContain('LOJA DO COLEGA');
   });
 });

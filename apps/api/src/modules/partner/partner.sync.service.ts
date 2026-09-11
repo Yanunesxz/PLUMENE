@@ -14,6 +14,7 @@
  * por `onConflict`, que exigiria a constraint.
  */
 import { supabase } from '../../config/supabase.js';
+import { buscarTudo } from '../../lib/paginacao.js';
 
 // ─── Tipos do corpo que o parceiro envia ─────────────────────────────────────
 
@@ -151,13 +152,18 @@ export async function receberClientes(
   // que estão SEM código. Estes últimos vieram das cargas de carteira (relatório
   // Curva ABC, que não traz código): quando o ERP mandar o mesmo cliente COM
   // código, é adoção, não criação — senão a mesma loja vira duas.
-  const { data: existentes } = await supabase
-    .from('customers')
-    .select('id, erp_id, cnpj')
-    .eq('company_id', company_id);
+  //
+  // PAGINADO: o PostgREST corta em 1.000 linhas sem avisar, e a CS ja tem
+  // 2.604 clientes. Sem paginar, todo cliente da pagina 2 em diante ficava
+  // fora deste mapa — e a proxima carga do ERP o CRIARIA de novo, duplicando
+  // a loja em vez de atualizar.
+  const existentes = await buscarTudo<{ id: string; erp_id: string | null; cnpj: string | null }>(
+    (de, ate) =>
+      supabase.from('customers').select('id, erp_id, cnpj').eq('company_id', company_id).range(de, ate),
+  );
   const idPorCodigo = new Map<string, string>();
   const semCodigoPorCnpj = new Map<string, string>();
-  for (const c of (existentes ?? []) as Array<{ id: string; erp_id: string | null; cnpj: string | null }>) {
+  for (const c of existentes) {
     const cod = miolo(c.erp_id);
     if (cod) {
       idPorCodigo.set(cod, c.id);

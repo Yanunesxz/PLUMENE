@@ -23,6 +23,7 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
 import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
+import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type { Order, OrderWithItems, ApiResponse, OrderStatus, ProductWithPrice } from '@csb/shared';
 
@@ -85,13 +86,19 @@ export function PaginaDetalhePedido() {
   // uma lista para apertar o botão é o tipo de caminho que ninguém descobre.
   const decisao = order ? decisaoDoPedido(user?.role, order.status, podeAprovar) : null;
 
-  const handleDecisao = async (status: OrderStatus, extra?: { erp_order_id?: string }) => {
-    if (!id || !order) return;
-    if (await decidir(id, status, extra)) setOrder({ ...order, status, ...(extra ?? {}) });
+  const handleDecisao = async (
+    status: OrderStatus,
+    extra?: { erp_order_id?: string },
+  ): Promise<boolean> => {
+    if (!id || !order) return false;
+    const deu = await decidir(id, status, extra);
+    if (deu) setOrder({ ...order, status, ...(extra ?? {}) });
+    return deu;
   };
 
   // ─── Lançar no Control: o número que o ERP deu ─────────────────────────────
   const [lancando, setLancando] = useState(false);
+  const [erroDoLancamento, setErroDoLancamento] = useState<string | null>(null);
   const [ultimoErp, setUltimoErp] = useState<string | null>(null);
   const [carregandoUltimo, setCarregandoUltimo] = useState(false);
 
@@ -110,8 +117,38 @@ export function PaginaDetalhePedido() {
   };
 
   const lancarNoErp = async (numeroErp: string) => {
-    await handleDecisao('sent_erp', { erp_order_id: numeroErp });
-    setLancando(false);
+    setErroDoLancamento(null);
+    // Só fecha quando deu certo. Se a API recusa (número repetido, formato), o
+    // diálogo fica aberto COM o que ela digitou — jogar o número fora e
+    // reabrir com a sugestão de novo é o caminho curto para carimbar o errado.
+    if (await handleDecisao('sent_erp', { erp_order_id: numeroErp })) setLancando(false);
+    else setErroDoLancamento('O número não foi aceito — confira no Control e tente de novo.');
+  };
+
+  // ─── Corrigir o número do Control (financeiro/admin, antes da nota) ────────
+  const [corrigindoNumero, setCorrigindoNumero] = useState(false);
+  const [erroDaCorrecao, setErroDaCorrecao] = useState<string | null>(null);
+  const [salvandoNumero, setSalvandoNumero] = useState(false);
+
+  const corrigirNumero = async (numeroErp: string) => {
+    if (!id || !token) return;
+    setSalvandoNumero(true);
+    setErroDaCorrecao(null);
+    try {
+      const res = await api.patch<ApiResponse<{ erp_order_id: string }>>(
+        `/orders/${id}/numero-erp`,
+        { erp_order_id: numeroErp },
+        token,
+      );
+      setOrder((prev) => (prev ? { ...prev, erp_order_id: res.data.erp_order_id } : prev));
+      await db.orders.update(id, { erp_order_id: res.data.erp_order_id });
+      setCorrigindoNumero(false);
+      setToast({ message: `Número corrigido para ${res.data.erp_order_id}.`, type: 'success' });
+    } catch (err) {
+      setErroDaCorrecao(err instanceof Error ? err.message : 'Não foi possível corrigir.');
+    } finally {
+      setSalvandoNumero(false);
+    }
   };
 
   const [salvandoDesconto, setSalvandoDesconto] = useState(false);
@@ -482,6 +519,22 @@ export function PaginaDetalhePedido() {
     return [...porProduto.values()];
   }, [itensOrdenados]);
 
+  // As peças de HOJE com referência e tamanho — é o que a comparação com o
+  // original precisa, e a foto do original já vem assim do servidor.
+  const itensComRef = useMemo(
+    () =>
+      itensOrdenados.map((i) => ({
+        ...i,
+        product: prodMap.get(i.product_id)
+          ? { sku: prodMap.get(i.product_id)!.sku, name: prodMap.get(i.product_id)!.name }
+          : null,
+        variant: i.variant_id && variantSize.get(i.variant_id)
+          ? { size: variantSize.get(i.variant_id)! }
+          : null,
+      })),
+    [itensOrdenados, prodMap, variantSize],
+  );
+
   // A cor escolhida mora nas linhas "0015 3M azul" das notas (o item vai
   // sortido para o ERP) — aqui ela volta para a linha do produto, onde quem
   // confere olha. O que sobra das notas é o recado que o rep digitou.
@@ -669,8 +722,24 @@ export function PaginaDetalhePedido() {
                 {/* O número do Control, quando já foi lançado: é por ele que a
                     fábrica e o financeiro falam do pedido. */}
                 {order.erp_order_id && !ehLoja && (
-                  <span className="shrink-0 rounded bg-primary-soft px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary-soft-foreground">
-                    Control {order.erp_order_id}
+                  <span className="flex shrink-0 items-center gap-1">
+                    <span className="rounded bg-primary-soft px-1.5 py-0.5 font-mono text-[10px] font-semibold text-primary-soft-foreground">
+                      Control {order.erp_order_id}
+                    </span>
+                    {/* Digitou errado? Enquanto a nota não sai dá para corrigir —
+                        é por este número que o faturamento acha o pedido. */}
+                    {!order.invoiced && (user?.role === 'financeiro' || user?.role === 'admin') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setErroDaCorrecao(null);
+                          setCorrigindoNumero(true);
+                        }}
+                        className="text-[10px] font-semibold text-muted-foreground underline hover:text-foreground"
+                      >
+                        corrigir
+                      </button>
+                    )}
                   </span>
                 )}
                 {origemParaExibir(order) && (
@@ -911,6 +980,18 @@ export function PaginaDetalhePedido() {
                 </Button>
               </div>
             </div>
+          )}
+
+          {/* Veio assim, foi faturado assado (044). Só aparece quando há o
+              que comparar — e para quem trabalha o pedido, não para a loja. */}
+          {order.original && !ehLoja && (
+            <PedidoOriginal
+              original={order.original}
+              itensAtuais={itensComRef}
+              totalAtual={order.total}
+              invoicedTotal={order.invoiced_total}
+              faturado={!!order.invoiced}
+            />
           )}
 
           <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -1252,8 +1333,26 @@ export function PaginaDetalhePedido() {
           ultimo={ultimoErp}
           carregandoUltimo={carregandoUltimo}
           ocupado={decidindo !== null}
+          erro={erroDoLancamento}
           onConfirmar={(n) => void lancarNoErp(n)}
-          onCancelar={() => setLancando(false)}
+          onCancelar={() => {
+            setErroDoLancamento(null);
+            setLancando(false);
+          }}
+        />
+      )}
+
+      {corrigindoNumero && order && (
+        <LancarNoErp
+          modo="corrigir"
+          atual={order.erp_order_id}
+          numeroDoPedido={order.order_number}
+          ultimo={null}
+          carregandoUltimo={false}
+          ocupado={salvandoNumero}
+          erro={erroDaCorrecao}
+          onConfirmar={(n) => void corrigirNumero(n)}
+          onCancelar={() => setCorrigindoNumero(false)}
         />
       )}
 

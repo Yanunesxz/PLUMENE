@@ -10,6 +10,7 @@ import {
   setOrderPayment,
   setOrderNotes,
   ultimoNumeroErp,
+  corrigirNumeroErp,
   deleteOrder,
   listDeletedOrders,
 } from './orders.service.js';
@@ -37,6 +38,7 @@ import {
   setOrderItemsSchema,
   setPaymentSchema,
   setNotesSchema,
+  corrigirNumeroErpSchema,
 } from './orders.schema.js';
 
 /**
@@ -488,6 +490,33 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
     default:
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
   }
+}
+
+/** A Larissa corrige o número do Control que digitou errado (antes da nota). */
+export async function corrigirNumeroErpHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(corrigirNumeroErpSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await corrigirNumeroErp(id, company_id, body.erp_order_id);
+  if (r.ok) {
+    await reply.send({ data: { erp_order_id: r.erp_order_id } });
+    return;
+  }
+  const respostas = {
+    formato: { status: 422, error: 'Número do Control inválido — são duas letras e a numeração, ex.: CS17379', code: 'ERP_NUMBER_INVALID' },
+    em_uso: { status: 409, error: 'Este número do Control já está em outro pedido', code: 'ERP_NUMBER_IN_USE' },
+    nao_lancado: { status: 409, error: 'Só dá para corrigir o número de um pedido já lançado no ERP', code: 'NAO_LANCADO' },
+    ja_faturado: { status: 409, error: 'O pedido já foi faturado — o número agora é o da nota e não muda', code: 'JA_FATURADO' },
+    not_found: { status: 404, error: 'Pedido não encontrado', code: 'NOT_FOUND' },
+    erro: { status: 500, error: 'Não foi possível corrigir o número', code: 'UPDATE_FAILED' },
+  } as const;
+  const resp = respostas[r.motivo];
+  await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
 }
 
 /** O último número do Control lançado — a tela sugere o próximo a partir dele. */

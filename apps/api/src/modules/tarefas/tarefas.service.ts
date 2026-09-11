@@ -2,22 +2,18 @@
  * Tarefas do representante — o escritório manda, o rep executa.
  *
  * O Fabian (gerência) marca o que fazer; a Bruna (interna, dona da carteira de
- * inativos) liga para o cliente parado e marca a visita COM HORÁRIO — e o
+ * esfriados) liga para o cliente que sumiu e marca a visita COM HORÁRIO — e o
  * representante dá o OK. Ciclo: pendente → confirmada (OK no horário) → feita.
  *
  * Tolera a migração 037 não aplicada: leitura devolve vazio, escrita falha com
  * motivo — o app continua vendendo sem depender da ordem do deploy.
  */
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import type { TarefaDoRep } from '@csb/shared';
 
-let temTarefas: boolean | null = null;
-
 export async function detectarTarefas(): Promise<boolean> {
-  if (temTarefas !== null) return temTarefas;
-  const { error } = await supabase.from('rep_tasks').select('id').limit(1);
-  temTarefas = !error;
-  return temTarefas;
+  return detectar('rep_tasks', 'id');
 }
 
 /** Nomes de usuários e clientes, resolvidos à parte — rep_id e created_by são

@@ -1,4 +1,6 @@
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
+import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -82,7 +84,13 @@ export async function getOrderById(
   if (error || !order) return null;
   // `as unknown`: o select dinâmico (com/sem embed) tira do supabase-js a
   // inferência do shape — mesmo caso do getPriceMap logo abaixo.
-  return order as unknown as OrderWithItems;
+  const pedido = order as unknown as OrderWithItems;
+  // A cópia do original (044), quando existe: é ela que deixa a tela mostrar
+  // "o pedido veio assim, foi faturado assado". Só existe em pedido que
+  // encolheu — no resto, ausente, e a tela não mostra bloco nenhum.
+  const original = await lerOriginal(pedido.id, company_id);
+  if (original) pedido.original = original;
+  return pedido;
 }
 
 interface PrecoDoProduto {
@@ -95,13 +103,8 @@ interface PrecoDoProduto {
  * detecções deste arquivo. Sem a coluna, a faixa maior fica null e todo tamanho
  * paga o preço normal: é o comportamento anterior à migração, não um erro.
  */
-let temColunaDaFaixaMaior: boolean | null = null;
-
 async function detectarColunaDaFaixaMaior(): Promise<boolean> {
-  if (temColunaDaFaixaMaior !== null) return temColunaDaFaixaMaior;
-  const { error } = await supabase.from('product_prices').select('price_larger').limit(1);
-  temColunaDaFaixaMaior = !error;
-  return temColunaDaFaixaMaior;
+  return detectar('product_prices', 'price_larger');
 }
 
 // Preço dos produtos na tabela de preço do representante. É a fonte autoritativa:
@@ -160,33 +163,18 @@ async function getSizeMap(variantIds: string[]): Promise<Map<string, string>> {
  * alguém rodar o SQL. Detecta uma vez e guarda, para o deploy não depender da
  * ordem. (Mesmo padrão de `reps.service.ts` e `partner.service.ts`.)
  */
-let temColunasDeOrigem: boolean | null = null;
-
 async function detectarColunasDeOrigem(): Promise<boolean> {
-  if (temColunasDeOrigem !== null) return temColunasDeOrigem;
-  const { error } = await supabase.from('orders').select('source').limit(1);
-  temColunasDeOrigem = !error;
-  return temColunasDeOrigem;
+  return detectar('orders', 'source');
 }
 
 /** `orders.price_table_id` vem da migração 025 — mesmo cuidado da 014 acima. */
-let temColunaDaTabela: boolean | null = null;
-
 async function detectarColunaDaTabela(): Promise<boolean> {
-  if (temColunaDaTabela !== null) return temColunaDaTabela;
-  const { error } = await supabase.from('orders').select('price_table_id').limit(1);
-  temColunaDaTabela = !error;
-  return temColunaDaTabela;
+  return detectar('orders', 'price_table_id');
 }
 
 /** `orders.discount_percent` vem da migração 029 — mesmo cuidado das outras. */
-let temColunaDoDesconto: boolean | null = null;
-
 async function detectarColunaDoDesconto(): Promise<boolean> {
-  if (temColunaDoDesconto !== null) return temColunaDoDesconto;
-  const { error } = await supabase.from('orders').select('discount_percent').limit(1);
-  temColunaDoDesconto = !error;
-  return temColunaDoDesconto;
+  return detectar('orders', 'discount_percent');
 }
 
 /**
@@ -470,13 +458,8 @@ export type DeleteOrderResult =
 // depois de dois pedidos da CS sumirem sem rastro nenhum.
 
 /** `deleted_orders` vem da migração 040 — mesmo cuidado das outras. */
-let temPedidosExcluidos: boolean | null = null;
-
 async function detectarPedidosExcluidos(): Promise<boolean> {
-  if (temPedidosExcluidos !== null) return temPedidosExcluidos;
-  const { error } = await supabase.from('deleted_orders').select('id').limit(1);
-  temPedidosExcluidos = !error;
-  return temPedidosExcluidos;
+  return detectar('deleted_orders', 'id');
 }
 
 /**
@@ -764,6 +747,11 @@ export async function setOrderItems(
   const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
+  // ANTES de trocar qualquer peça: a foto do que o representante fechou (044).
+  // Só a primeira vale, e rascunho não entra — quem está montando o pedido não
+  // está cortando nada. É acessório: falhar aqui não impede a edição.
+  await guardarOriginal(o, 'edicao', user_id);
+
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
   let tabela: string | null = o.price_table_id ?? null;
@@ -910,6 +898,60 @@ export async function setOrderPayment(
   return { ok: true, order: data as Order };
 }
 
+export type CorrigirNumeroErpResult =
+  | { ok: true; erp_order_id: string }
+  | { ok: false; motivo: 'not_found' | 'formato' | 'em_uso' | 'nao_lancado' | 'ja_faturado' | 'erro' };
+
+/**
+ * Corrige o número do Control de um pedido já lançado.
+ *
+ * Existe porque errar o número é fácil (o diálogo sugere o próximo da
+ * sequência, e a sugestão pode não ser o que o Control deu) e o estrago é
+ * grande: é por esse número que o faturamento do ERP acha o pedido. Sem
+ * conserto, o pedido ficaria esperando uma nota que nunca chega.
+ *
+ * Depois da NOTA o número não muda mais: aí ele é o que está no documento
+ * fiscal, e divergir disso seria criar uma segunda verdade.
+ */
+export async function corrigirNumeroErp(
+  id: string,
+  company_id: string,
+  numeroDigitado: string,
+): Promise<CorrigirNumeroErpResult> {
+  const numero = normalizarNumeroErp(numeroDigitado);
+  if (!numero || !numeroErpValido(numero)) return { ok: false, motivo: 'formato' };
+
+  const { data: pedido } = await supabase
+    .from('orders')
+    .select('id, status, invoiced, erp_order_id')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!pedido) return { ok: false, motivo: 'not_found' };
+  const o = pedido as { status: Order['status']; invoiced: boolean | null; erp_order_id: string | null };
+  if (o.status !== 'sent_erp' || !o.erp_order_id) return { ok: false, motivo: 'nao_lancado' };
+  if (o.invoiced) return { ok: false, motivo: 'ja_faturado' };
+
+  const { data: dono } = await supabase
+    .from('orders')
+    .select('id')
+    .eq('company_id', company_id)
+    .eq('erp_order_id', numero)
+    .neq('id', id)
+    .limit(1);
+  if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
+
+  const { error } = await supabase
+    .from('orders')
+    .update({ erp_order_id: numero, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id);
+  if (error) {
+    return { ok: false, motivo: (error as { code?: string }).code === CHAVE_DUPLICADA ? 'em_uso' : 'erro' };
+  }
+  return { ok: true, erp_order_id: numero };
+}
+
 /**
  * O último número do Control lançado nesta empresa — é dele que a tela sugere
  * o próximo, para a Larissa seguir a ordem de lá sem consultar o ERP.
@@ -980,13 +1022,8 @@ export async function setOrderNotes(
 }
 
 /** `customers.last_purchase_at` vem da migração 036 — mesmo cuidado das outras. */
-let temUltimaCompra: boolean | null = null;
-
 async function detectarUltimaCompra(): Promise<boolean> {
-  if (temUltimaCompra !== null) return temUltimaCompra;
-  const { error } = await supabase.from('customers').select('last_purchase_at').limit(1);
-  temUltimaCompra = !error;
-  return temUltimaCompra;
+  return detectar('customers', 'last_purchase_at');
 }
 
 /**
@@ -1024,6 +1061,19 @@ export async function setOrderInvoiced(
     somenteDoRep?: string | null;
   } = {},
 ): Promise<Order | null> {
+  // O carimbo fecha o pedido para sempre. Se ninguém tinha cortado peça, esta
+  // é a hora da foto (044): daí em diante todo pedido faturado tem o original
+  // registrado, e o "veio assim, foi faturado assado" sempre tem as duas metades.
+  if (invoiced) {
+    const { data: antes } = await supabase
+      .from('orders')
+      .select('id, company_id, status')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (antes) await guardarOriginal(antes as Pick<Order, 'id' | 'company_id' | 'status'>, 'faturamento');
+  }
+
   let query = supabase
     .from('orders')
     .update({
@@ -1151,6 +1201,12 @@ export async function updateOrderStatus(
     .select()
     .single();
 
+  // Duas pessoas lançando ao mesmo tempo leem "número livre" e gravam as duas;
+  // quem chega depois bate no índice único da 042. Vira o mesmo 409 da leitura
+  // — a Larissa vê "já está em outro pedido" em vez de um erro cru.
+  if (error && (error as { code?: string }).code === CHAVE_DUPLICADA) {
+    throw new Error('ERP_NUMBER_IN_USE');
+  }
   if (error || !data) return null;
 
   // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido

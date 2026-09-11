@@ -10,25 +10,16 @@
  * orders.service.ts). Sem a tabela: lista vazia, escolha ignorada, pedido segue.
  */
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import type { PaymentCondition } from '@csb/shared';
 
-let temCondicoes: boolean | null = null;
-
 export async function detectarCondicoes(): Promise<boolean> {
-  if (temCondicoes !== null) return temCondicoes;
-  const { error } = await supabase.from('payment_conditions').select('id').limit(1);
-  temCondicoes = !error;
-  return temCondicoes;
+  return detectar('payment_conditions', 'id');
 }
 
 /** `orders.payment_condition_id` — chega na mesma migração, detectada à parte. */
-let temColunaDaCondicao: boolean | null = null;
-
 export async function detectarColunaDaCondicao(): Promise<boolean> {
-  if (temColunaDaCondicao !== null) return temColunaDaCondicao;
-  const { error } = await supabase.from('orders').select('payment_condition_id').limit(1);
-  temColunaDaCondicao = !error;
-  return temColunaDaCondicao;
+  return detectar('orders', 'payment_condition_id');
 }
 
 /**

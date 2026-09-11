@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, type FormEvent } from 'react';
+import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
@@ -56,6 +56,22 @@ const EMPTY_CUST = {
   observacoes: '',
 };
 
+/**
+ * Corta a espera em N ms. `AbortSignal.timeout` só existe do Safari 16 em
+ * diante — no iPhone parado no iOS 15 ele não existe, e a chamada inteira
+ * morreria num TypeError silencioso. Aqui o pior caso vira "sem corte de
+ * tempo", nunca "sem consulta".
+ */
+function abortarEm(ms: number): AbortSignal | null {
+  if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+    return AbortSignal.timeout(ms);
+  }
+  if (typeof AbortController === 'undefined') return null;
+  const c = new AbortController();
+  setTimeout(() => c.abort(), ms);
+  return c.signal;
+}
+
 const campoClasse =
   'flex h-10 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground';
 
@@ -79,18 +95,31 @@ export function PaginaClientes() {
     setForm((f) => ({ ...f, [k]: e.target.value }));
   const isOnline = useOnlineStatus();
   const [buscandoCep, setBuscandoCep] = useState(false);
+  const [avisoDoCep, setAvisoDoCep] = useState('');
+  // O ÚLTIMO CEP pedido. Sem ele, quem corrige o CEP no meio da busca recebe o
+  // endereço do CEP anterior: a resposta que demorou chega depois e preenche
+  // a rua errada, calada.
+  const cepPedido = useRef('');
 
   // O CEP preenche o endereço (ViaCEP) — só online; sem rede a pessoa digita.
   // Nunca sobrescreve o que já foi digitado: é ajuda, não dono do formulário.
   const buscarCep = async (cep: string) => {
-    if (!isOnline || !cepValido(cep) || buscandoCep) return;
+    const digitos = apenasDigitos(cep);
+    if (!isOnline || !cepValido(cep)) return;
+    cepPedido.current = digitos;
     setBuscandoCep(true);
+    setAvisoDoCep('');
     try {
-      const res = await fetch(`https://viacep.com.br/ws/${apenasDigitos(cep)}/json/`, {
-        signal: AbortSignal.timeout(6000),
+      const res = await fetch(`https://viacep.com.br/ws/${digitos}/json/`, {
+        signal: abortarEm(6000),
       });
       const j = (await res.json()) as { erro?: boolean; logradouro?: string; bairro?: string; localidade?: string; uf?: string };
-      if (j.erro) return;
+      // A pessoa já trocou o CEP: esta resposta é de outro endereço.
+      if (cepPedido.current !== digitos) return;
+      if (j.erro) {
+        setAvisoDoCep('CEP não encontrado nos Correios — confira, ou digite o endereço na mão.');
+        return;
+      }
       setForm((f) => ({
         ...f,
         logradouro: f.logradouro || j.logradouro || '',
@@ -99,25 +128,30 @@ export function PaginaClientes() {
         uf: f.uf || j.uf || '',
       }));
     } catch {
-      /* sem rede ou ViaCEP fora: a pessoa digita */
+      if (cepPedido.current === digitos) {
+        setAvisoDoCep('Não deu para consultar o CEP agora — digite o endereço na mão.');
+      }
     } finally {
-      setBuscandoCep(false);
+      if (cepPedido.current === digitos) setBuscandoCep(false);
     }
   };
 
-  const customers = useLiveQuery(
-    () =>
-      search
-        ? db.customers
-            .filter(
-              (c) =>
-                c.name.toLowerCase().includes(search.toLowerCase()) ||
-                (c.cnpj ?? '').includes(search),
-            )
-            .toArray()
-        : db.customers.orderBy('name').toArray(),
-    [search],
-  );
+  const customers = useLiveQuery(() => {
+    if (!search) return db.customers.orderBy('name').toArray();
+    const texto = search.toLowerCase();
+    // O CNPJ é procurado em DÍGITOS dos dois lados: a base tem cadastro com
+    // máscara (cargas antigas) e sem (o cadastro novo, 041), e quem digita
+    // "22.518" ou "22518" quer o mesmo cliente.
+    const digitos = apenasDigitos(search);
+    return db.customers
+      .filter(
+        (c) =>
+          c.name.toLowerCase().includes(texto) ||
+          (c.trade_name ?? '').toLowerCase().includes(texto) ||
+          (digitos.length >= 3 && apenasDigitos(c.cnpj ?? '').includes(digitos)),
+      )
+      .toArray();
+  }, [search]);
 
   // ─── A carteira por frescor ────────────────────────────────────────────────
   // A Minha Área manda para cá com ?frescor=parado — o rep cai direto na lista
@@ -133,6 +167,9 @@ export function PaginaClientes() {
   // para atrelar ("esses números vão ter que ser incluídos e atrelados").
   // ?erp=sem: o card da Minha Área do financeiro cai aqui já filtrado.
   const [soSemCodigo, setSoSemCodigo] = useState(params.get('erp') === 'sem');
+  // Quem INCLUI no Control é a Larissa: para ela é fila de trabalho; para o
+  // representante é só a informação de que o cliente novo ainda não está lá.
+  const ehEscritorio = user?.role === 'financeiro' || user?.role === 'admin' || user?.role === 'manager';
 
   const { visiveis, contagem, semCodigo } = useMemo(() => {
     const decorados = (customers ?? []).map((c) => ({
@@ -141,9 +178,12 @@ export function PaginaClientes() {
     }));
     const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
     for (const d of decorados) contagem[d.situacao.nivel]++;
-    const semCodigo = decorados.filter((d) => !d.cliente.erp_id).length;
+    // Só quem nasceu no app: cliente de carga da Curva ABC também está sem
+    // código, mas já existe no Control — ver PaginaMinhaArea.
+    const nascidoNoApp = (c: CustomerListItem) => !c.erp_id && !!c.rep_id;
+    const semCodigo = decorados.filter((d) => nascidoNoApp(d.cliente)).length;
     let visiveis = frescor === 'all' ? decorados : decorados.filter((d) => d.situacao.nivel === frescor);
-    if (soSemCodigo) visiveis = visiveis.filter((d) => !d.cliente.erp_id);
+    if (soSemCodigo) visiveis = visiveis.filter((d) => nascidoNoApp(d.cliente));
     // Filtrando por frescor, quem está há MAIS tempo sem comprar vem primeiro —
     // é a ordem de prioridade da visita. Sem filtro, a ordem alfabética de
     // sempre (a busca por nome depende dela).
@@ -153,14 +193,15 @@ export function PaginaClientes() {
     return { visiveis, contagem, semCodigo };
   }, [customers, frescor, soSemCodigo]);
 
-  // As cores do Yan: verde ativo, amarelo atenção, vermelho inativo.
-  // Ordem do Yan (02/09): ativo → atenção → inativo, e o ATIVO com o número —
-  // o rep precisa ver quantos clientes vivos tem, não só quantos parados.
+  // As cores do Yan: verde ativo, amarelo atenção, vermelho ESFRIADO — o nome
+  // que ele passou a usar em 11/09/2026 para o cliente que sumiu.
+  // Ordem do Yan (02/09): ativo → atenção → esfriado, e o ATIVO com o número —
+  // o rep precisa ver quantos clientes vivos tem, não só quantos pararam.
   const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
     { valor: 'ativo', rotulo: `Ativos${contagem.ativo ? ` (${contagem.ativo})` : ''}`, cor: 'bg-positive' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
-    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'parado', rotulo: `Esfriados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
   ];
 
@@ -341,9 +382,13 @@ export function PaginaClientes() {
                 placeholder="00.000.000/0000-00"
                 inputMode="numeric"
               />
-              {apenasDigitos(form.cnpj).length >= 11 && !documento(form.cnpj) && (
-                <p className="text-xs text-danger">Este número não é um CPF/CNPJ válido.</p>
-              )}
+              {/* Só quando o número PODE estar pronto (11 = CPF, 14 = CNPJ):
+                  avisando aos 11 dígitos, quem digita CNPJ lê "inválido" no
+                  meio da digitação e apaga o que estava certo. */}
+              {(apenasDigitos(form.cnpj).length === 11 || apenasDigitos(form.cnpj).length >= 14) &&
+                !documento(form.cnpj) && (
+                  <p className="text-xs text-danger">Este número não é um CPF/CNPJ válido.</p>
+                )}
             </div>
             <div className="space-y-1.5">
               <label className="text-sm font-medium text-foreground">Inscrição Estadual</label>
@@ -364,6 +409,7 @@ export function PaginaClientes() {
                 inputMode="numeric"
               />
               {buscandoCep && <p className="text-xs text-muted-foreground">Buscando o endereço…</p>}
+              {!buscandoCep && avisoDoCep && <p className="text-xs text-warn-soft-foreground">{avisoDoCep}</p>}
             </div>
             <div className="space-y-1.5 sm:col-span-2">
               <label className="text-sm font-medium text-foreground">
@@ -400,7 +446,12 @@ export function PaginaClientes() {
                 <label className="text-sm font-medium text-foreground">
                   UF <span className="text-danger">*</span>
                 </label>
-                <select value={form.uf} onChange={setF('uf')} className={campoClasse} aria-label="UF">
+                <select
+                  value={form.uf}
+                  onChange={setF('uf')}
+                  className={cn(campoClasse, 'h-11 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring')}
+                  aria-label="UF"
+                >
                   <option value="">UF</option>
                   {UFS.map((u) => (
                     <option key={u} value={u}>
@@ -484,7 +535,9 @@ export function PaginaClientes() {
             {f.rotulo}
           </button>
         ))}
-        {semCodigo > 0 && (
+        {/* Fica visível enquanto o filtro estiver LIGADO, mesmo zerando: era
+            o único jeito de desligar, e sumia justo quando a fila acabava. */}
+        {(semCodigo > 0 || soSemCodigo) && (
           <button
             type="button"
             onClick={() => setSoSemCodigo((v) => !v)}
@@ -495,7 +548,7 @@ export function PaginaClientes() {
                 : 'border-border bg-background text-muted-foreground hover:bg-sunken',
             )}
           >
-            Sem código no ERP ({semCodigo})
+            Para incluir no Control ({semCodigo})
           </button>
         )}
       </div>
@@ -541,13 +594,17 @@ export function PaginaClientes() {
                       {apenasDigitos(customer.cnpj).length === 11 ? 'CPF' : 'CNPJ'}: {formatarDocumento(customer.cnpj)}
                     </p>
                   )}
-                  {/* O número do Control: quem nasceu no app fica "sem código"
-                      até o financeiro atrelar — visível, para ninguém esquecer. */}
+                  {/* O número do Control. Quem NASCEU no app e ainda não tem
+                      código é pendência da Larissa — o aviso só aparece nesses;
+                      cliente de carga sem código já existe no Control e o selo
+                      viraria ruído em 1.225 cartões. */}
                   {customer.erp_id ? (
                     <p className="truncate text-xs text-muted-foreground">Cód. ERP {customer.erp_id}</p>
-                  ) : (
-                    <p className="truncate text-xs text-warn-soft-foreground">Sem código no ERP</p>
-                  )}
+                  ) : customer.rep_id ? (
+                    <p className="truncate text-xs text-warn-soft-foreground">
+                      {ehEscritorio ? 'Falta incluir no Control' : 'Ainda não está no Control'}
+                    </p>
+                  ) : null}
                   {customer.credit_limit != null && (
                     <p className="truncate text-xs text-muted-foreground">
                       Limite: {formatBRL(customer.credit_limit)}

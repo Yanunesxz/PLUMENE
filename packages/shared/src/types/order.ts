@@ -1,5 +1,6 @@
 import type { OrderStatus } from '../constants/orderStatus.js';
 import type { OrderSource } from './access.js';
+import type { PedidoOriginal } from '../pedidos/pedidoOriginal.js';
 
 export interface OrderItem {
   id: string;
@@ -79,6 +80,12 @@ export interface Order {
 
 export interface OrderWithItems extends Order {
   items: OrderItem[];
+  /**
+   * A cópia do pedido como o representante fechou, quando alguém já cortou
+   * peça depois disso (migração 044). Ausente = o pedido nunca encolheu, ou
+   * a 044 ainda não rodou. O tipo mora em pedidos/pedidoOriginal.ts.
+   */
+  original?: PedidoOriginal | null;
   /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante

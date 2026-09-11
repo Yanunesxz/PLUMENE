@@ -72,7 +72,7 @@ export function PaginaAtividades() {
         <div className="mt-8 flex flex-col items-center gap-2 rounded-xl border border-dashed border-border py-12 text-center">
           <CalendarClock className="h-6 w-6 text-subtle" strokeWidth={1.5} />
           <p className="text-sm text-muted-foreground">
-            Nenhuma tarefa marcada ainda. Comece pela lista de Clientes: os inativos (vermelhos)
+            Nenhuma tarefa marcada ainda. Comece pela lista de Clientes: os esfriados (vermelhos)
             são as primeiras ligações.
           </p>
         </div>

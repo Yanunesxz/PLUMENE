@@ -3,9 +3,11 @@
  *
  * Separado do serviço de propósito: tudo aqui é função pura, então o teste
  * cobre a parte que decide O QUE a IA vê (ordenação, cortes, agregados) sem
- * depender da API da Anthropic. A régua de dias espelha a do app
- * (apps/web/src/lib/carteira.ts): esfriando aos 90, parado aos 180.
+ * depender da API da Anthropic. A régua de dias é a DA FÁBRICA (migração 043,
+ * `@csb/shared`): quem chama passa a régua da empresa, e sem ela vale a de
+ * sempre — 90 para esfriando, 180 para parado.
  */
+import { REGUA_PADRAO, type ReguaDaCarteira } from '@csb/shared';
 
 export interface ClienteParaRelatorio {
   name: string;
@@ -15,9 +17,6 @@ export interface ClienteParaRelatorio {
   overdue_amount?: number | null;
   rep_erp_id?: string | null;
 }
-
-const ESFRIANDO_APOS_DIAS = 90;
-const PARADO_APOS_DIAS = 180;
 
 /** Quantos clientes entram LISTADOS no prompt — acima disso vira uma linha de
  *  resumo. Segura o custo e a latência mesmo numa carteira gigante. */
@@ -45,13 +44,17 @@ export interface ResumoDaCarteira {
   vencidoTotal: number;
 }
 
-export function resumirCarteira(clientes: ClienteParaRelatorio[], hoje = new Date()): ResumoDaCarteira {
+export function resumirCarteira(
+  clientes: ClienteParaRelatorio[],
+  hoje = new Date(),
+  regua: ReguaDaCarteira = REGUA_PADRAO,
+): ResumoDaCarteira {
   const r: ResumoDaCarteira = { total: clientes.length, parados: 0, esfriando: 0, ativos: 0, semRegistro: 0, vencidoTotal: 0 };
   for (const c of clientes) {
     const dias = diasDesde(c.last_purchase_at, hoje);
     if (dias === null) r.semRegistro++;
-    else if (dias >= PARADO_APOS_DIAS) r.parados++;
-    else if (dias >= ESFRIANDO_APOS_DIAS) r.esfriando++;
+    else if (dias >= regua.esfriado) r.parados++;
+    else if (dias >= regua.atencao) r.esfriando++;
     else r.ativos++;
     r.vencidoTotal += c.overdue_amount ?? 0;
   }
@@ -93,6 +96,7 @@ export function linhasDaEmpresa(
   clientes: ClienteParaRelatorio[],
   nomeDoRep: Map<string, string>,
   hoje = new Date(),
+  regua: ReguaDaCarteira = REGUA_PADRAO,
 ): string[] {
   const porRep = new Map<string, ClienteParaRelatorio[]>();
   for (const c of clientes) {
@@ -104,7 +108,7 @@ export function linhasDaEmpresa(
 
   const linhas: string[] = [];
   for (const [codigo, lista] of porRep) {
-    const r = resumirCarteira(lista, hoje);
+    const r = resumirCarteira(lista, hoje, regua);
     const nome = codigo === 'sem_rep' ? 'SEM REPRESENTANTE' : (nomeDoRep.get(codigo) ?? `rep ${codigo}`);
     linhas.push(
       `${nome}: ${r.total} clientes | ${r.parados} parados | ${r.esfriando} esfriando | ${r.ativos} ativos` +
@@ -115,7 +119,7 @@ export function linhasDaEmpresa(
 
   const piores = clientes
     .map((c) => ({ c, dias: diasDesde(c.last_purchase_at, hoje) }))
-    .filter((x): x is { c: ClienteParaRelatorio; dias: number } => x.dias !== null && x.dias >= PARADO_APOS_DIAS)
+    .filter((x): x is { c: ClienteParaRelatorio; dias: number } => x.dias !== null && x.dias >= regua.esfriado)
     .sort((a, b) => b.dias - a.dias)
     .slice(0, 40);
   if (piores.length > 0) {
@@ -161,13 +165,17 @@ function tempoParado(dias: number): string {
   return `há ${meses} meses`;
 }
 
-function quemProcurarPrimeiro(clientes: ClienteParaRelatorio[], hoje: Date): string[] {
+function quemProcurarPrimeiro(
+  clientes: ClienteParaRelatorio[],
+  hoje: Date,
+  regua: ReguaDaCarteira,
+): string[] {
   const candidatos = clientes
     .map((c) => ({ c, dias: diasDesde(c.last_purchase_at, hoje) }))
-    .filter((x): x is { c: ClienteParaRelatorio; dias: number } => x.dias !== null && x.dias >= ESFRIANDO_APOS_DIAS)
+    .filter((x): x is { c: ClienteParaRelatorio; dias: number } => x.dias !== null && x.dias >= regua.atencao)
     .sort((a, b) => {
-      const grupoA = a.dias >= PARADO_APOS_DIAS ? 0 : 1;
-      const grupoB = b.dias >= PARADO_APOS_DIAS ? 0 : 1;
+      const grupoA = a.dias >= regua.esfriado ? 0 : 1;
+      const grupoB = b.dias >= regua.esfriado ? 0 : 1;
       if (grupoA !== grupoB) return grupoA - grupoB;
       const compraA = a.c.total_purchased ?? 0;
       const compraB = b.c.total_purchased ?? 0;
@@ -178,7 +186,7 @@ function quemProcurarPrimeiro(clientes: ClienteParaRelatorio[], hoje: Date): str
 
   return candidatos.map(({ c, dias }) => {
     const partes = [
-      `- ${c.trade_name?.trim() || c.name} — ${dias >= PARADO_APOS_DIAS ? 'parado' : 'esfriando'} ${tempoParado(dias)}`,
+      `- ${c.trade_name?.trim() || c.name} — ${dias >= regua.esfriado ? 'esfriado' : 'em atenção'} ${tempoParado(dias)}`,
     ];
     if (c.total_purchased) partes.push(`já comprou ${brl(c.total_purchased)}`);
     if (c.overdue_amount) partes.push(`vencido ${brl(c.overdue_amount)}`);
@@ -188,16 +196,22 @@ function quemProcurarPrimeiro(clientes: ClienteParaRelatorio[], hoje: Date): str
 
 export function relatorioLocal(
   clientes: ClienteParaRelatorio[],
-  opcoes: { alcance: 'minha carteira' | 'empresa inteira'; nomeDoRep?: Map<string, string> },
+  opcoes: {
+    alcance: 'minha carteira' | 'empresa inteira';
+    nomeDoRep?: Map<string, string>;
+    /** A régua da fábrica (043). Ausente = a de sempre, 90/180. */
+    regua?: ReguaDaCarteira;
+  },
   hoje = new Date(),
 ): string {
-  const r = resumirCarteira(clientes, hoje);
+  const regua = opcoes.regua ?? REGUA_PADRAO;
+  const r = resumirCarteira(clientes, hoje, regua);
   const blocos: string[] = [];
 
   const dona = opcoes.alcance === 'empresa inteira' ? 'A empresa tem' : 'Sua carteira tem';
   blocos.push(
-    `${dona} ${r.total} clientes: ${r.parados} parados (6+ meses sem comprar), ` +
-      `${r.esfriando} esfriando (3–6 meses), ${r.ativos} ativos e ${r.semRegistro} sem registro de compra.` +
+    `${dona} ${r.total} clientes: ${r.parados} esfriados (${regua.esfriado}+ dias sem comprar), ` +
+      `${r.esfriando} em atenção (${regua.atencao} a ${regua.esfriado} dias), ${r.ativos} ativos e ${r.semRegistro} sem registro de compra.` +
       (r.vencidoTotal > 0 ? ` Há ${brl(r.vencidoTotal)} vencidos.` : ''),
   );
 
@@ -209,7 +223,7 @@ export function relatorioLocal(
     }
     const linhas = [...porRep.entries()]
       .map(([codigo, lista]) => {
-        const rr = resumirCarteira(lista, hoje);
+        const rr = resumirCarteira(lista, hoje, regua);
         const nome =
           codigo === 'sem_rep' ? 'Sem representante' : (opcoes.nomeDoRep?.get(codigo) ?? `Rep ${codigo}`);
         return { nome, rr };
@@ -219,23 +233,23 @@ export function relatorioLocal(
       .slice(0, 8)
       .map(
         ({ nome, rr }) =>
-          `- ${nome}: ${rr.parados} parados de ${rr.total}` +
+          `- ${nome}: ${rr.parados} esfriados de ${rr.total}` +
           (rr.vencidoTotal > 0 ? `, ${brl(rr.vencidoTotal)} vencidos` : ''),
       );
-    if (linhas.length > 0) blocos.push(`Carteiras com mais clientes parados:\n${linhas.join('\n')}`);
+    if (linhas.length > 0) blocos.push(`Carteiras com mais clientes esfriados:\n${linhas.join('\n')}`);
   }
 
-  const prioridade = quemProcurarPrimeiro(clientes, hoje);
+  const prioridade = quemProcurarPrimeiro(clientes, hoje, regua);
   if (prioridade.length > 0) {
     blocos.push(`Quem procurar primeiro:\n${prioridade.join('\n')}`);
     blocos.push(
-      'Próximo passo: comece pelos parados que mais compravam — recuperar cliente antigo é a venda mais barata que existe.',
+      'Próximo passo: comece pelos esfriados que mais compravam — recuperar cliente antigo é a venda mais barata que existe.',
     );
   } else {
     blocos.push(
       r.semRegistro === r.total
         ? 'Ainda não há registro de compra nesta carteira — os selos acendem quando o histórico for carregado.'
-        : 'Nenhum cliente parado ou esfriando — carteira em dia.',
+        : 'Nenhum cliente esfriado ou em atenção — carteira em dia.',
     );
   }
 
@@ -259,11 +273,16 @@ export function escolherProvedor(chaves: {
   return null;
 }
 
-export function montarPedido(escopo: 'minha carteira' | 'empresa inteira', resumo: ResumoDaCarteira, linhas: string[]): string {
+export function montarPedido(
+  escopo: 'minha carteira' | 'empresa inteira',
+  resumo: ResumoDaCarteira,
+  linhas: string[],
+  regua: ReguaDaCarteira = REGUA_PADRAO,
+): string {
   return (
     `Faca o relatorio simples da ${escopo}.\n\n` +
-    `Resumo: ${resumo.total} clientes | ${resumo.parados} parados (180+ dias sem comprar) | ` +
-    `${resumo.esfriando} esfriando (90-180 dias) | ${resumo.ativos} ativos | ` +
+    `Resumo: ${resumo.total} clientes | ${resumo.parados} esfriados (${regua.esfriado}+ dias sem comprar) | ` +
+    `${resumo.esfriando} em atencao (${regua.atencao}-${regua.esfriado} dias) | ${resumo.ativos} ativos | ` +
     `${resumo.semRegistro} sem registro de compra | vencido total ${reais(resumo.vencidoTotal)}\n\n` +
     `Dados:\n${linhas.join('\n')}`
   );

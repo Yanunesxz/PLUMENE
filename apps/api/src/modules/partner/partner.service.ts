@@ -6,7 +6,7 @@
  * daí o pedido fica como `sent_erp` e sai da fila.
  */
 import { supabase } from '../../config/supabase.js';
-import { coresPorSku, semLinhasDeCor } from '@csb/shared';
+import { coresPorSku, semLinhasDeCor, normalizarNumeroErp } from '@csb/shared';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
 const COR_SORTIDA = '00001';
@@ -293,8 +293,13 @@ export async function confirmOrderImport(
 
   if (!order) return { outcome: 'not_found' };
 
+  // Uma grafia so para o numero do Control: e por ele que o faturamento acha o
+  // pedido depois, e "sx-14627" nao pode virar um pedido diferente de "SX14627".
+  const numero = normalizarNumeroErp(pedido_erp) || pedido_erp.trim();
+
   if (order.erp_order_id) {
-    if (order.erp_order_id === pedido_erp) return { outcome: 'ok', ja_confirmado: true };
+    const atual = normalizarNumeroErp(order.erp_order_id as string);
+    if (atual === numero) return { outcome: 'ok', ja_confirmado: true };
     return { outcome: 'conflict', pedido_erp_atual: order.erp_order_id as string };
   }
 
@@ -302,7 +307,7 @@ export async function confirmOrderImport(
     .from('orders')
     .update({
       status: 'sent_erp',
-      erp_order_id: pedido_erp,
+      erp_order_id: numero,
       synced_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     })

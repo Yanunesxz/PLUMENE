@@ -29,7 +29,7 @@ import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
-import { situacaoDaCompra } from '../../lib/carteira.js';
+import { situacaoDaCompra, reguaDaCarteira } from '../../lib/carteira.js';
 import {
   janelaDoFechamento,
   comInicialMaiuscula,
@@ -202,8 +202,14 @@ export function PaginaMinhaArea() {
   }, [orders]);
 
   const clientes = customers?.length ?? 0;
-  // Nascidos no app e ainda sem o número do Control — a fila de inclusão.
-  const clientesSemCodigo = useMemo(() => (customers ?? []).filter((c) => !c.erp_id).length, [customers]);
+  // A fila de inclusão é só quem NASCEU no app (tem rep_id) e ainda não tem
+  // código. Os ~1.225 clientes que vieram das cargas da Curva ABC também estão
+  // sem código, mas já existem no Control — contá-los aqui transformaria o
+  // aviso num número que ninguém consegue zerar.
+  const clientesSemCodigo = useMemo(
+    () => (customers ?? []).filter((c) => !c.erp_id && c.rep_id).length,
+    [customers],
+  );
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
   const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
@@ -218,6 +224,9 @@ export function PaginaMinhaArea() {
     for (const c of customers ?? []) m.set(c.id, c.name);
     return m;
   }, [customers]);
+
+  // A régua da fábrica (043): os dias que acendem cada cor.
+  const regua = reguaDaCarteira();
 
   // A saúde da carteira, para o aviso lá embaixo.
   const carteira = useMemo(() => {
@@ -396,7 +405,7 @@ export function PaginaMinhaArea() {
       )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
-          O toque cai na lista de Clientes já filtrada nos parados. */}
+          O toque cai na lista de Clientes já filtrada nos esfriados. */}
       {(carteira.parados > 0 || carteira.esfriando > 0) && (
         <Link
           to="/customers?frescor=parado"
@@ -404,12 +413,12 @@ export function PaginaMinhaArea() {
         >
           <p className="text-sm font-semibold text-warn-soft-foreground">
             {carteira.parados > 0
-              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} sem comprar há 6+ meses`
-              : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} esfriando`}
+              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} esfriado${carteira.parados > 1 ? 's' : ''} — sem comprar há ${regua.esfriado}+ dias`
+              : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} em atenção`}
           </p>
           <p className="mt-0.5 text-xs text-warn-soft-foreground/80">
             {carteira.parados > 0 && carteira.esfriando > 0
-              ? `E mais ${carteira.esfriando} esfriando (3–6 meses). `
+              ? `E mais ${carteira.esfriando} em atenção (${regua.atencao} a ${regua.esfriado} dias). `
               : ''}
             {carteira.vencido > 0 ? `${formatBRL(carteira.vencido)} vencidos na carteira. ` : ''}
             Toque para ver quem visitar primeiro.
