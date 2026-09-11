@@ -121,3 +121,14 @@ export const corrigirNumeroErpSchema = z.object({
     .max(12)
     .refine(numeroErpValido, 'Número do Control inválido — são duas letras e a numeração, ex.: CS17379'),
 });
+
+/**
+ * "Atualizar no ERP" (046): a venda interna editou as peças de um pedido que já
+ * está no Control e avisa que a fábrica precisa mudar lá. `confirmar` é a outra
+ * ponta — quem mexe no Control diz que já atualizou.
+ */
+export const erpSyncSchema = z.object({
+  acao: z.enum(['pedir', 'confirmar']),
+  /** O recado de quem pediu ("tirei 6 peças da 0124, faltou no estoque"). */
+  observacao: z.string().trim().max(500).optional(),
+});

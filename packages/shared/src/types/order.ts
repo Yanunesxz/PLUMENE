@@ -1,6 +1,7 @@
 import type { OrderStatus } from '../constants/orderStatus.js';
 import type { OrderSource } from './access.js';
 import type { PedidoOriginal } from '../pedidos/pedidoOriginal.js';
+import type { SincroniaComOErp } from '../pedidos/sincroniaErp.js';
 
 export interface OrderItem {
   id: string;
@@ -86,6 +87,12 @@ export interface OrderWithItems extends Order {
    * a 044 ainda não rodou. O tipo mora em pedidos/pedidoOriginal.ts.
    */
   original?: PedidoOriginal | null;
+  /**
+   * O que o Control CONHECE deste pedido (migração 046). Presente só em
+   * pedido já lançado. Quando as peças de hoje divergem do snapshot, a
+   * fábrica está com a versão velha e alguém tem de atualizar lá.
+   */
+  erp_sync?: SincroniaComOErp | null;
   /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante
