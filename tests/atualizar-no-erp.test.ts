@@ -158,3 +158,38 @@ describe('confirmarAtualizacao — "já atualizei no Control"', () => {
     expect(gravado.pedido_em).toBeNull();
   });
 });
+
+/**
+ * O número do Control também chega SEM a Larissa digitar: o ERP do parceiro
+ * confirma a importação por POST /partner/v1/pedidos/:id/confirmar. Esse
+ * caminho grava o número e força sent_erp — e precisa tirar a mesma foto,
+ * senão pedido confirmado pela API nunca acusaria "mudou depois de ir para
+ * o ERP" quando a venda interna editasse.
+ */
+describe('a confirmação pela API do parceiro também tira a foto', () => {
+  it('grava a foto com o número que o ERP mandou', async () => {
+    const fake = criarSupabaseFake({
+      orders: [
+        { data: { id: 'o1', status: 'approved', erp_order_id: null }, error: null }, // o pedido
+        { data: [], error: null }, // o espaço da antecipação do dublê
+        { data: null, error: null }, // o update
+        { data: { ...PEDIDO_LANCADO, erp_order_id: 'SX14627' }, error: null }, // a foto
+      ],
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: null, error: null }, // o upsert
+      ],
+    } as never);
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    const { confirmOrderImport } = await import('../apps/api/src/modules/partner/partner.service.js');
+
+    const r = await confirmOrderImport(EMPRESA, 'o1', 'sx-14627');
+
+    expect(r).toEqual({ outcome: 'ok', ja_confirmado: false });
+    const foto = fake.ultimaGravacao('order_erp_sync', 'upsert')?.valores as {
+      erp_order_id: string;
+      pecas: number;
+    };
+    expect(foto).toMatchObject({ erp_order_id: 'SX14627', pecas: 20 });
+  });
+});

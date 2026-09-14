@@ -7,6 +7,7 @@
  */
 import { supabase } from '../../config/supabase.js';
 import { coresPorSku, semLinhasDeCor, normalizarNumeroErp } from '@csb/shared';
+import { registrarNoErp } from '../orders/erpSync.service.js';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
 const COR_SORTIDA = '00001';
@@ -315,5 +316,11 @@ export async function confirmOrderImport(
     .eq('company_id', company_id);
 
   if (error) throw new Error(`Falha ao confirmar pedido: ${error.message}`);
+
+  // O Control passou a conhecer o pedido por ESTE caminho também (046): sem a
+  // foto aqui, pedido confirmado pela API nunca acusaria "mudou depois de ir
+  // para o ERP" quando a venda interna editasse. Acessório: não derruba a
+  // confirmação.
+  await registrarNoErp(order_id, company_id, null);
   return { outcome: 'ok', ja_confirmado: false };
 }
