@@ -137,4 +137,10 @@ export const erpSyncSchema = z.object({
    * a confirmação é recusada em vez de engolir a segunda edição.
    */
   assinatura: z.string().trim().max(40).optional(),
+}).refine((b) => b.acao !== 'confirmar' || !!b.assinatura, {
+  // Sem ela a confirmação fotografaria o pedido de agora sem conferir nada. O
+  // app antigo, que não manda, recebe o recado de atualizar em vez de engolir
+  // uma edição.
+  message: 'Atualize o app para confirmar — esta versão não diz qual lista você conferiu',
+  path: ['assinatura'],
 });

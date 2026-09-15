@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy } from 'lucide-react';
@@ -25,7 +25,7 @@ import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFatura
 import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
-import { precoDoTamanho, coresPorSku, semLinhasDeCor, assinaturaDoPedido } from '@csb/shared';
+import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
 import type {
   Order,
   OrderWithItems,
@@ -82,11 +82,16 @@ export function PaginaDetalhePedido() {
    * ERP" justo no instante em que a edição o fazia nascer. Falhou a rede? Fica
    * o que já está na tela.
    */
+  // Cada recarga leva um número; só a MAIS NOVA pode trocar o pedido da tela.
+  // Duas edições seguidas disparam dois GETs, e no 3G o primeiro pode voltar
+  // depois do segundo — sem isto ele apagaria da tela o que veio depois dele.
+  const recargaMaisNova = useRef(0);
   const recarregarPedido = async () => {
     if (!id || !token) return;
+    const esta = ++recargaMaisNova.current;
     try {
       const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
-      setOrder(r.data);
+      if (esta === recargaMaisNova.current) setOrder(r.data);
     } catch {
       /* sem rede: mantém o pedido que já está na tela */
     }
@@ -188,36 +193,49 @@ export function PaginaDetalhePedido() {
   const [sincronizando, setSincronizando] = useState(false);
   const [erroDaSincronia, setErroDaSincronia] = useState<string | null>(null);
 
-  const mexerNaSincronia = async (acao: 'pedir' | 'confirmar', observacao?: string) => {
+  const mexerNaSincronia = async (acao: 'pedir' | 'confirmar', observacao?: string, assinaturaVista?: string) => {
     if (!id || !token || !order || sincronizando) return;
     setSincronizando(true);
     setErroDaSincronia(null);
     try {
-      const res = await api.patch<ApiResponse<{ sincronia: SincroniaComOErp; aparelhos: number | null }>>(
+      const res = await api.patch<
+        ApiResponse<SincroniaComOErp> & { avisados?: { financeiro: number; admin: number } | null }
+      >(
         `/orders/${id}/erp-sync`,
         {
           acao,
           ...(observacao?.trim() ? { observacao: observacao.trim() } : {}),
-          // A Larissa confirma O QUE VIU: se a venda interna mexeu de novo
-          // enquanto ela digitava no Control, a API recusa em vez de engolir.
-          ...(acao === 'confirmar' ? { assinatura: assinaturaDoPedido(pedidoHoje) } : {}),
+          // A Larissa confirma O QUE CONFERIU (congelado pelo cartão quando o
+          // aviso apareceu): se a venda interna mexeu de novo enquanto ela
+          // digitava no Control, a API recusa em vez de engolir.
+          ...(acao === 'confirmar' && assinaturaVista ? { assinatura: assinaturaVista } : {}),
         },
         token,
       );
-      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data.sincronia } : prev));
+      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data } : prev));
+      const avisados = res.avisados;
       if (acao === 'confirmar') {
         setToast({ message: 'Control atualizado — o aviso saiu deste pedido.', type: 'success' });
-      } else if ((res.data.aparelhos ?? 0) > 0) {
+      } else if (!avisados) {
         setToast({
-          message: `Aviso enviado: chegou em ${res.data.aparelhos} aparelho(s) de quem mexe no Control.`,
+          message: 'Ficou registrado no pedido, mas não deu para confirmar o envio do aviso. Avise a Larissa por outro canal.',
+          type: 'error',
+        });
+      } else if (avisados.financeiro > 0) {
+        // "Enviado", nunca "chegou": o push não confirma entrega — o celular pode
+        // estar desligado e o aviso esperar lá no serviço do navegador.
+        setToast({
+          message: `Aviso enviado para ${avisados.financeiro} celular(es) do financeiro.`,
           type: 'success',
         });
       } else {
-        // Registrado no pedido, mas o celular de ninguém recebeu: dizer "a
-        // fábrica foi avisada" aqui seria mentir para quem está esperando.
+        // Registrado, mas quem mexe no Control não recebeu: dizer "avisado" aqui
+        // seria mentir para quem está esperando.
         setToast({
           message:
-            'Ficou registrado no pedido, mas ninguém do financeiro está com aviso ligado no celular. Avise a Larissa por outro canal.',
+            avisados.admin > 0
+              ? 'O aviso saiu só para o admin — ninguém do financeiro está com aviso ligado. Avise a Larissa por outro canal.'
+              : 'Ficou registrado no pedido, mas ninguém do financeiro está com aviso ligado no celular. Avise a Larissa por outro canal.',
           type: 'error',
         });
       }
@@ -280,7 +298,7 @@ export function PaginaDetalhePedido() {
         desconto.valor != null ? { desconto_valor: desconto.valor } : { desconto: desconto.percent },
         token!,
       );
-      setOrder({ ...order, ...res.data });
+      setOrder((prev) => (prev ? { ...prev, ...res.data } : prev));
       void recarregarPedido();
       const zerou = desconto.valor === 0 || desconto.percent === 0;
       setToast({
@@ -420,7 +438,7 @@ export function PaginaDetalhePedido() {
       );
       // O embed `payment_condition` fica para trás no update — zera para o
       // rótulo resolver pelo cache das condições, que tem a nova.
-      setOrder({ ...order, ...res.data, payment_condition: null });
+      setOrder((prev) => (prev ? { ...prev, ...res.data, payment_condition: null } : prev));
       void recarregarPedido();
       setToast({
         message: novaId ? 'Condição de pagamento atualizada.' : 'Condição de pagamento removida.',
@@ -1084,15 +1102,19 @@ export function PaginaDetalhePedido() {
               diverge do que a fábrica tem na mão. */}
           {order.erp_sync && !ehLoja && (
             <AtualizarNoErp
+              // Foto nova (confirmação) = cartão novo: a lista conferida recomeça.
+              key={order.erp_sync.confirmado_em}
               sincronia={order.erp_sync}
               pedidoHoje={pedidoHoje}
               numeroNoControl={order.erp_order_id}
-              podePedir={podeEditarPecas || ehEscritorioDoErp}
-              podeConfirmar={ehEscritorioDoErp}
+              atualizadoEm={order.updated_at ?? null}
+              faturado={!!order.invoiced}
+              podePedir={(podeEditarPecas || ehEscritorioDoErp) && !order.invoiced}
+              podeConfirmar={ehEscritorioDoErp && !order.invoiced}
               ocupado={sincronizando}
               erro={erroDaSincronia}
               onPedir={(obs) => void mexerNaSincronia('pedir', obs)}
-              onConfirmar={() => void mexerNaSincronia('confirmar')}
+              onConfirmar={(assinatura) => void mexerNaSincronia('confirmar', undefined, assinatura)}
             />
           )}
 

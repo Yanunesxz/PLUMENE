@@ -23,6 +23,11 @@ const REP = 'rep-1';
 const chamadas: Array<{ fn: string; args: unknown[]; gravacoesAntes: number }> = [];
 let gravacoesDoFake: () => number = () => 0;
 
+// O que as funções simuladas devolvem — cada teste pode trocar.
+const PEDIR_OK = { ok: true, sincronia: { order_id: 'o1', pedido_em: '2026-09-15T10:00:00Z' } };
+let respostaDoPedir: unknown = PEDIR_OK;
+let respostaDaFoto: string = 'guardada';
+
 function simularFoto() {
   const registrar = (fn: string, retorno: unknown) =>
     vi.fn(async (...args: unknown[]) => {
@@ -31,12 +36,15 @@ function simularFoto() {
     });
   vi.doMock('../apps/api/src/modules/orders/erpSync.service.js', () => ({
     registrarNoErp: registrar('registrarNoErp', 'guardada'),
-    garantirFotoDoErp: registrar('garantirFotoDoErp', 'guardada'),
+    garantirFotoDoErp: vi.fn(async (...args: unknown[]) => {
+      chamadas.push({ fn: 'garantirFotoDoErp', args, gravacoesAntes: gravacoesDoFake() });
+      return respostaDaFoto;
+    }),
     atualizarNumeroNaFoto: registrar('atualizarNumeroNaFoto', undefined),
     lerSincronia: vi.fn(async () => null),
-    pedirAtualizacao: registrar('pedirAtualizacao', {
-      ok: true,
-      sincronia: { order_id: 'o1', pedido_em: '2026-09-15T10:00:00Z' },
+    pedirAtualizacao: vi.fn(async (...args: unknown[]) => {
+      chamadas.push({ fn: 'pedirAtualizacao', args, gravacoesAntes: gravacoesDoFake() });
+      return respostaDoPedir;
     }),
     confirmarAtualizacao: registrar('confirmarAtualizacao', {
       ok: true,
@@ -62,6 +70,8 @@ async function carregarServico(respostas: Record<string, unknown>) {
 beforeEach(() => {
   vi.resetModules();
   chamadas.length = 0;
+  respostaDoPedir = PEDIR_OK;
+  respostaDaFoto = 'guardada';
 });
 
 describe('o lançamento fotografa o que o Control passou a conhecer', () => {
@@ -111,6 +121,53 @@ describe('a edição de um pedido lançado fotografa ANTES de mexer', () => {
     expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
   });
 
+  it('a Simone troca o desconto: a foto sai antes de gravar', async () => {
+    const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false };
+    const { setOrderDiscount, fake } = await carregarServico({
+      orders: { data: lancado, error: null },
+      order_items: { data: [{ total: 100 }], error: null },
+    });
+
+    const r = await setOrderDiscount('o1', EMPRESA, REP, 'rep', { percent: 8 }, true);
+
+    expect(r.ok).toBe(true);
+    const foto = chamadas.find((c) => c.fn === 'garantirFotoDoErp');
+    expect(foto?.gravacoesAntes).toBe(0);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
+  });
+
+  it('a Simone tira a condição de pagamento: a foto sai antes de gravar', async () => {
+    const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false };
+    const { setOrderPayment, fake } = await carregarServico({ orders: { data: lancado, error: null } });
+
+    const r = await setOrderPayment('o1', EMPRESA, REP, 'rep', null, true);
+
+    expect(r.ok).toBe(true);
+    expect(chamadas.find((c) => c.fn === 'garantirFotoDoErp')?.gravacoesAntes).toBe(0);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
+  });
+
+  it('se a foto FALHA, a edição não passa — senão essa mudança sumiria do aviso para sempre', async () => {
+    respostaDaFoto = 'falhou';
+    const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false, notes: 'entregar sexta' };
+    const { setOrderNotes, fake } = await carregarServico({ orders: { data: lancado, error: null } });
+
+    const r = await setOrderNotes('o1', EMPRESA, REP, 'rep', 'entregar segunda', true);
+
+    expect(r).toEqual({ ok: false, reason: 'sem_foto_do_erp' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('tabela ausente não trava a edição — o app segue como antes da 046', async () => {
+    respostaDaFoto = 'sem_tabela';
+    const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false, notes: null };
+    const { setOrderNotes } = await carregarServico({
+      orders: [{ data: lancado, error: null }, { data: { ...lancado, notes: 'x' }, error: null }],
+    });
+
+    expect((await setOrderNotes('o1', EMPRESA, REP, 'rep', 'x', true)).ok).toBe(true);
+  });
+
   it('representante comum não passa do portão — e aí nem foto nem edição', async () => {
     const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false, notes: null };
     const { setOrderNotes, fake } = await carregarServico({ orders: { data: lancado, error: null } });
@@ -153,7 +210,7 @@ function assinar(payload: Record<string, unknown>): string {
 const token = (extra: Record<string, unknown>) =>
   assinar({ sub: REP, email: 'x@csb.com', company_id: EMPRESA, name: 'X', price_table_id: 't1', ...extra });
 
-const aparelhosAvisados = vi.fn(async () => 2);
+const aparelhosAvisados = vi.fn(async () => ({ financeiro: 2, admin: 1 }));
 
 async function subirApp(respostas: Record<string, unknown>) {
   const fake = criarSupabaseFake(respostas as never);
@@ -196,10 +253,12 @@ describe('PATCH /orders/:id/erp-sync — quem pode', { timeout: 20_000 }, () => 
     expect(res.statusCode).toBe(403);
   });
 
-  it('venda interna não pede em pedido já faturado', async () => {
-    const app = await subirApp({ orders: { data: { rep_id: REP, invoiced: true }, error: null } });
-    const res = await patch(app, token({ role: 'rep', venda_interna: true }), { acao: 'pedir' });
+  it('pedido já faturado: o pedido de atualização é recusado, inclusive para o escritório', async () => {
+    respostaDoPedir = { ok: false, motivo: 'ja_faturado' };
+    const app = await subirApp({});
+    const res = await patch(app, token({ role: 'financeiro' }), { acao: 'pedir' });
     expect(res.statusCode).toBe(409);
+    expect((res.json() as { code: string }).code).toBe('JA_FATURADO');
   });
 
   it('a venda interna dona pede, e a resposta diz em quantos aparelhos o aviso chegou', async () => {
@@ -214,14 +273,26 @@ describe('PATCH /orders/:id/erp-sync — quem pode', { timeout: 20_000 }, () => 
       observacao: 'tirei 6 da 0124',
     });
     expect(res.statusCode).toBe(200);
-    expect((res.json() as { data: { aparelhos: number } }).data.aparelhos).toBe(2);
+    const corpo = res.json() as { data: { order_id: string }; avisados: unknown; aparelhos: number };
+    // `data` continua sendo a sincronia: o app antigo aberto no celular lê direto.
+    expect(corpo.data.order_id).toBe('o1');
+    expect(corpo.avisados).toEqual({ financeiro: 2, admin: 1 });
+    expect(corpo.aparelhos).toBe(3);
     expect(chamadas.find((c) => c.fn === 'pedirAtualizacao')?.args).toEqual(['o1', EMPRESA, REP, 'tirei 6 da 0124']);
   });
 
   it('só financeiro e admin confirmam — a venda interna não', async () => {
     const app = await subirApp({});
-    const res = await patch(app, token({ role: 'rep', venda_interna: true }), { acao: 'confirmar' });
+    // Com a assinatura, para o teste bater no portão de papel e não na validação do corpo.
+    const res = await patch(app, token({ role: 'rep', venda_interna: true }), { acao: 'confirmar', assinatura: '1-abcdef01' });
     expect(res.statusCode).toBe(403);
+    expect(chamadas.find((c) => c.fn === 'confirmarAtualizacao')).toBeUndefined();
+  });
+
+  it('confirmar SEM a assinatura é recusado — o app antigo engoliria a segunda edição', async () => {
+    const app = await subirApp({});
+    const res = await patch(app, token({ role: 'financeiro' }), { acao: 'confirmar' });
+    expect(res.statusCode).toBe(400);
     expect(chamadas.find((c) => c.fn === 'confirmarAtualizacao')).toBeUndefined();
   });
 
