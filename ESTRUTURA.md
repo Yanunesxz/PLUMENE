@@ -60,10 +60,17 @@ packages/shared/src/
 
 ```
 apps/api/src/
-├── index.ts              → ENTRADA: cria o servidor, registra cors/helmet/jwt e os routers
+├── app.ts                → buildApp(): monta o Fastify (helmet, compress, rate-limit 300/min,
+│                           cors, jwt, tratamento de erro → INTERNAL_ERROR) e é QUEM REGISTRA
+│                           os routers. Sem listen(): serve às duas entradas abaixo.
+├── index.ts              → ENTRADA 1 (local / Docker / Railway): listen() + scheduler do ERP
+│   (apps/api/api/index.ts → ENTRADA 2 (Vercel, função serverless): a mesma buildApp(),
+│                           sem listen() e sem scheduler; o vercel.json reescreve tudo para cá.
+│                           Medido em 15/09/2026: só o Railway responde; as URLs da Vercel dão 500)
 │
 ├── config/
-│   ├── env.ts            → lê variáveis de ambiente (validação zod)
+│   ├── env.ts            → lê variáveis de ambiente (requireEnv à mão — NÃO há zod aqui).
+│   │                       PARTNER_API_KEYS não passa por ele: partner.auth.ts lê process.env
 │   ├── supabase.ts       → cliente Supabase (service role — ignora RLS)
 │   └── migrations/       → SQL versionado (rodar no Supabase SQL Editor, em ordem)
 │       ├── 001_base_schema.sql        → tabelas núcleo
@@ -110,14 +117,29 @@ apps/api/src/
 │       ├── 042_numero_do_control_unico.sql → índice único orders(company_id, erp_order_id): dois pedidos nunca com o mesmo número do Control
 │       ├── 043_regua_da_carteira.sql → companies.carteira_atencao_dias/carteira_esfriado_dias (o admin muda os 90/180 no Painel)
 │       ├── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
-│       └── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
+│       ├── (045 NÃO EXISTE — número pulado. Foi reservado por mensagem entre sessões; não assuma que está livre)
+│       └── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
 │                           + requirePermission('faturar_pedidos') — teclas do gerente
 │
 ├── lib/
-│   └── password.ts       → hashPassword (bcrypt) + verifyPassword (aceita sha256 legado)
+│   ├── password.ts       → hashPassword (bcrypt) + verifyPassword (aceita sha256 legado)
+│   ├── detectarColuna.ts → detectar(tabela, coluna): "esta coluna/tabela já existe?" para
+│   │                       código que sobe antes da migração rodar. "sim" vale para sempre,
+│   │                       "não" vale 30 s (só 42703/42P01/PGRST204/PGRST205 ou "does not
+│   │                       exist"); erro de rede não memoriza. Use ISTO, nunca cache próprio.
+│   │                       detectarOuFalhar: igual, mas LANÇA quando o banco não respondeu
+│   │                       — para coluna que é FILTRO (o invoiced da fila do parceiro)
+│   ├── paginacao.ts      → buscarTudo / buscarTudoOuFalhar / buscarPorIds / emLotes: o
+│   │                       PostgREST corta em 1.000 linhas EM SILÊNCIO; listagem que pode
+│   │                       passar disso pagina aqui. buscarTudo ENGOLE erro de página (serve
+│   │                       às telas); buscarTudoOuFalhar LANÇA — é a das rotas do parceiro,
+│   │                       onde lista pela metade vira "o resto não existe" no ERP
+│   ├── validation.ts     → parseBody(schema zod, body, reply): o 400 padronizado
+│   ├── email.ts          → e-mail de confirmação do pedido (Gmail; sem env vira no-op)
+│   └── tokens.ts         → tokens dos links de convite/vitrine (só o SHA-256 vai ao banco)
 │
 ├── modules/              → FEATURES — cada uma tem o trio router → controller → service
 │   ├── access/           → convite da loja, vitrine temporária e a área da loja
@@ -131,7 +153,24 @@ apps/api/src/
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
-│   └── sync/             → POST /sync (fila offline) + controle de sync do ERP
+│   ├── sync/             → POST /sync (fila offline) + controle de sync do ERP
+│   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
+│   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
+│   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
+│   │                       → 401 PARTNER_UNAUTHORIZED). SEIS rotas (partner.router.ts):
+│   │                         GET  /partner/v1/status
+│   │                         GET  /partner/v1/pedidos                (a fila que o ERP PUXA)
+│   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
+│   │                         POST /partner/v1/faturamento            (partner.faturamento.service)
+│   │                         POST /partner/v1/clientes               (partner.sync.service)
+│   │                         POST /partner/v1/representantes         (partner.sync.service)
+│   │                       É o CANAL OFICIAL com o Control (decisão de 15/09/2026 — ver
+│   │                       _tools/erp-sync/README.md). O contrato vive em docs/API-PARCEIRO.md
+│   │                       e apps/web/public/api-parceiro.html — a MESMA especificação.
+│   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
+│   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
+│   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
+│   └── ia/               → relatório da carteira sob demanda (Anthropic ou OpenAI, por env)
 │
 ├── erp/                  → integração com o ERP (Firebird)
 │   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto)
@@ -147,7 +186,7 @@ apps/api/src/
 - `X.controller.ts` → lê request, valida, chama o service, devolve a resposta
 - `X.service.ts` → a lógica de negócio + acesso ao Supabase
 
-> **Fluxo de uma requisição:** `index.ts` → router (guard) → controller → service → Supabase.
+> **Fluxo de uma requisição:** `app.ts` → router (guard) → controller → service → Supabase.
 
 ---
 
@@ -230,11 +269,33 @@ _tools/
 │   ├── carregar.mjs    → substitui as tabelas de preço pelas do PDF
 │   └── carregar-faixa-maior.mjs → preenche price_larger (exige a migração 026)
 ├── erp-sync/
+│   ├── README.md  → LEIA ANTES DE RODAR: o que cada modo faz, linha por linha, e a
+│   │                DECISÃO de 15/09/2026 sobre o push-orders
 │   ├── sync.py    → Firebird → Supabase. Modos: full, products, prices, customers,
-│   │                stock, reconcile (liga/desliga ativo), prices-audit (diagnóstico)
-│   └── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
-└── firebird-reader/ → leitura/extração do schema do Firebird + DLLs (fbembed)
+│   │                stock, reconcile (liga/desliga ativo), prices-audit (diagnóstico), test
+│   │                e push-orders — o ÚNICO que escreve NO FIREBIRD do Fábio (insere
+│   │                PEDIDO + ITENS_PEDIDO, cunha o número por GEN_ID e CRIA o generator
+│   │                se faltar). Contradiz o contrato "nada é escrito no seu ERP".
+│   │                VETADO em produção até o Yan decidir com o Fábio. prices/full também
+│   │                estão vetados (upsert de preço duplicado) — ver o README.
+│   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
+│   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-046.sql         → a 046 pronta para colar. Em 15/09 a API NÃO enxergava a tabela
+│                                    em nenhum dos dois bancos (PGRST205): colar e conferir com
+│                                    node _tools/conferir-046.mjs (GET de verdade, nunca HEAD)
+├── SQL-PARA-RODAR-042-043-044.sql → medido em 15/09: 043/044 nos dois bancos; a 042 estava na
+│                                    PLUMENE e FALTAVA na Corpo Sensual. Meça antes de colar.
+├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
+├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
+│                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
+│                    conferir-046, conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
+└── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
+                 → cargas e consertos pontuais direto no Supabase (fora do app)
 ```
+
+> `_tools/firebird-reader/` **não existe no disco** (este mapa a listava). O `sync.py:38-42`
+> ainda a procura como segunda opção para as DLLs; a primeira é `_tools/erp-sync/fbembed25_x64/`.
 
 ---
 
@@ -251,6 +312,8 @@ _tools/
 | Adicionar **rota na API** | `apps/api/src/modules/<área>/*.router.ts` |
 | Mudar um **tipo de dado** | `packages/shared/src/types/` |
 | Mudar o **banco** (colunas) | nova migration em `apps/api/src/config/migrations/` |
-| Mexer no **sync do ERP** | `_tools/erp-sync/sync.py` |
+| Mexer na **API de Parceiro** (o que o Control puxa/confirma) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html` |
+| Mexer no **sync do ERP** (Firebird → Supabase) | `_tools/erp-sync/sync.py` — leia `_tools/erp-sync/README.md` antes |
+| Rodar o **push-orders** (app → Firebird) | NÃO. Vetado em produção — `_tools/erp-sync/README.md`, seção "DECISÃO" |
 | Mexer no **offline** | `apps/web/src/offline/` |
 ```
