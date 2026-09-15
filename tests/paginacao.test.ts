@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { buscarTudo, buscarPorIds, emLotes, LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
+import {
+  buscarTudo,
+  buscarTudoOuFalhar,
+  buscarPorIds,
+  emLotes,
+  LIMITE_POSTGREST,
+} from '../apps/api/src/lib/paginacao.js';
 
 /**
  * O corte silencioso do PostgREST.
@@ -78,6 +84,63 @@ describe('listagem inteira', () => {
 
     expect(tudo).toHaveLength(LIMITE_POSTGREST);
     expect(chamadas).toBe(2);
+  });
+});
+
+/**
+ * A variante que NÃO engole: é a da API de Parceiro, onde "erro do banco"
+ * precisa virar 500 para o robô do ERP tentar de novo — devolver a metade com
+ * 200 faria o ERP concluir que o resto dos pedidos não existe.
+ */
+describe('listagem inteira que não engole erro', () => {
+  it('traz tudo quando passa do teto, concatenando as páginas', async () => {
+    const tabela = tabelaCom(1500);
+
+    const tudo = await buscarTudoOuFalhar<{ id: string }>((de, ate) => tabela.pagina(de, ate));
+
+    expect(tudo).toHaveLength(1500);
+    expect(tabela.chamadas).toBe(2);
+    expect(tudo.at(-1)!.id).toBe('linha-1499');
+  });
+
+  it('erro no meio LANÇA com a mensagem do banco, em vez de devolver a metade', async () => {
+    let chamadas = 0;
+    const promessa = buscarTudoOuFalhar<{ id: string }>((de) => {
+      chamadas += 1;
+      if (chamadas > 1) return Promise.resolve({ data: null, error: { message: 'caiu' } });
+      return Promise.resolve({
+        data: Array.from({ length: LIMITE_POSTGREST }, (_, i) => ({ id: `l${de + i}` })),
+        error: null,
+      });
+    });
+
+    await expect(promessa).rejects.toThrow(/caiu/);
+    expect(chamadas).toBe(2);
+  });
+
+  it('erro logo na primeira página também lança', async () => {
+    await expect(
+      buscarTudoOuFalhar(() => Promise.resolve({ data: null, error: { message: 'sem acesso' } })),
+    ).rejects.toThrow(/sem acesso/);
+  });
+
+  it('página cheia exata vai buscar a seguinte, como a variante que engole', async () => {
+    const tabela = tabelaCom(LIMITE_POSTGREST);
+
+    await buscarTudoOuFalhar(tabela.pagina);
+
+    expect(tabela.chamadas).toBe(2);
+  });
+
+  it('resposta que não é lista encerra o laço em vez de girar para sempre', async () => {
+    let chamadas = 0;
+    const tudo = await buscarTudoOuFalhar(() => {
+      chamadas += 1;
+      return Promise.resolve({ data: { id: 'objeto-solto' }, error: null });
+    });
+
+    expect(tudo).toEqual([]);
+    expect(chamadas).toBe(1);
   });
 });
 

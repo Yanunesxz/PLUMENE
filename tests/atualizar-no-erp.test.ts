@@ -168,11 +168,20 @@ describe('confirmarAtualizacao — "já atualizei no Control"', () => {
  */
 describe('a confirmação pela API do parceiro também tira a foto', () => {
   it('grava a foto com o número que o ERP mandou', async () => {
+    // A ordem das consultas do confirmar (contrato de 15/09/2026): lê o
+    // pedido, sonda `order_number`, confere se o número já é de outro pedido,
+    // grava — e só então a foto. Entre uma e outra vai o espaço da
+    // antecipação do dublê.
     const fake = criarSupabaseFake({
       orders: [
         { data: { id: 'o1', status: 'approved', erp_order_id: null }, error: null }, // o pedido
         { data: [], error: null }, // o espaço da antecipação do dublê
-        { data: null, error: null }, // o update
+        { data: [], error: null }, // a sonda de order_number (existe)
+        { data: [], error: null }, // espaço
+        { data: [], error: null }, // ninguém usa o número
+        { data: [], error: null }, // espaço
+        { data: [{ id: 'o1' }], error: null }, // o update (uma linha afetada)
+        { data: [], error: null }, // espaço
         { data: { ...PEDIDO_LANCADO, erp_order_id: 'SX14627' }, error: null }, // a foto
       ],
       order_erp_sync: [

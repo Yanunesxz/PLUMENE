@@ -43,6 +43,37 @@ export async function buscarTudo<T>(
 }
 
 /**
+ * Igual a `buscarTudo`, mas uma página que falha LANÇA em vez de devolver o
+ * que juntou até ali.
+ *
+ * Existe por causa da API de Parceiro: lá, erro do banco precisa virar 500
+ * para o robô do ERP tentar de novo na próxima rodada. Engolir o erro viraria
+ * "200 com a lista pela metade" — e o ERP concluiria que o resto dos pedidos
+ * não existe. `buscarTudo` continua engolindo de propósito para as telas, que
+ * preferem mostrar o que veio a ficar em branco.
+ */
+export async function buscarTudoOuFalhar<T>(
+  consulta: (de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const tudo: T[] = [];
+  for (let de = 0; ; de += LIMITE_POSTGREST) {
+    const ate = de + LIMITE_POSTGREST - 1;
+    const { data, error } = await consulta(de, ate);
+    if (error) {
+      const mensagem = (error as { message?: string }).message ?? 'erro desconhecido';
+      throw new Error(`Falha ao buscar as linhas ${de}-${ate}: ${mensagem}`);
+    }
+    // Resposta que não é lista não é "página que falhou": encerra em vez de
+    // girar para sempre (mesma proteção do `buscarTudo`).
+    if (!Array.isArray(data)) break;
+    const linhas = data as T[];
+    tudo.push(...linhas);
+    if (linhas.length < LIMITE_POSTGREST) break;
+  }
+  return tudo;
+}
+
+/**
  * Roda a consulta uma vez por lote de ids e junta tudo.
  *
  * Dois cortes acontecem aqui: o número de ids na URL (`.in`) e o número de

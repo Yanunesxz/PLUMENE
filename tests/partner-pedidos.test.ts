@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
 import { esquecerDeteccoes } from '../apps/api/src/lib/detectarColuna.js';
+import { LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
 
 /**
  * A mão dos PEDIDOS na API de Parceiro — o que o programa do Fábio puxa e o
@@ -9,20 +10,23 @@ import { esquecerDeteccoes } from '../apps/api/src/lib/detectarColuna.js';
  *
  * Até 15/09/2026 este módulo não tinha teste nenhum: a fila, as cinco
  * pendências, a cor sortida e os desfechos do `confirmar` só existiam no
- * código. Estes testes são a rede de segurança antes de endurecer o contrato
- * (brief da integração, §7 passo 4).
+ * código. Estes testes são a rede de segurança do contrato endurecido em
+ * 15/09 (brief da integração, §7 passos 4 a 6).
  *
  * O que fica trancado:
- *   1. a fila padrão é approved SEM número do Control; `desde` e `incluir=todos`
- *      mudam só o filtro, nunca o formato;
+ *   1. a fila padrão é approved SEM número do Control e NÃO faturado; `desde`
+ *      e `incluir=todos` mudam só o filtro, nunca o formato; a lista vem
+ *      inteira (além das 1.000 linhas do PostgREST) e erro sobe, nunca "200
+ *      com a lista pela metade";
  *   2. as CINCO pendências têm texto exato, saem deduplicadas, e `importavel`
  *      é "nenhuma pendência";
  *   3. a cor vai SEMPRE como '00001' e a escolha do cliente viaja na
  *      observação do item; a observação do pedido sai sem as linhas de cor;
  *   4. condição de pagamento ausente não é pendência; desconto sai em pontos
  *      percentuais; coluna de migração ausente degrada para null/0 sem quebrar;
- *   5. o `confirmar` grava o número normalizado e tira a foto da 046, repete
- *      idempotente com o mesmo número e recusa número diferente.
+ *   5. o `confirmar` checa nesta ordem: formato → existe → já tem número →
+ *      status permite → número livre → grava só se ninguém gravou no meio —
+ *      e cada desfecho tem o seu código HTTP no controller.
  */
 
 const EMPRESA = 'empresa-1';
@@ -116,7 +120,7 @@ afterEach(() => {
 // ─── A fila ──────────────────────────────────────────────────────────────────
 
 describe('a fila de pedidos para o ERP', () => {
-  it('padrão: aprovados sem número do Control, só da empresa da chave', async () => {
+  it('padrão: aprovados sem número do Control e NÃO faturados, só da empresa da chave', async () => {
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem([{ data: [pedido()], error: null }]),
       price_tables: { data: [], error: null },
@@ -129,7 +133,24 @@ describe('a fila de pedidos para o ERP', () => {
     expect(eqs).toContainEqual(['company_id', EMPRESA]);
     expect(eqs).toContainEqual(['status', 'approved']);
     expect(fake.filtrosDe('orders', 'is').map((f) => f.args)).toContainEqual(['erp_order_id', null]);
+    // O carimbo manual de faturado não exige número: sem este filtro, pedido
+    // já faturado à mão iria para o Control de novo (19 de 21 na CS em 11/09).
+    expect(fake.filtrosDe('orders', 'or').map((f) => f.args)).toEqual([
+      ['invoiced.is.null,invoiced.eq.false'],
+    ]);
     expect(fake.filtrosDe('orders', 'in')).toHaveLength(0);
+  });
+
+  it('sem a coluna invoiced (banco antes da 027) a fila não pede o filtro de faturado', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ invoiced: undefined })], error: null }], [OK, COLUNA_AUSENTE, OK, OK]),
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(fake.filtrosDe('orders', 'or')).toHaveLength(0);
+    expect(p!.faturado).toBe(false);
   });
 
   it('`desde` filtra por atualizado_em — a "data que eu puxei" do parceiro', async () => {
@@ -146,9 +167,11 @@ describe('a fila de pedidos para o ERP', () => {
     ]);
   });
 
-  it('`incluir=todos` traz aprovados E já enviados — a reconciliação', async () => {
+  it('`incluir=todos` traz aprovados E já enviados, faturados inclusive — a reconciliação', async () => {
     const { getPartnerOrders, fake } = await carregar({
-      orders: filaDaListagem([{ data: [pedido({ status: 'sent_erp', erp_order_id: 'CS17379' })], error: null }]),
+      orders: filaDaListagem([
+        { data: [pedido({ status: 'sent_erp', erp_order_id: 'CS17379', invoiced: true })], error: null },
+      ]),
       price_tables: { data: [], error: null },
     });
 
@@ -160,11 +183,13 @@ describe('a fila de pedidos para o ERP', () => {
     ]);
     expect(fake.filtrosDe('orders', 'eq').map((f) => f.args)).not.toContainEqual(['status', 'approved']);
     expect(fake.filtrosDe('orders', 'is')).toHaveLength(0);
-    // O enviado sai com o número que o Control deu — é por ele que o parceiro reconcilia.
-    expect(lista[0]).toMatchObject({ situacao: 'sent_erp', pedido_erp: 'CS17379' });
+    expect(fake.filtrosDe('orders', 'or')).toHaveLength(0);
+    // O enviado sai com o número que o Control deu — é por ele que o parceiro
+    // reconcilia; `importavel` continua dizendo só dos vínculos.
+    expect(lista[0]).toMatchObject({ situacao: 'sent_erp', pedido_erp: 'CS17379', faturado: true, importavel: true });
   });
 
-  it('ordena por created_at crescente — o mais antigo é o primeiro a ser lançado', async () => {
+  it('ordena por created_at e desempata por id — o mais antigo é o primeiro, e a página não embaralha', async () => {
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem([{ data: [], error: null }]),
       price_tables: { data: [], error: null },
@@ -172,19 +197,55 @@ describe('a fila de pedidos para o ERP', () => {
 
     await getPartnerOrders(EMPRESA, {});
 
-    expect(fake.filtrosDe('orders', 'order').map((f) => f.args)).toContainEqual([
-      'created_at',
-      { ascending: true },
+    expect(fake.filtrosDe('orders', 'order').map((f) => f.args)).toEqual([
+      ['created_at', { ascending: true }],
+      ['id', { ascending: true }],
     ]);
   });
 
-  it('erro do banco na listagem sobe — nunca "200 com lista vazia"', async () => {
+  it('passa das 1.000 linhas do PostgREST: página cheia e mais uma, tudo numa lista só', async () => {
+    const cheia = Array.from({ length: LIMITE_POSTGREST }, (_, i) => pedido({ id: `o-${i}` }));
+    const resto = [pedido({ id: 'o-ultimo' })];
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        { data: cheia, error: null },
+        { data: resto, error: null },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
+
+    expect(lista).toHaveLength(LIMITE_POSTGREST + 1);
+    expect(lista.at(-1)!.id).toBe('o-ultimo');
+    expect(fake.filtrosDe('orders', 'range').map((f) => f.args)).toEqual([
+      [0, LIMITE_POSTGREST - 1],
+      [LIMITE_POSTGREST, 2 * LIMITE_POSTGREST - 1],
+    ]);
+    // O builder é montado do zero a cada página: os filtros vão nas duas.
+    expect(fake.filtrosDe('orders', 'in')).toHaveLength(2);
+  });
+
+  it('erro do banco no meio da listagem sobe — nunca "200 com a lista pela metade"', async () => {
+    const cheia = Array.from({ length: LIMITE_POSTGREST }, (_, i) => pedido({ id: `o-${i}` }));
     const { getPartnerOrders } = await carregar({
-      orders: filaDaListagem([{ data: null, error: { message: 'timeout' } }]),
+      orders: filaDaListagem([
+        { data: cheia, error: null },
+        { data: null, error: { message: 'timeout' } },
+      ]),
       price_tables: { data: [], error: null },
     });
 
     await expect(getPartnerOrders(EMPRESA, {})).rejects.toThrow(/timeout/);
+  });
+
+  it('erro ao ler as tabelas de preço também sobe — mapa vazio poria pendência falsa em todo pedido', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([{ data: [pedido()], error: null }]),
+      price_tables: { data: null, error: { message: 'caiu' } },
+    });
+
+    await expect(getPartnerOrders(EMPRESA, {})).rejects.toThrow(/caiu/);
   });
 });
 
@@ -302,7 +363,7 @@ describe('o pedido como o ERP recebe', () => {
   });
 
   it('sem a foto da tabela no pedido, usa a tabela do cliente; coluna padrão 1', async () => {
-    const { getPartnerOrders } = await carregar({
+    const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem([{ data: [pedido({ price_table_erp_code: null, price_column: null })], error: null }]),
       price_tables: { data: [{ id: 't1', erp_code: 'T02', price_column: null }], error: null },
     });
@@ -311,6 +372,9 @@ describe('o pedido como o ERP recebe', () => {
 
     expect(p!.tabela_preco).toEqual({ codigo_erp: 'T02', coluna: 1 });
     expect(p!.importavel).toBe(true);
+    // As tabelas também vêm paginadas e em ordem estável.
+    expect(fake.filtrosDe('price_tables', 'range')).toHaveLength(1);
+    expect(fake.filtrosDe('price_tables', 'order').map((f) => f.args[0])).toEqual(['id']);
   });
 
   it('coluna de migração ausente (42703): o campo sai null/0 e a consulta não pede a coluna', async () => {
@@ -342,11 +406,17 @@ describe('o pedido como o ERP recebe', () => {
 // ─── O confirmar ─────────────────────────────────────────────────────────────
 
 const LIDO = (linha: Record<string, unknown> | null): RespostaTabela => ({ data: linha, error: null });
+const APROVADO = LIDO({ id: 'o1', status: 'approved', erp_order_id: null });
+/** A sonda de `order_number` que a pré-checagem faz (o dono volta com o número do app). */
+const SONDA = OK;
+const NUMERO_LIVRE: RespostaTabela = { data: [], error: null };
+const NUMERO_DO_O2: RespostaTabela = { data: [{ id: 'o2', order_number: 14600 }], error: null };
+const GRAVOU: RespostaTabela = { data: [{ id: 'o1' }], error: null };
 
 describe('confirmOrderImport — o ERP devolve o número', () => {
   it('grava o número NORMALIZADO, força sent_erp, carimba synced_at/updated_at e tira a foto', async () => {
     const { confirmOrderImport, fake, registrarNoErp } = await carregar({
-      orders: emSequencia(LIDO({ id: 'o1', status: 'approved', erp_order_id: null }), LIDO(null)),
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, GRAVOU),
     });
 
     const r = await confirmOrderImport(EMPRESA, 'o1', ' cs-17379 ');
@@ -357,7 +427,35 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(typeof gravado['synced_at']).toBe('string');
     expect(typeof gravado['updated_at']).toBe('string');
     expect(fake.filtrosDe('orders', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
+    // Grava só se ninguém gravou no meio, e pede as linhas afetadas para saber.
+    expect(fake.filtrosDe('orders', 'is').map((f) => f.args)).toContainEqual(['erp_order_id', null]);
+    expect(fake.filtrosDe('orders', 'select').map((f) => f.args[0])).toContain('id');
     expect(registrarNoErp).toHaveBeenCalledWith('o1', EMPRESA, null);
+  });
+
+  it('número fora da máscara (duas letras + até 10 dígitos) é recusado ANTES de tocar no banco', async () => {
+    const { confirmOrderImport, fake } = await carregar({ orders: emSequencia(APROVADO) });
+
+    for (const ruim of ['PED-00123', '17379', 'CS', 'CS123456789012', 'C17379']) {
+      expect(await confirmOrderImport(EMPRESA, 'o1', ruim)).toEqual({ outcome: 'invalid_number' });
+    }
+    expect(fake.filtrosDe('orders')).toHaveLength(0);
+  });
+
+  it('pedido que não existe (ou é de outra empresa) é not_found', async () => {
+    const { confirmOrderImport, fake } = await carregar({ orders: emSequencia(LIDO(null)) });
+
+    expect(await confirmOrderImport(EMPRESA, 'nao-existe', 'CS17379')).toEqual({ outcome: 'not_found' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('erro do banco na leitura LANÇA — timeout não é "o pedido sumiu"', async () => {
+    const { confirmOrderImport, fake } = await carregar({
+      orders: emSequencia({ data: null, error: { message: 'timeout' } }),
+    });
+
+    await expect(confirmOrderImport(EMPRESA, 'o1', 'CS17379')).rejects.toThrow(/timeout/);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
   });
 
   it('repetir com o MESMO número (em qualquer grafia) é idempotente: ok, sem gravar', async () => {
@@ -382,11 +480,116 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
   });
 
-  it('pedido que não existe (ou é de outra empresa) é not_found', async () => {
-    const { confirmOrderImport, fake } = await carregar({ orders: emSequencia(LIDO(null)) });
+  it.each([['draft'], ['pending_rep'], ['pending_approval'], ['rejected'], ['sent_erp']])(
+    'pedido em %s sem número não pode ser confirmado — o fluxo não deixa ir para sent_erp',
+    async (status) => {
+      const { confirmOrderImport, fake } = await carregar({
+        orders: emSequencia(LIDO({ id: 'o1', status, erp_order_id: null })),
+      });
 
-    expect(await confirmOrderImport(EMPRESA, 'nao-existe', 'CS17379')).toEqual({ outcome: 'not_found' });
+      expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({
+        outcome: 'not_confirmable',
+        situacao: status,
+      });
+      // Nem conferiu o número, nem gravou.
+      expect(fake.filtrosDe('orders', 'neq')).toHaveLength(0);
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    },
+  );
+
+  it('pedido em error_erp pode ser confirmado — é a única outra entrada de sent_erp no fluxo', async () => {
+    const { confirmOrderImport } = await carregar({
+      orders: emSequencia(LIDO({ id: 'o1', status: 'error_erp', erp_order_id: null }), SONDA, NUMERO_LIVRE, GRAVOU),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'ok', ja_confirmado: false });
+  });
+
+  it('número já usado por OUTRO pedido da empresa é recusado antes de gravar, dizendo qual', async () => {
+    const { confirmOrderImport, fake, registrarNoErp } = await carregar({
+      orders: emSequencia(APROVADO, SONDA, NUMERO_DO_O2),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'cs-17379')).toEqual({
+      outcome: 'number_in_use',
+      pedido_em_uso: { id: 'o2', numero: 14600 },
+    });
+    // A pergunta é a mesma do financeiro: este número, nesta empresa, fora deste pedido.
+    expect(fake.filtrosDe('orders', 'eq').map((f) => f.args)).toContainEqual(['erp_order_id', 'CS17379']);
+    expect(fake.filtrosDe('orders', 'neq').map((f) => f.args)).toContainEqual(['id', 'o1']);
     expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(registrarNoErp).not.toHaveBeenCalled();
+  });
+
+  it('sem a coluna order_number, o dono volta só com o id', async () => {
+    const { confirmOrderImport } = await carregar({
+      orders: emSequencia(APROVADO, COLUNA_AUSENTE, { data: [{ id: 'o2' }], error: null }),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({
+      outcome: 'number_in_use',
+      pedido_em_uso: { id: 'o2', numero: null },
+    });
+  });
+
+  it('o índice único da 042 (23505) na gravação vira o mesmo "número em uso", não 500', async () => {
+    const { confirmOrderImport, fake, registrarNoErp } = await carregar({
+      orders: emSequencia(
+        APROVADO,
+        SONDA,
+        NUMERO_LIVRE, // a pré-checagem não viu: outro confirmou no mesmo instante
+        { data: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } },
+        NUMERO_DO_O2, // a segunda pergunta acha o dono (a sonda já está lembrada)
+      ),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({
+      outcome: 'number_in_use',
+      pedido_em_uso: { id: 'o2', numero: 14600 },
+    });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
+    expect(registrarNoErp).not.toHaveBeenCalled();
+  });
+
+  it('outro erro na gravação LANÇA (vira 500 no app)', async () => {
+    const { confirmOrderImport } = await carregar({
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, { data: null, error: { message: 'caiu a conexão' } }),
+    });
+
+    await expect(confirmOrderImport(EMPRESA, 'o1', 'CS17379')).rejects.toThrow(/caiu a conexão/);
+  });
+
+  it('corrida: ninguém afetado porque alguém confirmou no meio com o MESMO número → idempotente', async () => {
+    const { confirmOrderImport, registrarNoErp } = await carregar({
+      orders: emSequencia(
+        APROVADO,
+        SONDA,
+        NUMERO_LIVRE,
+        { data: [], error: null }, // o `.is('erp_order_id', null)` não casou mais
+        LIDO({ id: 'o1', status: 'sent_erp', erp_order_id: 'CS17379' }), // relido
+      ),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'ok', ja_confirmado: true });
+    // A foto é de quem gravou — esta chamada não gravou nada.
+    expect(registrarNoErp).not.toHaveBeenCalled();
+  });
+
+  it('corrida: alguém confirmou no meio com OUTRO número → conflito, não sobrescreve', async () => {
+    const { confirmOrderImport } = await carregar({
+      orders: emSequencia(
+        APROVADO,
+        SONDA,
+        NUMERO_LIVRE,
+        { data: [], error: null },
+        LIDO({ id: 'o1', status: 'sent_erp', erp_order_id: 'CS17000' }),
+      ),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({
+      outcome: 'conflict',
+      pedido_erp_atual: 'CS17000',
+    });
   });
 });
 
@@ -410,7 +613,7 @@ function replyFalso() {
 function requisicao(body: unknown, id = 'o1') {
   return { body, params: { id }, query: {}, headers: { 'x-api-key': 'chave' } } as unknown as FastifyRequest<{
     Params: { id: string };
-    Body: { pedido_erp?: string };
+    Body: { pedido_erp?: unknown };
   }>;
 }
 
@@ -426,8 +629,8 @@ async function carregarController(resultado: unknown) {
 }
 
 describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', () => {
-  it.each([[{}], [{ pedido_erp: '   ' }], [null]])(
-    'corpo sem pedido_erp (%j) é 400 MISSING_PEDIDO_ERP, antes de tocar no banco',
+  it.each([[{}], [{ pedido_erp: '   ' }], [{ pedido_erp: 17379 }], [null], [[]], ['CS17379']])(
+    'corpo sem pedido_erp em texto (%j) é 400 MISSING_PEDIDO_ERP, antes de tocar no banco',
     async (body) => {
       const { partnerConfirmOrderHandler, confirmOrderImport } = await carregarController({ outcome: 'ok' });
       const { reply, enviado } = replyFalso();
@@ -439,6 +642,20 @@ describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', ()
       expect(confirmOrderImport).not.toHaveBeenCalled();
     },
   );
+
+  it('invalid_number → 400 INVALID_PEDIDO_ERP com o formato na mensagem', async () => {
+    const { partnerConfirmOrderHandler } = await carregarController({ outcome: 'invalid_number' });
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'PED-00123' }), reply);
+
+    expect(enviado.status).toBe(400);
+    expect(enviado.corpo).toEqual({
+      error: 'pedido_erp fora do formato: duas letras e ate 10 digitos (ex.: CS17379)',
+      code: 'INVALID_PEDIDO_ERP',
+      statusCode: 400,
+    });
+  });
 
   it('not_found → 404 ORDER_NOT_FOUND', async () => {
     const { partnerConfirmOrderHandler } = await carregarController({ outcome: 'not_found' });
@@ -467,6 +684,42 @@ describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', ()
     });
   });
 
+  it('not_confirmable → 409 ORDER_NOT_APPROVED com a situação atual', async () => {
+    const { partnerConfirmOrderHandler } = await carregarController({
+      outcome: 'not_confirmable',
+      situacao: 'draft',
+    });
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'CS17379' }), reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toEqual({
+      error: 'so pedido aprovado pode ser confirmado',
+      code: 'ORDER_NOT_APPROVED',
+      statusCode: 409,
+      situacao: 'draft',
+    });
+  });
+
+  it('number_in_use → 409 ERP_NUMBER_IN_USE com pedido_em_uso (o mesmo código do lançamento à mão)', async () => {
+    const { partnerConfirmOrderHandler } = await carregarController({
+      outcome: 'number_in_use',
+      pedido_em_uso: { id: 'o2', numero: 14600 },
+    });
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'CS17379' }), reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toMatchObject({
+      code: 'ERP_NUMBER_IN_USE',
+      statusCode: 409,
+      pedido_em_uso: { id: 'o2', numero: 14600 },
+    });
+    expect((enviado.corpo as { error: string }).error).toContain('14600');
+  });
+
   it('ok → 200 { ok, ja_confirmado }', async () => {
     const { partnerConfirmOrderHandler, confirmOrderImport } = await carregarController({
       outcome: 'ok',
@@ -479,5 +732,15 @@ describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', ()
     expect(enviado.status).toBe(200);
     expect(enviado.corpo).toEqual({ ok: true, ja_confirmado: false });
     expect(confirmOrderImport).toHaveBeenCalledWith(EMPRESA, 'o1', 'CS17379');
+  });
+
+  it('desfecho que o controller não conhece responde 500 INTERNAL_ERROR — nunca fica pendurado', async () => {
+    const { partnerConfirmOrderHandler } = await carregarController({ outcome: 'inventado' });
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'CS17379' }), reply);
+
+    expect(enviado.status).toBe(500);
+    expect(enviado.corpo).toEqual({ error: 'Erro interno do servidor', code: 'INTERNAL_ERROR', statusCode: 500 });
   });
 });

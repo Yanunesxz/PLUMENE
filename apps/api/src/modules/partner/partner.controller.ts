@@ -72,15 +72,24 @@ export async function partnerOrdersHandler(
   });
 }
 
-/** POST /partner/v1/pedidos/:id/confirmar { pedido_erp } — marca como importado */
+/**
+ * POST /partner/v1/pedidos/:id/confirmar { pedido_erp } — marca como importado.
+ *
+ * Cada desfecho do service tem o seu código textual; é o que o programador do
+ * Fábio lê para decidir se tenta de novo (5xx) ou corrige do lado dele (4xx).
+ */
 export async function partnerConfirmOrderHandler(
-  request: FastifyRequest<{ Params: { id: string }; Body: { pedido_erp?: string } }>,
+  request: FastifyRequest<{ Params: { id: string }; Body: { pedido_erp?: unknown } }>,
   reply: FastifyReply,
 ): Promise<void> {
   const partner = await requirePartner(request, reply);
   if (!partner) return;
 
-  const pedido_erp = request.body?.pedido_erp?.trim();
+  // Corpo nulo, lista, ou `pedido_erp` numérico: nada disso pode virar
+  // TypeError (que o app.ts carimbaria como 500 INTERNAL_ERROR).
+  const corpo = request.body;
+  const bruto = corpo && typeof corpo === 'object' ? (corpo as { pedido_erp?: unknown }).pedido_erp : undefined;
+  const pedido_erp = typeof bruto === 'string' ? bruto.trim() : '';
   if (!pedido_erp) {
     await reply.status(400).send({
       error: 'Informe "pedido_erp" — o número do pedido gerado no seu ERP',
@@ -93,6 +102,13 @@ export async function partnerConfirmOrderHandler(
   const result = await confirmOrderImport(partner.company_id, request.params.id, pedido_erp);
 
   switch (result.outcome) {
+    case 'invalid_number':
+      await reply.status(400).send({
+        error: 'pedido_erp fora do formato: duas letras e ate 10 digitos (ex.: CS17379)',
+        code: 'INVALID_PEDIDO_ERP',
+        statusCode: 400,
+      });
+      return;
     case 'not_found':
       await reply.status(404).send({
         error: 'Pedido não encontrado',
@@ -108,8 +124,35 @@ export async function partnerConfirmOrderHandler(
         pedido_erp_atual: result.pedido_erp_atual,
       });
       return;
+    case 'not_confirmable':
+      await reply.status(409).send({
+        error: 'so pedido aprovado pode ser confirmado',
+        code: 'ORDER_NOT_APPROVED',
+        statusCode: 409,
+        situacao: result.situacao,
+      });
+      return;
+    case 'number_in_use':
+      await reply.status(409).send({
+        error: result.pedido_em_uso
+          ? `Número do Control já usado pelo pedido ${result.pedido_em_uso.numero ?? result.pedido_em_uso.id}`
+          : 'Número do Control já usado por outro pedido',
+        code: 'ERP_NUMBER_IN_USE',
+        statusCode: 409,
+        pedido_em_uso: result.pedido_em_uso,
+      });
+      return;
     case 'ok':
       await reply.send({ ok: true, ja_confirmado: result.ja_confirmado });
+      return;
+    default:
+      // Outcome sem `case` deixava a requisição pendurada até o timeout do
+      // cliente. Melhor um 500 honesto do que silêncio.
+      await reply.status(500).send({
+        error: 'Erro interno do servidor',
+        code: 'INTERNAL_ERROR',
+        statusCode: 500,
+      });
   }
 }
 
