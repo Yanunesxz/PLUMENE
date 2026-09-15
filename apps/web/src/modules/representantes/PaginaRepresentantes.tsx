@@ -1,4 +1,5 @@
-import { useEffect, useState, useMemo, type FormEvent } from 'react';
+import { useEffect, useState, useMemo, useRef, type FormEvent } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { UserPlus, Users, X, Mail, IdCard, Tag, Pencil, Trash2, Search, Target } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api } from '../../services/api.js';
@@ -10,6 +11,7 @@ import { Spinner } from '../../components/interface/Spinner.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { PainelDaMeta } from '../../components/comercial/PainelDaMeta.js';
 import { cn } from '@/lib/utils';
+import { mesmoCodigoErp } from '../../lib/codigoErp.js';
 import type {
   RepListItem,
   PriceTable,
@@ -36,6 +38,12 @@ const EMPTY = {
 
 export function PaginaRepresentantes() {
   const { token, user } = useAuthStore();
+  const [params] = useSearchParams();
+  // ?busca= existe para o CRM (CSP 360) conseguir apontar direto para UM
+  // registro: o cadastro do representante mora aqui, não lá, então o link de lá
+  // chega com o código do ERP e esta lista já abre filtrada nele. Sem o
+  // parâmetro nada muda — o campo continua começando vazio.
+  const buscaDaUrl = params.get('busca')?.trim() ?? '';
   // O financeiro entra para VER — a API nega as escritas dele, e a tela não
   // mostra botão que só responderia "acesso negado" no toque.
   const somenteLeitura = user?.role === 'financeiro';
@@ -49,8 +57,13 @@ export function PaginaRepresentantes() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
-  const [repSearch, setRepSearch] = useState('');
+  const [repSearch, setRepSearch] = useState(buscaDaUrl);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  /** Cartão apontado por um link de fora — destacado só para a pessoa achar. */
+  const [idEmDestaque, setIdEmDestaque] = useState<string | null>(null);
+  const cartaoEmDestaque = useRef<HTMLDivElement | null>(null);
+  // Uma vez só: depois que a pessoa mexe na busca, o destaque não volta sozinho.
+  const jaDestacou = useRef(false);
 
   const isEditing = editingId !== null;
 
@@ -62,9 +75,29 @@ export function PaginaRepresentantes() {
       (r) =>
         r.name.toLowerCase().includes(q) ||
         r.email.toLowerCase().includes(q) ||
-        (r.cpf ?? '').includes(q),
+        (r.cpf ?? '').includes(q) ||
+        // O código do ERP é a ponte com o CRM: é por ele que o link de lá
+        // (?busca=00779) encontra o representante — sem isto o link cairia
+        // numa lista vazia, porque o código não era procurado em lugar nenhum.
+        mesmoCodigoErp(r.erp_rep_id, q),
     );
   }, [reps, repSearch]);
+
+  // Sobrou UM com a busca que veio da URL: rola até ele e destaca. Não abre o
+  // formulário de edição — quem clicou no CRM veio conferir antes de mexer, e
+  // abrir sozinho convidaria a alteração acidental em produção.
+  useEffect(() => {
+    if (!buscaDaUrl || jaDestacou.current || reps === null) return;
+    const unico = filteredReps.length === 1 ? filteredReps[0] : undefined;
+    if (!unico) return;
+    jaDestacou.current = true;
+    setIdEmDestaque(unico.id);
+  }, [buscaDaUrl, reps, filteredReps]);
+
+  useEffect(() => {
+    if (!idEmDestaque) return;
+    cartaoEmDestaque.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [idEmDestaque]);
 
   const set =
     (k: keyof typeof EMPTY) =>
@@ -453,15 +486,22 @@ export function PaginaRepresentantes() {
         </div>
       ) : (
         <>
-          {reps.length > 3 && (
+          {/* Chegando de um link com ?busca=, o campo aparece mesmo com poucos
+              representantes: senão a pessoa veria a lista já filtrada sem ter
+              onde limpar o filtro. */}
+          {(reps.length > 3 || buscaDaUrl !== '') && (
             <div className="relative mb-4">
               <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 type="search"
                 inputMode="search"
-                placeholder="Buscar representante por nome, e-mail ou CPF…"
+                placeholder="Buscar representante por nome, e-mail, CPF ou código…"
                 value={repSearch}
-                onChange={(e) => setRepSearch(e.target.value)}
+                onChange={(e) => {
+                  setRepSearch(e.target.value);
+                  // Mexeu na busca: o destaque do link já cumpriu o papel.
+                  setIdEmDestaque(null);
+                }}
                 className="pl-9"
               />
             </div>
@@ -473,73 +513,80 @@ export function PaginaRepresentantes() {
           ) : (
             <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
               {filteredReps.map((rep) => (
-                <div key={rep.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
-                    {rep.name.trim().charAt(0).toUpperCase()}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-foreground">{rep.name}</p>
-                    {rep.legal_name && <p className="truncate text-xs text-muted-foreground">{rep.legal_name}</p>}
+                <div
+                  key={rep.id}
+                  ref={rep.id === idEmDestaque ? cartaoEmDestaque : null}
+                  className={cn(
+                    'rounded-xl border border-border bg-card p-4 shadow-sm transition-shadow',
+                    rep.id === idEmDestaque && 'border-primary ring-2 ring-primary/40',
+                  )}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-soft-foreground">
+                        {rep.name.trim().charAt(0).toUpperCase()}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-medium text-foreground">{rep.name}</p>
+                        {rep.legal_name && <p className="truncate text-xs text-muted-foreground">{rep.legal_name}</p>}
+                      </div>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-1">
+                      {rep.venda_interna === true && <Badge variant="brand">Venda interna</Badge>}
+                      {!rep.active && <Badge variant="gray">Inativo</Badge>}
+                      {!somenteLeitura && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setMetaDe({ id: rep.id, name: rep.name })}
+                            aria-label={`Meta de ${rep.name}`}
+                            title="Meta de bonificação"
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Target className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => startEdit(rep)}
+                            aria-label={`Editar ${rep.name}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void handleDelete(rep)}
+                            disabled={deletingId === rep.id}
+                            aria-label={`Excluir ${rep.name}`}
+                            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+                    <p className="flex items-center gap-1.5">
+                      <Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{rep.email}</span>
+                    </p>
+                    {rep.cpf && (
+                      <p className="flex items-center gap-1.5">
+                        <IdCard className="h-3.5 w-3.5 shrink-0" /> {rep.cpf}
+                      </p>
+                    )}
+                    <p className="flex items-center gap-1.5">
+                      <Tag className="h-3.5 w-3.5 shrink-0" />
+                      {rep.price_table_name ? (
+                        <Badge variant="green">{rep.price_table_name}</Badge>
+                      ) : (
+                        <span className="italic">Sem tabela</span>
+                      )}
+                    </p>
                   </div>
                 </div>
-                <div className="flex shrink-0 items-center gap-1">
-                  {rep.venda_interna === true && <Badge variant="brand">Venda interna</Badge>}
-                  {!rep.active && <Badge variant="gray">Inativo</Badge>}
-                  {!somenteLeitura && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => setMetaDe({ id: rep.id, name: rep.name })}
-                        aria-label={`Meta de ${rep.name}`}
-                        title="Meta de bonificação"
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Target className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(rep)}
-                        aria-label={`Editar ${rep.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => void handleDelete(rep)}
-                        disabled={deletingId === rep.id}
-                        aria-label={`Excluir ${rep.name}`}
-                        className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-40"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-                <p className="flex items-center gap-1.5">
-                  <Mail className="h-3.5 w-3.5 shrink-0" /> <span className="truncate">{rep.email}</span>
-                </p>
-                {rep.cpf && (
-                  <p className="flex items-center gap-1.5">
-                    <IdCard className="h-3.5 w-3.5 shrink-0" /> {rep.cpf}
-                  </p>
-                )}
-                <p className="flex items-center gap-1.5">
-                  <Tag className="h-3.5 w-3.5 shrink-0" />
-                  {rep.price_table_name ? (
-                    <Badge variant="green">{rep.price_table_name}</Badge>
-                  ) : (
-                    <span className="italic">Sem tabela</span>
-                  )}
-                </p>
-                </div>
-              </div>
-            ))}
+              ))}
             </div>
           )}
         </>
