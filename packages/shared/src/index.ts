@@ -19,4 +19,5 @@ export * from './pedidos/pedidoOriginal.js';
 export * from './pedidos/sincroniaErp.js';
 export * from './cadastro/documento.js';
 export * from './cadastro/endereco.js';
+export * from './cadastro/codigoErp.js';
 export * from './carteira/regua.js';

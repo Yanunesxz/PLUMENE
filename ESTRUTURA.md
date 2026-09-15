@@ -47,6 +47,10 @@ packages/shared/src/
 ├── constants/            → uniões + rótulos PT
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
+├── cadastro/
+│   └── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
+│                           GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
+│                           tests/codigo-miolo.test.ts confere a paridade
 └── pricing/
     ├── faixaDeTamanho.ts → EG/XG/48-54 custam mais: qual tamanho é "faixa maior"
     │                       e qual preço cobrar. Usado pela API (grava o pedido)
@@ -119,7 +123,15 @@ apps/api/src/
 │       ├── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
 │       ├── (045 NÃO EXISTE — número pulado. Foi reservado por mensagem entre sessões; não assuma que está livre)
 │       ├── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
-│       └── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│       ├── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP)
+│       └── 048_integracao_control_fase_0.sql → base da integração com o Control: erp_sync_log registra as
+│                                   chamadas do parceiro; companies.canal_* (canal oficial de cada fluxo, por
+│                                   empresa; padrão = hoje); orders.erp_order_source/set_at/set_by; order_erp_events
+│                                   (rastro do pedido, sem FK: sobrevive à exclusão); public.codigo_miolo() + trava
+│                                   price_tables.price_column 1-6 + erp_code único pelo miolo; users.updated_at;
+│                                   order_invoices e order_invoice_items (notas e itens faturados). SQL para os dois
+│                                   bancos em _tools/SQL-PARA-RODAR-048.sql. É A ÚLTIMA: o próximo número se combina
+│                                   por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -133,6 +145,9 @@ apps/api/src/
 │   │                       exist"); erro de rede não memoriza. Use ISTO, nunca cache próprio.
 │   │                       detectarOuFalhar: igual, mas LANÇA quando o banco não respondeu
 │   │                       — para coluna que é FILTRO (o invoiced da fila do parceiro)
+│   ├── canais.ts         → lerCanais(company_id) / exigirCanal / corpoCanalFechado: o canal oficial
+│   │                       de cada fluxo com o Control (companies.canal_*, 048). Sem a 048 = padrões
+│   │                       de hoje (manual/carga); banco sem resposta LANÇA; memória de 30 s
 │   ├── paginacao.ts      → buscarTudo / buscarTudoOuFalhar / buscarPorIds / emLotes: o
 │   │                       PostgREST corta em 1.000 linhas EM SILÊNCIO; listagem que pode
 │   │                       passar disso pagina aqui. buscarTudo ENGOLE erro de página (serve
@@ -150,7 +165,9 @@ apps/api/src/
 │   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
 │   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
-│   │                       (rep nos próprios; gerente em tudo até virar nota)
+│   │                       (rep nos próprios; gerente em tudo até virar nota).
+│   │                       eventosErp.service.ts → registrarEventoErp (order_erp_events) e
+│   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
@@ -168,6 +185,8 @@ apps/api/src/
 │   │                       É o CANAL OFICIAL com o Control (decisão de 15/09/2026 — ver
 │   │                       _tools/erp-sync/README.md). O contrato vive em docs/API-PARCEIRO.md
 │   │                       e apps/web/public/api-parceiro.html — a MESMA especificação.
+│   │                       partner.log.ts → registrarChamada: cada chamada em erp_sync_log (048);
+│   │                       nunca derruba a resposta; `detalhe` sem dado de cliente
 │   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
 │   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
@@ -281,6 +300,10 @@ _tools/
 │   │                estão vetados (upsert de preço duplicado) — ver o README.
 │   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-048.sql         → a 048 para colar nos DOIS bancos (termina com o NOTIFY). Conferir
+│                                    depois com node _tools/conferir-048.mjs [raiz da PLUMENE]
+├── SQL-PARA-RODAR-013-042-NA-CS.sql → SÓ NA CORPO SENSUAL: a 013 inteira + o índice único da 042.
+│                                    Rodar antes a consulta de repetidos que está no cabeçalho
 ├── SQL-PARA-RODAR-046-047.sql     → 046 e 047 num arquivo só — JÁ APLICADO nos dois bancos (15/09)
 ├── SQL-PARA-RODAR-046.sql         → a 046 sozinha (substituída pelo 046-047). Medido em 15/09 09:5x com
 │                                    node _tools/conferir-046-047.mjs: 046 e 047 visíveis nos DOIS bancos
@@ -289,7 +312,7 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
                  → cargas e consertos pontuais direto no Supabase (fora do app)
