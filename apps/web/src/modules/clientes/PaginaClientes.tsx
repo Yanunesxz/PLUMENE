@@ -25,6 +25,7 @@ import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { situacaoDaCompra, type Frescor } from '../../lib/carteira.js';
+import { mesmoCodigoErp } from '../../lib/codigoErp.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import {
   documento,
@@ -80,7 +81,17 @@ export function PaginaClientes() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { tabelas, precisaEscolher, nomeDe } = useMinhasTabelas();
-  const [search, setSearch] = useState('');
+  // ?busca= existe para o CRM (CSP 360) conseguir apontar direto para UM
+  // registro: o cadastro do cliente mora aqui (e no Control atrás), não lá, então
+  // o link de lá chega com o código do ERP e esta lista já abre filtrada nele.
+  // Sem o parâmetro nada muda — a busca continua começando vazia.
+  const buscaDaUrl = params.get('busca')?.trim() ?? '';
+  const [search, setSearch] = useState(buscaDaUrl);
+  /** Cartão apontado por um link de fora — destacado só para a pessoa achar. */
+  const [idEmDestaque, setIdEmDestaque] = useState<string | null>(null);
+  const cartaoEmDestaque = useRef<HTMLDivElement | null>(null);
+  // Uma vez só: depois que a pessoa mexe na busca, o destaque não volta sozinho.
+  const jaDestacou = useRef(false);
   // "Sem cliente criado" no link temporário cai aqui com o formulário aberto;
   // depois de salvar, `voltarPara` devolve à criação do link com o cliente novo.
   const [showForm, setShowForm] = useState(params.get('novo') === '1');
@@ -148,7 +159,11 @@ export function PaginaClientes() {
         (c) =>
           c.name.toLowerCase().includes(texto) ||
           (c.trade_name ?? '').toLowerCase().includes(texto) ||
-          (digitos.length >= 3 && apenasDigitos(c.cnpj ?? '').includes(digitos)),
+          (digitos.length >= 3 && apenasDigitos(c.cnpj ?? '').includes(digitos)) ||
+          // O código do Control é a ponte com o CRM: é por ele que o link de
+          // lá (?busca=01234) acha o cliente. Sem isto o código não era
+          // procurado em lugar nenhum e o link caía numa lista vazia.
+          mesmoCodigoErp(c.erp_id, texto),
       )
       .toArray();
   }, [search]);
@@ -192,6 +207,23 @@ export function PaginaClientes() {
     }
     return { visiveis, contagem, semCodigo };
   }, [customers, frescor, soSemCodigo]);
+
+  // Sobrou UM cliente com a busca que veio da URL: rola até ele e destaca. NÃO
+  // abre a ficha (/customers/:id) sozinho — o código do ERP pode casar com mais
+  // de um cadastro, e navegar por engano tira a pessoa do lugar sem ela
+  // entender o que aconteceu.
+  useEffect(() => {
+    if (!buscaDaUrl || jaDestacou.current || customers === undefined) return;
+    const unico = visiveis.length === 1 ? visiveis[0] : undefined;
+    if (!unico) return;
+    jaDestacou.current = true;
+    setIdEmDestaque(unico.cliente.id);
+  }, [buscaDaUrl, customers, visiveis]);
+
+  useEffect(() => {
+    if (!idEmDestaque) return;
+    cartaoEmDestaque.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [idEmDestaque]);
 
   // As cores do Yan: verde ativo, amarelo atenção, vermelho ESFRIADO — o nome
   // que ele passou a usar em 11/09/2026 para o cliente que sumiu.
@@ -509,9 +541,13 @@ export function PaginaClientes() {
         <Input
           type="search"
           inputMode="search"
-          placeholder="Buscar por nome ou CNPJ…"
+          placeholder="Buscar por nome, CNPJ ou código do Control…"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            // Mexeu na busca: o destaque do link já cumpriu o papel.
+            setIdEmDestaque(null);
+          }}
           className="pl-9"
         />
       </div>
@@ -571,9 +607,11 @@ export function PaginaClientes() {
           {visiveis.map(({ cliente: customer, situacao }) => (
             <div
               key={customer.id}
+              ref={customer.id === idEmDestaque ? cartaoEmDestaque : null}
               className={cn(
                 'group flex items-center gap-3 rounded-xl border border-border bg-card p-4 shadow-sm transition-all',
                 customer.blocked ? 'opacity-70' : 'hover:border-primary/30 hover:shadow-md',
+                customer.id === idEmDestaque && 'border-primary ring-2 ring-primary/40',
               )}
             >
               <button
