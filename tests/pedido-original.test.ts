@@ -142,3 +142,53 @@ describe('guardarOriginal', () => {
     expect(fake.ultimaGravacao('order_originals', 'insert')).toBeUndefined();
   });
 });
+
+/**
+ * O total mistura corte com troca de preço: ao editar, o servidor reprecifica
+ * TODAS as linhas pela tabela de hoje. A comparação tem de separar os dois —
+ * senão a manchete infla o corte com a reprecificação, e um pedido que só
+ * GANHOU peça aparece como "saíram −2 peças" quando a tabela baixou.
+ * (Caso real: a troca de 08/09 baixou 44 preços em T2/T3; o #14629 está
+ * sent_erp com −R$ 80 de reprecificação pendente.)
+ */
+describe('compararComOOriginal — corte separado de troca de preço', () => {
+  it('o corte é contado a preço ORIGINAL e a reprecificação vai à parte', () => {
+    // 0161 caiu de 92,90 para 91,90 (60 peças ficaram) e saíram 5 da 0703 (28,50).
+    const antes = [
+      peca({ product_id: '0161', variant_id: 'm', quantity: 60, unit_price: 92.9, total: 5574 }),
+      peca({ product_id: '0703', variant_id: 'g', quantity: 10, unit_price: 28.5, total: 285 }),
+    ];
+    const depois = [
+      peca({ product_id: '0161', variant_id: 'm', quantity: 60, unit_price: 91.9, total: 5514 }),
+      peca({ product_id: '0703', variant_id: 'g', quantity: 5, unit_price: 28.5, total: 142.5 }),
+    ];
+
+    const d = compararComOOriginal(antes, depois);
+
+    expect(d.linhas).toHaveLength(1); // só a 0703 mudou de quantidade
+    expect(d.valorQueSaiu).toBe(142.5); // 5 × 28,50, e NÃO 202,50
+    expect(d.valorReprecificado).toBe(-60); // 60 × (91,90 − 92,90)
+  });
+
+  it('pedido que só ganhou peça com a tabela baixando NÃO vira "saíram peças"', () => {
+    const antes = [peca({ product_id: '0161', quantity: 60, unit_price: 92.9, total: 5574 })];
+    const depois = [
+      peca({ product_id: '0161', quantity: 60, unit_price: 91.9, total: 5514 }),
+      peca({ product_id: '0118', quantity: 2, unit_price: 15.1, total: 30.2 }),
+    ];
+
+    const d = compararComOOriginal(antes, depois);
+
+    expect(d.pecasAntes).toBe(60);
+    expect(d.pecasDepois).toBe(62);
+    expect(d.valorQueSaiu).toBe(-30.2); // entrou R$ 30,20, a preço da linha
+    expect(d.valorReprecificado).toBe(-60);
+  });
+
+  it('mesmas peças e mesmo preço: nada reprecificado, nada cortado', () => {
+    const iguais = [peca({ product_id: 'p1', quantity: 7 })];
+    const d = compararComOOriginal(iguais, [...iguais]);
+    expect(d.mudou).toBe(false);
+    expect(d.valorReprecificado).toBe(0);
+  });
+});

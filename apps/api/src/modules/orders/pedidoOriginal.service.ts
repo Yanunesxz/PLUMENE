@@ -76,7 +76,12 @@ export async function guardarOriginal(
       .maybeSingle();
     pedido = simples.data ?? null;
   }
-  if (!pedido) return 'falhou';
+  if (!pedido) {
+    // Falha aqui é silenciosa para quem chamou (o corte segue), então fica
+    // escrita: sem a foto do primeiro corte, o original some para sempre.
+    console.error(`[044] sem pedido para fotografar o original: ${order.id}`);
+    return 'falhou';
+  }
 
   const p = pedido as { total?: number | null; items?: Array<{ quantity?: number | null }> };
   const { error } = await supabase.from('order_originals').insert({
@@ -90,7 +95,11 @@ export async function guardarOriginal(
   });
   // 23505 = outra requisição tirou a foto no mesmo instante. A primeira vence,
   // que é exatamente o combinado.
-  if (error) return (error as { code?: string }).code === '23505' ? 'ja_tinha' : 'falhou';
+  if (error) {
+    if ((error as { code?: string }).code === '23505') return 'ja_tinha';
+    console.error(`[044] falha ao guardar o original do pedido ${order.id}: ${error.message}`);
+    return 'falhou';
+  }
   return 'guardada';
 }
 

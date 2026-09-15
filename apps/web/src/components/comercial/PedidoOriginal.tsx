@@ -37,15 +37,23 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
 
   const totalOriginal = original.total ?? null;
   const valorDeHoje = invoicedTotal ?? totalAtual ?? null;
-  const diferencaEmReais =
-    totalOriginal != null && valorDeHoje != null
-      ? Number((totalOriginal - valorDeHoje).toFixed(2))
+
+  // Três coisas que o total mistura e a manchete tem de separar:
+  //   corte    → peças que saíram (ou entraram), a preço ORIGINAL: d.valorQueSaiu
+  //   preço    → a reprecificação das peças que ficaram: d.valorReprecificado
+  //   nota     → o que o Control faturou abaixo do pedido de HOJE
+  // Derivar "encolheu" do total fazia um pedido que só ganhou peça aparecer
+  // como "saíram −2 peças" quando a tabela tinha baixado de preço.
+  const encolheu = d.pecasAntes > d.pecasDepois;
+  const reprecificou = Math.abs(d.valorReprecificado) >= 0.01;
+  const diferencaDaNota =
+    faturado && invoicedTotal != null && totalAtual != null
+      ? Number((totalAtual - invoicedTotal).toFixed(2))
       : null;
+  const notaDiferente = diferencaDaNota != null && Math.abs(diferencaDaNota) >= 0.01;
 
-  // Nada mudou e nem a nota fechou por menos: não há comparação a fazer.
-  if (!d.mudou && !(diferencaEmReais && Math.abs(diferencaEmReais) >= 0.01) && !faturado) return null;
-
-  const encolheu = d.pecasAntes > d.pecasDepois || (diferencaEmReais ?? 0) > 0;
+  // Nada mudou, o preço é o mesmo e a nota bateu: não há comparação a fazer.
+  if (!d.mudou && !reprecificou && !notaDiferente && !faturado) return null;
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -92,33 +100,48 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
           </div>
         </div>
 
-        {d.mudou || (diferencaEmReais != null && Math.abs(diferencaEmReais) >= 0.01) ? (
+        {d.mudou || reprecificou || notaDiferente ? (
           <p
             className={`mt-3 rounded-lg px-3 py-2 text-xs ${
-              encolheu
+              encolheu || (diferencaDaNota ?? 0) > 0
                 ? 'bg-warn-soft text-warn-soft-foreground'
                 : 'bg-positive-soft text-positive-soft-foreground'
             }`}
           >
+            {/* O corte, pelo preço que as peças tinham no original: é o que o
+                lojista deixou de receber, sem a troca de tabela misturada. */}
             {d.pecasAntes !== d.pecasDepois && (
               <>
                 {encolheu
                   ? `Saíram ${d.pecasAntes - d.pecasDepois} peças do pedido`
                   : `Entraram ${d.pecasDepois - d.pecasAntes} peças no pedido`}
-                {diferencaEmReais != null && Math.abs(diferencaEmReais) >= 0.01
-                  ? ` · ${formatBRL(Math.abs(diferencaEmReais))} ${encolheu ? 'a menos' : 'a mais'}`
+                {Math.abs(d.valorQueSaiu) >= 0.01
+                  ? ` · ${formatBRL(Math.abs(d.valorQueSaiu))} ${d.valorQueSaiu > 0 ? 'a menos' : 'a mais'}`
                   : ''}
                 .{' '}
               </>
             )}
-            {d.pecasAntes === d.pecasDepois &&
-              diferencaEmReais != null &&
-              Math.abs(diferencaEmReais) >= 0.01 && (
-                <>
-                  As mesmas peças, mas a nota fechou {formatBRL(Math.abs(diferencaEmReais))}{' '}
-                  {encolheu ? 'abaixo' : 'acima'} do pedido.{' '}
-                </>
-              )}
+            {d.mudou && d.pecasAntes === d.pecasDepois && (
+              <>
+                Trocaram peças, mesma quantidade
+                {Math.abs(d.valorQueSaiu) >= 0.01
+                  ? ` · ${formatBRL(Math.abs(d.valorQueSaiu))} ${d.valorQueSaiu > 0 ? 'a menos' : 'a mais'}`
+                  : ''}
+                .{' '}
+              </>
+            )}
+            {reprecificou && (
+              <>
+                O preço das peças mudou {formatBRL(Math.abs(d.valorReprecificado))}{' '}
+                {d.valorReprecificado > 0 ? 'para cima' : 'para baixo'} desde o original.{' '}
+              </>
+            )}
+            {diferencaDaNota != null && Math.abs(diferencaDaNota) >= 0.01 && (
+              <>
+                A nota fechou {formatBRL(Math.abs(diferencaDaNota))}{' '}
+                {diferencaDaNota > 0 ? 'abaixo' : 'acima'} do pedido.{' '}
+              </>
+            )}
             {faturado ? 'É o que a nota levou.' : 'O pedido ainda pode mudar até a nota.'}
           </p>
         ) : (

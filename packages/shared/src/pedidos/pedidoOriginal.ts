@@ -49,8 +49,16 @@ export interface DiferencaDoPedido {
   linhas: LinhaDaDiferenca[];
   pecasAntes: number;
   pecasDepois: number;
-  /** Soma do que saiu menos o que entrou. Positivo = o pedido encolheu. */
+  /** Soma do que saiu menos o que entrou, A PREÇO ORIGINAL. Positivo = o pedido encolheu. */
   valorQueSaiu: number;
+  /**
+   * Quanto o total mudou só por TROCA DE PREÇO das peças que ficaram: ao
+   * editar, o servidor reprecifica todas as linhas pela tabela de hoje. Sem
+   * separar isto do corte, a manchete "R$ X a menos" somava as duas coisas —
+   * e um pedido que só ganhou peça aparecia como "saíram −2 peças". Positivo =
+   * as peças ficaram mais caras que no original.
+   */
+  valorReprecificado: number;
   /** `false` quando nada mudou — a tela não mostra bloco nenhum. */
   mudou: boolean;
 }
@@ -112,6 +120,18 @@ export function compararComOOriginal(
   // O que mais saiu primeiro: é a linha que explica o pedido ter encolhido.
   linhas.sort((x, y) => y.valor - x.valor || x.ref.localeCompare(y.ref));
 
+  // A troca de preço das peças que continuam no pedido: só entre linhas que
+  // existem nos dois lados, pela quantidade de HOJE. É o que sobra do total
+  // depois de tirar o corte — e não pode ser vendido como corte.
+  let valorReprecificado = 0;
+  for (const [chave, d] of depois) {
+    const a = antes.get(chave);
+    if (!a) continue;
+    const precoAntes = Number(a.unit_price ?? 0);
+    const precoDepois = Number(d.unit_price ?? 0);
+    if (precoAntes !== precoDepois) valorReprecificado += (precoDepois - precoAntes) * d.quantity;
+  }
+
   const pecasAntes = somar(original);
   const pecasDepois = somar(atual);
   return {
@@ -119,6 +139,7 @@ export function compararComOOriginal(
     pecasAntes,
     pecasDepois,
     valorQueSaiu: Number(linhas.reduce((s, l) => s + l.valor, 0).toFixed(2)),
+    valorReprecificado: Number(valorReprecificado.toFixed(2)),
     mudou: linhas.length > 0,
   };
 }

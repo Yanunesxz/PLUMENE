@@ -285,7 +285,10 @@ describe('atrelar o número do Control (financeiro)', () => {
  * achar o cadastro) e entrega a loja do colega. O escritório, que é quem vai
  * procurar, continua recebendo o nome e o código.
  */
-describe('POST /customers — o duplicado de outra carteira', () => {
+// Sobe o app inteiro (buildApp): a primeira requisição leva ~1,5 s com a
+// máquina livre e passava dos 5 s padrão quando outra suíte rodava junto —
+// o portão de produção falhava por carga, não por defeito.
+describe('POST /customers — o duplicado de outra carteira', { timeout: 20_000 }, () => {
   const CORPO = {
     name: 'LOJA NOVA LTDA',
     cnpj: '11.222.333/0001-81',
