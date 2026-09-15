@@ -173,6 +173,21 @@ describe('os 3 degraus', () => {
     expect(lista.some((a) => a.id.includes('longe'))).toBe(false);
   });
 
+  it('cliente marcado como VAREJO pela venda interna não recebe o aviso de esfriar', () => {
+    // Pedido do Yan (15/09/2026): o cliente de balcão não volta, e lembrar que
+    // ele "vai esfriar" é a cobrança de contato que a marca existe para calar.
+    const lista = montarAlertas(
+      entradas({
+        clientes: [
+          { id: 'balcao', nome: 'Compra de Balcão', ultimaCompraEm: diasAtras(178), varejo: true },
+          { id: 'loja', nome: 'Loja de Verdade', ultimaCompraEm: diasAtras(178) },
+        ],
+      }),
+    );
+    expect(lista.some((a) => a.id === 'cliente-expira-balcao')).toBe(false);
+    expect(lista.find((a) => a.id === 'cliente-expira-loja')?.nivel).toBe('atencao');
+  });
+
   it('link da vitrine que expira HOJE sem pedido é atenção', () => {
     const lista = montarAlertas(
       entradas({

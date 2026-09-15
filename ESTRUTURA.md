@@ -118,7 +118,8 @@ apps/api/src/
 │       ├── 043_regua_da_carteira.sql → companies.carteira_atencao_dias/carteira_esfriado_dias (o admin muda os 90/180 no Painel)
 │       ├── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
 │       ├── (045 NÃO EXISTE — número pulado. Foi reservado por mensagem entre sessões; não assuma que está livre)
-│       └── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│       ├── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
+│       └── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -280,7 +281,8 @@ _tools/
 │   │                estão vetados (upsert de preço duplicado) — ver o README.
 │   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
-├── SQL-PARA-RODAR-046.sql         → a 046 pronta para colar. Em 15/09 a API NÃO enxergava a tabela
+├── SQL-PARA-RODAR-046-047.sql     → 046 e 047 num arquivo só, para os DOIS bancos (o de colar hoje)
+├── SQL-PARA-RODAR-046.sql         → a 046 sozinha (substituída pelo 046-047). Em 15/09 a API NÃO enxergava a tabela
 │                                    em nenhum dos dois bancos (PGRST205): colar e conferir com
 │                                    node _tools/conferir-046.mjs (GET de verdade, nunca HEAD)
 ├── SQL-PARA-RODAR-042-043-044.sql → medido em 15/09: 043/044 nos dois bancos; a 042 estava na

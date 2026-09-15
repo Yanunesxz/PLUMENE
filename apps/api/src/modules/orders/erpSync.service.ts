@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import { detectar } from '../../lib/detectarColuna.js';
+import { detectar, detectarComCerteza } from '../../lib/detectarColuna.js';
 import { assinaturaDoPedido, type Order, type SincroniaComOErp, type PedidoParaComparar } from '@csb/shared';
 
 /**
@@ -24,6 +24,15 @@ import { assinaturaDoPedido, type Order, type SincroniaComOErp, type PedidoParaC
 /** `order_erp_sync` vem da 046 — o código sobe antes do SQL, como sempre. */
 async function detectarTabela(): Promise<boolean> {
   return detectar('order_erp_sync', 'order_id');
+}
+
+/**
+ * `assinatura_pedida` entrou na 046 depois (15/09/2026). Quem criou a tabela
+ * antes não tem a coluna — e mandar coluna inexistente derruba a gravação
+ * inteira, então ela só vai quando existe.
+ */
+async function temAssinaturaPedida(): Promise<boolean> {
+  return detectar('order_erp_sync', 'assinatura_pedida');
 }
 
 /** As peças já com referência e tamanho: a foto não pode depender do catálogo. */
@@ -78,7 +87,13 @@ async function fotografar(order_id: string, company_id: string): Promise<Foto | 
 }
 
 /** A linha que diz "é isto que a fábrica tem na mão", com o pedido de atualização zerado. */
-function linhaDaFoto(order_id: string, company_id: string, foto: Foto, quem: string | null) {
+function linhaDaFoto(
+  order_id: string,
+  company_id: string,
+  foto: Foto,
+  quem: string | null,
+  comAssinatura: boolean,
+): Record<string, unknown> {
   return {
     order_id,
     company_id,
@@ -92,6 +107,7 @@ function linhaDaFoto(order_id: string, company_id: string, foto: Foto, quem: str
     pedido_em: null,
     pedido_por: null,
     observacao: null,
+    ...(comAssinatura ? { assinatura_pedida: null } : {}),
   };
 }
 
@@ -118,10 +134,20 @@ export async function registrarNoErp(
     console.error(`[046] sem pedido para fotografar: ${order_id}`);
     return 'falhou';
   }
+  return gravarFoto(order_id, company_id, foto, quem ?? null);
+}
 
+/** Grava por cima a foto já tirada. Separado para quem confere antes (a confirmação) gravar a MESMA foto que conferiu. */
+async function gravarFoto(
+  order_id: string,
+  company_id: string,
+  foto: Foto,
+  quem: string | null,
+): Promise<'guardada' | 'falhou'> {
+  const comAssinatura = await temAssinaturaPedida();
   const { error } = await supabase
     .from('order_erp_sync')
-    .upsert(linhaDaFoto(order_id, company_id, foto, quem ?? null), { onConflict: 'order_id' });
+    .upsert(linhaDaFoto(order_id, company_id, foto, quem, comAssinatura), { onConflict: 'order_id' });
   if (error) {
     console.error(`[046] falha ao gravar a foto do pedido ${order_id}: ${error.message}`);
     return 'falhou';
@@ -148,14 +174,29 @@ export async function garantirFotoDoErp(
   company_id: string,
 ): Promise<'guardada' | 'ja_tinha' | 'nao_lancado' | 'sem_tabela' | 'falhou'> {
   if (order.status !== 'sent_erp') return 'nao_lancado';
-  if (!(await detectarTabela())) return 'sem_tabela';
 
-  const { data: existente } = await supabase
+  // "Não existe" e "não deu para perguntar" são coisas diferentes aqui: sem a
+  // tabela, a edição segue como antes da 046; com um soluço de rede, a edição
+  // PARA — gravar sem a foto apagaria esta mudança do aviso para sempre.
+  const tabela = await detectarComCerteza('order_erp_sync', 'order_id');
+  if (tabela === 'nao_existe') return 'sem_tabela';
+  if (tabela === 'nao_sei') {
+    console.error(`[046] não deu para saber se a tabela da foto existe; edição do pedido ${order.id} barrada`);
+    return 'falhou';
+  }
+
+  const { data: existente, error: erroDaBusca } = await supabase
     .from('order_erp_sync')
     .select('order_id')
     .eq('order_id', order.id)
     .eq('company_id', company_id)
     .maybeSingle();
+  // A busca falhou: não se sabe se já há foto. Seguir poderia gravar a edição
+  // sem foto nenhuma — o mesmo buraco de cima.
+  if (erroDaBusca) {
+    console.error(`[046] falha ao procurar a foto do pedido ${order.id}: ${erroDaBusca.message}`);
+    return 'falhou';
+  }
   if (existente) return 'ja_tinha';
 
   const foto = await fotografar(order.id, company_id);
@@ -166,7 +207,10 @@ export async function garantirFotoDoErp(
 
   // INSERT, não upsert: se duas edições chegarem juntas, a primeira foto vence
   // e a segunda não sobrescreve com o pedido já editado.
-  const { error } = await supabase.from('order_erp_sync').insert(linhaDaFoto(order.id, company_id, foto, null));
+  const comAssinatura = await temAssinaturaPedida();
+  const { error } = await supabase
+    .from('order_erp_sync')
+    .insert(linhaDaFoto(order.id, company_id, foto, null, comAssinatura));
   if (error) {
     if ((error as { code?: string }).code === '23505') return 'ja_tinha';
     console.error(`[046] falha na primeira foto do pedido ${order.id}: ${error.message}`);
@@ -192,7 +236,7 @@ export async function atualizarNumeroNaFoto(order_id: string, company_id: string
 
 export type PedirResult =
   | { ok: true; sincronia: SincroniaComOErp }
-  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'erro' };
+  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'ja_faturado' | 'erro' };
 
 /**
  * Alguém editou o pedido e apertou "Atualizar no ERP": fica registrado quem
@@ -216,10 +260,29 @@ export async function pedirAtualizacao(
   // Sem foto não há o que atualizar: o pedido nunca foi para o Control.
   if (!existente) return { ok: false, motivo: 'nao_lancado' };
 
+  // Com a nota emitida, avisar a fábrica não conserta mais nada — vale para
+  // qualquer papel, não só para a venda interna (a revisão de 15/09 achou o
+  // escritório disparando push em pedido já faturado).
+  const { data: pedido } = await supabase
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .eq('id', order_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!pedido) return { ok: false, motivo: 'erro' };
+  if ((pedido as { invoiced?: boolean | null }).invoiced) return { ok: false, motivo: 'ja_faturado' };
+
   const agora = new Date().toISOString();
+  const aviso: Record<string, unknown> = { pedido_em: agora, pedido_por: quem, observacao: observacao?.trim() || null };
+  // A impressão do pedido NESTE aviso, calculada do banco (não do aparelho): é
+  // o que deixa a tela dizer, sem se confundir com carimbo ou número corrigido,
+  // que o pedido mudou de novo depois de a venda interna avisar.
+  if (await temAssinaturaPedida()) {
+    aviso.assinatura_pedida = assinaturaDoPedido(pedido as unknown as PedidoParaComparar);
+  }
   const { error } = await supabase
     .from('order_erp_sync')
-    .update({ pedido_em: agora, pedido_por: quem, observacao: observacao?.trim() || null })
+    .update(aviso)
     .eq('order_id', order_id)
     .eq('company_id', company_id);
   if (error) return { ok: false, motivo: 'erro' };
@@ -230,7 +293,7 @@ export async function pedirAtualizacao(
 
 export type ConfirmarResult =
   | { ok: true; sincronia: SincroniaComOErp }
-  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'mudou_de_novo' | 'erro' };
+  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'mudou_de_novo' | 'ja_faturado' | 'erro' };
 
 /**
  * "Já atualizei no Control": a foto é tirada de novo, e a divergência some
@@ -257,20 +320,18 @@ export async function confirmarAtualizacao(
     .maybeSingle();
   if (!existente) return { ok: false, motivo: 'nao_lancado' };
 
-  if (assinaturaVista) {
-    const { data: agora } = await supabase
-      .from('orders')
-      .select('*, items:order_items(*)')
-      .eq('id', order_id)
-      .eq('company_id', company_id)
-      .maybeSingle();
-    if (!agora) return { ok: false, motivo: 'erro' };
-    if (assinaturaDoPedido(agora as unknown as PedidoParaComparar) !== assinaturaVista) {
-      return { ok: false, motivo: 'mudou_de_novo' };
-    }
+  // UMA foto só: é ela que é conferida contra o que a Larissa viu e é ELA que
+  // é gravada. Conferir numa leitura e fotografar noutra deixava passar a edição
+  // que caísse entre as duas — inclusive a troca de peças no meio (apagou as
+  // velhas, ainda não inseriu as novas), que gravaria um pedido com zero peças.
+  const foto = await fotografar(order_id, company_id);
+  if (!foto) return { ok: false, motivo: 'erro' };
+  if ((foto.pedido as { invoiced?: boolean | null }).invoiced) return { ok: false, motivo: 'ja_faturado' };
+  if (assinaturaVista && assinaturaDoPedido(foto.pedido as PedidoParaComparar) !== assinaturaVista) {
+    return { ok: false, motivo: 'mudou_de_novo' };
   }
 
-  const r = await registrarNoErp(order_id, company_id, quem);
+  const r = await gravarFoto(order_id, company_id, foto, quem);
   if (r !== 'guardada') return { ok: false, motivo: 'erro' };
 
   const sincronia = await lerSincronia(order_id, company_id);
@@ -283,14 +344,17 @@ export async function lerSincronia(
   company_id: string,
 ): Promise<SincroniaComOErp | null> {
   if (!(await detectarTabela())) return null;
+  const colunas =
+    'erp_order_id, total, pecas, snapshot, confirmado_em, pedido_em, observacao' +
+    ((await temAssinaturaPedida()) ? ', assinatura_pedida' : '');
   const { data } = await supabase
     .from('order_erp_sync')
-    .select('erp_order_id, total, pecas, snapshot, confirmado_em, pedido_em, observacao')
+    .select(colunas)
     .eq('order_id', order_id)
     .eq('company_id', company_id)
     .maybeSingle();
   if (!data) return null;
-  const l = data as {
+  const l = data as unknown as {
     erp_order_id: string | null;
     total: number | null;
     pecas: number;
@@ -298,6 +362,7 @@ export async function lerSincronia(
     confirmado_em: string;
     pedido_em: string | null;
     observacao: string | null;
+    assinatura_pedida?: string | null;
   };
   return {
     order_id,
@@ -307,6 +372,7 @@ export async function lerSincronia(
     confirmado_em: l.confirmado_em,
     pedido_em: l.pedido_em,
     observacao: l.observacao,
+    assinatura_pedida: l.assinatura_pedida ?? null,
     snapshot: l.snapshot,
   };
 }

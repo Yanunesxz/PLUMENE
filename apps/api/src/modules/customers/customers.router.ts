@@ -6,6 +6,7 @@ import {
   createCustomerHandler,
   trocarTabelaDoClienteHandler,
   marcarInatividadeHandler,
+  marcarVarejoHandler,
   atrelarCodigoErpHandler,
 } from './customers.controller.js';
 
@@ -34,6 +35,13 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
     '/customers/:id/inatividade',
     { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'relacionamento'])] },
     marcarInatividadeHandler,
+  );
+  // Cliente de varejo (migração 047): só a venda interna marca, na própria
+  // carteira — o controller barra o representante comum.
+  fastify.patch(
+    '/customers/:id/varejo',
+    { preHandler: [authenticate, requireRole(['rep'])] },
+    marcarVarejoHandler,
   );
   // O número do cliente no Control, atrelado ao cadastro nascido no app. É a
   // Larissa (financeiro) quem inclui e atrela — o admin fica como válvula.

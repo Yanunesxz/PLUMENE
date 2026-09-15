@@ -9,6 +9,7 @@
  */
 import { env } from '../../config/env.js';
 import { supabase } from '../../config/supabase.js';
+import { detectar } from '../../lib/detectarColuna.js';
 import {
   linhasDaCarteira,
   linhasDaEmpresa,
@@ -35,11 +36,14 @@ export async function relatorioDaCarteira(
   company_id: string,
   escopo: { rep_id: string; erp_rep_id?: string | null; irrestrito: boolean },
 ): Promise<RelatorioResult> {
+  // Cliente de varejo (047) não é carteira a recuperar: a venda interna o tirou
+  // da cobrança, e o relatório não pode devolvê-lo como "parado".
+  const comVarejo = await detectar('customers', 'varejo');
   const clientes: ClienteParaRelatorio[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
       .from('customers')
-      .select(COLUNAS)
+      .select(comVarejo ? `${COLUNAS}, varejo` : COLUNAS)
       .eq('company_id', company_id)
       .range(from, from + PAGE_SIZE - 1);
     if (!escopo.irrestrito) {
@@ -51,7 +55,11 @@ export async function relatorioDaCarteira(
     // Erro logo na primeira página = as colunas da 036 não existem ainda; é a
     // única leitura que esta rota faz fora do padrão da lista de clientes.
     if (error) return from === 0 ? { ok: false, reason: 'sem_migracao' } : { ok: false, reason: 'falha_ia' };
-    clientes.push(...((data ?? []) as unknown as ClienteParaRelatorio[]));
+    clientes.push(
+      ...((data ?? []) as unknown as Array<ClienteParaRelatorio & { varejo?: boolean | null }>).filter(
+        (c) => c.varejo !== true,
+      ),
+    );
     if (!data || data.length < PAGE_SIZE) break;
   }
   if (clientes.length === 0) return { ok: false, reason: 'sem_clientes' };

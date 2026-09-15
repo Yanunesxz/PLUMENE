@@ -566,7 +566,7 @@ export async function listDeletedOrders(company_id: string): Promise<PedidoExclu
 
 export type DescontoResult =
   | { ok: true; order: Order }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' | 'maior_que_o_pedido' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_coluna' | 'maior_que_o_pedido' | 'sem_foto_do_erp' };
 
 /**
  * O percentual que corresponde a um desconto em REAIS.
@@ -621,8 +621,10 @@ export async function setOrderDiscount(
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
-  await garantirFotoDoErp(o, company_id);
+  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
+  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
+  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
+  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
 
   const { data: itens } = await supabase
     .from('order_items')
@@ -719,7 +721,7 @@ export interface ItemEditado {
 
 export type EditarPecasResult =
   | { ok: true; order: OrderWithItems }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'price_not_found' | 'save_failed' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'price_not_found' | 'save_failed' | 'sem_foto_do_erp' };
 
 /**
  * Troca as peças de um pedido que ainda não foi para a fábrica.
@@ -764,8 +766,10 @@ export async function setOrderItems(
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
-  await garantirFotoDoErp(o, company_id);
+  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
+  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
+  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
+  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
 
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
@@ -862,7 +866,7 @@ export async function setOrderItems(
 
 export type PagamentoResult =
   | { ok: true; order: Order }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'condicao_invalida' | 'sem_coluna' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'condicao_invalida' | 'sem_coluna' | 'sem_foto_do_erp' };
 
 /**
  * Troca a condição de pagamento de um pedido em aberto.
@@ -897,8 +901,10 @@ export async function setOrderPayment(
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
-  await garantirFotoDoErp(o, company_id);
+  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
+  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
+  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
+  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
 
   let gravar: string | null = null;
   if (payment_condition_id) {
@@ -992,7 +998,7 @@ export async function ultimoNumeroErp(company_id: string): Promise<string | null
 
 export type NotesResult =
   | { ok: true; order: Order }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_foto_do_erp' };
 
 /**
  * Troca a observação do pedido — só o TEXTO LIVRE. As linhas de cor que o
@@ -1028,8 +1034,10 @@ export async function setOrderNotes(
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
-  await garantirFotoDoErp(o, company_id);
+  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
+  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
+  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
+  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
 
   // Sem a lista de SKUs em mãos: o modo genérico reconhece a linha de cor pelo
   // formato completo ("0015 3M azul"), que é o que `observacaoDeCores` grava.

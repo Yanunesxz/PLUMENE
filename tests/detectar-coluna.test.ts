@@ -108,3 +108,36 @@ describe('detectarOuFalhar', () => {
     expect(fake.filtrosDe('orders', 'select')).toHaveLength(1);
   });
 });
+
+/**
+ * A dúvida não pode virar "não" para quem precisa parar diante dela: a foto do
+ * "Atualizar no ERP" antes de uma edição. Com um soluço de rede tratado como
+ * "tabela ausente", a edição gravava sem a foto e a mudança sumia do aviso
+ * (revisão de 15/09/2026).
+ */
+describe('detectarComCerteza', () => {
+  it('distingue existe, não existe e não sei', async () => {
+    const existe = await carregar({ customers: [ok] });
+    expect(await existe.detectarComCerteza('customers', 'cep')).toBe('existe');
+
+    vi.resetModules();
+    const ausente = await carregar({ customers: [semColuna] });
+    expect(await ausente.detectarComCerteza('customers', 'cep')).toBe('nao_existe');
+
+    vi.resetModules();
+    const duvida = await carregar({ customers: [soluco] });
+    expect(await duvida.detectarComCerteza('customers', 'cep')).toBe('nao_sei');
+  });
+
+  it('a dúvida não é memorizada: na próxima pergunta, responde de verdade', async () => {
+    const { detectarComCerteza, fake } = await carregar({ customers: [soluco, ok] });
+    expect(await detectarComCerteza('customers', 'cep')).toBe('nao_sei');
+    expect(await detectarComCerteza('customers', 'cep')).toBe('existe');
+    expect(fake.filtrosDe('customers', 'select')).toHaveLength(2);
+  });
+
+  it('o detectar de sempre continua dizendo "não" na dúvida — os 22 serviços degradam como antes', async () => {
+    const { detectar } = await carregar({ customers: [soluco] });
+    expect(await detectar('customers', 'cep')).toBe(false);
+  });
+});

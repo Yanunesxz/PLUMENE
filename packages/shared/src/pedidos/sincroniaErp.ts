@@ -25,6 +25,12 @@ export interface SincroniaComOErp {
   pedido_em: string | null;
   /** O recado de quem pediu ("tirei 6 peças da 0124, faltou no estoque"). */
   observacao: string | null;
+  /**
+   * A impressão do pedido (`assinaturaDoPedido`) no momento do último aviso.
+   * Diferente da de hoje = a venda interna mudou DE NOVO depois de avisar, e a
+   * lista tem mudança que ninguém avisou. Ausente antes da coluna existir.
+   */
+  assinatura_pedida?: string | null;
   snapshot: Order & { items: ItemDaFoto[] };
 }
 

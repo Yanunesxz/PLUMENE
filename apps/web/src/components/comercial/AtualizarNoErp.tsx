@@ -3,9 +3,17 @@ import { RefreshCw, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '../interface/Button.js';
 import { Textarea } from '../interface/Textarea.js';
 import { formatBRL } from '../../lib/utils.js';
-import { divergenciaComOErp, type PedidoParaComparar, type SincroniaComOErp } from '@csb/shared';
+import { lerListaConferida, guardarListaConferida, esquecerListaConferida } from '../../lib/listaConferida.js';
+import {
+  assinaturaDoPedido,
+  divergenciaComOErp,
+  type PedidoParaComparar,
+  type SincroniaComOErp,
+} from '@csb/shared';
 
 interface Props {
+  /** O pedido — é a chave da lista conferida guardada no aparelho. */
+  orderId: string;
   /** O que o Control conhece deste pedido (046). */
   sincronia: SincroniaComOErp;
   /** O pedido de HOJE: peças com referência e tamanho, desconto, condição e observação. */
@@ -15,6 +23,8 @@ interface Props {
    * número depois do lançamento, é pelo novo que ela acha o pedido lá.
    */
   numeroNoControl: string | null;
+  /** Com a nota emitida não há o que atualizar: o cartão vira registro, sem botões. */
+  faturado: boolean;
   /** Quem editou pede a atualização: a venda interna dona, ou o escritório. */
   podePedir: boolean;
   /** Quem mexe no Control confirma que já atualizou lá: financeiro e admin. */
@@ -22,7 +32,8 @@ interface Props {
   ocupado: boolean;
   erro?: string | null;
   onPedir: (observacao: string) => void;
-  onConfirmar: () => void;
+  /** Recebe a impressão da lista que a pessoa CONFERIU — não a do instante do clique. */
+  onConfirmar: (assinaturaVista: string) => void;
 }
 
 /**
@@ -40,11 +51,16 @@ interface Props {
  * O cartão só aparece quando o pedido de hoje DIVERGE da fotografia do Control
  * — nas peças, no desconto, na condição de pagamento ou na observação, que são
  * as quatro coisas que a venda interna consegue mudar depois do lançamento.
+ *
+ * O componente é montado com `key` na data da foto: foto nova, cartão novo, e
+ * a lista "conferida" começa do zero.
  */
 export function AtualizarNoErp({
+  orderId,
   sincronia,
   pedidoHoje,
   numeroNoControl,
+  faturado,
   podePedir,
   podeConfirmar,
   ocupado,
@@ -63,11 +79,53 @@ export function AtualizarNoErp({
   }, [sincronia.pedido_em]);
 
   const d = useMemo(() => divergenciaComOErp(sincronia.snapshot, pedidoHoje), [sincronia, pedidoHoje]);
+  const assinaturaAgora = useMemo(() => assinaturaDoPedido(pedidoHoje), [pedidoHoje]);
+
+  // A lista que a Larissa CONFERIU é a do momento em que o aviso apareceu para
+  // ela — não a do clique. Fica guardada no aparelho (lib/listaConferida) porque
+  // a tela recarrega sozinha: o app se atualiza quando a aba sai da frente, e é
+  // exatamente quando ela vai digitar no Control. Se a Simone mudou de novo
+  // nesse meio tempo, a confirmação engoliria a mudança que a Larissa não viu.
+  //
+  // Só para quem CONFIRMA: para a venda interna, que é quem muda o pedido, um
+  // alarme de "mudou de novo" a cada edição dela seria ruído.
+  const [assinaturaVista, setAssinaturaVista] = useState<string | null>(() =>
+    podeConfirmar ? lerListaConferida(orderId, sincronia.confirmado_em) : null,
+  );
+  useEffect(() => {
+    if (!podeConfirmar) return;
+    if (!d.mudou) {
+      // O pedido voltou a bater com o Control (a edição foi desfeita): a próxima
+      // divergência é outra conversa e começa do zero.
+      if (assinaturaVista !== null) {
+        setAssinaturaVista(null);
+        esquecerListaConferida(orderId, sincronia.confirmado_em);
+      }
+      return;
+    }
+    if (assinaturaVista === null) {
+      setAssinaturaVista(assinaturaAgora);
+      guardarListaConferida(orderId, sincronia.confirmado_em, assinaturaAgora);
+    }
+  }, [podeConfirmar, d.mudou, assinaturaAgora, assinaturaVista, orderId, sincronia.confirmado_em]);
+  const mudouDeNovo = podeConfirmar && assinaturaVista !== null && assinaturaVista !== assinaturaAgora;
+
+  const conferirListaNova = () => {
+    setAssinaturaVista(assinaturaAgora);
+    guardarListaConferida(orderId, sincronia.confirmado_em, assinaturaAgora);
+  };
 
   // O Control está em dia: nada a dizer.
   if (!d.mudou) return null;
 
   const jaPediu = Boolean(sincronia.pedido_em);
+  // A venda interna mudou o pedido DE NOVO depois do último aviso: a lista abaixo
+  // tem mudança que ninguém avisou. Pela impressão guardada no aviso, não pela
+  // data de alteração do pedido — carimbo de faturado e correção de número
+  // também mexem nessa data e acendiam a frase sem mudança nenhuma.
+  const mudouDepoisDoAviso =
+    jaPediu && !faturado && !!sincronia.assinatura_pedida && sincronia.assinatura_pedida !== assinaturaAgora;
+
   const quando = (iso: string) =>
     new Date(iso).toLocaleString('pt-BR', {
       day: '2-digit',
@@ -83,11 +141,14 @@ export function AtualizarNoErp({
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warn-soft-foreground" strokeWidth={2.5} />
         <div className="min-w-0 flex-1">
           <p className="text-[15px] font-semibold leading-snug text-warn-soft-foreground">
-            O Control está com a versão antiga deste pedido
+            {faturado
+              ? 'A nota saiu com o pedido diferente do que está no Control'
+              : 'O Control está com a versão antiga deste pedido'}
           </p>
           <p className="mt-1 text-sm leading-relaxed text-warn-soft-foreground/90">
-            O pedido mudou depois que foi lançado{numeroNoControl ? ` como ${numeroNoControl}` : ''}. Enquanto
-            a fábrica não atualizar lá, a nota sai pelo pedido velho.
+            {faturado
+              ? `O pedido mudou depois do lançamento${numeroNoControl ? ` como ${numeroNoControl}` : ''} e foi faturado antes de alguém atualizar lá. Confira a nota com o financeiro.`
+              : `O pedido mudou depois que foi lançado${numeroNoControl ? ` como ${numeroNoControl}` : ''}. Enquanto a fábrica não atualizar lá, a nota sai pelo pedido velho.`}
           </p>
 
           {/* O que exatamente mudou: é a lista que a pessoa vai digitar no
@@ -133,7 +194,27 @@ export function AtualizarNoErp({
             <p className="mt-2 rounded-lg bg-card/60 px-2.5 py-1.5 text-xs text-warn-soft-foreground">
               Atualização pedida em {quando(sincronia.pedido_em as string)}
               {sincronia.observacao ? `: “${sincronia.observacao}”` : '.'}
+              {mudouDepoisDoAviso ? (
+                <span className="mt-1 block font-semibold">
+                  A venda interna mudou o pedido de novo depois desse aviso. A lista acima já tem a mudança nova — confira
+                  tudo, não só o que foi avisado.
+                </span>
+              ) : null}
             </p>
+          )}
+
+          {mudouDeNovo && !faturado && (
+            <div className="mt-2 rounded-lg border border-danger/40 bg-danger-soft px-2.5 py-2 text-xs text-danger-soft-foreground">
+              <p className="font-semibold">O pedido mudou depois que você conferiu a lista.</p>
+              <p className="mt-0.5">Confira a lista acima outra vez antes de dizer que atualizou o Control.</p>
+              <button
+                type="button"
+                onClick={conferirListaNova}
+                className="mt-1.5 font-semibold underline"
+              >
+                Conferi a lista nova
+              </button>
+            </div>
           )}
 
           {erro && (
@@ -142,7 +223,7 @@ export function AtualizarNoErp({
             </p>
           )}
 
-          {escrevendo && (
+          {escrevendo && !faturado && (
             <div className="mt-3">
               <label htmlFor="erp-obs" className="text-xs font-medium text-warn-soft-foreground">
                 Recado para quem vai mexer no Control (opcional)
@@ -159,26 +240,32 @@ export function AtualizarNoErp({
             </div>
           )}
 
-          <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-            {podeConfirmar && (
-              <Button variant="outline" disabled={ocupado} onClick={onConfirmar}>
-                <Check className="h-4 w-4" strokeWidth={2.5} />
-                Já atualizei no Control
-              </Button>
-            )}
-            {podePedir && !escrevendo && (
-              <Button disabled={ocupado} onClick={() => setEscrevendo(true)}>
-                <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
-                {jaPediu ? 'Avisar de novo' : 'Atualizar no ERP'}
-              </Button>
-            )}
-            {podePedir && escrevendo && (
-              <Button disabled={ocupado} onClick={() => onPedir(observacao)}>
-                <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
-                {ocupado ? 'Avisando…' : 'Avisar a fábrica'}
-              </Button>
-            )}
-          </div>
+          {!faturado && (podeConfirmar || podePedir) && (
+            <div className="mt-3 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+              {podeConfirmar && (
+                <Button
+                  variant="outline"
+                  disabled={ocupado || mudouDeNovo}
+                  onClick={() => onConfirmar(assinaturaVista ?? assinaturaAgora)}
+                >
+                  <Check className="h-4 w-4" strokeWidth={2.5} />
+                  Já atualizei no Control
+                </Button>
+              )}
+              {podePedir && !escrevendo && (
+                <Button disabled={ocupado} onClick={() => setEscrevendo(true)}>
+                  <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
+                  {jaPediu ? 'Avisar de novo' : 'Atualizar no ERP'}
+                </Button>
+              )}
+              {podePedir && escrevendo && (
+                <Button disabled={ocupado} onClick={() => onPedir(observacao)}>
+                  <RefreshCw className="h-4 w-4" strokeWidth={2.5} />
+                  {ocupado ? 'Avisando…' : 'Avisar a fábrica'}
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

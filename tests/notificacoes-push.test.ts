@@ -16,6 +16,8 @@ const EMPRESA = 'empresa-1';
 
 const enviadas: Array<{ endpoint: string; corpo: string }> = [];
 let falharCom: number | null = null;
+/** Simula o serviço de push que aceita a conexão e nunca responde. */
+let pendurar = false;
 
 async function carregar(
   respostas: Parameters<typeof criarSupabaseFake>[0],
@@ -35,6 +37,7 @@ async function carregar(
   const webpushFalso = {
     setVapidDetails: vi.fn(),
     sendNotification: vi.fn(async (assinatura: { endpoint: string }, corpo: string) => {
+      if (pendurar) await new Promise(() => {});
       if (falharCom !== null) {
         const erro = new Error('falhou') as Error & { statusCode: number };
         erro.statusCode = falharCom;
@@ -52,6 +55,7 @@ async function carregar(
 beforeEach(() => {
   vi.resetModules();
   falharCom = null;
+  pendurar = false;
 });
 
 const LINHA = { endpoint: 'https://push/abc', p256dh: 'p', auth: 'a' };
@@ -210,5 +214,45 @@ describe('publicoPorDocumentos', () => {
 
     expect(r).toEqual({ usuarios: [], naoEncontrados: [], clientesSemConta: 0 });
     expect(fake.filtrosDe('customers')).toHaveLength(0);
+  });
+});
+
+/**
+ * O aviso do "Atualizar no ERP" (046). A tela diz para quem saiu — e não pode
+ * dizer "a Larissa foi avisada" quando só o admin recebeu, nem ficar presa em
+ * "Avisando…" porque o serviço de push não respondeu.
+ */
+describe('avisarPedidoMudouNoErp', () => {
+  const PEDIDO = { id: 'o1', order_number: 14627, erp_order_id: 'CS17379' };
+
+  it('conta financeiro e admin separados — são duas buscas, uma por papel', async () => {
+    const { avisos, fake } = await carregar({
+      users: { data: [{ id: 'larissa' }], error: null },
+      push_subscriptions: { data: [LINHA], error: null },
+    });
+
+    const r = await avisos.avisarPedidoMudouNoErp(EMPRESA, PEDIDO, 'simone', 'tirei 6');
+
+    expect(r).toEqual({ financeiro: 1, admin: 1 });
+    const papeis = fake.filtrosDe('users', 'in').map((f) => f.args[1]);
+    expect(papeis).toEqual(expect.arrayContaining([['financeiro'], ['admin']]));
+  });
+
+  it('serviço de push que não responde: devolve "não sei" no teto, sem prender a tela', async () => {
+    pendurar = true;
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      const { avisos } = await carregar({
+        users: { data: [{ id: 'larissa' }], error: null },
+        push_subscriptions: { data: [LINHA], error: null },
+      });
+
+      const resposta = avisos.avisarPedidoMudouNoErp(EMPRESA, PEDIDO, 'simone');
+      await vi.advanceTimersByTimeAsync(avisos.TETO_DO_AVISO_MS + 10);
+
+      expect(await resposta).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

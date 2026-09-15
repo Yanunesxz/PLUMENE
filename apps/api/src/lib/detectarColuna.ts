@@ -39,14 +39,28 @@ export function esquecerDeteccoes(): void {
   memoria.clear();
 }
 
-/** O que a sonda descobriu: uma resposta sobre o schema, ou nenhuma (rede, timeout, 503). */
-type Sondagem = 'existe' | 'nao_existe' | 'sem_resposta';
-
 /**
  * `tabela` + `coluna` identificam a pergunta e a chave do cache. Sem `coluna`,
  * pergunta se a TABELA existe.
  */
-async function sondar(tabela: string, coluna?: string): Promise<Sondagem> {
+export async function detectar(tabela: string, coluna?: string): Promise<boolean> {
+  return (await detectarComCerteza(tabela, coluna)) === 'existe';
+}
+
+/**
+ * A mesma pergunta, sem achatar a dúvida em "não".
+ *
+ * Quase todo chamador quer só o booleano: na dúvida o recurso degrada e tudo
+ * segue. Mas há quem precise distinguir "a tabela não existe" (seguir sem o
+ * recurso) de "não deu para perguntar" (parar e tentar de novo): a foto do
+ * "Atualizar no ERP" antes de uma edição. Tratar um soluço de rede como tabela
+ * ausente deixava a edição gravar sem a foto — e a mudança sumia do aviso para
+ * sempre (revisão de 15/09/2026).
+ */
+export async function detectarComCerteza(
+  tabela: string,
+  coluna?: string,
+): Promise<'existe' | 'nao_existe' | 'nao_sei'> {
   const chave = coluna ? `${tabela}.${coluna}` : tabela;
   const lembrado = memoria.get(chave);
   if (lembrado && lembrado.ate > Date.now()) return lembrado.existe ? 'existe' : 'nao_existe';
@@ -65,23 +79,14 @@ async function sondar(tabela: string, coluna?: string): Promise<Sondagem> {
     return 'nao_existe';
   }
 
-  // Rede, timeout, 503: não é resposta sobre o schema. Não memoriza nada —
-  // pergunta de novo na próxima vez, em vez de desligar o recurso até o fim
-  // do processo.
-  return 'sem_resposta';
+  // Rede, timeout, 503: não é resposta sobre o schema. Não memoriza nada e
+  // pergunta de novo na próxima, em vez de desligar o recurso até o fim do
+  // processo. Quem usa `detectar` recebe "não" desta vez e degrada.
+  return 'nao_sei';
 }
 
 /**
- * "Existe?" — e, quando o banco não respondeu sobre o schema, responde "não"
- * desta vez (o chamador degrada: o campo sai null, a coluna nova não é
- * gravada). É a resposta certa para SELECT e para gravação opcional.
- */
-export async function detectar(tabela: string, coluna?: string): Promise<boolean> {
-  return (await sondar(tabela, coluna)) === 'existe';
-}
-
-/**
- * Igual a `detectar`, mas LANÇA quando a sonda não foi resposta sobre o schema.
+ * Igual a `detectar`, mas LANÇA quando o banco não respondeu sobre o schema.
  *
  * Para quando degradar é perigoso: um FILTRO que existe para impedir
  * lançamento duplicado (o `invoiced` da fila do parceiro) não pode sumir em
@@ -91,10 +96,10 @@ export async function detectar(tabela: string, coluna?: string): Promise<boolean
  * é a mesma de `detectar`: o "sim" lembrado vale para os dois.
  */
 export async function detectarOuFalhar(tabela: string, coluna?: string): Promise<boolean> {
-  const sondagem = await sondar(tabela, coluna);
-  if (sondagem === 'sem_resposta') {
+  const certeza = await detectarComCerteza(tabela, coluna);
+  if (certeza === 'nao_sei') {
     const alvo = coluna ? `${tabela}.${coluna}` : tabela;
     throw new Error(`Falha ao sondar ${alvo}: o banco não respondeu sobre o schema`);
   }
-  return sondagem === 'existe';
+  return certeza === 'existe';
 }
