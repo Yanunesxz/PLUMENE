@@ -366,6 +366,13 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
         statusCode: 503,
       });
       return;
+    case 'sem_foto_do_erp':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a versão que o Control conhece deste pedido. Nada foi alterado — tente de novo em instantes.',
+        code: 'FOTO_DO_ERP_FALHOU',
+        statusCode: 503,
+      });
+      return;
     default:
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
   }
@@ -396,6 +403,13 @@ export async function setNotesHandler(request: FastifyRequest, reply: FastifyRep
         error: 'Este pedido já saiu do seu alcance — a observação não pode mais mudar por aqui',
         code: 'ORDER_JA_ENVIADO',
         statusCode: 409,
+      });
+      return;
+    case 'sem_foto_do_erp':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a versão que o Control conhece deste pedido. Nada foi alterado — tente de novo em instantes.',
+        code: 'FOTO_DO_ERP_FALHOU',
+        statusCode: 503,
       });
       return;
     default:
@@ -444,6 +458,13 @@ export async function setPaymentHandler(request: FastifyRequest, reply: FastifyR
         statusCode: 503,
       });
       return;
+    case 'sem_foto_do_erp':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a versão que o Control conhece deste pedido. Nada foi alterado — tente de novo em instantes.',
+        code: 'FOTO_DO_ERP_FALHOU',
+        statusCode: 503,
+      });
+      return;
     default:
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
   }
@@ -488,6 +509,13 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
         error: 'Não foi possível salvar as peças — tente de novo',
         code: 'SAVE_FAILED',
         statusCode: 500,
+      });
+      return;
+    case 'sem_foto_do_erp':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a versão que o Control conhece deste pedido. Nada foi alterado — tente de novo em instantes.',
+        code: 'FOTO_DO_ERP_FALHOU',
+        statusCode: 503,
       });
       return;
     default:
@@ -640,21 +668,12 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
     }
     const { data: dono } = await supabase
       .from('orders')
-      .select('rep_id, invoiced')
+      .select('rep_id')
       .eq('id', id)
       .eq('company_id', company_id)
       .maybeSingle();
-    const pedidoDono = dono as { rep_id: string; invoiced: boolean | null } | null;
-    if (!pedidoDono || pedidoDono.rep_id !== sub) {
+    if (!dono || (dono as { rep_id: string }).rep_id !== sub) {
       await reply.status(403).send({ error: 'Este pedido não é seu', code: 'FORBIDDEN', statusCode: 403 });
-      return;
-    }
-    if (pedidoDono.invoiced) {
-      await reply.status(409).send({
-        error: 'O pedido já foi faturado — a nota saiu e não há mais o que atualizar no Control',
-        code: 'JA_FATURADO',
-        statusCode: 409,
-      });
       return;
     }
   }
@@ -681,6 +700,11 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
         error: 'O pedido mudou de novo enquanto você atualizava o Control. Confira a lista outra vez antes de confirmar.',
         code: 'MUDOU_DE_NOVO',
       },
+      ja_faturado: {
+        status: 409,
+        error: 'O pedido já foi faturado — a nota saiu e não há mais o que atualizar no Control',
+        code: 'JA_FATURADO',
+      },
       erro: { status: 500, error: 'Não foi possível registrar', code: 'UPDATE_FAILED' },
     } as const;
     const resp = respostas[r.motivo];
@@ -689,9 +713,10 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
   }
 
   // O aviso é carona, nunca condição: push falhando não desfaz o registro. Mas
-  // a resposta diz em quantos aparelhos chegou — a tela não pode afirmar "a
-  // fábrica foi avisada" sem saber.
-  let aparelhos: number | null = null;
+  // a resposta diz para quantos aparelhos saiu, separando financeiro de admin —
+  // a tela não pode dizer "a Larissa foi avisada" quando só o admin recebeu.
+  // `null` = o envio não terminou dentro do tempo; não se sabe.
+  let avisados: { financeiro: number; admin: number } | null = null;
   if (body.acao === 'pedir') {
     const { data: pedido } = await supabase
       .from('orders')
@@ -699,15 +724,22 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
       .eq('id', id)
       .eq('company_id', company_id)
       .maybeSingle();
-    aparelhos = pedido
+    avisados = pedido
       ? await avisarPedidoMudouNoErp(
           company_id,
           pedido as { id: string; order_number: number | null; erp_order_id: string | null },
           sub,
           body.observacao ?? null,
         )
-      : 0;
+      : { financeiro: 0, admin: 0 };
   }
 
-  await reply.send({ data: { sincronia: r.sincronia, aparelhos } });
+  // `data` continua sendo a sincronia, como na primeira versão da rota: o app
+  // que ainda está aberto no celular com o pacote antigo lê `data` direto, e
+  // mudar o formato deixava a tela do pedido em branco para ele.
+  await reply.send({
+    data: r.sincronia,
+    avisados,
+    aparelhos: avisados ? avisados.financeiro + avisados.admin : null,
+  });
 }

@@ -169,32 +169,47 @@ export function avisarFaturadoAoRep(
  * nota sairia errada — então quem mexe no Control é avisado na hora, com o
  * número de lá no título para ela achar o pedido sem procurar.
  */
+/** Quanto o pedido de atualização espera o push antes de responder "não sei". */
+export const TETO_DO_AVISO_MS = 5_000;
+
 export async function avisarPedidoMudouNoErp(
   company_id: string,
   pedido: { id: string; order_number: number | null; erp_order_id: string | null },
   quemPediu: string,
   observacao?: string | null,
-): Promise<number> {
+): Promise<{ financeiro: number; admin: number } | null> {
   const noControl = pedido.erp_order_id ? ` (${pedido.erp_order_id} no Control)` : '';
-  // ESPERA a entrega e devolve quantos aparelhos receberam: a tela não pode
-  // dizer "a fábrica foi avisada" sem saber se o aviso chegou em alguém. Falha
-  // de push vira zero — nunca derruba o registro do pedido de atualização.
+  const aviso = {
+    title: `Pedido #${pedido.order_number ?? ''} mudou depois de ir para o Control`,
+    body: observacao?.trim()
+      ? `${observacao.trim()} — atualize no Control${noControl}.`
+      : `O pedido mudou${noControl}. Veja o que mudou e atualize no Control.`,
+    url: `/orders/${pedido.id}`,
+    tag: `erp-sync-${pedido.id}`,
+  };
+
+  // Financeiro e admin contados separados: quem atualiza o Control é a Larissa,
+  // e "saiu para 1 aparelho" não pode esconder que foi só o do admin.
+  const envio = Promise.all([
+    enviarParaPapeis(company_id, ['financeiro'], aviso, quemPediu),
+    enviarParaPapeis(company_id, ['admin'], aviso, quemPediu),
+  ]).then(([financeiro, admin]) => ({ financeiro, admin }));
+
+  // Teto de tempo: o web-push não tem timeout próprio, e um serviço de push que
+  // aceita a conexão e não responde deixava a venda interna olhando "Avisando…"
+  // para sempre. Depois do teto o envio continua por trás; a resposta diz
+  // "não sei" (null) em vez de esperar.
+  let relogio: ReturnType<typeof setTimeout> | undefined;
+  const teto = new Promise<null>((resolver) => {
+    relogio = setTimeout(() => resolver(null), TETO_DO_AVISO_MS);
+    relogio.unref?.();
+  });
   try {
-    return await enviarParaPapeis(
-      company_id,
-      ['financeiro', 'admin'],
-      {
-        title: `Pedido #${pedido.order_number ?? ''} mudou depois de ir para o Control`,
-        body: observacao?.trim()
-          ? `${observacao.trim()} — atualize no Control${noControl}.`
-          : `O pedido mudou${noControl}. Veja o que mudou e atualize no Control.`,
-        url: `/orders/${pedido.id}`,
-        tag: `erp-sync-${pedido.id}`,
-      },
-      quemPediu,
-    );
+    return await Promise.race([envio, teto]);
   } catch (err) {
     console.error('[push] aviso de pedido mudou no ERP:', err);
-    return 0;
+    return null;
+  } finally {
+    if (relogio) clearTimeout(relogio);
   }
 }

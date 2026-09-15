@@ -94,6 +94,7 @@ describe('pedirAtualizacao — o botão da venda interna', () => {
           error: null,
         },
       ],
+      orders: { data: { invoiced: false }, error: null }, // sem nota: dá para pedir
     });
 
     const r = await pedirAtualizacao('o1', EMPRESA, 'simone', '  tirei 6 pecas da 0124  ');
@@ -328,5 +329,101 @@ describe('assinaturaDoPedido', () => {
     expect(assinaturaDoPedido({ items: [i], discount_percent: 5 })).not.toBe(base);
     expect(assinaturaDoPedido({ items: [i], payment_condition_id: 'c1' })).not.toBe(base);
     expect(assinaturaDoPedido({ items: [i], notes: 'x' })).not.toBe(base);
+  });
+});
+
+// ─── Segunda revisão (15/09/2026) ────────────────────────────────────────────
+
+describe('pedido faturado não tem o que atualizar no Control — para ninguém', () => {
+  it('pedir é recusado e nada é gravado', async () => {
+    const { pedirAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: { order_id: 'o1' }, error: null }, // lançado
+      ],
+      orders: { data: { invoiced: true }, error: null },
+    });
+
+    expect(await pedirAtualizacao('o1', EMPRESA, 'larissa')).toEqual({ ok: false, motivo: 'ja_faturado' });
+    expect(fake.ultimaGravacao('order_erp_sync', 'update')).toBeUndefined();
+  });
+
+  it('confirmar também', async () => {
+    const { confirmarAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null },
+        { data: { order_id: 'o1' }, error: null },
+      ],
+      orders: { data: { ...PEDIDO_LANCADO, invoiced: true }, error: null },
+    });
+
+    expect(await confirmarAtualizacao('o1', EMPRESA, 'larissa', 'qualquer')).toEqual({
+      ok: false,
+      motivo: 'ja_faturado',
+    });
+    expect(fake.ultimaGravacao('order_erp_sync', 'upsert')).toBeUndefined();
+  });
+});
+
+describe('confirmar com a lista que a Larissa conferiu IGUAL à do banco', () => {
+  it('passa, e grava exatamente a foto que foi conferida', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    // Como a TELA monta: itens com referência e tamanho, desconto como número.
+    const naTela = {
+      items: [
+        {
+          id: 'i1',
+          order_id: 'o1',
+          product_id: 'p1',
+          variant_id: 'v-m',
+          quantity: 6,
+          unit_price: 24.9,
+          total: 149.4,
+          product: { sku: '0124', name: 'PIJAMA' },
+          variant: { size: 'M' },
+        },
+      ],
+      discount_percent: 5,
+      payment_condition_id: null,
+      notes: 'entregar sexta',
+    };
+    // Como o BANCO devolve: sem os embeds, NUMERIC como texto, observação com espaço no fim.
+    const noBanco = {
+      id: 'o1',
+      erp_order_id: 'CS17379',
+      total: 141.93,
+      invoiced: false,
+      discount_percent: '5.00',
+      payment_condition_id: null,
+      notes: 'entregar sexta  ',
+      items: [{ id: 'i1', order_id: 'o1', product_id: 'p1', variant_id: 'v-m', quantity: 6, unit_price: 24.9, total: 149.4 }],
+    };
+    const { confirmarAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: [], error: null }, // o espaço da antecipação do dublê
+        { data: { order_id: 'o1' }, error: null }, // existe
+        {
+          data: {
+            erp_order_id: 'CS17379',
+            total: 141.93,
+            pecas: 6,
+            snapshot: noBanco,
+            confirmado_em: '2026-09-15T15:00:00Z',
+            pedido_em: null,
+            observacao: null,
+          },
+          error: null,
+        },
+      ],
+      orders: { data: noBanco, error: null },
+    });
+
+    const r = await confirmarAtualizacao('o1', EMPRESA, 'larissa', assinaturaDoPedido(naTela));
+
+    expect(r.ok).toBe(true);
+    expect(fake.ultimaGravacao('order_erp_sync', 'upsert')?.valores).toMatchObject({ pecas: 6, confirmado_por: 'larissa' });
+    // Uma leitura do pedido só: conferir e gravar a MESMA foto.
+    expect(fake.filtrosDe('orders', 'select')).toHaveLength(1);
   });
 });
