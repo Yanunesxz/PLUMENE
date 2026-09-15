@@ -281,10 +281,9 @@ _tools/
 │   │                estão vetados (upsert de preço duplicado) — ver o README.
 │   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
-├── SQL-PARA-RODAR-046-047.sql     → 046 e 047 num arquivo só, para os DOIS bancos (o de colar hoje)
-├── SQL-PARA-RODAR-046.sql         → a 046 sozinha (substituída pelo 046-047). Em 15/09 a API NÃO enxergava a tabela
-│                                    em nenhum dos dois bancos (PGRST205): colar e conferir com
-│                                    node _tools/conferir-046.mjs (GET de verdade, nunca HEAD)
+├── SQL-PARA-RODAR-046-047.sql     → 046 e 047 num arquivo só — JÁ APLICADO nos dois bancos (15/09)
+├── SQL-PARA-RODAR-046.sql         → a 046 sozinha (substituída pelo 046-047). Medido em 15/09 09:5x com
+│                                    node _tools/conferir-046-047.mjs: 046 e 047 visíveis nos DOIS bancos
 ├── SQL-PARA-RODAR-042-043-044.sql → medido em 15/09: 043/044 nos dois bancos; a 042 estava na
 │                                    PLUMENE e FALTAVA na Corpo Sensual. Meça antes de colar.
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
