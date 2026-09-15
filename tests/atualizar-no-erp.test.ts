@@ -427,3 +427,93 @@ describe('confirmar com a lista que a Larissa conferiu IGUAL à do banco', () =>
     expect(fake.filtrosDe('orders', 'select')).toHaveLength(1);
   });
 });
+
+// ─── Terceira revisão (15/09/2026) ───────────────────────────────────────────
+
+describe('garantirFotoDoErp — dúvida não é ausência', () => {
+  const SOLUCO: RespostaTabela = { data: null, error: { message: 'fetch failed', code: '' } };
+
+  it('se não deu para perguntar se a tabela existe, a edição PARA (falhou), em vez de gravar sem foto', async () => {
+    const { garantirFotoDoErp, fake } = await carregarServico({ order_erp_sync: SOLUCO });
+
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('falhou');
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+
+  it('se a busca pela foto falhar, também para — não se sabe se já havia foto', async () => {
+    const { garantirFotoDoErp, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // a tabela existe
+        SOLUCO, // a busca pela foto falha
+      ],
+      // O pedido existe: sem a checagem da busca, a foto sairia e seria gravada.
+      orders: { data: PEDIDO_LANCADO, error: null },
+    });
+
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('falhou');
+    expect(fake.ultimaGravacao('order_erp_sync', 'insert')).toBeUndefined();
+  });
+
+  it('tabela que NÃO existe continua deixando a edição passar, como antes da 046', async () => {
+    const { garantirFotoDoErp } = await carregarServico({ order_erp_sync: SEM_A_TABELA });
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('sem_tabela');
+  });
+});
+
+describe('pedirAtualizacao — a impressão do pedido no momento do aviso', () => {
+  const PEDIDO_NO_BANCO = {
+    id: 'o1',
+    invoiced: false,
+    discount_percent: 0,
+    payment_condition_id: null,
+    notes: null,
+    items: [{ id: 'i1', order_id: 'o1', product_id: 'p1', variant_id: null, quantity: 6, unit_price: 10, total: 60 }],
+  };
+  const LINHA_LIDA = {
+    erp_order_id: 'CS17379',
+    total: 120,
+    pecas: 12,
+    snapshot: PEDIDO_LANCADO,
+    confirmado_em: '2026-09-15T10:00:00Z',
+    pedido_em: '2026-09-15T11:00:00Z',
+    observacao: null,
+  };
+
+  it('guarda a impressão calculada do BANCO, não do aparelho', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    const { pedirAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // a tabela existe
+        { data: [], error: null }, // espaço da antecipação do dublê
+        { data: { order_id: 'o1' }, error: null }, // já lançado
+        { data: [], error: null }, // espaço
+        { data: [], error: null }, // a coluna assinatura_pedida existe
+        { data: LINHA_LIDA, error: null }, // o update, e a leitura final
+      ],
+      orders: { data: PEDIDO_NO_BANCO, error: null },
+    });
+
+    expect((await pedirAtualizacao('o1', EMPRESA, 'simone')).ok).toBe(true);
+    const gravado = fake.ultimaGravacao('order_erp_sync', 'update')?.valores as Record<string, unknown>;
+    expect(gravado.assinatura_pedida).toBe(assinaturaDoPedido(PEDIDO_NO_BANCO));
+  });
+
+  it('sem a coluna (tabela criada antes dela), grava o aviso sem ela — e não derruba a gravação', async () => {
+    const { pedirAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null },
+        { data: [], error: null },
+        { data: { order_id: 'o1' }, error: null },
+        { data: [], error: null },
+        { data: null, error: { message: 'column order_erp_sync.assinatura_pedida does not exist', code: '42703' } },
+        { data: LINHA_LIDA, error: null },
+      ],
+      orders: { data: PEDIDO_NO_BANCO, error: null },
+    });
+
+    expect((await pedirAtualizacao('o1', EMPRESA, 'simone')).ok).toBe(true);
+    const gravado = fake.ultimaGravacao('order_erp_sync', 'update')?.valores as Record<string, unknown>;
+    expect(gravado).not.toHaveProperty('assinatura_pedida');
+    expect(gravado.pedido_por).toBe('simone');
+  });
+});

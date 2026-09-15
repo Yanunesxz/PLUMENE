@@ -3,6 +3,7 @@ import { RefreshCw, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '../interface/Button.js';
 import { Textarea } from '../interface/Textarea.js';
 import { formatBRL } from '../../lib/utils.js';
+import { lerListaConferida, guardarListaConferida, esquecerListaConferida } from '../../lib/listaConferida.js';
 import {
   assinaturaDoPedido,
   divergenciaComOErp,
@@ -11,6 +12,8 @@ import {
 } from '@csb/shared';
 
 interface Props {
+  /** O pedido — é a chave da lista conferida guardada no aparelho. */
+  orderId: string;
   /** O que o Control conhece deste pedido (046). */
   sincronia: SincroniaComOErp;
   /** O pedido de HOJE: peças com referência e tamanho, desconto, condição e observação. */
@@ -20,8 +23,6 @@ interface Props {
    * número depois do lançamento, é pelo novo que ela acha o pedido lá.
    */
   numeroNoControl: string | null;
-  /** Última mudança no pedido (orders.updated_at) — para dizer se mudou depois do último aviso. */
-  atualizadoEm: string | null;
   /** Com a nota emitida não há o que atualizar: o cartão vira registro, sem botões. */
   faturado: boolean;
   /** Quem editou pede a atualização: a venda interna dona, ou o escritório. */
@@ -55,10 +56,10 @@ interface Props {
  * a lista "conferida" começa do zero.
  */
 export function AtualizarNoErp({
+  orderId,
   sincronia,
   pedidoHoje,
   numeroNoControl,
-  atualizadoEm,
   faturado,
   podePedir,
   podeConfirmar,
@@ -81,26 +82,49 @@ export function AtualizarNoErp({
   const assinaturaAgora = useMemo(() => assinaturaDoPedido(pedidoHoje), [pedidoHoje]);
 
   // A lista que a Larissa CONFERIU é a do momento em que o aviso apareceu para
-  // ela — não a do clique. A tela recarrega o pedido sozinha (token renovado,
-  // outra edição salva, a própria recarga depois de mexer); se a Simone mudou de
-  // novo nesse meio tempo, o clique mandaria a assinatura nova e a confirmação
-  // engoliria justamente a mudança que a Larissa não viu.
-  const [assinaturaVista, setAssinaturaVista] = useState<string | null>(null);
+  // ela — não a do clique. Fica guardada no aparelho (lib/listaConferida) porque
+  // a tela recarrega sozinha: o app se atualiza quando a aba sai da frente, e é
+  // exatamente quando ela vai digitar no Control. Se a Simone mudou de novo
+  // nesse meio tempo, a confirmação engoliria a mudança que a Larissa não viu.
+  //
+  // Só para quem CONFIRMA: para a venda interna, que é quem muda o pedido, um
+  // alarme de "mudou de novo" a cada edição dela seria ruído.
+  const [assinaturaVista, setAssinaturaVista] = useState<string | null>(() =>
+    podeConfirmar ? lerListaConferida(orderId, sincronia.confirmado_em) : null,
+  );
   useEffect(() => {
-    if (d.mudou && assinaturaVista === null) setAssinaturaVista(assinaturaAgora);
-  }, [d.mudou, assinaturaAgora, assinaturaVista]);
-  const mudouDeNovo = assinaturaVista !== null && assinaturaVista !== assinaturaAgora;
+    if (!podeConfirmar) return;
+    if (!d.mudou) {
+      // O pedido voltou a bater com o Control (a edição foi desfeita): a próxima
+      // divergência é outra conversa e começa do zero.
+      if (assinaturaVista !== null) {
+        setAssinaturaVista(null);
+        esquecerListaConferida(orderId, sincronia.confirmado_em);
+      }
+      return;
+    }
+    if (assinaturaVista === null) {
+      setAssinaturaVista(assinaturaAgora);
+      guardarListaConferida(orderId, sincronia.confirmado_em, assinaturaAgora);
+    }
+  }, [podeConfirmar, d.mudou, assinaturaAgora, assinaturaVista, orderId, sincronia.confirmado_em]);
+  const mudouDeNovo = podeConfirmar && assinaturaVista !== null && assinaturaVista !== assinaturaAgora;
+
+  const conferirListaNova = () => {
+    setAssinaturaVista(assinaturaAgora);
+    guardarListaConferida(orderId, sincronia.confirmado_em, assinaturaAgora);
+  };
 
   // O Control está em dia: nada a dizer.
   if (!d.mudou) return null;
 
   const jaPediu = Boolean(sincronia.pedido_em);
-  // Mudou depois do último aviso: a lista abaixo tem mais do que a venda interna
-  // avisou (vale também para quem abriu o pedido agora, sem ter visto antes).
+  // A venda interna mudou o pedido DE NOVO depois do último aviso: a lista abaixo
+  // tem mudança que ninguém avisou. Pela impressão guardada no aviso, não pela
+  // data de alteração do pedido — carimbo de faturado e correção de número
+  // também mexem nessa data e acendiam a frase sem mudança nenhuma.
   const mudouDepoisDoAviso =
-    jaPediu &&
-    !!atualizadoEm &&
-    new Date(atualizadoEm).getTime() - new Date(sincronia.pedido_em as string).getTime() > 1_000;
+    jaPediu && !faturado && !!sincronia.assinatura_pedida && sincronia.assinatura_pedida !== assinaturaAgora;
 
   const quando = (iso: string) =>
     new Date(iso).toLocaleString('pt-BR', {
@@ -170,17 +194,22 @@ export function AtualizarNoErp({
             <p className="mt-2 rounded-lg bg-card/60 px-2.5 py-1.5 text-xs text-warn-soft-foreground">
               Atualização pedida em {quando(sincronia.pedido_em as string)}
               {sincronia.observacao ? `: “${sincronia.observacao}”` : '.'}
-              {mudouDepoisDoAviso ? ' O pedido mudou de novo depois desse aviso — a lista acima já inclui.' : ''}
+              {mudouDepoisDoAviso ? (
+                <span className="mt-1 block font-semibold">
+                  A venda interna mudou o pedido de novo depois desse aviso. A lista acima já tem a mudança nova — confira
+                  tudo, não só o que foi avisado.
+                </span>
+              ) : null}
             </p>
           )}
 
           {mudouDeNovo && !faturado && (
             <div className="mt-2 rounded-lg border border-danger/40 bg-danger-soft px-2.5 py-2 text-xs text-danger-soft-foreground">
-              <p className="font-semibold">O pedido mudou de novo enquanto esta tela estava aberta.</p>
+              <p className="font-semibold">O pedido mudou depois que você conferiu a lista.</p>
               <p className="mt-0.5">Confira a lista acima outra vez antes de dizer que atualizou o Control.</p>
               <button
                 type="button"
-                onClick={() => setAssinaturaVista(assinaturaAgora)}
+                onClick={conferirListaNova}
                 className="mt-1.5 font-semibold underline"
               >
                 Conferi a lista nova
