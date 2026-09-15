@@ -311,7 +311,11 @@ export async function receberRepresentantes(
     const campos: Record<string, unknown> = { name: nome, updated_at: new Date().toISOString() };
     const email = txt(raw.email);
     if (email) campos['email'] = email.toLowerCase();
-    if (raw.ativo != null) campos['active'] = flagSim(raw.ativo);
+    // "Só é alterado quando vem": string vazia (um CHAR nulo do Firebird
+    // serializado como "") NÃO é "veio" — antes ela desligava o login do rep a
+    // cada envio, em silêncio.
+    const ativo = typeof raw.ativo === 'boolean' ? raw.ativo : txt(raw.ativo);
+    if (ativo != null) campos['active'] = flagSim(ativo);
 
     const { error } = await supabase.from('users').update(campos).eq('id', existenteId);
     if (error) throw new Error(`Atualizar rep ${codigo} falhou: ${error.message}`);

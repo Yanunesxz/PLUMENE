@@ -79,3 +79,32 @@ describe('detectar coluna', () => {
     expect(await detectar('customers', 'cep')).toBe(true);
   });
 });
+
+/**
+ * A variante que NÃO degrada. Existe para a coluna que é FILTRO da fila do
+ * parceiro (`orders.invoiced`): ler um soluço de rede como "não existe" tiraria
+ * o filtro de faturado em silêncio, e o ERP importaria de novo o que a
+ * Larissa já faturou à mão.
+ */
+describe('detectarOuFalhar', () => {
+  it('responde igual ao detectar quando o banco fala do schema: sim e não', async () => {
+    const { detectarOuFalhar } = await carregar({ orders: [ok, semColuna] });
+    expect(await detectarOuFalhar('orders', 'invoiced')).toBe(true);
+    expect(await detectarOuFalhar('orders', 'discount_percent')).toBe(false);
+  });
+
+  it('soluço do Supabase LANÇA em vez de responder "não" — e não memoriza nada', async () => {
+    const { detectarOuFalhar, fake } = await carregar({ orders: [soluco, ok] });
+    await expect(detectarOuFalhar('orders', 'invoiced')).rejects.toThrow(/orders\.invoiced/);
+    // Na chamada seguinte pergunta de novo, e o banco já respondeu.
+    expect(await detectarOuFalhar('orders', 'invoiced')).toBe(true);
+    expect(fake.filtrosDe('orders', 'select')).toHaveLength(2);
+  });
+
+  it('divide a memória com o detectar: o "sim" lembrado por um vale para o outro', async () => {
+    const { detectar, detectarOuFalhar, fake } = await carregar({ orders: [ok] });
+    expect(await detectar('orders', 'invoiced')).toBe(true);
+    expect(await detectarOuFalhar('orders', 'invoiced')).toBe(true);
+    expect(fake.filtrosDe('orders', 'select')).toHaveLength(1);
+  });
+});

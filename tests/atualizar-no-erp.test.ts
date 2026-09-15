@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
-import { esquecerDeteccoes } from '../apps/api/src/lib/detectarColuna.js';
 
 /**
  * "ATUALIZAR NO ERP" (migração 046).
@@ -40,9 +39,10 @@ const SEM_A_TABELA: RespostaTabela = {
   error: { message: 'relation "order_erp_sync" does not exist', code: '42P01' },
 };
 
+// `vi.resetModules()` já isola: cada import dinâmico reavalia detectarColuna.js
+// numa instância nova, com a memória de sondas vazia.
 beforeEach(() => {
   vi.resetModules();
-  esquecerDeteccoes();
 });
 
 describe('registrarNoErp — a foto do que o Control conhece', () => {

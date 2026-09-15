@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
-import { esquecerDeteccoes } from '../apps/api/src/lib/detectarColuna.js';
 import { LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
 
 /**
@@ -106,9 +105,10 @@ async function carregar(respostas: Record<string, RespostaTabela | RespostaTabel
   return { ...mod, fake, registrarNoErp };
 }
 
+// `vi.resetModules()` já isola: o `import(SERVICO)` de cada teste reavalia
+// detectarColuna.js numa instância nova, com a memória de sondas vazia.
 beforeEach(() => {
   vi.resetModules();
-  esquecerDeteccoes();
 });
 afterEach(() => {
   vi.doUnmock(SUPABASE);
@@ -151,6 +151,22 @@ describe('a fila de pedidos para o ERP', () => {
 
     expect(fake.filtrosDe('orders', 'or')).toHaveLength(0);
     expect(p!.faturado).toBe(false);
+  });
+
+  it('sonda de invoiced que falha por rede LANÇA — a fila nunca sai sem o filtro de faturado', async () => {
+    // Um soluço lido como "coluna não existe" tiraria o `.or('invoiced...')` em
+    // silêncio, e a fila entregaria os pedidos faturados à mão (os 19 de 21 da
+    // CS) para o Control importar de novo. Aqui é 500, e o ERP tenta depois.
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem(
+        [{ data: [pedido()], error: null }],
+        [OK, { data: null, error: { message: 'timeout' } }, OK, OK],
+      ),
+      price_tables: { data: [], error: null },
+    });
+
+    await expect(getPartnerOrders(EMPRESA, {})).rejects.toThrow(/orders\.invoiced/);
+    expect(fake.filtrosDe('orders', 'range')).toHaveLength(0);
   });
 
   it('`desde` filtra por atualizado_em — a "data que eu puxei" do parceiro', async () => {
@@ -458,6 +474,20 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
   });
 
+  it('id sem forma de UUID (22P02) é not_found — não um 500 que o ERP repetiria para sempre', async () => {
+    // `orders.id` é uuid: "abc" (ou um id cortado num CHAR(30) do Firebird) faz
+    // o Postgres recusar o texto. Isso é "não existe pedido com esse id".
+    const { confirmOrderImport, fake } = await carregar({
+      orders: emSequencia({
+        data: null,
+        error: { message: 'invalid input syntax for type uuid: "abc"', code: '22P02' },
+      }),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'abc', 'CS17379')).toEqual({ outcome: 'not_found' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
   it('repetir com o MESMO número (em qualquer grafia) é idempotente: ok, sem gravar', async () => {
     const { confirmOrderImport, fake, registrarNoErp } = await carregar({
       orders: emSequencia(LIDO({ id: 'o1', status: 'sent_erp', erp_order_id: 'cs 17379' })),
@@ -521,8 +551,8 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(registrarNoErp).not.toHaveBeenCalled();
   });
 
-  it('sem a coluna order_number, o dono volta só com o id', async () => {
-    const { confirmOrderImport } = await carregar({
+  it('sem a coluna order_number, o dono volta só com o id — e a consulta não pede a coluna', async () => {
+    const { confirmOrderImport, fake } = await carregar({
       orders: emSequencia(APROVADO, COLUNA_AUSENTE, { data: [{ id: 'o2' }], error: null }),
     });
 
@@ -530,6 +560,12 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
       outcome: 'number_in_use',
       pedido_em_uso: { id: 'o2', numero: null },
     });
+    // O dublê devolve a linha qualquer que seja o select; o que prova o teste é
+    // o select em si — pedir `order_number` num banco sem a coluna seria 42703
+    // (500) em toda confirmação.
+    const selects = fake.filtrosDe('orders', 'select').map((f) => String(f.args[0]));
+    expect(selects).toContain('id');
+    expect(selects).not.toContain('id, order_number');
   });
 
   it('o índice único da 042 (23505) na gravação vira o mesmo "número em uso", não 500', async () => {

@@ -49,6 +49,9 @@ async function carregarAuth(env: string | undefined) {
 describe('requirePartner', () => {
   afterEach(() => {
     delete process.env['PARTNER_API_KEYS'];
+    // O spy de console.error do cenário do JSON inválido: restaurado aqui, e
+    // não dentro do teste, para um expect falho não deixá-lo vazar.
+    vi.restoreAllMocks();
   });
 
   it('sem PARTNER_API_KEYS a API está desligada: 503, mesmo com a chave certa', async () => {
@@ -71,7 +74,6 @@ describe('requirePartner', () => {
 
     expect(await requirePartner(requisicao(CHAVE), reply)).toBeNull();
     expect(enviado.status).toBe(503);
-    vi.restoreAllMocks();
   });
 
   it('chave errada é 401 PARTNER_UNAUTHORIZED', async () => {

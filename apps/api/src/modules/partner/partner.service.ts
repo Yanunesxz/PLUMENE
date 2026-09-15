@@ -15,7 +15,7 @@ import {
 } from '@csb/shared';
 import type { OrderStatus } from '@csb/shared';
 import { registrarNoErp } from '../orders/erpSync.service.js';
-import { detectar } from '../../lib/detectarColuna.js';
+import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
@@ -132,11 +132,17 @@ function buildOrderSelect(c: ColunasOpcionais): string {
  * rodar com a API de pé e o campo passa a sair sozinho, sem reiniciar. O
  * cache próprio que morava aqui memorizava qualquer erro de rede como
  * "coluna não existe" até o próximo restart.
+ *
+ * Só `invoiced` NÃO pode degradar: ela é FILTRO da fila (não só campo do
+ * SELECT). Se a sonda falhar por rede e for lida como "não existe", a fila sai
+ * sem `.or('invoiced...')` e entrega os pedidos faturados à mão — exatamente o
+ * que o filtro existe para impedir. Então ali o erro sobe (500) e o ERP tenta
+ * de novo na próxima rodada, como a doc manda.
  */
 async function detectarColunas(): Promise<ColunasOpcionais> {
   const [orderNumber, invoiced, condition, discount] = await Promise.all([
     detectar('orders', 'order_number'),
-    detectar('orders', 'invoiced'),
+    detectarOuFalhar('orders', 'invoiced'),
     detectar('orders', 'payment_condition_id'),
     detectar('orders', 'discount_percent'),
   ]);
@@ -315,6 +321,9 @@ export type ConfirmResult =
 /** Postgres: violação de chave única — o índice da migração 042 no número do Control. */
 const CHAVE_DUPLICADA = '23505';
 
+/** Postgres: "invalid input syntax for type uuid" — o `:id` não tem forma de id. */
+const ID_MALFORMADO = '22P02';
+
 interface PedidoLido {
   id: string;
   status: string;
@@ -331,7 +340,14 @@ async function lerPedido(company_id: string, order_id: string): Promise<PedidoLi
 
   // Erro de banco NÃO é "não existe": com o `.single()` de antes, um timeout
   // do Supabase virava 404 e o robô do ERP concluía que o pedido tinha sumido.
-  if (error) throw new Error(`Falha ao ler o pedido: ${error.message}`);
+  // A exceção é o id sem forma de UUID ("abc", ou um id cortado num CHAR(30)
+  // do Firebird): o Postgres recusa o texto (22P02), e isso É "não existe
+  // pedido com esse id" — como 500, a doc mandaria o ERP repetir a mesma
+  // chamada errada em toda rodada, sem nunca chegar a um 4xx.
+  if (error) {
+    if ((error as { code?: string }).code === ID_MALFORMADO) return null;
+    throw new Error(`Falha ao ler o pedido: ${error.message}`);
+  }
   return (data as PedidoLido | null) ?? null;
 }
 

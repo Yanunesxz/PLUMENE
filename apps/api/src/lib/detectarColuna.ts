@@ -39,19 +39,22 @@ export function esquecerDeteccoes(): void {
   memoria.clear();
 }
 
+/** O que a sonda descobriu: uma resposta sobre o schema, ou nenhuma (rede, timeout, 503). */
+type Sondagem = 'existe' | 'nao_existe' | 'sem_resposta';
+
 /**
  * `tabela` + `coluna` identificam a pergunta e a chave do cache. Sem `coluna`,
  * pergunta se a TABELA existe.
  */
-export async function detectar(tabela: string, coluna?: string): Promise<boolean> {
+async function sondar(tabela: string, coluna?: string): Promise<Sondagem> {
   const chave = coluna ? `${tabela}.${coluna}` : tabela;
   const lembrado = memoria.get(chave);
-  if (lembrado && lembrado.ate > Date.now()) return lembrado.existe;
+  if (lembrado && lembrado.ate > Date.now()) return lembrado.existe ? 'existe' : 'nao_existe';
 
   const { error } = await supabase.from(tabela).select(coluna ?? 'id').limit(1);
   if (!error) {
     memoria.set(chave, { existe: true, ate: Number.POSITIVE_INFINITY });
-    return true;
+    return 'existe';
   }
 
   // Ausência de verdade: guarda por pouco tempo — o SQL pode rodar a qualquer
@@ -59,11 +62,39 @@ export async function detectar(tabela: string, coluna?: string): Promise<boolean
   const codigo = (error as { code?: string }).code ?? '';
   if (CODIGOS_DE_AUSENCIA.has(codigo) || /does not exist|schema cache/i.test(error.message ?? '')) {
     memoria.set(chave, { existe: false, ate: Date.now() + VALIDADE_DO_NAO_MS });
-    return false;
+    return 'nao_existe';
   }
 
   // Rede, timeout, 503: não é resposta sobre o schema. Não memoriza nada —
-  // responde "não" desta vez (o chamador degrada) e pergunta de novo na
-  // próxima, em vez de desligar o recurso até o fim do processo.
-  return false;
+  // pergunta de novo na próxima vez, em vez de desligar o recurso até o fim
+  // do processo.
+  return 'sem_resposta';
+}
+
+/**
+ * "Existe?" — e, quando o banco não respondeu sobre o schema, responde "não"
+ * desta vez (o chamador degrada: o campo sai null, a coluna nova não é
+ * gravada). É a resposta certa para SELECT e para gravação opcional.
+ */
+export async function detectar(tabela: string, coluna?: string): Promise<boolean> {
+  return (await sondar(tabela, coluna)) === 'existe';
+}
+
+/**
+ * Igual a `detectar`, mas LANÇA quando a sonda não foi resposta sobre o schema.
+ *
+ * Para quando degradar é perigoso: um FILTRO que existe para impedir
+ * lançamento duplicado (o `invoiced` da fila do parceiro) não pode sumir em
+ * silêncio porque o Supabase soluçou no arranque — a fila sairia com os
+ * pedidos faturados à mão dentro, e o ERP os importaria de novo. Aqui o erro
+ * sobe (vira 500 na API) e o robô tenta de novo na próxima rodada. A memória
+ * é a mesma de `detectar`: o "sim" lembrado vale para os dois.
+ */
+export async function detectarOuFalhar(tabela: string, coluna?: string): Promise<boolean> {
+  const sondagem = await sondar(tabela, coluna);
+  if (sondagem === 'sem_resposta') {
+    const alvo = coluna ? `${tabela}.${coluna}` : tabela;
+    throw new Error(`Falha ao sondar ${alvo}: o banco não respondeu sobre o schema`);
+  }
+  return sondagem === 'existe';
 }
