@@ -32,11 +32,16 @@ export interface FaturamentoParceiro {
   /** ISO da emissão da nota. Ausente = agora. */
   faturado_em?: string | null;
   /**
-   * O valor que a nota realmente fechou. Ausente = mantém o do pedido.
-   * É normal ser MENOR que o pedido: o que faltou no estoque não é faturado.
+   * O valor que a nota realmente fechou. Ausente = fica NULL (reenviar sem o
+   * valor APAGA o informado antes, e o painel volta ao valor do pedido); zero
+   * não é nota. É normal ser MENOR que o pedido: o que faltou no estoque não
+   * é faturado.
    */
   valor_faturado?: number | null;
 }
+
+/** Postgres: "invalid input syntax for type uuid" — o `id` não tem forma de id. */
+const ID_MALFORMADO = '22P02';
 
 export interface ResultadoFaturamento {
   recebidos: number;
@@ -90,7 +95,10 @@ export async function receberFaturamento(
       : busca.eq('id', id as string);
 
     const { data: pedido, error: erroBusca } = await busca.maybeSingle();
-    if (erroBusca) {
+    // `id` sem forma de UUID: o Postgres recusa o texto (22P02). Isso é "não
+    // existe pedido com esse id", não "falha ao buscar" — senão a doc mandaria
+    // o ERP reenviar o mesmo id errado a cada rodada.
+    if (erroBusca && (erroBusca as { code?: string }).code !== ID_MALFORMADO) {
       ignorados.push({ pedido: referencia, motivo: `falha ao buscar: ${erroBusca.message}` });
       continue;
     }

@@ -240,4 +240,39 @@ describe('representantes', () => {
 
     expect(fake.gravacoes.some((g) => g.tabela === 'users' && g.operacao === 'insert')).toBe(false);
   });
+
+  it('`ativo` vazio ("") é "não veio": não mexe no acesso do rep', async () => {
+    // Um CHAR nulo do Firebird costuma sair como "" no JSON gerado à mão. Antes,
+    // "" contava como "veio" e virava active=false — desligava o login a cada envio.
+    const { service, fake } = await carregar({
+      users: [
+        { data: [{ id: 'u1', erp_rep_id: 'R01' }], error: null },
+        { data: null, error: null },
+      ],
+    });
+
+    const r = await service.receberRepresentantes(EMPRESA, [{ codigo: 'R01', nome: 'SIMONE', ativo: '' }]);
+
+    expect(r.atualizados).toBe(1);
+    const update = fake.gravacoes.find((g) => g.tabela === 'users' && g.operacao === 'update');
+    expect('active' in (update!.valores as Record<string, unknown>)).toBe(false);
+  });
+
+  it('`ativo: "N"` (ou false) desativa; `"S"` (ou true) reativa', async () => {
+    const { service, fake } = await carregar({
+      users: [
+        { data: [{ id: 'u1', erp_rep_id: 'R01' }, { id: 'u2', erp_rep_id: 'R02' }], error: null },
+        { data: null, error: null },
+        { data: null, error: null },
+      ],
+    });
+
+    await service.receberRepresentantes(EMPRESA, [
+      { codigo: 'R01', nome: 'SIMONE', ativo: 'N' },
+      { codigo: 'R02', nome: 'CARLA', ativo: true },
+    ]);
+
+    const updates = fake.gravacoes.filter((g) => g.tabela === 'users' && g.operacao === 'update');
+    expect(updates.map((u) => (u.valores as Record<string, unknown>)['active'])).toEqual([false, true]);
+  });
 });

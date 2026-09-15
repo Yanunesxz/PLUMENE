@@ -6,8 +6,17 @@
  * daí o pedido fica como `sent_erp` e sai da fila.
  */
 import { supabase } from '../../config/supabase.js';
-import { coresPorSku, semLinhasDeCor, normalizarNumeroErp } from '@csb/shared';
+import {
+  coresPorSku,
+  semLinhasDeCor,
+  normalizarNumeroErp,
+  numeroErpValido,
+  ORDER_STATUS_FLOW,
+} from '@csb/shared';
+import type { OrderStatus } from '@csb/shared';
 import { registrarNoErp } from '../orders/erpSync.service.js';
+import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
+import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
 const COR_SORTIDA = '00001';
@@ -115,24 +124,29 @@ function buildOrderSelect(c: ColunasOpcionais): string {
   `;
 }
 
-// Colunas de migrações que podem não estar aplicadas (009, 027, 028, 029).
-// Detecta uma vez e guarda; sem a coluna, o campo correspondente sai null/0.
-let colunasDetectadas: ColunasOpcionais | null = null;
-
-async function detectColunas(): Promise<ColunasOpcionais> {
-  if (colunasDetectadas) return colunasDetectadas;
-  const probe = async (coluna: string) => {
-    const { error } = await supabase.from('orders').select(coluna).limit(1);
-    return !error;
-  };
+/**
+ * Colunas de migrações que podem não estar aplicadas (009, 027, 028, 029).
+ * Sem a coluna, o campo correspondente sai null/0.
+ *
+ * `detectar` lembra o "sim" para sempre e o "não" por 30 s: a migração pode
+ * rodar com a API de pé e o campo passa a sair sozinho, sem reiniciar. O
+ * cache próprio que morava aqui memorizava qualquer erro de rede como
+ * "coluna não existe" até o próximo restart.
+ *
+ * Só `invoiced` NÃO pode degradar: ela é FILTRO da fila (não só campo do
+ * SELECT). Se a sonda falhar por rede e for lida como "não existe", a fila sai
+ * sem `.or('invoiced...')` e entrega os pedidos faturados à mão — exatamente o
+ * que o filtro existe para impedir. Então ali o erro sobe (500) e o ERP tenta
+ * de novo na próxima rodada, como a doc manda.
+ */
+async function detectarColunas(): Promise<ColunasOpcionais> {
   const [orderNumber, invoiced, condition, discount] = await Promise.all([
-    probe('order_number'),
-    probe('invoiced'),
-    probe('payment_condition_id'),
-    probe('discount_percent'),
+    detectar('orders', 'order_number'),
+    detectarOuFalhar('orders', 'invoiced'),
+    detectar('orders', 'payment_condition_id'),
+    detectar('orders', 'discount_percent'),
   ]);
-  colunasDetectadas = { orderNumber, invoiced, condition, discount };
-  return colunasDetectadas;
+  return { orderNumber, invoiced, condition, discount };
 }
 
 function mapOrder(
@@ -226,16 +240,23 @@ function mapOrder(
 async function getPriceTableMap(
   company_id: string,
 ): Promise<Map<string, { erp_code: string | null; price_column: number }>> {
-  const { data } = await supabase
-    .from('price_tables')
-    .select('id, erp_code, price_column')
-    .eq('company_id', company_id);
+  // Erro sobe (500): mapa vazio faria todo pedido sair com pendência de
+  // tabela sem motivo, e o robô do ERP acreditaria.
+  const tabelas = await buscarTudoOuFalhar<{
+    id: string;
+    erp_code: string | null;
+    price_column: number | null;
+  }>((de, ate) =>
+    supabase
+      .from('price_tables')
+      .select('id, erp_code, price_column')
+      .eq('company_id', company_id)
+      .order('id')
+      .range(de, ate),
+  );
 
   return new Map(
-    (data ?? []).map((t: { id: string; erp_code: string | null; price_column: number | null }) => [
-      t.id,
-      { erp_code: t.erp_code, price_column: t.price_column ?? 1 },
-    ]),
+    tabelas.map((t) => [t.id, { erp_code: t.erp_code, price_column: t.price_column ?? 1 }]),
   );
 }
 
@@ -243,79 +264,192 @@ async function getPriceTableMap(
  * Pedidos aprovados aguardando importação no ERP (padrão), ou todos os
  * aprovados/importados quando `incluir=todos`. `desde` filtra por
  * atualizado_em >= data (a "data que eu puxei" do parceiro).
+ *
+ * A lista vem INTEIRA: o PostgREST corta em 1.000 linhas em silêncio, e com
+ * `incluir=todos` (a reconciliação) o ERP concluiria que o resto dos pedidos
+ * não existe. Erro em qualquer página sobe — nunca "200 com a lista pela
+ * metade".
  */
 export async function getPartnerOrders(
   company_id: string,
   opts: { desde?: string | undefined; incluirImportados?: boolean },
 ): Promise<PartnerOrder[]> {
-  const colunas = await detectColunas();
-  let query = supabase
-    .from('orders')
-    .select(buildOrderSelect(colunas))
-    .eq('company_id', company_id)
-    .order('created_at', { ascending: true });
+  const colunas = await detectarColunas();
+  const select = buildOrderSelect(colunas);
 
-  if (opts.incluirImportados) {
-    query = query.in('status', ['approved', 'sent_erp']);
-  } else {
-    query = query.eq('status', 'approved').is('erp_order_id', null);
-  }
-  if (opts.desde) {
-    query = query.gte('updated_at', opts.desde);
-  }
+  const linhas = await buscarTudoOuFalhar<OrderRow>((de, ate) => {
+    let query = supabase.from('orders').select(select).eq('company_id', company_id);
 
-  const { data, error } = await query;
-  if (error) throw new Error(`Falha ao buscar pedidos: ${error.message}`);
+    if (opts.incluirImportados) {
+      query = query.in('status', ['approved', 'sent_erp']);
+    } else {
+      // A fila: aprovado, sem número do Control e NÃO faturado. O carimbo
+      // manual de faturado não exige número — sem este filtro, 19 dos 21
+      // pedidos da fila da Corpo Sensual (11/09/2026) já estavam faturados e
+      // iriam para o Control de novo.
+      query = query.eq('status', 'approved').is('erp_order_id', null);
+      if (colunas.invoiced) query = query.or('invoiced.is.null,invoiced.eq.false');
+    }
+    if (opts.desde) {
+      query = query.gte('updated_at', opts.desde);
+    }
+
+    // O desempate por id é o que faz o `.range()` valer: dois pedidos criados
+    // no mesmo instante trocariam de lugar entre uma página e a outra.
+    return query
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(de, ate);
+  });
 
   const tableMap = await getPriceTableMap(company_id);
-  return ((data ?? []) as unknown as OrderRow[]).map((row) => mapOrder(row, tableMap));
+  return linhas.map((row) => mapOrder(row, tableMap));
 }
 
 export type ConfirmResult =
   | { outcome: 'ok'; ja_confirmado: boolean }
+  /** `pedido_erp` fora da máscara duas letras + até 10 dígitos. */
+  | { outcome: 'invalid_number' }
   | { outcome: 'not_found' }
-  | { outcome: 'conflict'; pedido_erp_atual: string };
+  /** Este pedido já tem OUTRO número do Control. */
+  | { outcome: 'conflict'; pedido_erp_atual: string }
+  /** O status atual não deixa o pedido ir para sent_erp (rascunho, recusado, em triagem…). */
+  | { outcome: 'not_confirmable'; situacao: string }
+  /** O número já é de OUTRO pedido desta empresa. `pedido_em_uso` é null se não deu para achá-lo. */
+  | { outcome: 'number_in_use'; pedido_em_uso: { id: string; numero: number | null } | null };
+
+/** Postgres: violação de chave única — o índice da migração 042 no número do Control. */
+const CHAVE_DUPLICADA = '23505';
+
+/** Postgres: "invalid input syntax for type uuid" — o `:id` não tem forma de id. */
+const ID_MALFORMADO = '22P02';
+
+interface PedidoLido {
+  id: string;
+  status: string;
+  erp_order_id: string | null;
+}
+
+async function lerPedido(company_id: string, order_id: string): Promise<PedidoLido | null> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('id, status, erp_order_id')
+    .eq('id', order_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  // Erro de banco NÃO é "não existe": com o `.single()` de antes, um timeout
+  // do Supabase virava 404 e o robô do ERP concluía que o pedido tinha sumido.
+  // A exceção é o id sem forma de UUID ("abc", ou um id cortado num CHAR(30)
+  // do Firebird): o Postgres recusa o texto (22P02), e isso É "não existe
+  // pedido com esse id" — como 500, a doc mandaria o ERP repetir a mesma
+  // chamada errada em toda rodada, sem nunca chegar a um 4xx.
+  if (error) {
+    if ((error as { code?: string }).code === ID_MALFORMADO) return null;
+    throw new Error(`Falha ao ler o pedido: ${error.message}`);
+  }
+  return (data as PedidoLido | null) ?? null;
+}
+
+/**
+ * O OUTRO pedido desta empresa que já usa o número — `null` quando está livre.
+ * É a mesma pergunta que o financeiro faz ao lançar à mão (ERP_NUMBER_IN_USE
+ * em orders.service.ts); o número do Control é de UM pedido só.
+ */
+async function donoDoNumero(
+  company_id: string,
+  numero: string,
+  order_id: string,
+): Promise<{ id: string; numero: number | null } | null> {
+  const temNumero = await detectar('orders', 'order_number');
+  const { data, error } = await supabase
+    .from('orders')
+    .select(temNumero ? 'id, order_number' : 'id')
+    .eq('company_id', company_id)
+    .eq('erp_order_id', numero)
+    .neq('id', order_id)
+    .limit(1);
+
+  if (error) throw new Error(`Falha ao conferir o número do Control: ${error.message}`);
+  const dono = Array.isArray(data)
+    ? (data[0] as { id: string; order_number?: number | null } | undefined)
+    : undefined;
+  return dono ? { id: dono.id, numero: dono.order_number ?? null } : null;
+}
+
+/** Pedido que já tem número: o mesmo é idempotente, outro é conflito. */
+function respostaParaJaConfirmado(atual: string, numero: string): ConfirmResult {
+  if (normalizarNumeroErp(atual) === numero) return { outcome: 'ok', ja_confirmado: true };
+  return { outcome: 'conflict', pedido_erp_atual: atual };
+}
 
 /**
  * Confirma a importação: grava o número do pedido gerado no ERP e tira o
  * pedido da fila. Idempotente — repetir com o mesmo número responde ok.
+ *
+ * A ordem das checagens é contrato (15/09/2026): formato → existe → já tem
+ * número → status permite → número livre → grava (só se ninguém gravou no
+ * meio). O "já tem número" vem ANTES do status para reconfirmar um `sent_erp`
+ * continuar idempotente.
  */
 export async function confirmOrderImport(
   company_id: string,
   order_id: string,
   pedido_erp: string,
 ): Promise<ConfirmResult> {
-  const { data: order } = await supabase
-    .from('orders')
-    .select('id, status, erp_order_id')
-    .eq('id', order_id)
-    .eq('company_id', company_id)
-    .single();
+  // Uma grafia só para o número do Control: é por ele que o faturamento acha o
+  // pedido depois, e "sx-14627" não pode virar um pedido diferente de "SX14627".
+  // E é a mesma máscara que o financeiro precisa respeitar ao lançar à mão.
+  const numero = normalizarNumeroErp(pedido_erp);
+  if (!numeroErpValido(numero)) return { outcome: 'invalid_number' };
 
-  if (!order) return { outcome: 'not_found' };
+  const pedido = await lerPedido(company_id, order_id);
+  if (!pedido) return { outcome: 'not_found' };
 
-  // Uma grafia so para o numero do Control: e por ele que o faturamento acha o
-  // pedido depois, e "sx-14627" nao pode virar um pedido diferente de "SX14627".
-  const numero = normalizarNumeroErp(pedido_erp) || pedido_erp.trim();
+  if (pedido.erp_order_id) return respostaParaJaConfirmado(pedido.erp_order_id, numero);
 
-  if (order.erp_order_id) {
-    const atual = normalizarNumeroErp(order.erp_order_id as string);
-    if (atual === numero) return { outcome: 'ok', ja_confirmado: true };
-    return { outcome: 'conflict', pedido_erp_atual: order.erp_order_id as string };
-  }
+  // Só o que o fluxo do app deixa ir para sent_erp (hoje approved e error_erp).
+  // Sem isto, um id errado promovia rascunho, recusado ou pedido em triagem
+  // direto para "enviado ao ERP".
+  const destinos = (ORDER_STATUS_FLOW as Record<string, OrderStatus[] | undefined>)[pedido.status];
+  if (!destinos?.includes('sent_erp')) return { outcome: 'not_confirmable', situacao: pedido.status };
 
-  const { error } = await supabase
+  const dono = await donoDoNumero(company_id, numero, order_id);
+  if (dono) return { outcome: 'number_in_use', pedido_em_uso: dono };
+
+  const agora = new Date().toISOString();
+  const { data: afetadas, error } = await supabase
     .from('orders')
     .update({
       status: 'sent_erp',
       erp_order_id: numero,
-      synced_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
+      synced_at: agora,
+      updated_at: agora,
     })
     .eq('id', order_id)
-    .eq('company_id', company_id);
+    .eq('company_id', company_id)
+    // Só grava se ninguém gravou no meio: duas confirmações simultâneas com
+    // números diferentes não podem passar as duas com a última vencendo.
+    .is('erp_order_id', null)
+    .select('id');
 
-  if (error) throw new Error(`Falha ao confirmar pedido: ${error.message}`);
+  if (error) {
+    // O índice único da 042 pegou o que a pré-checagem não viu (corrida).
+    if ((error as { code?: string }).code === CHAVE_DUPLICADA) {
+      const emUso = await donoDoNumero(company_id, numero, order_id).catch(() => null);
+      return { outcome: 'number_in_use', pedido_em_uso: emUso };
+    }
+    throw new Error(`Falha ao confirmar pedido: ${error.message}`);
+  }
+
+  // Nenhuma linha afetada = alguém confirmou entre a leitura e a gravação.
+  // Responde como se o pedido já tivesse número (idempotente ou conflito).
+  if (Array.isArray(afetadas) && afetadas.length === 0) {
+    const relido = await lerPedido(company_id, order_id);
+    if (!relido) return { outcome: 'not_found' };
+    if (relido.erp_order_id) return respostaParaJaConfirmado(relido.erp_order_id, numero);
+    throw new Error('Falha ao confirmar pedido: nenhuma linha gravada');
+  }
 
   // O Control passou a conhecer o pedido por ESTE caminho também (046): sem a
   // foto aqui, pedido confirmado pela API nunca acusaria "mudou depois de ir

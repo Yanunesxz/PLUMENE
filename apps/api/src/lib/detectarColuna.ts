@@ -84,3 +84,22 @@ export async function detectarComCerteza(
   // processo. Quem usa `detectar` recebe "não" desta vez e degrada.
   return 'nao_sei';
 }
+
+/**
+ * Igual a `detectar`, mas LANÇA quando o banco não respondeu sobre o schema.
+ *
+ * Para quando degradar é perigoso: um FILTRO que existe para impedir
+ * lançamento duplicado (o `invoiced` da fila do parceiro) não pode sumir em
+ * silêncio porque o Supabase soluçou no arranque — a fila sairia com os
+ * pedidos faturados à mão dentro, e o ERP os importaria de novo. Aqui o erro
+ * sobe (vira 500 na API) e o robô tenta de novo na próxima rodada. A memória
+ * é a mesma de `detectar`: o "sim" lembrado vale para os dois.
+ */
+export async function detectarOuFalhar(tabela: string, coluna?: string): Promise<boolean> {
+  const certeza = await detectarComCerteza(tabela, coluna);
+  if (certeza === 'nao_sei') {
+    const alvo = coluna ? `${tabela}.${coluna}` : tabela;
+    throw new Error(`Falha ao sondar ${alvo}: o banco não respondeu sobre o schema`);
+  }
+  return certeza === 'existe';
+}

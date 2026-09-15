@@ -146,6 +146,51 @@ describe('o ERP informa o que faturou', () => {
     expect(gravado['invoiced']).toBe(true);
     expect('invoiced_total' in gravado).toBe(false);
   });
+
+  it('`id` sem forma de UUID (22P02) é "pedido não encontrado", não "falha ao buscar"', async () => {
+    // "falha ao buscar" manda o ERP reenviar na próxima rodada — e ele reenviaria
+    // o mesmo id errado para sempre. Id malformado é 4xx de verdade.
+    const { receberFaturamento } = await servico({
+      orders: [
+        { data: [{ invoiced_total: null }], error: null },
+        { data: null, error: { message: 'invalid input syntax for type uuid: "abc"', code: '22P02' } },
+      ],
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ id: 'abc' }]);
+
+    expect(r.atualizados).toBe(0);
+    expect(r.ignorados).toEqual([{ pedido: 'abc', motivo: 'pedido não encontrado nesta empresa' }]);
+  });
+});
+
+/**
+ * Os seis motivos de `ignorados` são contrato publicado (docs/API-PARCEIRO.md e
+ * api-parceiro.html): o parser do Fábio decide por eles. Texto exato, com acento.
+ */
+describe('os seis motivos de ignorado, letra por letra', () => {
+  const PEDIDO = { data: { id: 'o1', invoiced: false, total: 100 }, error: null };
+  const SONDA = { data: [{ invoiced_total: null }], error: null };
+  // Linha de enchimento: o dublê pré-busca a próxima resposta a cada consulta.
+  // No "erro ao gravar" a foto da 044 (guardarOriginal) também lê `orders`.
+  const VAZIO = { data: [], error: null };
+
+  it.each<[string, Record<string, unknown>, RegExp | string, Array<{ data: unknown; error: unknown }>]>([
+    ['sem identificação', {}, 'informe "pedido_erp" ou "id"', [SONDA]],
+    ['erro na busca', { pedido_erp: 'CS17379' }, /^falha ao buscar: timeout$/, [SONDA, { data: null, error: { message: 'timeout' } }]],
+    ['pedido inexistente', { pedido_erp: 'CS17379' }, 'pedido não encontrado nesta empresa', [SONDA, { data: null, error: null }]],
+    ['data inválida', { pedido_erp: 'CS17379', faturado_em: 'ontem' }, '"faturado_em" não é uma data ISO', [SONDA, PEDIDO]],
+    ['valor zerado', { pedido_erp: 'CS17379', valor_faturado: 0 }, '"valor_faturado" precisa ser maior que zero', [SONDA, PEDIDO]],
+    ['erro ao gravar', { pedido_erp: 'CS17379' }, /^falha ao gravar: caiu$/, [SONDA, VAZIO, PEDIDO, VAZIO, PEDIDO, VAZIO, { data: null, error: { message: 'caiu' } }]],
+  ])('%s', async (_nome, item, motivo, orders) => {
+    const { receberFaturamento } = await servico({ orders });
+
+    const r = await receberFaturamento(EMPRESA, [item]);
+
+    expect(r.ignorados).toHaveLength(1);
+    if (typeof motivo === 'string') expect(r.ignorados[0]!.motivo).toBe(motivo);
+    else expect(r.ignorados[0]!.motivo).toMatch(motivo);
+  });
 });
 
 describe('quanto o pedido vale como venda', () => {
