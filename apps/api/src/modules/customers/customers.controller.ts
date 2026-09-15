@@ -5,6 +5,7 @@ import {
   atualizarTabelaDoCliente,
   obterCliente,
   marcarInatividade,
+  marcarVarejo,
   atrelarCodigoErp,
 } from './customers.service.js';
 import { z } from 'zod';
@@ -21,6 +22,8 @@ const inatividadeSchema = z.object({
   motivo: z.string().trim().min(2).max(200),
   observacao: z.string().trim().max(2000).optional(),
 });
+
+const varejoSchema = z.object({ varejo: z.boolean() });
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
@@ -211,6 +214,57 @@ export async function trocarTabelaDoClienteHandler(
 }
 
 /** O porquê do cliente vermelho: motivo + observação de quem apurou. */
+/**
+ * PATCH /customers/:id/varejo — só a VENDA INTERNA marca o cliente de balcão
+ * como varejo, para ele sair da cobrança de contato (migração 047).
+ *
+ * Pedido do Yan (15/09/2026): "apenas as vendedoras internas". A rota já só
+ * deixa entrar representante; aqui fica de fora o representante comum — ele
+ * não atende balcão, e um toque dele sumiria com um cliente de verdade da régua.
+ */
+export async function marcarVarejoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, role, erp_rep_id, venda_interna } = request.user;
+  if (role !== 'rep' || venda_interna !== true) {
+    await reply.status(403).send({
+      error: 'Só a venda interna marca cliente de varejo',
+      code: 'SO_VENDA_INTERNA',
+      statusCode: 403,
+    });
+    return;
+  }
+  const { id } = request.params as { id: string };
+  const body = await parseBody(varejoSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await marcarVarejo(company_id, id, { rep_id: sub, erp_rep_id: erp_rep_id ?? null }, sub, body.varejo);
+
+  if (r.ok) {
+    await reply.send({ data: { varejo: r.varejo, varejo_marcado_em: r.marcado_em } });
+    return;
+  }
+  if (r.motivo === 'sem_migracao') {
+    await reply.status(503).send({
+      error: 'A marca de cliente varejo precisa da migração 047',
+      code: 'VAREJO_INDISPONIVEL',
+      statusCode: 503,
+    });
+    return;
+  }
+  if (r.motivo === 'cliente_nao_encontrado') {
+    await reply.status(404).send({
+      error: 'Cliente não encontrado na sua carteira',
+      code: 'NOT_FOUND',
+      statusCode: 404,
+    });
+    return;
+  }
+  await reply.status(500).send({
+    error: 'Não foi possível salvar a marca de varejo',
+    code: 'UPDATE_FAILED',
+    statusCode: 500,
+  });
+}
+
 export async function marcarInatividadeHandler(
   request: FastifyRequest,
   reply: FastifyReply,

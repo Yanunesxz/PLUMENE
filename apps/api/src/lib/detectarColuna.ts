@@ -44,14 +44,31 @@ export function esquecerDeteccoes(): void {
  * pergunta se a TABELA existe.
  */
 export async function detectar(tabela: string, coluna?: string): Promise<boolean> {
+  return (await detectarComCerteza(tabela, coluna)) === 'existe';
+}
+
+/**
+ * A mesma pergunta, sem achatar a dúvida em "não".
+ *
+ * Quase todo chamador quer só o booleano: na dúvida o recurso degrada e tudo
+ * segue. Mas há quem precise distinguir "a tabela não existe" (seguir sem o
+ * recurso) de "não deu para perguntar" (parar e tentar de novo): a foto do
+ * "Atualizar no ERP" antes de uma edição. Tratar um soluço de rede como tabela
+ * ausente deixava a edição gravar sem a foto — e a mudança sumia do aviso para
+ * sempre (revisão de 15/09/2026).
+ */
+export async function detectarComCerteza(
+  tabela: string,
+  coluna?: string,
+): Promise<'existe' | 'nao_existe' | 'nao_sei'> {
   const chave = coluna ? `${tabela}.${coluna}` : tabela;
   const lembrado = memoria.get(chave);
-  if (lembrado && lembrado.ate > Date.now()) return lembrado.existe;
+  if (lembrado && lembrado.ate > Date.now()) return lembrado.existe ? 'existe' : 'nao_existe';
 
   const { error } = await supabase.from(tabela).select(coluna ?? 'id').limit(1);
   if (!error) {
     memoria.set(chave, { existe: true, ate: Number.POSITIVE_INFINITY });
-    return true;
+    return 'existe';
   }
 
   // Ausência de verdade: guarda por pouco tempo — o SQL pode rodar a qualquer
@@ -59,11 +76,11 @@ export async function detectar(tabela: string, coluna?: string): Promise<boolean
   const codigo = (error as { code?: string }).code ?? '';
   if (CODIGOS_DE_AUSENCIA.has(codigo) || /does not exist|schema cache/i.test(error.message ?? '')) {
     memoria.set(chave, { existe: false, ate: Date.now() + VALIDADE_DO_NAO_MS });
-    return false;
+    return 'nao_existe';
   }
 
-  // Rede, timeout, 503: não é resposta sobre o schema. Não memoriza nada —
-  // responde "não" desta vez (o chamador degrada) e pergunta de novo na
-  // próxima, em vez de desligar o recurso até o fim do processo.
-  return false;
+  // Rede, timeout, 503: não é resposta sobre o schema. Não memoriza nada e
+  // pergunta de novo na próxima, em vez de desligar o recurso até o fim do
+  // processo. Quem usa `detectar` recebe "não" desta vez e degrada.
+  return 'nao_sei';
 }

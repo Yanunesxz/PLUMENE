@@ -29,7 +29,7 @@ import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
-import { situacaoDaCompra, reguaDaCarteira } from '../../lib/carteira.js';
+import { situacaoDoCliente, reguaDaCarteira } from '../../lib/carteira.js';
 import {
   janelaDoFechamento,
   comInicialMaiuscula,
@@ -234,7 +234,8 @@ export function PaginaMinhaArea() {
     let esfriando = 0;
     let vencido = 0;
     for (const c of customers ?? []) {
-      const s = situacaoDaCompra(c.last_purchase_at);
+      // Varejo marcado pela venda interna não conta como parado nem esfriando.
+      const s = situacaoDoCliente(c);
       if (s.nivel === 'parado') parados++;
       if (s.nivel === 'esfriando') esfriando++;
       vencido += c.overdue_amount ?? 0;

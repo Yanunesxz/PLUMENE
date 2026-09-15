@@ -34,7 +34,11 @@ CREATE TABLE IF NOT EXISTS order_erp_sync (
   pedido_em      TIMESTAMPTZ,
   pedido_por     UUID REFERENCES users(id) ON DELETE SET NULL,
   -- O recado de quem pediu ("tirei 6 peças da 0124, faltou no estoque").
-  observacao     TEXT
+  observacao     TEXT,
+  -- A impressão do pedido (assinaturaDoPedido, em shared) no momento do aviso.
+  -- É ela que diz, sem se confundir com carimbo ou correção de número, se a
+  -- venda interna mudou o pedido DE NOVO depois de avisar.
+  assinatura_pedida TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_order_erp_sync_company ON order_erp_sync(company_id);
@@ -42,12 +46,20 @@ CREATE INDEX IF NOT EXISTS idx_order_erp_sync_company ON order_erp_sync(company_
 CREATE INDEX IF NOT EXISTS idx_order_erp_sync_pedido
   ON order_erp_sync(company_id, pedido_em) WHERE pedido_em IS NOT NULL;
 
+-- Acrescentada em 15/09/2026, antes de a 046 ficar visível em qualquer banco.
+-- Para quem já tinha criado a tabela sem ela: idempotente.
+ALTER TABLE order_erp_sync ADD COLUMN IF NOT EXISTS assinatura_pedida TEXT;
+
 COMMENT ON TABLE order_erp_sync IS
   'A fotografia do pedido como o Control o conhece. Migração 046. Divergência = comparar com os itens de hoje.';
 COMMENT ON COLUMN order_erp_sync.confirmado_em IS
   'Quando o Control passou a conhecer esta versão: no lançamento, ou quando alguém confirmou que atualizou lá.';
 COMMENT ON COLUMN order_erp_sync.pedido_em IS
   'Quando alguém apertou "Atualizar no ERP" depois de editar. NULL = nada pedido.';
+
+-- Recarrega o cache do Supabase: sem isto a tabela pode existir no banco e
+-- continuar invisível para o app (erro PGRST205).
+NOTIFY pgrst, 'reload schema';
 
 -- ─── Conferência ─────────────────────────────────────────────────────────────
 -- SELECT o.order_number, s.erp_order_id, s.pecas AS pecas_no_control,

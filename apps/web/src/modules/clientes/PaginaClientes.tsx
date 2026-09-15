@@ -24,7 +24,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { situacaoDaCompra, type Frescor } from '../../lib/carteira.js';
+import { situacaoDoCliente, type NivelDaCarteira } from '../../lib/carteira.js';
 import { mesmoCodigoErp } from '../../lib/codigoErp.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import {
@@ -172,8 +172,11 @@ export function PaginaClientes() {
   // A Minha Área manda para cá com ?frescor=parado — o rep cai direto na lista
   // de quem precisa de visita. (O `params` é o mesmo lá de cima, do ?novo.)
   const frescorDaUrl = params.get('frescor');
-  const [frescor, setFrescor] = useState<Frescor | 'all'>(
-    frescorDaUrl === 'parado' || frescorDaUrl === 'esfriando' || frescorDaUrl === 'ativo'
+  const [frescor, setFrescor] = useState<NivelDaCarteira | 'all'>(
+    frescorDaUrl === 'parado' ||
+      frescorDaUrl === 'esfriando' ||
+      frescorDaUrl === 'ativo' ||
+      frescorDaUrl === 'varejo'
       ? frescorDaUrl
       : 'all',
   );
@@ -189,9 +192,14 @@ export function PaginaClientes() {
   const { visiveis, contagem, semCodigo } = useMemo(() => {
     const decorados = (customers ?? []).map((c) => ({
       cliente: c,
-      situacao: situacaoDaCompra(c.last_purchase_at),
+      // Varejo marcado pela venda interna sai da régua: não conta em Atenção
+      // nem em Esfriados — é o que para a cobrança de contato (047).
+      situacao: situacaoDoCliente(c),
     }));
-    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0 } as Record<Frescor, number>;
+    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0, varejo: 0 } as Record<
+      NivelDaCarteira,
+      number
+    >;
     for (const d of decorados) contagem[d.situacao.nivel]++;
     // Só quem nasceu no app: cliente de carga da Curva ABC também está sem
     // código, mas já existe no Control — ver PaginaMinhaArea.
@@ -229,12 +237,14 @@ export function PaginaClientes() {
   // que ele passou a usar em 11/09/2026 para o cliente que sumiu.
   // Ordem do Yan (02/09): ativo → atenção → esfriado, e o ATIVO com o número —
   // o rep precisa ver quantos clientes vivos tem, não só quantos pararam.
-  const FILTROS: Array<{ valor: Frescor | 'all'; rotulo: string; cor?: string }> = [
+  const FILTROS: Array<{ valor: NivelDaCarteira | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
     { valor: 'ativo', rotulo: `Ativos${contagem.ativo ? ` (${contagem.ativo})` : ''}`, cor: 'bg-positive' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
     { valor: 'parado', rotulo: `Esfriados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
+    // Só aparece quando existe: carteira sem balcão não ganha um chip vazio.
+    ...(contagem.varejo > 0 ? [{ valor: 'varejo' as const, rotulo: `Varejo (${contagem.varejo})` }] : []),
   ];
 
   useEffect(() => {
@@ -659,6 +669,7 @@ export function PaginaClientes() {
                         situacao.nivel === 'parado' && 'text-danger',
                         situacao.nivel === 'esfriando' && 'text-warn-soft-foreground',
                         situacao.nivel === 'ativo' && 'text-positive-soft-foreground',
+                        situacao.nivel === 'varejo' && 'text-muted-foreground',
                       )}
                     >
                       {situacao.rotulo}

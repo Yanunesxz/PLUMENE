@@ -97,6 +97,17 @@ export function PaginaDetalhePedido() {
     }
   };
 
+  /**
+   * Toda mudança que esta tela aplica no pedido passa por aqui: ela vence as
+   * recargas que já estavam no ar (a resposta atrasada de uma edição anterior
+   * não apaga o lançamento, o carimbo ou o aviso que vieram depois) e mescla
+   * sobre o pedido MAIS NOVO, nunca sobre o da hora do toque.
+   */
+  const mudarPedido = (mudanca: (atual: OrderWithItems) => OrderWithItems) => {
+    recargaMaisNova.current++;
+    setOrder((prev) => (prev ? mudanca(prev) : prev));
+  };
+
   // O financeiro fatura — é a razão de ele existir ("quem aceita os pedidos").
   // E a venda interna, só nos pedidos DELA.
   const canInvoice =
@@ -127,7 +138,12 @@ export function PaginaDetalhePedido() {
   ): Promise<boolean> => {
     if (!id || !order) return false;
     const deu = await decidir(id, status, extra);
-    if (deu) setOrder({ ...order, status, ...(extra ?? {}) });
+    if (deu) {
+      mudarPedido((atual) => ({ ...atual, status, ...(extra ?? {}) }));
+      // Lançar no ERP cria a foto do que o Control conhece (046) lá no servidor:
+      // a tela precisa dela para o aviso existir se o pedido mudar depois.
+      if (status === 'sent_erp') void recarregarPedido();
+    }
     return deu;
   };
 
@@ -175,7 +191,7 @@ export function PaginaDetalhePedido() {
         { erp_order_id: numeroErp },
         token,
       );
-      setOrder((prev) => (prev ? { ...prev, erp_order_id: res.data.erp_order_id } : prev));
+      mudarPedido((atual) => ({ ...atual, erp_order_id: res.data.erp_order_id }));
       await db.orders.update(id, { erp_order_id: res.data.erp_order_id });
       setCorrigindoNumero(false);
       setToast({ message: `Número corrigido para ${res.data.erp_order_id}.`, type: 'success' });
@@ -212,7 +228,7 @@ export function PaginaDetalhePedido() {
         },
         token,
       );
-      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data } : prev));
+      mudarPedido((atual) => ({ ...atual, erp_sync: res.data }));
       const avisados = res.avisados;
       if (acao === 'confirmar') {
         setToast({ message: 'Control atualizado — o aviso saiu deste pedido.', type: 'success' });
@@ -298,7 +314,7 @@ export function PaginaDetalhePedido() {
         desconto.valor != null ? { desconto_valor: desconto.valor } : { desconto: desconto.percent },
         token!,
       );
-      setOrder((prev) => (prev ? { ...prev, ...res.data } : prev));
+      mudarPedido((atual) => ({ ...atual, ...res.data }));
       void recarregarPedido();
       const zerou = desconto.valor === 0 || desconto.percent === 0;
       setToast({
@@ -405,7 +421,7 @@ export function PaginaDetalhePedido() {
       // Mescla (a resposta vem sem a foto do Control e sem o original) e depois
       // busca o pedido inteiro — é esta edição que faz o cartão "Atualizar no
       // ERP" e o "original × faturado" nascerem.
-      setOrder((prev) => (prev ? { ...prev, ...res.data } : res.data));
+      mudarPedido((atual) => ({ ...atual, ...res.data }));
       void recarregarPedido();
       void db.orders.update(id, { total: res.data.total ?? 0 });
       setEditando(false);
@@ -438,7 +454,7 @@ export function PaginaDetalhePedido() {
       );
       // O embed `payment_condition` fica para trás no update — zera para o
       // rótulo resolver pelo cache das condições, que tem a nova.
-      setOrder((prev) => (prev ? { ...prev, ...res.data, payment_condition: null } : prev));
+      mudarPedido((atual) => ({ ...atual, ...res.data, payment_condition: null }));
       void recarregarPedido();
       setToast({
         message: novaId ? 'Condição de pagamento atualizada.' : 'Condição de pagamento removida.',
@@ -724,15 +740,27 @@ export function PaginaDetalhePedido() {
   useEffect(() => {
     if (!id) return;
     let cancel = false;
+    // A carga também entra na fila das recargas: o token renovado no meio de uma
+    // edição dispara esta carga de novo, e ela não pode apagar da tela o que foi
+    // salvo depois de ter saído.
+    const esta = ++recargaMaisNova.current;
+    const aindaVale = () => !cancel && esta === recargaMaisNova.current;
     const fallbackLocal = async () => {
       const local = await db.orders.get(id);
-      if (!cancel) setOrder(local ? ({ ...local, items: [] } as OrderWithItems) : null);
+      if (!aindaVale()) return;
+      // Sem rede e já com ESTE pedido completo na tela: fica o que está. A cópia
+      // do aparelho não tem peças nem a foto do Control, e trocar por ela sumiria
+      // com o aviso "Atualizar no ERP" até a próxima carga boa. Pedido diferente
+      // (navegou de um para outro) nunca herda o anterior.
+      setOrder((prev) =>
+        prev && prev.id === id ? prev : local ? ({ ...local, items: [] } as OrderWithItems) : null,
+      );
     };
     if (token) {
       api
         .get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token)
         .then((r) => {
-          if (!cancel) setOrder(r.data);
+          if (aindaVale()) setOrder(r.data);
         })
         .catch(() => void fallbackLocal());
     } else {
@@ -760,7 +788,7 @@ export function PaginaDetalhePedido() {
         { notes: textoObs.trim() },
         token,
       );
-      setOrder((prev) => (prev ? { ...prev, notes: res.data.notes ?? null } : prev));
+      mudarPedido((atual) => ({ ...atual, notes: res.data.notes ?? null }));
       void recarregarPedido();
       setEditandoObs(false);
       setToast({ message: 'Observação salva.', type: 'success' });
@@ -783,9 +811,7 @@ export function PaginaDetalhePedido() {
         { invoiced: !order.invoiced },
         token,
       );
-      setOrder((prev) =>
-        prev ? { ...prev, invoiced: !!res.data.invoiced, invoiced_at: res.data.invoiced_at ?? null } : prev,
-      );
+      mudarPedido((atual) => ({ ...atual, invoiced: !!res.data.invoiced, invoiced_at: res.data.invoiced_at ?? null }));
     } catch {
       /* mantém estado anterior */
     } finally {
@@ -1107,7 +1133,7 @@ export function PaginaDetalhePedido() {
               sincronia={order.erp_sync}
               pedidoHoje={pedidoHoje}
               numeroNoControl={order.erp_order_id}
-              atualizadoEm={order.updated_at ?? null}
+              orderId={order.id}
               faturado={!!order.invoiced}
               podePedir={(podeEditarPecas || ehEscritorioDoErp) && !order.invoiced}
               podeConfirmar={ehEscritorioDoErp && !order.invoiced}
