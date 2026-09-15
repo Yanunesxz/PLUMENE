@@ -1,6 +1,7 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import {
   situacaoDaCompra,
+  situacaoDoCliente,
   definirReguaDaCarteira,
   reguaDaCarteira,
   NOME_DO_NIVEL,
@@ -72,5 +73,21 @@ describe('a régua que o admin muda (043)', () => {
     definirReguaDaCarteira({ atencao: 45, esfriado: 120 });
     expect(faixaEmPalavras('esfriando')).toBe('45 a 120 dias sem comprar');
     expect(faixaEmPalavras('parado')).toBe('120 dias ou mais sem comprar');
+  });
+});
+
+describe('cliente de varejo (migração 047)', () => {
+  it('marcado pela venda interna sai da régua: nem atenção, nem esfriado', () => {
+    // 900 dias sem comprar seria o vermelho mais escuro da carteira.
+    const s = situacaoDoCliente({ last_purchase_at: diasAtras(900), varejo: true });
+    expect(s.nivel).toBe('varejo');
+    expect(s.rotulo).toContain('sem cobrança de contato');
+    expect(NOME_DO_NIVEL[s.nivel]).toBe('Varejo');
+  });
+
+  it('sem a marca, o mesmo cliente segue a régua de sempre', () => {
+    expect(situacaoDoCliente({ last_purchase_at: diasAtras(900) }).nivel).toBe('parado');
+    expect(situacaoDoCliente({ last_purchase_at: diasAtras(900), varejo: false }).nivel).toBe('parado');
+    expect(situacaoDoCliente({ last_purchase_at: diasAtras(10), varejo: null }).nivel).toBe('ativo');
   });
 });

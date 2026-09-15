@@ -30,6 +30,11 @@ async function detectarHistoricoDeCompra(): Promise<boolean> {
   return detectar('customers', 'last_purchase_at');
 }
 
+/** A marca de cliente de varejo (migração 047). */
+export async function detectarVarejo(): Promise<boolean> {
+  return detectar('customers', 'varejo');
+}
+
 /** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
 async function detectarInatividade(): Promise<boolean> {
   return detectar('customers', 'inactivity_reason');
@@ -47,6 +52,7 @@ async function colunasDaLista(): Promise<string> {
   let colunas = CUSTOMER_COLUMNS;
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at, overdue_amount';
   if (await detectarInatividade()) colunas += ', inactivity_reason';
+  if (await detectarVarejo()) colunas += ', varejo';
   return colunas;
 }
 
@@ -315,6 +321,7 @@ async function colunasDoDetalhe(): Promise<string> {
   if (await detectarCadastroReal()) colunas += `, ${COLUNAS_DO_CADASTRO_REAL}`;
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
   if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
+  if (await detectarVarejo()) colunas += ', varejo, varejo_marcado_em, varejo_marcado_por';
   return colunas;
 }
 
@@ -330,13 +337,25 @@ export async function obterCliente(
   customer_id: string,
   escopo: EscopoDaCarteira,
 ): Promise<CustomerDetail | null> {
-  const cliente = await clienteDaCarteira<Omit<CustomerDetail, 'pedidos'>>(
+  const lido = await clienteDaCarteira<Omit<CustomerDetail, 'pedidos'> & { varejo_marcado_por?: string | null }>(
     company_id,
     customer_id,
     escopo,
     await colunasDoDetalhe(),
   );
-  if (!cliente) return null;
+  if (!lido) return null;
+
+  // Quem marcou o varejo, pelo nome: a ficha diz "marcado pela Simone" — sem
+  // isso o gerente vê o cliente fora da régua e não sabe a quem perguntar.
+  const { varejo_marcado_por, ...cliente } = lido;
+  if (varejo_marcado_por) {
+    const { data: quem } = await supabase
+      .from('users')
+      .select('name')
+      .eq('id', varejo_marcado_por)
+      .maybeSingle();
+    cliente.varejo_marcado_por_nome = (quem as { name: string } | null)?.name ?? null;
+  }
 
   const { data } = await supabase
     .from('orders')
@@ -392,6 +411,39 @@ export async function marcarInatividade(
     .eq('company_id', company_id);
 
   return error ? { ok: false, motivo: 'erro' } : { ok: true };
+}
+
+export type MarcaDeVarejo =
+  | { ok: true; varejo: boolean; marcado_em: string }
+  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'erro' };
+
+/**
+ * Marca (ou desmarca) o cliente como VAREJO — a venda interna tirando da
+ * cobrança de contato quem compra no balcão e não volta.
+ *
+ * Quem pode é decidido no controller (só rep com venda interna). Aqui vale a
+ * outra metade: o cliente é da carteira dela.
+ */
+export async function marcarVarejo(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+  quem: string,
+  varejo: boolean,
+): Promise<MarcaDeVarejo> {
+  if (!(await detectarVarejo())) return { ok: false, motivo: 'sem_migracao' };
+
+  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  const marcado_em = new Date().toISOString();
+  const { error } = await supabase
+    .from('customers')
+    .update({ varejo, varejo_marcado_por: quem, varejo_marcado_em: marcado_em })
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+
+  return error ? { ok: false, motivo: 'erro' } : { ok: true, varejo, marcado_em };
 }
 
 export type TrocaDeTabela =

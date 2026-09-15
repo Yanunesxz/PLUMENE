@@ -22,6 +22,16 @@ import {
 
 export type { Frescor, ReguaDaCarteira };
 
+/**
+ * A situação que a tela mostra: a faixa da régua OU "varejo".
+ *
+ * Varejo não é faixa de dias — é a venda interna dizendo que aquele cliente de
+ * balcão não volta (migração 047). Ele sai da régua inteira: nem atenção, nem
+ * esfriado, nem alerta. Fica fora de `Frescor` (shared) de propósito: aquele
+ * tipo é a conta de dias, e as chaves dele estão em link salvo.
+ */
+export type NivelDaCarteira = Frescor | 'varejo';
+
 const CHAVE_GUARDADA = 'csb.regua-da-carteira';
 
 function lerDoAparelho(): ReguaDaCarteira {
@@ -57,7 +67,7 @@ export function definirReguaDaCarteira(nova: Partial<ReguaDaCarteira> | null | u
 }
 
 export interface SituacaoDaCompra {
-  nivel: Frescor;
+  nivel: NivelDaCarteira;
   /** Pronto para a tela: "Esfriado — sem comprar há 8 meses", "Comprou há 12 dias"… */
   rotulo: string;
   /** Dias desde a última compra. `null` sem registro. */
@@ -88,32 +98,52 @@ export function situacaoDaCompra(
 }
 
 /**
+ * A situação de UM cliente — o que selo, filtro, contagem e Minha Área usam.
+ *
+ * Marcado como varejo pela venda interna, a régua nem é consultada: é essa a
+ * promessa ao Yan, "não ficar cobrando elas para entrar em contato de novo".
+ */
+export function situacaoDoCliente(
+  cliente: { last_purchase_at?: string | null; varejo?: boolean | null },
+  comRegua: ReguaDaCarteira = regua,
+): SituacaoDaCompra {
+  if (cliente.varejo === true) {
+    const dias = diasSemComprar(cliente.last_purchase_at);
+    return { nivel: 'varejo', rotulo: 'Cliente varejo — sem cobrança de contato', dias };
+  }
+  return situacaoDaCompra(cliente.last_purchase_at, comRegua);
+}
+
+/**
  * O vocabulário do Yan para as cores: verde de ativo, amarelo de atenção,
  * vermelho de ESFRIADO — nasceu "desativado" (31/08/2026), virou "inativo" no
  * mesmo dia e virou "esfriado" em 11/09/2026, que é como ele fala do cliente
  * que sumiu. Nome curto para chips e títulos.
  */
-export const NOME_DO_NIVEL: Record<Frescor, string> = {
+export const NOME_DO_NIVEL: Record<NivelDaCarteira, string> = {
   ativo: 'Ativo',
   esfriando: 'Atenção',
   parado: 'Esfriado',
   sem_registro: 'Sem registro',
+  varejo: 'Varejo',
 };
 
 /** O mesmo nome no plural, para o chip que conta ("Esfriados (37)"). */
-export const NOME_DO_NIVEL_PLURAL: Record<Frescor, string> = {
+export const NOME_DO_NIVEL_PLURAL: Record<NivelDaCarteira, string> = {
   ativo: 'Ativos',
   esfriando: 'Atenção',
   parado: 'Esfriados',
   sem_registro: 'Sem registro',
+  varejo: 'Varejo',
 };
 
-/** Cor do selo, no vocabulário do Badge. */
-export const VARIANTE_DO_FRESCOR: Record<Frescor, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
+/** Cor do selo, no vocabulário do Badge. Varejo é neutro: fora da régua, nem bom nem ruim. */
+export const VARIANTE_DO_FRESCOR: Record<NivelDaCarteira, 'gray' | 'yellow' | 'green' | 'red' | 'brand'> = {
   ativo: 'green',
   esfriando: 'yellow',
   parado: 'red',
   sem_registro: 'gray',
+  varejo: 'gray',
 };
 
 /** "90 a 180 dias sem comprar" — para explicar a faixa na tela do admin. */

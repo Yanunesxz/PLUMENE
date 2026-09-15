@@ -22,7 +22,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { seloDoPedido } from '../../lib/pedido.js';
-import { situacaoDaCompra, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
+import { situacaoDoCliente, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
 import { formatarDocumento, formatarCep, apenasDigitos } from '@csb/shared';
 import type { ApiResponse, CustomerDetail } from '@csb/shared';
@@ -71,6 +71,52 @@ export function PaginaCliente() {
   const [obsMotivo, setObsMotivo] = useState('');
   const [editandoMotivo, setEditandoMotivo] = useState(false);
   const [salvandoMotivo, setSalvandoMotivo] = useState(false);
+
+  // ─── Cliente de varejo (migração 047) — só a venda interna marca ──────────
+  // "Para elas informarem que o cliente é cliente varejo e não ficar cobrando
+  // elas para entrar em contato novamente" (Yan, 15/09/2026). A API confere o
+  // mesmo: representante comum recebe 403.
+  const ehVendaInterna = user?.role === 'rep' && user?.venda_interna === true;
+  const [salvandoVarejo, setSalvandoVarejo] = useState(false);
+
+  const alternarVarejo = async (varejo: boolean) => {
+    if (!token || !id || salvandoVarejo) return;
+    setSalvandoVarejo(true);
+    try {
+      const res = await api.patch<ApiResponse<{ varejo: boolean; varejo_marcado_em: string }>>(
+        `/customers/${id}/varejo`,
+        { varejo },
+        token,
+      );
+      setCliente((c) =>
+        c
+          ? {
+              ...c,
+              varejo: res.data.varejo,
+              varejo_marcado_em: res.data.varejo_marcado_em,
+              varejo_marcado_por_nome: user?.name ?? null,
+            }
+          : c,
+      );
+      // A lista, a Minha Área e os Alertas leem o cache do aparelho: sem isto o
+      // cliente seguiria em "Esfriados" e o alerta de contato voltaria a tocar.
+      await db.customers.update(id, { varejo: res.data.varejo }).catch(() => {});
+      esquecerCache('/customers');
+      setToast({
+        message: res.data.varejo
+          ? 'Marcado como cliente varejo — ele sai da cobrança de contato.'
+          : 'Desmarcado — o cliente volta para a régua da carteira.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível salvar.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoVarejo(false);
+    }
+  };
 
   // ─── O número do cliente no Control (atrelar, financeiro/admin) ───────────
   // "Quando conectar no sistema vai ter que ter número dos clientes, e esses
@@ -213,8 +259,9 @@ export function PaginaCliente() {
   }
 
   const tabela = nomeDe(cliente.price_table_id);
-  // A cor do cliente (verde/amarelo/vermelho) — régua da migração 036.
-  const situacao = situacaoDaCompra(cliente.last_purchase_at);
+  // A cor do cliente (verde/amarelo/vermelho) — régua da migração 036 — ou
+  // "varejo", quando a venda interna o tirou da régua (047).
+  const situacao = situacaoDoCliente(cliente);
 
   return (
     <div className="p-4 md:p-6">
@@ -246,6 +293,42 @@ export function PaginaCliente() {
             )}
           </div>
         </div>
+
+        {/* Cliente de varejo: a venda interna liga e desliga; os demais só
+            leem quem marcou — é a quem perguntar se o cliente voltar a comprar. */}
+        {ehVendaInterna ? (
+          <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-border p-3">
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-foreground">
+                {cliente.varejo ? 'Cliente varejo' : 'É cliente de varejo?'}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {cliente.varejo
+                  ? 'Fora dos alertas e da lista de esfriados — ninguém vai cobrar contato.'
+                  : 'Marque quem compra no balcão e não volta: ele sai dos alertas e da cobrança de contato.'}
+              </p>
+            </div>
+            <Button
+              variant={cliente.varejo ? 'outline' : 'primary'}
+              size="sm"
+              disabled={salvandoVarejo}
+              onClick={() => void alternarVarejo(!cliente.varejo)}
+            >
+              {salvandoVarejo ? 'Salvando…' : cliente.varejo ? 'Desmarcar' : 'Marcar como varejo'}
+            </Button>
+          </div>
+        ) : (
+          cliente.varejo && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Marcado como varejo
+              {cliente.varejo_marcado_por_nome ? ` por ${cliente.varejo_marcado_por_nome}` : ''}
+              {cliente.varejo_marcado_em
+                ? ` em ${new Date(cliente.varejo_marcado_em).toLocaleDateString('pt-BR')}`
+                : ''}
+              {' — fora da cobrança de contato.'}
+            </p>
+          )
+        )}
 
         {/* O número do Control: é o que amarra este cadastro ao cliente do ERP.
             Quem nasceu no app fica "sem código" até o financeiro atrelar. */}

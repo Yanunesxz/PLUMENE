@@ -186,6 +186,7 @@ export function useAlertas(): Alertas {
         id: c.id,
         nome: c.trade_name?.trim() || c.name,
         ultimaCompraEm: c.last_purchase_at ?? null,
+        varejo: c.varejo === true,
       })),
       meta:
         faixas.length > 0

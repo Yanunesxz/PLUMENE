@@ -110,7 +110,8 @@ apps/api/src/
 │       ├── 042_numero_do_control_unico.sql → índice único orders(company_id, erp_order_id): dois pedidos nunca com o mesmo número do Control
 │       ├── 043_regua_da_carteira.sql → companies.carteira_atencao_dias/carteira_esfriado_dias (o admin muda os 90/180 no Painel)
 │       ├── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
-│       └── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
+│       ├── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
+│       └── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

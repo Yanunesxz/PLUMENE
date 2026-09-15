@@ -80,6 +80,12 @@ export interface Customer {
   /** Observação com as palavras de quem apurou. */
   inactivity_note?: string | null;
   inactivity_updated_at?: string | null;
+  /**
+   * Cliente de VAREJO (migração 047): a venda interna marca quem compra no
+   * balcão e não volta. Fica fora da régua da carteira — sem atenção, sem
+   * esfriado, sem alerta de contato.
+   */
+  varejo?: boolean | null;
   updated_at: string;
 }
 
@@ -115,6 +121,9 @@ export interface CustomerListItem
     // O controle por cores: cliente vermelho SEM motivo é pendência visível na
     // lista — é o que cobra o preenchimento sem precisar de relatório.
     | 'inactivity_reason'
+    // Varejo marcado pela venda interna: sem ele a lista voltaria a pintar de
+    // vermelho — e a cobrar — o cliente de balcão que nunca vai voltar.
+    | 'varejo'
   > {
   /**
    * Quem CADASTROU no app. Custa um UUID por linha e separa as duas famílias
@@ -124,6 +133,11 @@ export interface CustomerListItem
    * coluna o aviso "para incluir" contaria 1.254 e viraria ruído.
    */
   rep_id?: string | null;
+}
+
+/** A venda interna marca (ou desmarca) o cliente como varejo. */
+export interface MarcarVarejoRequest {
+  varejo: boolean;
 }
 
 /** O rep (ou o relacionamento) explica o cliente vermelho. */
@@ -233,6 +247,10 @@ export interface CustomerDetail {
   inactivity_reason?: string | null;
   inactivity_note?: string | null;
   inactivity_updated_at?: string | null;
+  /** Cliente de varejo (migração 047) — e quem marcou, para a ficha dizer. */
+  varejo?: boolean | null;
+  varejo_marcado_em?: string | null;
+  varejo_marcado_por_nome?: string | null;
   /** Do mais recente para o mais antigo. */
   pedidos: PedidoDoCliente[];
 }
