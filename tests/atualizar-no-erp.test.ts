@@ -193,3 +193,140 @@ describe('a confirmação pela API do parceiro também tira a foto', () => {
     expect(foto).toMatchObject({ erp_order_id: 'SX14627', pecas: 20 });
   });
 });
+
+// ─── Consertos da revisão adversarial (15/09/2026) ───────────────────────────
+
+describe('confirmarAtualizacao — o que ainda não foi lançado', () => {
+  it('pedido sem foto não é "confirmado": nada é gravado', async () => {
+    const { confirmarAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: null, error: null }, // sem foto: nunca lançado
+      ],
+    });
+
+    expect(await confirmarAtualizacao('o1', EMPRESA, 'larissa')).toEqual({ ok: false, motivo: 'nao_lancado' });
+    expect(fake.ultimaGravacao('order_erp_sync', 'upsert')).toBeUndefined();
+  });
+});
+
+describe('confirmarAtualizacao — a Larissa confirma o que VIU', () => {
+  it('se a venda interna mexeu de novo no meio, a confirmação é recusada e a foto não muda', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    const vista = assinaturaDoPedido({
+      items: [{ id: 'i1', order_id: 'o1', product_id: 'p1', variant_id: null, quantity: 12, unit_price: 10, total: 120 }],
+    });
+    const { confirmarAtualizacao, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: { order_id: 'o1' }, error: null }, // existe
+      ],
+      // o pedido de AGORA: a Simone baixou para 4 enquanto a Larissa digitava
+      orders: {
+        data: {
+          id: 'o1',
+          items: [{ id: 'i1', order_id: 'o1', product_id: 'p1', variant_id: null, quantity: 4, unit_price: 10, total: 40 }],
+        },
+        error: null,
+      },
+    });
+
+    expect(await confirmarAtualizacao('o1', EMPRESA, 'larissa', vista)).toEqual({ ok: false, motivo: 'mudou_de_novo' });
+    expect(fake.ultimaGravacao('order_erp_sync', 'upsert')).toBeUndefined();
+  });
+});
+
+describe('garantirFotoDoErp — os pedidos lançados antes da 046', () => {
+  it('pedido que não foi para o Control não ganha foto', async () => {
+    const { garantirFotoDoErp, fake } = await carregarServico({});
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'approved' }, EMPRESA)).toBe('nao_lancado');
+    expect(fake.filtrosDe('order_erp_sync')).toHaveLength(0);
+  });
+
+  it('pedido lançado SEM foto ganha a primeira, por INSERT (não sobrescreve ninguém)', async () => {
+    const { garantirFotoDoErp, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: null, error: null }, // ainda não há foto
+        { data: null, error: null }, // o insert
+      ],
+      orders: { data: PEDIDO_LANCADO, error: null },
+    });
+
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('guardada');
+    expect(fake.ultimaGravacao('order_erp_sync', 'insert')?.valores).toMatchObject({ pecas: 20, erp_order_id: 'CS17379' });
+    expect(fake.ultimaGravacao('order_erp_sync', 'upsert')).toBeUndefined();
+  });
+
+  it('pedido que JÁ tem foto mantém a dele — a edição de hoje não apaga a divergência que cria', async () => {
+    const { garantirFotoDoErp, fake } = await carregarServico({
+      order_erp_sync: [
+        { data: [], error: null }, // detecção
+        { data: { order_id: 'o1' }, error: null }, // já tem
+      ],
+    });
+
+    expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('ja_tinha');
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+});
+
+describe('divergenciaComOErp — as quatro portas', () => {
+  const item = (quantity: number) => ({
+    id: 'i1',
+    order_id: 'o1',
+    product_id: 'p1',
+    variant_id: null,
+    quantity,
+    unit_price: 10,
+    total: quantity * 10,
+  });
+
+  it('desconto trocado depois do lançamento acusa divergência mesmo com as mesmas peças', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    const d = divergenciaComOErp(
+      { items: [item(5)], discount_percent: 5 },
+      { items: [item(5)], discount_percent: 8 },
+    );
+    expect(d.mudou).toBe(true);
+    expect(d.itens.mudou).toBe(false);
+    expect(d.desconto).toEqual({ antes: 5, depois: 8 });
+  });
+
+  it('condição de pagamento e observação também contam', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    expect(divergenciaComOErp({ items: [], payment_condition_id: 'c1' }, { items: [], payment_condition_id: 'c2' }).condicaoMudou).toBe(true);
+    expect(divergenciaComOErp({ items: [], notes: 'entregar sexta' }, { items: [], notes: 'entregar segunda' }).observacaoMudou).toBe(true);
+  });
+
+  it('foto sem a coluna (undefined) e pedido sem condição (null) são o mesmo "sem condição"', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    const d = divergenciaComOErp({ items: [item(3)] }, { items: [item(3)], payment_condition_id: null, notes: '  ' });
+    expect(d.mudou).toBe(false);
+  });
+
+  it('troca de preço sozinha não pede atualização no Control', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    const d = divergenciaComOErp({ items: [item(5)] }, { items: [{ ...item(5), unit_price: 9, total: 45 }] });
+    expect(d.mudou).toBe(false);
+  });
+});
+
+describe('assinaturaDoPedido', () => {
+  it('não depende da ordem em que o banco devolve as linhas', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    const a = { id: 'a', order_id: 'o1', product_id: 'p1', variant_id: 'm', quantity: 2, unit_price: 1, total: 2 };
+    const b = { id: 'b', order_id: 'o1', product_id: 'p2', variant_id: null, quantity: 3, unit_price: 1, total: 3 };
+    expect(assinaturaDoPedido({ items: [a, b] })).toBe(assinaturaDoPedido({ items: [b, a] }));
+  });
+
+  it('muda quando muda quantidade, desconto, condição ou observação', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    const i = { id: 'a', order_id: 'o1', product_id: 'p1', variant_id: null, quantity: 2, unit_price: 1, total: 2 };
+    const base = assinaturaDoPedido({ items: [i] });
+    expect(assinaturaDoPedido({ items: [{ ...i, quantity: 3 }] })).not.toBe(base);
+    expect(assinaturaDoPedido({ items: [i], discount_percent: 5 })).not.toBe(base);
+    expect(assinaturaDoPedido({ items: [i], payment_condition_id: 'c1' })).not.toBe(base);
+    expect(assinaturaDoPedido({ items: [i], notes: 'x' })).not.toBe(base);
+  });
+});

@@ -25,7 +25,7 @@ import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFatura
 import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
-import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
+import { precoDoTamanho, coresPorSku, semLinhasDeCor, assinaturaDoPedido } from '@csb/shared';
 import type {
   Order,
   OrderWithItems,
@@ -33,6 +33,7 @@ import type {
   OrderStatus,
   ProductWithPrice,
   SincroniaComOErp,
+  PedidoParaComparar,
 } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
@@ -71,6 +72,25 @@ export function PaginaDetalhePedido() {
   const ehEscritorioDoErp = user?.role === 'financeiro' || user?.role === 'admin';
   // undefined = carregando, null = não encontrado
   const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
+
+  /**
+   * Busca o pedido INTEIRO de novo depois de uma mudança.
+   *
+   * As rotas de edição devolvem só o pedido cru (sem o que o GET monta: a foto
+   * do que o Control conhece, o original da 044, o link público, quem vendeu).
+   * Trocar o pedido da tela por essa resposta apagava o cartão "Atualizar no
+   * ERP" justo no instante em que a edição o fazia nascer. Falhou a rede? Fica
+   * o que já está na tela.
+   */
+  const recarregarPedido = async () => {
+    if (!id || !token) return;
+    try {
+      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      setOrder(r.data);
+    } catch {
+      /* sem rede: mantém o pedido que já está na tela */
+    }
+  };
 
   // O financeiro fatura — é a razão de ele existir ("quem aceita os pedidos").
   // E a venda interna, só nos pedidos DELA.
@@ -169,25 +189,42 @@ export function PaginaDetalhePedido() {
   const [erroDaSincronia, setErroDaSincronia] = useState<string | null>(null);
 
   const mexerNaSincronia = async (acao: 'pedir' | 'confirmar', observacao?: string) => {
-    if (!id || !token || sincronizando) return;
+    if (!id || !token || !order || sincronizando) return;
     setSincronizando(true);
     setErroDaSincronia(null);
     try {
-      const res = await api.patch<ApiResponse<SincroniaComOErp>>(
+      const res = await api.patch<ApiResponse<{ sincronia: SincroniaComOErp; aparelhos: number | null }>>(
         `/orders/${id}/erp-sync`,
-        { acao, ...(observacao?.trim() ? { observacao: observacao.trim() } : {}) },
+        {
+          acao,
+          ...(observacao?.trim() ? { observacao: observacao.trim() } : {}),
+          // A Larissa confirma O QUE VIU: se a venda interna mexeu de novo
+          // enquanto ela digitava no Control, a API recusa em vez de engolir.
+          ...(acao === 'confirmar' ? { assinatura: assinaturaDoPedido(pedidoHoje) } : {}),
+        },
         token,
       );
-      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data } : prev));
-      setToast({
-        message:
-          acao === 'pedir'
-            ? 'A fábrica foi avisada de que o pedido mudou.'
-            : 'Control atualizado — o aviso saiu deste pedido.',
-        type: 'success',
-      });
+      setOrder((prev) => (prev ? { ...prev, erp_sync: res.data.sincronia } : prev));
+      if (acao === 'confirmar') {
+        setToast({ message: 'Control atualizado — o aviso saiu deste pedido.', type: 'success' });
+      } else if ((res.data.aparelhos ?? 0) > 0) {
+        setToast({
+          message: `Aviso enviado: chegou em ${res.data.aparelhos} aparelho(s) de quem mexe no Control.`,
+          type: 'success',
+        });
+      } else {
+        // Registrado no pedido, mas o celular de ninguém recebeu: dizer "a
+        // fábrica foi avisada" aqui seria mentir para quem está esperando.
+        setToast({
+          message:
+            'Ficou registrado no pedido, mas ninguém do financeiro está com aviso ligado no celular. Avise a Larissa por outro canal.',
+          type: 'error',
+        });
+      }
     } catch (err) {
       setErroDaSincronia(err instanceof Error ? err.message : 'Não foi possível registrar.');
+      // O pedido pode ter mudado de novo (409): a lista do cartão tem de ser a de agora.
+      void recarregarPedido();
     } finally {
       setSincronizando(false);
     }
@@ -244,6 +281,7 @@ export function PaginaDetalhePedido() {
         token!,
       );
       setOrder({ ...order, ...res.data });
+      void recarregarPedido();
       const zerou = desconto.valor === 0 || desconto.percent === 0;
       setToast({
         message: zerou
@@ -346,7 +384,11 @@ export function PaginaDetalhePedido() {
         },
         token,
       );
-      setOrder(res.data);
+      // Mescla (a resposta vem sem a foto do Control e sem o original) e depois
+      // busca o pedido inteiro — é esta edição que faz o cartão "Atualizar no
+      // ERP" e o "original × faturado" nascerem.
+      setOrder((prev) => (prev ? { ...prev, ...res.data } : res.data));
+      void recarregarPedido();
       void db.orders.update(id, { total: res.data.total ?? 0 });
       setEditando(false);
       setToast({ message: 'Peças do pedido atualizadas.', type: 'success' });
@@ -379,6 +421,7 @@ export function PaginaDetalhePedido() {
       // O embed `payment_condition` fica para trás no update — zera para o
       // rótulo resolver pelo cache das condições, que tem a nova.
       setOrder({ ...order, ...res.data, payment_condition: null });
+      void recarregarPedido();
       setToast({
         message: novaId ? 'Condição de pagamento atualizada.' : 'Condição de pagamento removida.',
         type: 'success',
@@ -577,6 +620,18 @@ export function PaginaDetalhePedido() {
     [itensOrdenados, prodMap, variantSize],
   );
 
+  // O pedido de hoje no recorte que vai para o Control: peças, desconto,
+  // condição e observação — o mesmo que a foto do lançamento guarda.
+  const pedidoHoje = useMemo<PedidoParaComparar>(
+    () => ({
+      items: itensComRef,
+      discount_percent: order?.discount_percent ?? null,
+      payment_condition_id: order?.payment_condition_id ?? null,
+      notes: order?.notes ?? null,
+    }),
+    [itensComRef, order?.discount_percent, order?.payment_condition_id, order?.notes],
+  );
+
   // A cor escolhida mora nas linhas "0015 3M azul" das notas (o item vai
   // sortido para o ERP) — aqui ela volta para a linha do produto, onde quem
   // confere olha. O que sobra das notas é o recado que o rep digitou.
@@ -688,6 +743,7 @@ export function PaginaDetalhePedido() {
         token,
       );
       setOrder((prev) => (prev ? { ...prev, notes: res.data.notes ?? null } : prev));
+      void recarregarPedido();
       setEditandoObs(false);
       setToast({ message: 'Observação salva.', type: 'success' });
     } catch (err) {
@@ -1024,12 +1080,13 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
-          {/* O Control ficou para trás (046). Só aparece quando as peças de hoje
-              divergem do que a fábrica tem na mão. */}
+          {/* O Control ficou para trás (046). Só aparece quando o pedido de hoje
+              diverge do que a fábrica tem na mão. */}
           {order.erp_sync && !ehLoja && (
             <AtualizarNoErp
               sincronia={order.erp_sync}
-              itensAtuais={itensComRef}
+              pedidoHoje={pedidoHoje}
+              numeroNoControl={order.erp_order_id}
               podePedir={podeEditarPecas || ehEscritorioDoErp}
               podeConfirmar={ehEscritorioDoErp}
               ocupado={sincronizando}

@@ -600,17 +600,20 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
  *
  * Duas ações na mesma rota porque são os dois lados da mesma conversa:
  *
- *   pedir     → quem editou as peças de um pedido já lançado avisa que o
- *               Control está com a versão velha. Chega como push na mesa de
- *               quem mexe no Control.
+ *   pedir     → quem editou um pedido já lançado avisa que o Control está com
+ *               a versão velha. Chega como push na mesa de quem mexe no Control,
+ *               e a resposta diz em quantos aparelhos o aviso chegou.
  *   confirmar → quem mexeu no Control diz que já atualizou lá. A fotografia é
- *               tirada de novo e a divergência some sozinha.
+ *               tirada de novo e a divergência some sozinha — desde que o
+ *               pedido não tenha mudado outra vez enquanto isso.
  *
- * Quem PEDE é quem pode mexer no pedido (a venda interna dona dele, ou o
- * escritório). Quem CONFIRMA é só quem mexe no Control — financeiro e admin.
+ * Quem PEDE é quem pode ter mudado o pedido depois do lançamento: a venda
+ * interna DONA dele (o portão de edição só a deixa passar do sent_erp), ou o
+ * escritório. Representante comum não mexe em pedido lançado, então não tem o
+ * que pedir. Quem CONFIRMA é só quem mexe no Control — financeiro e admin.
  */
 export async function erpSyncHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, sub, role } = request.user;
+  const { company_id, sub, role, venda_interna } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(erpSyncSchema, request.body, reply);
   if (!body) return;
@@ -626,22 +629,31 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
     return;
   }
 
-  // Pedir a atualização é de quem pode MEXER no pedido. O dono do pedido é
-  // conferido aqui porque o service trabalha com a fotografia, não com o portão
-  // de edição: sem isto, um representante qualquer pediria atualização do
-  // pedido alheio.
   if (body.acao === 'pedir' && !doEscritorio) {
+    if (venda_interna !== true) {
+      await reply.status(403).send({
+        error: 'Pedido lançado no Control só muda pela venda interna ou pelo escritório',
+        code: 'FORBIDDEN_ROLE',
+        statusCode: 403,
+      });
+      return;
+    }
     const { data: dono } = await supabase
       .from('orders')
-      .select('rep_id')
+      .select('rep_id, invoiced')
       .eq('id', id)
       .eq('company_id', company_id)
       .maybeSingle();
-    if (!dono || (dono as { rep_id: string }).rep_id !== sub) {
-      await reply.status(403).send({
-        error: 'Este pedido não é seu',
-        code: 'FORBIDDEN',
-        statusCode: 403,
+    const pedidoDono = dono as { rep_id: string; invoiced: boolean | null } | null;
+    if (!pedidoDono || pedidoDono.rep_id !== sub) {
+      await reply.status(403).send({ error: 'Este pedido não é seu', code: 'FORBIDDEN', statusCode: 403 });
+      return;
+    }
+    if (pedidoDono.invoiced) {
+      await reply.status(409).send({
+        error: 'O pedido já foi faturado — a nota saiu e não há mais o que atualizar no Control',
+        code: 'JA_FATURADO',
+        statusCode: 409,
       });
       return;
     }
@@ -650,7 +662,7 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
   const r =
     body.acao === 'pedir'
       ? await pedirAtualizacao(id, company_id, sub, body.observacao ?? null)
-      : await confirmarAtualizacao(id, company_id, sub);
+      : await confirmarAtualizacao(id, company_id, sub, body.assinatura ?? null);
 
   if (!r.ok) {
     const respostas = {
@@ -664,16 +676,22 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
         error: 'Este pedido ainda não foi lançado no Control — não há o que atualizar lá',
         code: 'NAO_LANCADO',
       },
-      not_found: { status: 404, error: 'Pedido não encontrado', code: 'NOT_FOUND' },
+      mudou_de_novo: {
+        status: 409,
+        error: 'O pedido mudou de novo enquanto você atualizava o Control. Confira a lista outra vez antes de confirmar.',
+        code: 'MUDOU_DE_NOVO',
+      },
       erro: { status: 500, error: 'Não foi possível registrar', code: 'UPDATE_FAILED' },
     } as const;
-    const resp = respostas[r.motivo] ?? respostas.erro;
+    const resp = respostas[r.motivo];
     await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
     return;
   }
 
-  // O aviso é carona do pedido, nunca condição dele: push falhando não pode
-  // desfazer o registro de que alguém pediu a atualização.
+  // O aviso é carona, nunca condição: push falhando não desfaz o registro. Mas
+  // a resposta diz em quantos aparelhos chegou — a tela não pode afirmar "a
+  // fábrica foi avisada" sem saber.
+  let aparelhos: number | null = null;
   if (body.acao === 'pedir') {
     const { data: pedido } = await supabase
       .from('orders')
@@ -681,15 +699,15 @@ export async function erpSyncHandler(request: FastifyRequest, reply: FastifyRepl
       .eq('id', id)
       .eq('company_id', company_id)
       .maybeSingle();
-    if (pedido) {
-      avisarPedidoMudouNoErp(
-        company_id,
-        pedido as { id: string; order_number: number | null; erp_order_id: string | null },
-        sub,
-        body.observacao ?? null,
-      );
-    }
+    aparelhos = pedido
+      ? await avisarPedidoMudouNoErp(
+          company_id,
+          pedido as { id: string; order_number: number | null; erp_order_id: string | null },
+          sub,
+          body.observacao ?? null,
+        )
+      : 0;
   }
 
-  await reply.send({ data: r.sincronia });
+  await reply.send({ data: { sincronia: r.sincronia, aparelhos } });
 }

@@ -1,15 +1,20 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Check, AlertTriangle } from 'lucide-react';
 import { Button } from '../interface/Button.js';
 import { Textarea } from '../interface/Textarea.js';
 import { formatBRL } from '../../lib/utils.js';
-import { compararComOOriginal, type ItemDaFoto, type SincroniaComOErp } from '@csb/shared';
+import { divergenciaComOErp, type PedidoParaComparar, type SincroniaComOErp } from '@csb/shared';
 
 interface Props {
   /** O que o Control conhece deste pedido (046). */
   sincronia: SincroniaComOErp;
-  /** As peças de HOJE, já com referência e tamanho resolvidos. */
-  itensAtuais: ItemDaFoto[];
+  /** O pedido de HOJE: peças com referência e tamanho, desconto, condição e observação. */
+  pedidoHoje: PedidoParaComparar;
+  /**
+   * O número do Control que vale AGORA. Não o da foto: se a Larissa corrigiu o
+   * número depois do lançamento, é pelo novo que ela acha o pedido lá.
+   */
+  numeroNoControl: string | null;
   /** Quem editou pede a atualização: a venda interna dona, ou o escritório. */
   podePedir: boolean;
   /** Quem mexe no Control confirma que já atualizou lá: financeiro e admin. */
@@ -32,12 +37,14 @@ interface Props {
  * de a Larissa lançar. Sem este bloco, a nota sairia pelo pedido velho e
  * ninguém descobriria antes do faturamento.
  *
- * O cartão só aparece quando as peças de hoje DIVERGEM da fotografia do
- * Control. Pedido em dia não ganha aviso nenhum.
+ * O cartão só aparece quando o pedido de hoje DIVERGE da fotografia do Control
+ * — nas peças, no desconto, na condição de pagamento ou na observação, que são
+ * as quatro coisas que a venda interna consegue mudar depois do lançamento.
  */
 export function AtualizarNoErp({
   sincronia,
-  itensAtuais,
+  pedidoHoje,
+  numeroNoControl,
   podePedir,
   podeConfirmar,
   ocupado,
@@ -48,10 +55,14 @@ export function AtualizarNoErp({
   const [observacao, setObservacao] = useState('');
   const [escrevendo, setEscrevendo] = useState(false);
 
-  const d = useMemo(
-    () => compararComOOriginal(sincronia.snapshot.items ?? [], itensAtuais),
-    [sincronia, itensAtuais],
-  );
+  // Pedido registrado: o recado foi e a caixa fecha. Sem isto ela ficava aberta
+  // com o botão "Avisar a fábrica" armado, como se nada tivesse sido enviado.
+  useEffect(() => {
+    setEscrevendo(false);
+    setObservacao('');
+  }, [sincronia.pedido_em]);
+
+  const d = useMemo(() => divergenciaComOErp(sincronia.snapshot, pedidoHoje), [sincronia, pedidoHoje]);
 
   // O Control está em dia: nada a dizer.
   if (!d.mudou) return null;
@@ -64,6 +75,7 @@ export function AtualizarNoErp({
       hour: '2-digit',
       minute: '2-digit',
     });
+  const pct = (n: number) => `${n.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}%`;
 
   return (
     <div className="rounded-xl border border-warn/40 bg-warn-soft p-4 shadow-sm">
@@ -74,15 +86,14 @@ export function AtualizarNoErp({
             O Control está com a versão antiga deste pedido
           </p>
           <p className="mt-1 text-sm leading-relaxed text-warn-soft-foreground/90">
-            As peças mudaram depois que o pedido foi lançado
-            {sincronia.erp_order_id ? ` como ${sincronia.erp_order_id}` : ''}. Enquanto a fábrica não
-            atualizar lá, a nota sai pelo pedido velho.
+            O pedido mudou depois que foi lançado{numeroNoControl ? ` como ${numeroNoControl}` : ''}. Enquanto
+            a fábrica não atualizar lá, a nota sai pelo pedido velho.
           </p>
 
           {/* O que exatamente mudou: é a lista que a pessoa vai digitar no
               Control, então ela precisa estar aqui, e não "veja o pedido". */}
           <ul className="mt-3 divide-y divide-warn/30 border-y border-warn/30">
-            {d.linhas.map((l) => (
+            {d.itens.linhas.map((l) => (
               <li key={l.chave} className="flex items-center justify-between gap-3 py-1.5">
                 <span className="min-w-0 truncate text-sm text-warn-soft-foreground">
                   <span className="font-mono font-semibold">{l.ref || '—'}</span>
@@ -94,12 +105,29 @@ export function AtualizarNoErp({
                 </span>
               </li>
             ))}
+            {d.desconto && (
+              <li className="flex items-center justify-between gap-3 py-1.5">
+                <span className="text-sm text-warn-soft-foreground">Desconto do pedido</span>
+                <span className="tnum shrink-0 text-sm text-warn-soft-foreground">
+                  {pct(d.desconto.antes)} <span className="opacity-60">para</span>{' '}
+                  <span className="font-semibold">{pct(d.desconto.depois)}</span>
+                </span>
+              </li>
+            )}
+            {d.condicaoMudou && (
+              <li className="py-1.5 text-sm text-warn-soft-foreground">A condição de pagamento mudou</li>
+            )}
+            {d.observacaoMudou && (
+              <li className="py-1.5 text-sm text-warn-soft-foreground">A observação do pedido mudou</li>
+            )}
           </ul>
-          <p className="tnum mt-1.5 text-xs text-warn-soft-foreground/80">
-            No Control: {d.pecasAntes} peças
-            {sincronia.total != null ? ` · ${formatBRL(sincronia.total)}` : ''}. Aqui: {d.pecasDepois}{' '}
-            peças.
-          </p>
+          {d.itens.mudou && (
+            <p className="tnum mt-1.5 text-xs text-warn-soft-foreground/80">
+              No Control: {d.itens.pecasAntes} peças
+              {sincronia.total != null ? ` · ${formatBRL(sincronia.total)}` : ''}. Aqui: {d.itens.pecasDepois}{' '}
+              peças.
+            </p>
+          )}
 
           {jaPediu && (
             <p className="mt-2 rounded-lg bg-card/60 px-2.5 py-1.5 text-xs text-warn-soft-foreground">

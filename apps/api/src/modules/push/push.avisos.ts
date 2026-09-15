@@ -169,26 +169,32 @@ export function avisarFaturadoAoRep(
  * nota sairia errada — então quem mexe no Control é avisado na hora, com o
  * número de lá no título para ela achar o pedido sem procurar.
  */
-export function avisarPedidoMudouNoErp(
+export async function avisarPedidoMudouNoErp(
   company_id: string,
   pedido: { id: string; order_number: number | null; erp_order_id: string | null },
   quemPediu: string,
   observacao?: string | null,
-): void {
+): Promise<number> {
   const noControl = pedido.erp_order_id ? ` (${pedido.erp_order_id} no Control)` : '';
-  engolir(
-    enviarParaPapeis(
+  // ESPERA a entrega e devolve quantos aparelhos receberam: a tela não pode
+  // dizer "a fábrica foi avisada" sem saber se o aviso chegou em alguém. Falha
+  // de push vira zero — nunca derruba o registro do pedido de atualização.
+  try {
+    return await enviarParaPapeis(
       company_id,
       ['financeiro', 'admin'],
       {
         title: `Pedido #${pedido.order_number ?? ''} mudou depois de ir para o Control`,
         body: observacao?.trim()
           ? `${observacao.trim()} — atualize no Control${noControl}.`
-          : `As peças mudaram${noControl}. Veja o que mudou e atualize no Control.`,
+          : `O pedido mudou${noControl}. Veja o que mudou e atualize no Control.`,
         url: `/orders/${pedido.id}`,
         tag: `erp-sync-${pedido.id}`,
       },
       quemPediu,
-    ),
-  );
+    );
+  } catch (err) {
+    console.error('[push] aviso de pedido mudou no ERP:', err);
+    return 0;
+  }
 }

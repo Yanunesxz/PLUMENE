@@ -131,4 +131,10 @@ export const erpSyncSchema = z.object({
   acao: z.enum(['pedir', 'confirmar']),
   /** O recado de quem pediu ("tirei 6 peças da 0124, faltou no estoque"). */
   observacao: z.string().trim().max(500).optional(),
+  /**
+   * Só no `confirmar`: a impressão do pedido que estava na tela
+   * (`assinaturaDoPedido`, em shared). Se o pedido mudou de novo desde então,
+   * a confirmação é recusada em vez de engolir a segunda edição.
+   */
+  assinatura: z.string().trim().max(40).optional(),
 });
