@@ -1,6 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
-import type { SincroniaComOErp } from '@csb/shared';
+import { assinaturaDoPedido, type Order, type SincroniaComOErp, type PedidoParaComparar } from '@csb/shared';
 
 /**
  * "ATUALIZAR NO ERP" (migração 046).
@@ -15,9 +15,10 @@ import type { SincroniaComOErp } from '@csb/shared';
  * com a versão velha. Aqui mora a fotografia do que o Control CONHECE: tirada
  * no lançamento, tirada de novo quando alguém confirma que atualizou lá.
  *
- * "Está desatualizado" não é gravado: é a comparação entre as peças de hoje e a
- * foto, feita na tela. Um booleano guardado desencontraria do fato na primeira
- * vez que alguém editasse sem passar por aqui.
+ * "Está desatualizado" não é gravado: é a comparação entre o pedido de hoje e a
+ * foto (`divergenciaComOErp`, em shared), feita na tela. Um booleano guardado
+ * desencontraria do fato na primeira vez que alguém editasse sem passar por
+ * aqui.
  */
 
 /** `order_erp_sync` vem da 046 — o código sobe antes do SQL, como sempre. */
@@ -33,10 +34,14 @@ function contarPecas(itens: Array<{ quantity?: number | null }>): number {
   return itens.reduce((s, i) => s + Number(i.quantity ?? 0), 0);
 }
 
-async function fotografar(
-  order_id: string,
-  company_id: string,
-): Promise<{ pedido: unknown; total: number | null; pecas: number; erp_order_id: string | null } | null> {
+interface Foto {
+  pedido: unknown;
+  total: number | null;
+  pecas: number;
+  erp_order_id: string | null;
+}
+
+async function fotografar(order_id: string, company_id: string): Promise<Foto | null> {
   const rico = await supabase
     .from('orders')
     .select(COLUNAS_DA_FOTO)
@@ -72,14 +77,34 @@ async function fotografar(
   };
 }
 
+/** A linha que diz "é isto que a fábrica tem na mão", com o pedido de atualização zerado. */
+function linhaDaFoto(order_id: string, company_id: string, foto: Foto, quem: string | null) {
+  return {
+    order_id,
+    company_id,
+    erp_order_id: foto.erp_order_id,
+    total: foto.total,
+    pecas: foto.pecas,
+    snapshot: foto.pedido,
+    confirmado_em: new Date().toISOString(),
+    confirmado_por: quem,
+    // Foto nova zera o pedido de atualização: o que foi pedido acabou de ser feito.
+    pedido_em: null,
+    pedido_por: null,
+    observacao: null,
+  };
+}
+
 /**
  * O Control passou a conhecer o pedido como ele está AGORA.
  *
- * Chamado em dois momentos: quando o pedido é lançado (o Control acabou de
- * importar a planilha) e quando alguém confirma que já atualizou lá. Nos dois
- * a foto é a mesma coisa — "é isto que a fábrica tem na mão".
+ * Chamado em três momentos: quando a Larissa lança à mão, quando o ERP do
+ * parceiro confirma a importação pela API, e quando alguém confirma que já
+ * atualizou lá. Nos três a foto é a mesma coisa — "é isto que a fábrica tem na
+ * mão".
  *
- * Nunca derruba quem chamou: é acessório do lançamento, não o lançamento.
+ * Nunca derruba quem chamou: é acessório do lançamento, não o lançamento. Mas
+ * a falha fica escrita — foto que não grava é aviso que nunca vai aparecer.
  */
 export async function registrarNoErp(
   order_id: string,
@@ -89,34 +114,88 @@ export async function registrarNoErp(
   if (!(await detectarTabela())) return 'sem_tabela';
 
   const foto = await fotografar(order_id, company_id);
-  if (!foto) return 'falhou';
+  if (!foto) {
+    console.error(`[046] sem pedido para fotografar: ${order_id}`);
+    return 'falhou';
+  }
 
-  const { error } = await supabase.from('order_erp_sync').upsert(
-    {
-      order_id,
-      company_id,
-      erp_order_id: foto.erp_order_id,
-      total: foto.total,
-      pecas: foto.pecas,
-      snapshot: foto.pedido,
-      confirmado_em: new Date().toISOString(),
-      confirmado_por: quem ?? null,
-      // Foto nova zera o pedido de atualização: o que foi pedido acabou de ser feito.
-      pedido_em: null,
-      pedido_por: null,
-      observacao: null,
-    },
-    { onConflict: 'order_id' },
-  );
-  return error ? 'falhou' : 'guardada';
+  const { error } = await supabase
+    .from('order_erp_sync')
+    .upsert(linhaDaFoto(order_id, company_id, foto, quem ?? null), { onConflict: 'order_id' });
+  if (error) {
+    console.error(`[046] falha ao gravar a foto do pedido ${order_id}: ${error.message}`);
+    return 'falhou';
+  }
+  return 'guardada';
+}
+
+/**
+ * A foto de um pedido lançado que ainda NÃO tem foto — chamada um instante
+ * antes de qualquer edição (peças, desconto, pagamento, observação).
+ *
+ * Existe por causa dos pedidos que foram lançados antes de a 046 rodar (61 só
+ * na Corpo Sensual em 11/09/2026): eles nunca passaram pelo lançamento com a
+ * foto, então a primeira edição depois do deploy não teria com o que comparar
+ * e o aviso nunca apareceria. A melhor informação que existe sobre o que o
+ * Control conhece desses pedidos é o próprio pedido antes desta edição — foi
+ * lançado assim e ninguém avisou de mudança desde então.
+ *
+ * Só grava se faltar: pedido que já tem foto mantém a dele, senão a edição de
+ * hoje apagaria a divergência que ela mesma está criando.
+ */
+export async function garantirFotoDoErp(
+  order: Pick<Order, 'id' | 'status'>,
+  company_id: string,
+): Promise<'guardada' | 'ja_tinha' | 'nao_lancado' | 'sem_tabela' | 'falhou'> {
+  if (order.status !== 'sent_erp') return 'nao_lancado';
+  if (!(await detectarTabela())) return 'sem_tabela';
+
+  const { data: existente } = await supabase
+    .from('order_erp_sync')
+    .select('order_id')
+    .eq('order_id', order.id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (existente) return 'ja_tinha';
+
+  const foto = await fotografar(order.id, company_id);
+  if (!foto) {
+    console.error(`[046] sem pedido para a primeira foto: ${order.id}`);
+    return 'falhou';
+  }
+
+  // INSERT, não upsert: se duas edições chegarem juntas, a primeira foto vence
+  // e a segunda não sobrescreve com o pedido já editado.
+  const { error } = await supabase.from('order_erp_sync').insert(linhaDaFoto(order.id, company_id, foto, null));
+  if (error) {
+    if ((error as { code?: string }).code === '23505') return 'ja_tinha';
+    console.error(`[046] falha na primeira foto do pedido ${order.id}: ${error.message}`);
+    return 'falhou';
+  }
+  return 'guardada';
+}
+
+/**
+ * O número do Control foi corrigido depois do lançamento: a foto passa a
+ * apontar o número certo. Sem isto, o cartão e o push mandariam a Larissa
+ * procurar no Control um pedido com o número digitado errado.
+ */
+export async function atualizarNumeroNaFoto(order_id: string, company_id: string, numero: string): Promise<void> {
+  if (!(await detectarTabela())) return;
+  const { error } = await supabase
+    .from('order_erp_sync')
+    .update({ erp_order_id: numero })
+    .eq('order_id', order_id)
+    .eq('company_id', company_id);
+  if (error) console.error(`[046] falha ao corrigir o número na foto do pedido ${order_id}: ${error.message}`);
 }
 
 export type PedirResult =
   | { ok: true; sincronia: SincroniaComOErp }
-  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'not_found' | 'erro' };
+  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'erro' };
 
 /**
- * Alguém editou as peças e apertou "Atualizar no ERP": fica registrado quem
+ * Alguém editou o pedido e apertou "Atualizar no ERP": fica registrado quem
  * pediu, quando e por quê. Quem atualiza o Control de fato é uma pessoa — o
  * app só garante que ela seja avisada e que o recado não se perca.
  */
@@ -151,16 +230,22 @@ export async function pedirAtualizacao(
 
 export type ConfirmarResult =
   | { ok: true; sincronia: SincroniaComOErp }
-  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'erro' };
+  | { ok: false; motivo: 'sem_tabela' | 'nao_lancado' | 'mudou_de_novo' | 'erro' };
 
 /**
  * "Já atualizei no Control": a foto é tirada de novo, e a divergência some
  * porque ela É a comparação com a foto. Só quem mexe no Control confirma.
+ *
+ * `assinaturaVista` é a impressão do pedido que a Larissa tinha na tela ao
+ * apertar. Se a venda interna mexeu de novo enquanto ela digitava no Control,
+ * as impressões não batem e a confirmação é recusada — a foto de agora
+ * engoliria a segunda edição, e o Control ficaria com a versão do meio.
  */
 export async function confirmarAtualizacao(
   order_id: string,
   company_id: string,
   quem: string,
+  assinaturaVista?: string | null,
 ): Promise<ConfirmarResult> {
   if (!(await detectarTabela())) return { ok: false, motivo: 'sem_tabela' };
 
@@ -171,6 +256,19 @@ export async function confirmarAtualizacao(
     .eq('company_id', company_id)
     .maybeSingle();
   if (!existente) return { ok: false, motivo: 'nao_lancado' };
+
+  if (assinaturaVista) {
+    const { data: agora } = await supabase
+      .from('orders')
+      .select('*, items:order_items(*)')
+      .eq('id', order_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (!agora) return { ok: false, motivo: 'erro' };
+    if (assinaturaDoPedido(agora as unknown as PedidoParaComparar) !== assinaturaVista) {
+      return { ok: false, motivo: 'mudou_de_novo' };
+    }
+  }
 
   const r = await registrarNoErp(order_id, company_id, quem);
   if (r !== 'guardada') return { ok: false, motivo: 'erro' };

@@ -1,7 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
-import { registrarNoErp, lerSincronia } from './erpSync.service.js';
+import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -619,6 +619,11 @@ export async function setOrderDiscount(
   const acesso = podeMexerNoPedido(o, role, rep_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
+  // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
+  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
+  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
+  await garantirFotoDoErp(o, company_id);
+
   const { data: itens } = await supabase
     .from('order_items')
     .select('total')
@@ -757,6 +762,11 @@ export async function setOrderItems(
   // está cortando nada. É acessório: falhar aqui não impede a edição.
   await guardarOriginal(o, 'edicao', user_id);
 
+  // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
+  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
+  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
+  await garantirFotoDoErp(o, company_id);
+
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
   let tabela: string | null = o.price_table_id ?? null;
@@ -885,6 +895,11 @@ export async function setOrderPayment(
 
   if (!(await detectarColunaDaCondicao())) return { ok: false, reason: 'sem_coluna' };
 
+  // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
+  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
+  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
+  await garantirFotoDoErp(o, company_id);
+
   let gravar: string | null = null;
   if (payment_condition_id) {
     gravar = await condicaoValida(payment_condition_id, company_id);
@@ -954,6 +969,8 @@ export async function corrigirNumeroErp(
   if (error) {
     return { ok: false, motivo: (error as { code?: string }).code === CHAVE_DUPLICADA ? 'em_uso' : 'erro' };
   }
+  // A foto do que o Control conhece passa a apontar o número certo (046).
+  await atualizarNumeroNaFoto(id, company_id, numero);
   return { ok: true, erp_order_id: numero };
 }
 
@@ -1008,6 +1025,11 @@ export async function setOrderNotes(
 
   const acesso = podeMexerNoPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
+
+  // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
+  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
+  // "mudou depois de ir para o ERP". Acessório: não impede a edição.
+  await garantirFotoDoErp(o, company_id);
 
   // Sem a lista de SKUs em mãos: o modo genérico reconhece a linha de cor pelo
   // formato completo ("0015 3M azul"), que é o que `observacaoDeCores` grava.
