@@ -23,6 +23,7 @@ import {
 const ler = (rel: string) => readFileSync(path.resolve(__dirname, '..', rel), 'utf8').replace(/\r\n/g, '\n');
 
 const MIGRACAO = ler('apps/api/src/config/migrations/048_integracao_control_fase_0.sql');
+const MIGRACAO_049 = ler('apps/api/src/config/migrations/049_integracao_control_respostas.sql');
 const PARA_RODAR = ler('_tools/SQL-PARA-RODAR-048.sql');
 const PASSO_1 = ler('_tools/SQL-PARA-RODAR-013-042-NA-CS.sql');
 const MIGRACAO_013 = ler('apps/api/src/config/migrations/013_protecoes.sql');
@@ -104,7 +105,11 @@ describe('migração 048', () => {
   });
 
   it('as listas do rastro são as do código', () => {
-    expect(listaDoCheck(MIGRACAO, 'chk_order_erp_events_tipo')).toEqual([...TIPOS_DE_EVENTO_ERP]);
+    // A 049 recriou o CHECK de tipo com a lista daqui mais três acontecimentos:
+    // a fonte da lista de TIPOS passou a ser ela (tests/migracao-049.test.ts
+    // confere que a daqui é o começo da dela). A origem do evento e a origem
+    // do número continuam vindo desta migração.
+    expect(listaDoCheck(MIGRACAO_049, 'chk_order_erp_events_tipo')).toEqual([...TIPOS_DE_EVENTO_ERP]);
     expect(listaDoCheck(MIGRACAO, 'chk_order_erp_events_origem')).toEqual([...ORIGENS_DE_EVENTO_ERP]);
     expect(listaDoCheck(MIGRACAO, 'chk_orders_erp_order_source')).toEqual([...ORIGENS_DO_NUMERO]);
   });

@@ -14,4 +14,13 @@ export interface PaymentCondition {
   /** O texto que o representante reconhece ("30/60/90 DIAS"). Vai no COND PGTO. */
   description: string;
   active: boolean;
+  /**
+   * Como o Control descreve a condição (migração 049). `description` continua
+   * sendo a do app — o CRM casa por ela e a API nunca a regrava.
+   */
+  erp_description?: string | null;
+  /** Quando o Control mandou esta condição pela última vez. */
+  erp_updated_at?: string | null;
+  /** O menor pedido que a condição aceita, como o Control informa. Nulo = sem mínimo. */
+  valor_minimo?: number | null;
 }

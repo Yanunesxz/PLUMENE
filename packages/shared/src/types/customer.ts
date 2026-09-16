@@ -13,6 +13,15 @@ export interface PriceTable {
    * Padrão: 1
    */
   price_column: number;
+  /**
+   * Como o Control descreve a tabela (migração 049). `name` continua sendo o
+   * nome do app — o CRM casa por ele e a API nunca o regrava.
+   */
+  erp_description?: string | null;
+  /** Quando o Control mandou esta tabela pela última vez. */
+  erp_updated_at?: string | null;
+  /** Tabela desativada no Control não some: pedido antigo aponta para ela. */
+  active?: boolean;
 }
 
 // ─── Cliente ──────────────────────────────────────────────────────────────────
@@ -86,6 +95,18 @@ export interface Customer {
    * esfriado, sem alerta de contato.
    */
   varejo?: boolean | null;
+  /**
+   * O que o Control passou a mandar (migração 049): quando mandou este
+   * cadastro pela última vez; de quando é o retrato (última compra, total
+   * comprado, vencido); e a pendência financeira — R$ em aberto, quando esse
+   * valor chegou e quantos títulos vencidos. Bloqueio do Control NÃO trava o
+   * representante: o financeiro é avisado.
+   */
+  erp_updated_at?: string | null;
+  retrato_referencia_em?: string | null;
+  pendencia_financeira?: number | null;
+  pendencia_financeira_em?: string | null;
+  titulos_vencidos?: number | null;
   updated_at: string;
 }
 

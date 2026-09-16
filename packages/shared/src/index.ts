@@ -1,5 +1,6 @@
 export * from './types/access.js';
 export * from './types/api.js';
+export * from './types/control.js';
 export * from './types/customer.js';
 export * from './types/order.js';
 export * from './types/paymentCondition.js';

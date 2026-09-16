@@ -5,6 +5,13 @@ export interface Company {
   id: string;
   name: string;
   created_at: string;
+  /**
+   * "Sincronizar agora" (migração 049): quando alguém pediu ao Control que
+   * puxe tudo já, e quem. GET /partner/v1/status devolve sincronizar_agora
+   * enquanto isto for mais novo que a última passada do Control.
+   */
+  sync_solicitado_em?: string | null;
+  sync_solicitado_por?: string | null;
 }
 
 export interface User {
@@ -26,6 +33,11 @@ export interface User {
    * clientes que ele mesmo cadastrou no app.
    */
   erp_rep_id?: string | null;
+  /**
+   * O e-mail do representante NO Control (migração 049). Coluna própria:
+   * `email` é o login do app e não muda por causa do ERP.
+   */
+  erp_email?: string | null;
   /** Venda interna (migração 031): pedido nasce aprovado e ele mesmo fatura. */
   venda_interna?: boolean;
   /** Loja: o cliente que este login representa. Nulo nos demais papéis. */

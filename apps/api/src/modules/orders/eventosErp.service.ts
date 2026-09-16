@@ -21,8 +21,12 @@ import { detectar } from '../../lib/detectarColuna.js';
  */
 
 /**
- * Os tipos aceitos pelo CHECK de order_erp_events.tipo. A lista da 048 e esta
- * precisam ser as mesmas (tests/migracao-048.test.ts confere).
+ * Os tipos aceitos pelo CHECK de order_erp_events.tipo. A lista do banco é a
+ * da 049 (que recriou o CHECK da 048 com três acontecimentos a mais) e esta
+ * precisam ser as mesmas (tests/migracao-048.test.ts e tests/migracao-049.test.ts
+ * conferem). Os três últimos só existem no banco depois da 049: gravar um deles
+ * antes dela é recusado pelo CHECK e vira 'falhou' (fica no console, nunca
+ * derruba quem chamou).
  */
 export const TIPOS_DE_EVENTO_ERP = [
   'numero_gravado',
@@ -36,6 +40,11 @@ export const TIPOS_DE_EVENTO_ERP = [
   'excluido',
   'recusado_pelo_erp',
   'alterado_antes_da_confirmacao',
+  // 049: o financeiro pediu o lançamento (canal api), uma nota nova tomou o
+  // lugar da anterior, o Control avisou que excluiu o pedido.
+  'solicitado_ao_erp',
+  'nota_substituida',
+  'excluido_pelo_erp',
 ] as const;
 export type TipoEventoErp = (typeof TIPOS_DE_EVENTO_ERP)[number];
 

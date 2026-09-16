@@ -2,6 +2,7 @@ import type { OrderStatus } from '../constants/orderStatus.js';
 import type { OrderSource } from './access.js';
 import type { PedidoOriginal } from '../pedidos/pedidoOriginal.js';
 import type { SincroniaComOErp } from '../pedidos/sincroniaErp.js';
+import type { SolicitacaoErp } from './control.js';
 
 export interface OrderItem {
   id: string;
@@ -73,6 +74,13 @@ export interface Order {
   local_id: string | null;
   synced_at: string | null;
   erp_order_id: string | null;
+  /**
+   * Pedido SOLICITADO ao Control (migração 049): quando o financeiro apertou
+   * "Lançar no ERP" com o canal em 'api', e quem. Nulo = não solicitado, ou
+   * lançado à mão. Solicitado e com `erp_order_id` nulo = esperando o Control.
+   */
+  erp_requested_at?: string | null;
+  erp_requested_by?: string | null;
   created_by: string;
   approved_by: string | null;
   created_at: string;
@@ -101,6 +109,13 @@ export interface NotaDoPedido {
   valor: number | null;
   /** Preenchida quando a nota foi cancelada: os itens dela deixam de contar. */
   cancelada_em: string | null;
+  /**
+   * Nota substituída (migração 049): a nota nova que subiu por cima desta
+   * (id em order_invoices) e quando. Ausentes antes da 049; nulos na nota
+   * ativa. A tela usa só a nota ativa — ver `NotaSubstituida` para o rastro.
+   */
+  substituida_por?: string | null;
+  substituida_em?: string | null;
   itens: ItemDaNota[];
 }
 
@@ -125,6 +140,13 @@ export interface OrderWithItems extends Order {
    * 048 ainda não rodou. Ausente no cache offline.
    */
   notas?: NotaDoPedido[];
+  /**
+   * O pedido foi solicitado ao Control (migração 049). Presente só com o canal
+   * em 'api' e depois do clique do financeiro; é o que a tela usa para ficar
+   * consultando até `erp_order_id` chegar. Nulo = nunca solicitado. Ausente no
+   * cache offline e antes da 049.
+   */
+  solicitacao_erp?: SolicitacaoErp | null;
   /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante
