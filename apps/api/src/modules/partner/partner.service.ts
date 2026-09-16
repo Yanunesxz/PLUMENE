@@ -4,6 +4,10 @@
  * O parceiro (programa do ERP) busca os pedidos aprovados, grava no sistema
  * dele e confirma a importação informando o número gerado no ERP. A partir
  * daí o pedido fica como `sent_erp` e sai da fila.
+ *
+ * Desde a 049 (decisões de 16/09/2026) a fila é o que o financeiro SOLICITOU:
+ * o clique em "Lançar no Control" grava orders.erp_requested_at, e só esses
+ * pedidos saem no GET /pedidos. Sem a 049 no banco, a fila é a de antes.
  */
 import { supabase } from '../../config/supabase.js';
 import {
@@ -42,9 +46,35 @@ export interface PartnerOrder {
   valor_total: number | null;
   observacoes: string | null;
   pedido_erp: string | null;
+  /**
+   * Quando o financeiro solicitou o lançamento ao Control (049,
+   * orders.erp_requested_at). Na fila padrão vem sempre preenchido; null em
+   * pedido lançado à mão, no passivo e em banco sem a 049.
+   */
+  solicitado_em: string | null;
+  /**
+   * O app mudou este pedido DEPOIS de o Control o importar? É
+   * `updated_at > erp_order_set_at` (048): peças, desconto, condição ou
+   * observação alterados depois da confirmação. `null` quando o pedido ainda
+   * não tem número, ou quando o banco não tem a coluna de origem do número.
+   * Serve à reconciliação (`incluir=todos`): na fila, é sempre null.
+   */
+  alterado_apos_importacao: boolean | null;
   cliente: {
     codigo_erp: string | null;
     cnpj: string | null;
+    /**
+     * A CHAVE ÚNICA do cliente entre os sistemas: o CNPJ só com dígitos
+     * (decisão de 16/09/2026). É por ela que o Control casa o cadastro — e
+     * cria o cliente quando não acha. `null` quando o cadastro não tem CNPJ.
+     */
+    chave: string | null;
+    /**
+     * `true` = o app não tem o código deste cliente no Control (sem `erp_id`).
+     * O Control cria o cadastro, casa pelo CNPJ, e devolve o código pelo
+     * POST /clientes. Não é pendência: a falta de código deixou de travar.
+     */
+    novo_no_control: boolean;
     razao_social: string | null;
     nome_fantasia: string | null;
     /**
@@ -101,6 +131,10 @@ interface OrderRow {
   created_at: string;
   updated_at: string;
   erp_order_id: string | null;
+  /** Quando o financeiro solicitou o lançamento (049). Ausente em banco sem a coluna. */
+  erp_requested_at?: string | null;
+  /** Quando o número do Control foi gravado (048). Ausente em banco sem a coluna. */
+  erp_order_set_at?: string | null;
   discount_percent?: number | null;
   invoiced?: boolean | null;
   invoiced_at?: string | null;
@@ -149,6 +183,13 @@ interface ColunasOpcionais {
   discount: boolean;
   /** orders.price_table_id (025): a tabela que precificou o pedido. */
   priceTable: boolean;
+  /**
+   * orders.erp_requested_at (049): o pedido foi SOLICITADO ao Control. Com a
+   * coluna, a fila é só o solicitado; sem ela, a fila de antes.
+   */
+  solicitado: boolean;
+  /** orders.erp_order_set_at (048): quando o número do Control foi gravado. */
+  origemDoNumero: boolean;
   /** customers.cep e as demais colunas do cadastro real (041). */
   cadastroReal: boolean;
 }
@@ -162,6 +203,8 @@ function buildOrderSelect(c: ColunasOpcionais): string {
     id, ${c.orderNumber ? 'order_number, ' : ''}status, total, notes,
     created_at, updated_at, erp_order_id, price_table_erp_code, price_column,
     ${c.priceTable ? 'price_table_id, ' : ''}
+    ${c.solicitado ? 'erp_requested_at, ' : ''}
+    ${c.origemDoNumero ? 'erp_order_set_at, ' : ''}
     ${c.invoiced ? 'invoiced, invoiced_at, invoiced_total, ' : ''}
     ${c.discount ? 'discount_percent, ' : ''}
     ${c.condition ? 'payment_condition:payment_conditions(code, description), ' : ''}
@@ -183,24 +226,29 @@ function buildOrderSelect(c: ColunasOpcionais): string {
  * cache próprio que morava aqui memorizava qualquer erro de rede como
  * "coluna não existe" até o próximo restart.
  *
- * Só `invoiced` NÃO pode degradar: ela é FILTRO da fila (não só campo do
- * SELECT). Se a sonda falhar por rede e for lida como "não existe", a fila sai
- * sem `.or('invoiced...')` e entrega os pedidos faturados à mão — exatamente o
- * que o filtro existe para impedir. Então ali o erro sobe (500) e o ERP tenta
- * de novo na próxima rodada, como a doc manda.
+ * `invoiced` e `erp_requested_at` NÃO podem degradar: são FILTRO da fila (não
+ * só campo do SELECT). Se a sonda falhar por rede e for lida como "não
+ * existe", a fila sai sem `.or('invoiced...')` e entrega os pedidos faturados à
+ * mão — ou sai sem `.not('erp_requested_at'...)` e entrega pedidos que o
+ * financeiro ainda não mandou lançar. Exatamente o que os filtros existem para
+ * impedir. Então ali o erro sobe (500) e o ERP tenta de novo na próxima
+ * rodada, como a doc manda.
  */
 async function detectarColunas(): Promise<ColunasOpcionais> {
   // A ordem das sondas de `orders` é a que os testes do dublê seguem; a de
   // `customers` vai por último e não mexe na fila de `orders`.
-  const [orderNumber, invoiced, condition, discount, priceTable, cadastroReal] = await Promise.all([
-    detectar('orders', 'order_number'),
-    detectarOuFalhar('orders', 'invoiced'),
-    detectar('orders', 'payment_condition_id'),
-    detectar('orders', 'discount_percent'),
-    detectar('orders', 'price_table_id'),
-    detectar('customers', 'cep'),
-  ]);
-  return { orderNumber, invoiced, condition, discount, priceTable, cadastroReal };
+  const [orderNumber, invoiced, condition, discount, priceTable, solicitado, origemDoNumero, cadastroReal] =
+    await Promise.all([
+      detectar('orders', 'order_number'),
+      detectarOuFalhar('orders', 'invoiced'),
+      detectar('orders', 'payment_condition_id'),
+      detectar('orders', 'discount_percent'),
+      detectar('orders', 'price_table_id'),
+      detectarOuFalhar('orders', 'erp_requested_at'),
+      detectar('orders', 'erp_order_set_at'),
+      detectar('customers', 'cep'),
+    ]);
+  return { orderNumber, invoiced, condition, discount, priceTable, solicitado, origemDoNumero, cadastroReal };
 }
 
 type MapaDeTabelas = Map<string, { erp_code: string | null; price_column: number }>;
@@ -237,11 +285,33 @@ function textoOuNull(v: unknown): string | null {
   return t ? t : null;
 }
 
+/** O CNPJ só com dígitos — a chave do cliente entre os sistemas. `null` sem CNPJ. */
+function chaveDoCliente(cnpj: unknown): string | null {
+  if (typeof cnpj !== 'string') return null;
+  const digitos = cnpj.replace(/\D/g, '');
+  return digitos ? digitos : null;
+}
+
+/**
+ * O app mudou o pedido depois de o Control o importar? Só quando as duas
+ * datas existem; qualquer uma ilegível vale `null` (não se acusa nada).
+ */
+function alteradoAposImportacao(row: OrderRow): boolean | null {
+  const importadoEm = row.erp_order_set_at ? Date.parse(row.erp_order_set_at) : Number.NaN;
+  const atualizadoEm = row.updated_at ? Date.parse(row.updated_at) : Number.NaN;
+  if (Number.isNaN(importadoEm) || Number.isNaN(atualizadoEm)) return null;
+  return atualizadoEm > importadoEm;
+}
+
 function mapOrder(row: OrderRow, tableMap: MapaDeTabelas): PartnerOrder {
   const pendencias: string[] = [];
   const customer = row.customer;
 
-  if (!customer?.erp_id) pendencias.push('cliente sem código do ERP');
+  // O CNPJ é a chave do cliente entre os sistemas (16/09/2026): sem código do
+  // Control o pedido segue (`novo_no_control`: o Control cria o cadastro e
+  // devolve o código pelo POST /clientes); sem CNPJ não há por onde casar.
+  const chave = chaveDoCliente(customer?.cnpj);
+  if (!chave) pendencias.push('cliente sem CNPJ');
   if (!customer?.rep_erp_id) pendencias.push('cliente sem representante vinculado no ERP');
 
   const tabela = tabelaDoPedido(row, tableMap);
@@ -296,9 +366,13 @@ function mapOrder(row: OrderRow, tableMap: MapaDeTabelas): PartnerOrder {
     // Só o que o representante DIGITOU — as linhas de cor já saem por item.
     observacoes: semLinhasDeCor(row.notes, skusDoPedido) || null,
     pedido_erp: row.erp_order_id,
+    solicitado_em: row.erp_requested_at ?? null,
+    alterado_apos_importacao: alteradoAposImportacao(row),
     cliente: {
       codigo_erp: customer?.erp_id ?? null,
       cnpj: customer?.cnpj ?? null,
+      chave,
+      novo_no_control: !customer?.erp_id,
       razao_social: customer?.name ?? null,
       nome_fantasia: customer?.trade_name ?? null,
       endereco: {
@@ -357,10 +431,15 @@ async function getPriceTableMap(
  * aprovados/importados quando `incluir=todos`. `desde` filtra por
  * atualizado_em >= data (a "data que eu puxei" do parceiro).
  *
+ * A fila padrão (com a 049): aprovado, sem número do Control, NÃO faturado e
+ * SOLICITADO pelo financeiro (`erp_requested_at` preenchido) — o lançamento
+ * continua sendo um clique dele; a API só entrega o que ele mandou. Sem a
+ * 049 no banco, a fila é a de antes (todo aprovado sem número e não faturado).
+ *
  * `incluir=todos` continua trazendo `approved` e `sent_erp`, faturados
  * inclusive: é a lista de reconciliação. Importar dela só o que tem
- * `pedido_erp` nulo E `faturado` false — o resto já está no Control ou já foi
- * faturado à mão.
+ * `pedido_erp` nulo E `faturado` false E `solicitado_em` preenchido — o resto
+ * já está no Control, já foi faturado à mão, ou ninguém pediu ainda.
  *
  * A lista vem INTEIRA: o PostgREST corta em 1.000 linhas em silêncio, e com
  * `incluir=todos` (a reconciliação) o ERP concluiria que o resto dos pedidos
@@ -386,6 +465,8 @@ export async function getPartnerOrders(
       // iriam para o Control de novo.
       query = query.eq('status', 'approved').is('erp_order_id', null);
       if (colunas.invoiced) query = query.or('invoiced.is.null,invoiced.eq.false');
+      // E só o que o financeiro SOLICITOU (049). Sem a coluna, a fila de hoje.
+      if (colunas.solicitado) query = query.not('erp_requested_at', 'is', null);
     }
     if (opts.desde) {
       query = query.gte('updated_at', opts.desde);
@@ -505,7 +586,7 @@ export async function confirmOrderImport(
   parceiro: string | null = null,
 ): Promise<ConfirmResult> {
   // Uma grafia só para o número do Control: é por ele que o faturamento acha o
-  // pedido depois, e "sx-14627" não pode virar um pedido diferente de "SX14627".
+  // pedido depois, e "cs-17379" não pode virar um pedido diferente de "CS17379".
   // E é a mesma máscara que o financeiro precisa respeitar ao lançar à mão.
   const numero = normalizarNumeroErp(pedido_erp);
   if (!numeroErpValido(numero)) return { outcome: 'invalid_number' };
@@ -684,8 +765,18 @@ export async function conciliarPedidoErp(
 // ─── Conciliação: só contagens ───────────────────────────────────────────────
 
 export interface ContagensDaConciliacao {
-  /** A fila do `GET /pedidos`: aprovado, sem número, não faturado. */
+  /**
+   * Aprovado, sem número, não faturado — solicitado ao Control ou não. Antes
+   * da 049 era exatamente a fila do `GET /pedidos`; hoje a fila é o subconjunto
+   * `aprovados_solicitados_ao_control`.
+   */
   fila_aprovados_sem_numero_nao_faturados: number;
+  /**
+   * A fila do `GET /pedidos` depois da 049: aprovado, sem número, não faturado
+   * e com o clique do financeiro em "Lançar no Control" (erp_requested_at).
+   * `null` = a 049 ainda não rodou (aí a fila é a grandeza de cima).
+   */
+  aprovados_solicitados_ao_control: number | null;
   /** O passivo que o `/conciliar` resolve, ainda sem faturamento. */
   enviados_sem_numero_nao_faturados: number;
   /** O mesmo passivo, já faturado à mão. */
@@ -700,19 +791,28 @@ interface Grandeza {
   status: 'approved' | 'sent_erp';
   comNumero: boolean;
   faturado: boolean;
+  /** `true` = só os solicitados ao Control (erp_requested_at, 049). */
+  solicitado?: boolean;
 }
 
 const GRANDEZAS: Record<keyof ContagensDaConciliacao, Grandeza> = {
   fila_aprovados_sem_numero_nao_faturados: { status: 'approved', comNumero: false, faturado: false },
+  aprovados_solicitados_ao_control: { status: 'approved', comNumero: false, faturado: false, solicitado: true },
   enviados_sem_numero_nao_faturados: { status: 'sent_erp', comNumero: false, faturado: false },
   enviados_sem_numero_faturados: { status: 'sent_erp', comNumero: false, faturado: true },
   aprovados_faturados_sem_numero: { status: 'approved', comNumero: false, faturado: true },
   enviados_com_numero_sem_faturamento: { status: 'sent_erp', comNumero: true, faturado: false },
 };
 
-async function contarPedidos(company_id: string, g: Grandeza, temInvoiced: boolean): Promise<number> {
+async function contarPedidos(
+  company_id: string,
+  g: Grandeza,
+  colunas: { invoiced: boolean; solicitado: boolean },
+): Promise<number | null> {
   // Sem a coluna (banco antes da 027) nenhum pedido está faturado.
-  if (g.faturado && !temInvoiced) return 0;
+  if (g.faturado && !colunas.invoiced) return 0;
+  // Sem a 049 não existe "solicitado": a grandeza não tem número honesto.
+  if (g.solicitado && !colunas.solicitado) return null;
 
   // `count: 'exact'` com `limit(0)`: o banco devolve só a contagem, nenhuma
   // linha. GET de verdade — HEAD já disse "existe" para tabela que não existia.
@@ -722,9 +822,10 @@ async function contarPedidos(company_id: string, g: Grandeza, temInvoiced: boole
     .eq('company_id', company_id)
     .eq('status', g.status);
   query = g.comNumero ? query.not('erp_order_id', 'is', null) : query.is('erp_order_id', null);
-  if (temInvoiced) {
+  if (colunas.invoiced) {
     query = g.faturado ? query.eq('invoiced', true) : query.or('invoiced.is.null,invoiced.eq.false');
   }
+  if (g.solicitado) query = query.not('erp_requested_at', 'is', null);
 
   const { count, error } = await query.limit(0);
   if (error) throw new Error(`Falha ao contar os pedidos da conciliação: ${error.message}`);
@@ -743,15 +844,19 @@ async function contarPedidos(company_id: string, g: Grandeza, temInvoiced: boole
 export async function contarConciliacao(company_id: string): Promise<ContagensDaConciliacao> {
   // Como na fila: sonda de `invoiced` que falha por rede não pode virar "sem
   // faturamento" e zerar as contagens de faturados em silêncio.
-  const temInvoiced = await detectarOuFalhar('orders', 'invoiced');
+  const colunas = {
+    invoiced: await detectarOuFalhar('orders', 'invoiced'),
+    // A 049 degrada: sem ela a grandeza dos solicitados sai `null`.
+    solicitado: await detectar('orders', 'erp_requested_at'),
+  };
   const nomes = Object.keys(GRANDEZAS) as Array<keyof ContagensDaConciliacao>;
-  const valores = await Promise.all(nomes.map((nome) => contarPedidos(company_id, GRANDEZAS[nome], temInvoiced)));
+  const valores = await Promise.all(nomes.map((nome) => contarPedidos(company_id, GRANDEZAS[nome], colunas)));
 
-  const contagens = {} as ContagensDaConciliacao;
+  const contagens = {} as Record<keyof ContagensDaConciliacao, number | null>;
   nomes.forEach((nome, i) => {
-    contagens[nome] = valores[i] ?? 0;
+    contagens[nome] = valores[i] ?? null;
   });
-  return contagens;
+  return contagens as ContagensDaConciliacao;
 }
 
 // ─── Pedidos excluídos que já tinham número do Control ───────────────────────
@@ -813,3 +918,4 @@ export async function listarExcluidosComNumero(
   }
   return excluidos;
 }
+

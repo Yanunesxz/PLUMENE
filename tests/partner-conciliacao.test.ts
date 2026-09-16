@@ -303,25 +303,28 @@ function consultasDe(filtros: Filtro[]): Filtro[][] {
 const contagem = (n: number): RespostaTabela => ({ data: [], error: null, count: n });
 
 describe('contarConciliacao — só contagens da empresa da chave', () => {
-  it('as cinco grandezas, cada uma com o seu filtro, count exact e limit 0 (nenhuma linha)', async () => {
+  it('as seis grandezas, cada uma com o seu filtro, count exact e limit 0 (nenhuma linha)', async () => {
     const { contarConciliacao, fake } = await carregar({
-      // sonda de invoiced (+ espaço), as cinco contagens em paralelo, e os espaços delas.
-      orders: [OK, OK, contagem(1), contagem(2), contagem(3), contagem(4), contagem(5), OK, OK, OK, OK, OK],
+      // sonda de invoiced (+ espaço), sonda de erp_requested_at (+ espaço), as
+      // seis contagens em paralelo, e os espaços delas.
+      orders: [OK, OK, OK, OK, contagem(1), contagem(6), contagem(2), contagem(3), contagem(4), contagem(5), OK, OK, OK, OK, OK, OK],
     });
 
     const r = await contarConciliacao(EMPRESA);
 
     expect(r).toEqual({
       fila_aprovados_sem_numero_nao_faturados: 1,
+      aprovados_solicitados_ao_control: 6,
       enviados_sem_numero_nao_faturados: 2,
       enviados_sem_numero_faturados: 3,
       aprovados_faturados_sem_numero: 4,
       enviados_com_numero_sem_faturamento: 5,
     });
 
-    const [sonda, ...contagens] = consultasDe(fake.filtrosDe('orders'));
-    expect(sonda!.map((f) => f.metodo)).toEqual(['select', 'limit']);
-    expect(contagens).toHaveLength(5);
+    const [sondaInvoiced, sondaSolicitado, ...contagens] = consultasDe(fake.filtrosDe('orders'));
+    expect(sondaInvoiced!.map((f) => f.metodo)).toEqual(['select', 'limit']);
+    expect(sondaSolicitado!.map((f) => [f.metodo, ...f.args])).toEqual([['select', 'erp_requested_at'], ['limit', 1]]);
+    expect(contagens).toHaveLength(6);
     const resumo = contagens.map((c) => c.map((f) => [f.metodo, ...f.args]));
     for (const c of resumo) {
       expect(c[0]).toEqual(['select', 'id', { count: 'exact' }]);
@@ -332,11 +335,14 @@ describe('contarConciliacao — só contagens da empresa da chave', () => {
     const faturado = ['eq', 'invoiced', true];
     const semNumero = ['is', 'erp_order_id', null];
     const comNumero = ['not', 'erp_order_id', 'is', null];
+    const solicitado = ['not', 'erp_requested_at', 'is', null];
     expect(resumo[0]).toEqual(expect.arrayContaining([['eq', 'status', 'approved'], semNumero, semFaturado]));
-    expect(resumo[1]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], semNumero, semFaturado]));
-    expect(resumo[2]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], semNumero, faturado]));
-    expect(resumo[3]).toEqual(expect.arrayContaining([['eq', 'status', 'approved'], semNumero, faturado]));
-    expect(resumo[4]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], comNumero, semFaturado]));
+    expect(resumo[0]).not.toContainEqual(solicitado);
+    expect(resumo[1]).toEqual(expect.arrayContaining([['eq', 'status', 'approved'], semNumero, semFaturado, solicitado]));
+    expect(resumo[2]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], semNumero, semFaturado]));
+    expect(resumo[3]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], semNumero, faturado]));
+    expect(resumo[4]).toEqual(expect.arrayContaining([['eq', 'status', 'approved'], semNumero, faturado]));
+    expect(resumo[5]).toEqual(expect.arrayContaining([['eq', 'status', 'sent_erp'], comNumero, semFaturado]));
   });
 
   it('banco sem invoiced (antes da 027): faturados são 0 sem consultar, e os outros sem o filtro', async () => {
@@ -344,9 +350,13 @@ describe('contarConciliacao — só contagens da empresa da chave', () => {
       orders: [
         { data: null, error: { message: 'column orders.invoiced does not exist', code: '42703' } },
         OK,
+        OK,
+        OK,
         contagem(7),
+        contagem(10),
         contagem(8),
         contagem(9),
+        OK,
         OK,
         OK,
         OK,
@@ -355,13 +365,45 @@ describe('contarConciliacao — só contagens da empresa da chave', () => {
 
     expect(await contarConciliacao(EMPRESA)).toEqual({
       fila_aprovados_sem_numero_nao_faturados: 7,
+      aprovados_solicitados_ao_control: 10,
       enviados_sem_numero_nao_faturados: 8,
       enviados_sem_numero_faturados: 0,
       aprovados_faturados_sem_numero: 0,
       enviados_com_numero_sem_faturamento: 9,
     });
     expect(fake.filtrosDe('orders', 'or')).toHaveLength(0);
-    expect(fake.filtrosDe('orders', 'select')).toHaveLength(4);
+    expect(fake.filtrosDe('orders', 'select')).toHaveLength(6);
+  });
+
+  it('banco sem a 049 (erp_requested_at ausente): a grandeza dos solicitados sai null, sem consultar', async () => {
+    const { contarConciliacao, fake } = await carregar({
+      orders: [
+        OK,
+        OK,
+        { data: null, error: { message: 'column orders.erp_requested_at does not exist', code: '42703' } },
+        OK,
+        contagem(1),
+        contagem(2),
+        contagem(3),
+        contagem(4),
+        contagem(5),
+        OK,
+        OK,
+        OK,
+        OK,
+        OK,
+      ],
+    });
+
+    expect(await contarConciliacao(EMPRESA)).toEqual({
+      fila_aprovados_sem_numero_nao_faturados: 1,
+      aprovados_solicitados_ao_control: null,
+      enviados_sem_numero_nao_faturados: 2,
+      enviados_sem_numero_faturados: 3,
+      aprovados_faturados_sem_numero: 4,
+      enviados_com_numero_sem_faturamento: 5,
+    });
+    expect(fake.filtrosDe('orders', 'not').map((f) => f.args)).not.toContainEqual(['erp_requested_at', 'is', null]);
   });
 
   it('sonda de invoiced que falha por rede LANÇA e não conta nada', async () => {
@@ -375,7 +417,7 @@ describe('contarConciliacao — só contagens da empresa da chave', () => {
 
   it('erro em qualquer contagem LANÇA — nunca um painel com número inventado', async () => {
     const { contarConciliacao } = await carregar({
-      orders: [OK, OK, contagem(1), { data: null, error: { message: 'caiu' } }, contagem(3), contagem(4), contagem(5), OK],
+      orders: [OK, OK, OK, OK, contagem(1), contagem(6), { data: null, error: { message: 'caiu' } }, contagem(3), contagem(4), contagem(5), OK],
     });
 
     await expect(contarConciliacao(EMPRESA)).rejects.toThrow(/caiu/);
@@ -383,7 +425,7 @@ describe('contarConciliacao — só contagens da empresa da chave', () => {
 
   it('banco que não devolve a contagem também LANÇA', async () => {
     const { contarConciliacao } = await carregar({
-      orders: [OK, OK, contagem(1), { data: [], error: null }, contagem(3), contagem(4), contagem(5), OK],
+      orders: [OK, OK, OK, OK, contagem(1), contagem(6), { data: [], error: null }, contagem(3), contagem(4), contagem(5), OK],
     });
 
     await expect(contarConciliacao(EMPRESA)).rejects.toThrow(/contagem/);

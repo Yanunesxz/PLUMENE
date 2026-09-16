@@ -31,7 +31,13 @@ import { LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
  *   7. (fase 0) o confirmar diz de onde veio o número e deixa o rastro — sem a
  *      048, o UPDATE é o de hoje;
  *   8. (fase 0) sem canal_pedido_erp = 'api', a fila e o confirmar respondem
- *      409 CANAL_FECHADO sem tocar em pedido.
+ *      409 CANAL_FECHADO sem tocar em pedido;
+ *   9. (049, decisões de 16/09/2026) a fila é só o que o financeiro SOLICITOU
+ *      (`erp_requested_at`), com `solicitado_em` no pedido; sem a 049, a fila
+ *      de antes. O cliente ganha `chave` (CNPJ só dígitos) e `novo_no_control`;
+ *      "cliente sem código do ERP" deixa de ser pendência e "cliente sem CNPJ"
+ *      entra no lugar. `alterado_apos_importacao` compara updated_at com
+ *      erp_order_set_at. E o GET /status diz `sincronizar_agora`.
  */
 
 const EMPRESA = 'empresa-1';
@@ -39,6 +45,7 @@ const SUPABASE = '../apps/api/src/config/supabase.js';
 const ERP_SYNC = '../apps/api/src/modules/orders/erpSync.service.js';
 const AUTH = '../apps/api/src/modules/partner/partner.auth.js';
 const SERVICO = '../apps/api/src/modules/partner/partner.service.js';
+const INTEGRACAO = '../apps/api/src/modules/integracao/integracao.service.js';
 
 const OK: RespostaTabela = { data: [], error: null };
 const COLUNA_AUSENTE: RespostaTabela = {
@@ -54,14 +61,22 @@ const COLUNA_AUSENTE: RespostaTabela = {
 const emSequencia = (...respostas: RespostaTabela[]) => respostas.flatMap((r) => [r, r]);
 
 /**
- * A fila de `orders` para a listagem: as CINCO sondas de coluna
+ * A fila de `orders` para a listagem: as SETE sondas de coluna
  * (order_number, invoiced, payment_condition_id, discount_percent,
- * price_table_id) disparam juntas antes de qualquer resposta, depois vêm as
- * páginas. A sonda da 041 é em `customers` e não entra nesta fila.
+ * price_table_id, erp_requested_at da 049, erp_order_set_at da 048) disparam
+ * juntas antes de qualquer resposta, depois vêm as páginas. A sonda da 041 é
+ * em `customers` e não entra nesta fila. Teste que só diz as cinco de antes
+ * ganha as duas últimas como OK (as colunas existem).
  */
-function filaDaListagem(paginas: RespostaTabela[], sondas: RespostaTabela[] = [OK, OK, OK, OK, OK]) {
-  return [...sondas, ...sondas, ...emSequencia(...paginas)];
+const TOTAL_DE_SONDAS = 7;
+function filaDaListagem(paginas: RespostaTabela[], sondas: RespostaTabela[] = []) {
+  const todas = [...sondas, ...Array.from({ length: TOTAL_DE_SONDAS - sondas.length }, () => OK)];
+  return [...todas, ...todas, ...emSequencia(...paginas)];
 }
+/** A sonda que diz "a 049 não rodou" (erp_requested_at ausente), com o resto OK. */
+const SEM_049 = [OK, OK, OK, OK, OK, COLUNA_AUSENTE, OK];
+/** A sonda que diz "a 048 não rodou" (erp_order_set_at ausente), com a 049 OK. */
+const SEM_ORIGEM_DO_NUMERO = [OK, OK, OK, OK, OK, OK, COLUNA_AUSENTE];
 
 const CLIENTE = {
   erp_id: 'C0001',
@@ -121,6 +136,7 @@ afterEach(() => {
   vi.doUnmock(SUPABASE);
   vi.doUnmock(ERP_SYNC);
   vi.doUnmock(AUTH);
+  vi.doUnmock(INTEGRACAO);
   vi.doUnmock(SERVICO);
 });
 
@@ -272,6 +288,140 @@ describe('a fila de pedidos para o ERP', () => {
   });
 });
 
+// ─── A fila solicitada (049) ─────────────────────────────────────────────────
+
+describe('a fila é o que o financeiro SOLICITOU (049)', () => {
+  const SOLICITADO = '2026-09-16T13:00:00+00:00';
+
+  it('com a 049: a fila exige erp_requested_at preenchido e o pedido sai com solicitado_em', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ erp_requested_at: SOLICITADO })], error: null }]),
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(fake.filtrosDe('orders', 'not').map((f) => f.args)).toEqual([['erp_requested_at', 'is', null]]);
+    // Os filtros de antes continuam: aprovado, sem número, não faturado.
+    expect(fake.filtrosDe('orders', 'eq').map((f) => f.args)).toContainEqual(['status', 'approved']);
+    expect(fake.filtrosDe('orders', 'is').map((f) => f.args)).toContainEqual(['erp_order_id', null]);
+    expect(fake.filtrosDe('orders', 'or').map((f) => f.args)).toEqual([['invoiced.is.null,invoiced.eq.false']]);
+    expect(p!.solicitado_em).toBe(SOLICITADO);
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(selectDaLista.split('customer:customers')[0]).toContain('erp_requested_at');
+  });
+
+  it('sem a 049 (42703 em erp_requested_at): a fila de hoje, sem o filtro, sem a coluna no select, solicitado_em null', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido()], error: null }], SEM_049),
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(fake.filtrosDe('orders', 'not')).toHaveLength(0);
+    expect(p!.solicitado_em).toBeNull();
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(selectDaLista).not.toContain('erp_requested_at');
+  });
+
+  it('sonda de erp_requested_at que falha por rede LANÇA — a fila nunca entrega o que ninguém pediu', async () => {
+    // Lida como "não existe", a fila sairia sem o filtro e o Control importaria
+    // pedidos aprovados que o financeiro ainda não mandou lançar.
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem(
+        [{ data: [pedido()], error: null }],
+        [OK, OK, OK, OK, OK, { data: null, error: { message: 'timeout' } }, OK],
+      ),
+      price_tables: { data: [], error: null },
+    });
+
+    await expect(getPartnerOrders(EMPRESA, {})).rejects.toThrow(/orders\.erp_requested_at/);
+    expect(fake.filtrosDe('orders', 'range')).toHaveLength(0);
+  });
+
+  it('`incluir=todos` não exige solicitação — é a reconciliação, e traz o solicitado_em de cada um', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({ erp_requested_at: null }),
+            pedido({ id: 'o2', status: 'sent_erp', erp_order_id: 'CS17379', erp_requested_at: SOLICITADO }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
+
+    expect(fake.filtrosDe('orders', 'not')).toHaveLength(0);
+    expect(lista.map((p) => p.solicitado_em)).toEqual([null, SOLICITADO]);
+  });
+});
+
+describe('alterado_apos_importacao — o app mexeu depois de o Control importar?', () => {
+  const IMPORTADO_EM = '2026-09-16T13:00:00+00:00';
+
+  it('true quando updated_at passou de erp_order_set_at; false quando é o mesmo instante', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({ status: 'sent_erp', erp_order_id: 'CS17379', erp_order_set_at: IMPORTADO_EM, updated_at: '2026-09-16T13:05:00+00:00' }),
+            pedido({ id: 'o2', status: 'sent_erp', erp_order_id: 'CS17380', erp_order_set_at: IMPORTADO_EM, updated_at: IMPORTADO_EM }),
+            // Fuso diferente, mesmo instante: não é alteração.
+            pedido({ id: 'o3', status: 'sent_erp', erp_order_id: 'CS17381', erp_order_set_at: IMPORTADO_EM, updated_at: '2026-09-16T10:00:00-03:00' }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
+
+    expect(lista.map((p) => p.alterado_apos_importacao)).toEqual([true, false, false]);
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(selectDaLista.split('customer:customers')[0]).toContain('erp_order_set_at');
+  });
+
+  it('null na fila (sem número ainda) e null sem a coluna da 048 — e aí o select não a pede', async () => {
+    const naFila = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ erp_requested_at: '2026-09-16T13:00:00Z', erp_order_set_at: null })], error: null }]),
+      price_tables: { data: [], error: null },
+    });
+    const [p] = await naFila.getPartnerOrders(EMPRESA, {});
+    expect(p!.alterado_apos_importacao).toBeNull();
+
+    vi.resetModules();
+    const sem048 = await carregar({
+      orders: filaDaListagem(
+        [{ data: [pedido({ status: 'sent_erp', erp_order_id: 'CS17379', updated_at: '2026-09-16T13:05:00Z' })], error: null }],
+        SEM_ORIGEM_DO_NUMERO,
+      ),
+      price_tables: { data: [], error: null },
+    });
+    const [q] = await sem048.getPartnerOrders(EMPRESA, { incluirImportados: true });
+    expect(q!.alterado_apos_importacao).toBeNull();
+    const selectDaLista = sem048.fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(selectDaLista).not.toContain('erp_order_set_at');
+  });
+});
+
 // ─── O payload ───────────────────────────────────────────────────────────────
 
 describe('o pedido como o ERP recebe', () => {
@@ -326,14 +476,69 @@ describe('o pedido como o ERP recebe', () => {
     const [quaseTudo, semItens] = await getPartnerOrders(EMPRESA, {});
 
     expect(quaseTudo!.importavel).toBe(false);
+    // Sem código do ERP NÃO é mais pendência (16/09/2026): o cliente tem CNPJ,
+    // o Control cria o cadastro e devolve o código pelo POST /clientes.
     expect(quaseTudo!.pendencias).toEqual([
-      'cliente sem código do ERP',
       'cliente sem representante vinculado no ERP',
       'pedido sem tabela de preço vinculada no ERP',
       'item sem vínculo de produto/tamanho com o ERP',
     ]);
+    expect(quaseTudo!.cliente.novo_no_control).toBe(true);
     expect(semItens!.importavel).toBe(false);
     expect(semItens!.pendencias).toEqual(['pedido sem itens']);
+  });
+
+  it('cliente sem CNPJ é a pendência que entrou no lugar da de código — não há por onde o Control casar', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({ customer: { ...CLIENTE, cnpj: null } }),
+            pedido({ id: 'o2', customer: { ...CLIENTE, cnpj: '   ' } }),
+            pedido({ id: 'o3', customer: { ...CLIENTE, cnpj: 'sem numero' } }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, {});
+
+    for (const p of lista) {
+      expect(p.importavel).toBe(false);
+      expect(p.pendencias).toEqual(['cliente sem CNPJ']);
+      expect(p.cliente.chave).toBeNull();
+    }
+  });
+
+  it('a chave do cliente é o CNPJ só com dígitos, e novo_no_control diz se falta o código do Control', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({ customer: { ...CLIENTE, cnpj: '12.345.678/0001-99' } }),
+            pedido({ id: 'o2', customer: { ...CLIENTE, erp_id: null } }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const [comCodigo, semCodigo] = await getPartnerOrders(EMPRESA, {});
+
+    // O CNPJ cru continua saindo como está no cadastro; a chave é só dígitos.
+    expect(comCodigo!.cliente).toMatchObject({
+      codigo_erp: 'C0001',
+      cnpj: '12.345.678/0001-99',
+      chave: '12345678000199',
+      novo_no_control: false,
+    });
+    expect(comCodigo!.importavel).toBe(true);
+    expect(semCodigo!.cliente).toMatchObject({ codigo_erp: null, chave: '12345678000199', novo_no_control: true });
+    expect(semCodigo!.importavel).toBe(true);
+    expect(semCodigo!.pendencias).toEqual([]);
   });
 
   it('a cor é SEMPRE 00001 e a escolha do cliente viaja na observação do item', async () => {
@@ -543,6 +748,8 @@ describe('o cliente do pedido ganha endereço em pedaços, IE, WhatsApp e e-mail
     expect(p!.cliente).toEqual({
       codigo_erp: 'C0001',
       cnpj: '12345678000199',
+      chave: '12345678000199',
+      novo_no_control: false,
       razao_social: 'LOJA DA ESQUINA LTDA',
       nome_fantasia: 'ESQUINA',
       endereco: {
@@ -917,11 +1124,96 @@ async function carregarController(resultado: unknown, canalPedido = 'api') {
   const confirmOrderImport = vi.fn().mockResolvedValue(resultado);
   const getPartnerOrders = vi.fn().mockResolvedValue(resultado);
   vi.doMock(SERVICO, () => ({ confirmOrderImport, getPartnerOrders }));
+  vi.doMock(INTEGRACAO, () => ({
+    lerSolicitacaoDeSync: vi.fn().mockResolvedValue({ migracao: true, solicitacao: null }),
+  }));
   const { partnerConfirmOrderHandler, partnerOrdersHandler } = await import(
     '../apps/api/src/modules/partner/partner.controller.js'
   );
   return { partnerConfirmOrderHandler, partnerOrdersHandler, confirmOrderImport, getPartnerOrders, fake };
 }
+
+const SOLICITADO_EM = '2026-09-16T13:00:00.000Z';
+
+/**
+ * O /status com o pedido de sincronização (integracao.service) dublado:
+ * `resposta` é "há pedido pendente?", ou um Error para lançar.
+ */
+async function carregarStatus(resposta: boolean | Error) {
+  const fake = criarSupabaseFake({ companies: canais('api') });
+  vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
+  vi.doMock(AUTH, () => ({
+    requirePartner: () => Promise.resolve({ name: 'control', key: 'chave', company_id: EMPRESA }),
+  }));
+  vi.doMock(SERVICO, () => ({ confirmOrderImport: vi.fn(), getPartnerOrders: vi.fn() }));
+  const lerSolicitacaoDeSync =
+    resposta instanceof Error
+      ? vi.fn().mockRejectedValue(resposta)
+      : vi.fn().mockResolvedValue({
+          migracao: true,
+          solicitacao: resposta
+            ? { solicitado_em: SOLICITADO_EM, solicitado_por: 'fin-1', solicitado_por_nome: 'Ana Financeiro' }
+            : null,
+        });
+  vi.doMock(INTEGRACAO, () => ({ lerSolicitacaoDeSync }));
+  const { partnerStatusHandler } = await import('../apps/api/src/modules/partner/partner.controller.js');
+  return { partnerStatusHandler, lerSolicitacaoDeSync };
+}
+
+describe('GET /status diz sincronizar_agora (049)', () => {
+  it('true com pedido pendente — com o solicitado_em para o Control devolver, e anotado no registro', async () => {
+    const { partnerStatusHandler, lerSolicitacaoDeSync } = await carregarStatus(true);
+    const { reply, enviado } = replyFalso();
+    const req = requisicao(undefined);
+
+    await partnerStatusHandler(req as never, reply);
+
+    expect(enviado.status).toBe(200);
+    expect(enviado.corpo).toMatchObject({
+      ok: true,
+      sincronizar_agora: true,
+      solicitado_em: SOLICITADO_EM,
+      canais: { pedido_erp: 'api' },
+    });
+    expect(lerSolicitacaoDeSync).toHaveBeenCalledWith(EMPRESA);
+    expect(req.partnerLog?.detalhe).toMatchObject({ sincronizar_agora: true });
+  });
+
+  it('false sem pedido pendente — sempre booleano, e solicitado_em nulo', async () => {
+    const { partnerStatusHandler } = await carregarStatus(false);
+    const { reply, enviado } = replyFalso();
+
+    await partnerStatusHandler(requisicao(undefined) as never, reply);
+
+    expect(enviado.status).toBe(200);
+    expect(enviado.corpo).toMatchObject({ sincronizar_agora: false, solicitado_em: null });
+  });
+
+  it('os cinco canais da empresa saem no /status (catálogo e retrato inclusive)', async () => {
+    const { partnerStatusHandler } = await carregarStatus(false);
+    const { reply, enviado } = replyFalso();
+
+    await partnerStatusHandler(requisicao(undefined) as never, reply);
+
+    const corpo = enviado.corpo as { canais: Record<string, string> };
+    expect(Object.keys(corpo.canais).sort()).toEqual(['cadastro', 'catalogo', 'faturamento', 'pedido_erp', 'retrato']);
+  });
+
+  it('banco que não responde degrada para false (é a rota de diagnóstico), sem 500, e anota', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { partnerStatusHandler } = await carregarStatus(new Error('timeout'));
+    const { reply, enviado } = replyFalso();
+    const req = requisicao(undefined);
+
+    await partnerStatusHandler(req as never, reply);
+
+    expect(enviado.status).toBe(200);
+    expect(enviado.corpo).toMatchObject({ ok: true, sincronizar_agora: false, solicitado_em: null });
+    expect(req.partnerLog?.detalhe).toMatchObject({ sincronizar_agora: 'nao_lido' });
+    expect(erro).toHaveBeenCalled();
+    erro.mockRestore();
+  });
+});
 
 describe('o canal de pedidos (048) — a API só mexe na fila com canal_pedido_erp = api', () => {
   const FECHADO = {

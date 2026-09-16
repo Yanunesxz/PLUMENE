@@ -152,11 +152,43 @@ describe('GET /partner/v1/status na aplicação de verdade', () => {
     const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
 
     expect(res.statusCode).toBe(200);
+    // Os cinco canais (048): sem a virada, os padrões de hoje.
     expect((res.json() as { canais: unknown }).canais).toEqual({
       pedido_erp: 'manual',
       faturamento: 'manual',
       cadastro: 'carga',
+      retrato: 'carga',
+      catalogo: 'carga',
     });
+  });
+
+  it('as dezenove rotas do parceiro estão registradas — chave errada é 401 em todas, nunca 404', async () => {
+    const rotas: Array<[string, string]> = [
+      ['GET', '/partner/v1/status'],
+      ['GET', '/partner/v1/conciliacao'],
+      ['GET', '/partner/v1/pedidos/excluidos'],
+      ['POST', '/partner/v1/sincronizacao'],
+      ['GET', '/partner/v1/pedidos'],
+      ['POST', '/partner/v1/pedidos/o1/confirmar'],
+      ['POST', '/partner/v1/pedidos/o1/conciliar'],
+      ['POST', '/partner/v1/pedidos/o1/excluir'],
+      ['POST', '/partner/v1/faturamento'],
+      ['POST', '/partner/v1/clientes'],
+      ['POST', '/partner/v1/representantes'],
+      ['GET', '/partner/v1/clientes'],
+      ['GET', '/partner/v1/representantes'],
+      ['POST', '/partner/v1/tabelas-preco'],
+      ['POST', '/partner/v1/condicoes-pagamento'],
+      ['POST', '/partner/v1/produtos'],
+      ['POST', '/partner/v1/precos'],
+      ['POST', '/partner/v1/estoque'],
+      ['POST', '/partner/v1/retrato'],
+    ];
+    expect(rotas).toHaveLength(19);
+    for (const [method, url] of rotas) {
+      const res = await app.inject({ method: method as 'GET' | 'POST', url, headers: { 'x-api-key': 'errada' } });
+      expect([method, url, res.statusCode]).toEqual([method, url, 401]);
+    }
   });
 
   it('toda chamada fica registrada em erp_sync_log com a empresa e o parceiro da chave', async () => {
@@ -319,11 +351,23 @@ describe('GET /partner/v1/status com os canais virados (048 aplicada)', () => {
 
     expect(res.statusCode).toBe(200);
     const corpo = res.json() as Record<string, unknown>;
-    expect(Object.keys(corpo).sort()).toEqual(['canais', 'ok', 'parceiro', 'servidor_hora']);
+    // `sincronizar_agora` e `solicitado_em` (049) são os únicos campos novos —
+    // aditivos; o primeiro sempre booleano.
+    expect(Object.keys(corpo).sort()).toEqual([
+      'canais',
+      'ok',
+      'parceiro',
+      'servidor_hora',
+      'sincronizar_agora',
+      'solicitado_em',
+    ]);
     expect(corpo).toMatchObject({
       ok: true,
       parceiro: 'control-cs',
       canais: { pedido_erp: 'api', faturamento: 'api', cadastro: 'firebird' },
+      // Esta empresa não apertou "Sincronizar agora" (a linha não tem o carimbo).
+      sincronizar_agora: false,
+      solicitado_em: null,
     });
   });
 });
