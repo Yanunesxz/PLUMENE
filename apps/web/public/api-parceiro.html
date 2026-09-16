@@ -611,11 +611,13 @@
       escrito no seu ERP por fora — você continua no controle do que entra.
     </p>
     <p class="lede" style="margin-top: 12px">
-      Não exige biblioteca, componente ou linguagem específica: são seis chamadas
+      Não exige biblioteca, componente ou linguagem específica: são nove chamadas
       HTTP com resposta em JSON — quatro no ciclo do pedido (testar, buscar,
-      confirmar, faturar) e duas para o seu ERP manter os cadastros de clientes e
-      representantes. A mesma API atende várias fábricas — a sua chave identifica
-      a sua empresa e você enxerga apenas os seus pedidos.
+      confirmar, faturar), três para acertar o que aconteceu antes da integração
+      (conciliar, conferir a conciliação e listar os excluídos) e duas para o seu
+      ERP manter os cadastros de clientes e representantes. A mesma API atende
+      várias fábricas — a sua chave identifica a sua empresa e você enxerga
+      apenas os seus pedidos.
     </p>
     <div class="baseurl">
       <span class="k">URL base</span>
@@ -634,6 +636,9 @@
       <li><a href="#requisitos">O que você precisa</a></li>
       <li><a href="#auth">Autenticação</a></li>
       <li><a href="#endpoints">Endpoints</a></li>
+      <li><a href="#canais">Canal por empresa</a></li>
+      <li><a href="#ep-passivo">Conciliação e excluídos</a></li>
+      <li><a href="#ep-faturamento">Faturamento e notas</a></li>
       <li><a href="#ep-cadastros">Cadastros (clientes e reps)</a></li>
       <li><a href="#campos">Dicionário de campos</a></li>
       <li><a href="#cores">Tamanhos e cores</a></li>
@@ -779,9 +784,23 @@
             </tr>
             <tr>
               <td><b>Faturamento</b></td>
-              <td>O aviso de que a nota saiu, com data e valor. É o que fecha o
-                  ciclo: o lojista passa a ver o pedido como aprovado e a venda
-                  conta no painel.</td>
+              <td>O aviso de que a nota saiu, com data, valor e, se você quiser,
+                  a nota e as peças que ela levou. É o que fecha o ciclo: o
+                  lojista passa a ver o pedido como aprovado e a venda conta no
+                  painel.</td>
+            </tr>
+            <tr>
+              <td><b>Canal</b></td>
+              <td>Quem escreve cada dado na sua empresa: a equipe, à mão no
+                  aplicativo, ou o seu ERP, por esta API. Cada fluxo tem um
+                  escritor só — a rota da API só grava depois que o canal é
+                  ligado para ela.</td>
+            </tr>
+            <tr>
+              <td><b>Passivo</b></td>
+              <td>Pedidos lançados no ERP à mão antes da integração e marcados
+                  como enviados no aplicativo <em>sem</em> o número. A rota de
+                  conciliação dá a eles o número que o seu ERP já tem.</td>
             </tr>
           </tbody>
         </table>
@@ -835,6 +854,12 @@
         mesma chave: <code>POST /partner/v1/clientes</code> e
         <code>POST /partner/v1/representantes</code>, a cada ~10 minutos, mandando
         só o que mudou. Está tudo na seção <a href="#ep-cadastros">Cadastros</a>.
+      </p>
+      <p>
+        E uma vez, na implantação: <code>GET /partner/v1/conciliacao</code> mostra
+        quantos pedidos foram para o ERP antes da integração sem o número, e
+        <code>POST /partner/v1/pedidos/{id}/conciliar</code> dá o número a cada um
+        — ver <a href="#ep-passivo">Conciliação e excluídos</a>.
       </p>
     </section>
 
@@ -900,7 +925,7 @@
           <span class="code-lbl">Teste de conexão</span>
           <button class="copy" type="button">copiar</button>
         </div>
-        <pre><code><span class="c"># resposta esperada: {"ok":true,"parceiro":"...","servidor_hora":"..."}</span>
+        <pre><code><span class="c"># resposta esperada: {"ok":true,"parceiro":"...","servidor_hora":"...","canais":{...}}</span>
 curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
   https://setorxweb-production.up.railway.app/partner/v1/status</code></pre>
       </div>
@@ -909,7 +934,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         Chave ausente ou errada responde <span class="st er">401</span>
         <code>PARTNER_UNAUTHORIZED</code>; integração ainda não liberada para a sua
         empresa responde <span class="st er">503</span>
-        <code>PARTNER_API_DISABLED</code>. Vale para as seis chamadas.
+        <code>PARTNER_API_DISABLED</code>. Vale para as nove chamadas.
+      </p>
+      <p>
+        Toda chamada fica registrada do nosso lado — rota, status HTTP, quantos
+        registros chegaram, gravaram, ficaram iguais e foram ignorados, e os
+        motivos —, sem a sua chave e sem dado de cliente. É por esse registro que
+        respondemos “o que aconteceu com o envio das 14h”.
       </p>
 
       <div class="note warn">
@@ -925,10 +956,77 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
     <section id="endpoints">
       <h2><span class="num">06</span>Endpoints</h2>
       <p class="sub">
-        São seis. Quatro fazem o ciclo do pedido — um para testar a conexão, um
+        São nove. Quatro fazem o ciclo do pedido — um para testar a conexão, um
         para buscar a fila, um para confirmar a importação e um para informar o
-        faturamento. Os outros dois são a mão inversa: o seu ERP manda os
-        cadastros de clientes e de representantes.
+        faturamento. Três acertam o que aconteceu antes da integração ou fora
+        dela — conciliar o número, conferir a conciliação e listar os excluídos.
+        Os outros dois são a mão inversa: o seu ERP manda os cadastros de
+        clientes e de representantes.
+      </p>
+
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Método e rota</th><th>Para quê</th><th>Canal exigido</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>GET /partner/v1/status</code></td><td>Testar a conexão e a chave; diz quais canais estão ligados</td><td class="t-mut">—</td></tr>
+            <tr><td><code>GET /partner/v1/pedidos</code></td><td>Buscar a fila de pedidos aprovados aguardando importação</td><td>pedidos</td></tr>
+            <tr><td><code>POST /partner/v1/pedidos/{id}/confirmar</code></td><td>Confirmar a importação com o número gerado no ERP</td><td>pedidos</td></tr>
+            <tr><td><code>POST /partner/v1/pedidos/{id}/conciliar</code></td><td>Dar o número a um pedido que foi para o ERP sem número (o passivo)</td><td>pedidos</td></tr>
+            <tr><td><code>GET /partner/v1/conciliacao</code></td><td>Só contagens, para conferir o passivo antes e depois de cada rodada</td><td class="t-mut">—</td></tr>
+            <tr><td><code>GET /partner/v1/pedidos/excluidos</code></td><td>Pedidos excluídos no aplicativo que já tinham número do ERP</td><td class="t-mut">—</td></tr>
+            <tr><td><code>POST /partner/v1/faturamento</code></td><td>Informar o que foi faturado (com a nota e as peças) — fecha o ciclo</td><td>faturamento</td></tr>
+            <tr><td><code>POST /partner/v1/clientes</code></td><td>O ERP envia os clientes (cadastro)</td><td>cadastro</td></tr>
+            <tr><td><code>POST /partner/v1/representantes</code></td><td>O ERP envia os representantes (cadastro)</td><td>cadastro</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="canais">Canal por empresa</h3>
+      <p>
+        Cada fluxo tem <b>um escritor só</b>. Enquanto a fábrica ainda lança o
+        número do pedido e o faturado à mão no aplicativo, a API não pode escrever
+        os mesmos dados — seria pedido lançado duas vezes e faturamento que se
+        desfaz sozinho. Por isso cada empresa tem três canais, que o responsável
+        pelo sistema liga para a API quando a fábrica estiver pronta:
+      </p>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>Canal</th><th>Rotas que dependem dele</th><th>Valor que libera a API</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><code>pedido_erp</code></td><td><code>GET /pedidos</code>, <code>POST /confirmar</code>, <code>POST /conciliar</code></td><td><code>api</code></td></tr>
+            <tr><td><code>faturamento</code></td><td><code>POST /faturamento</code></td><td><code>api</code></td></tr>
+            <tr><td><code>cadastro</code></td><td><code>POST /clientes</code>, <code>POST /representantes</code></td><td><code>api</code></td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>
+        Com o canal em outro valor, a rota responde <b>antes de ler o corpo</b> e
+        sem gravar nada:
+      </p>
+      <div class="code">
+        <div class="code-bar">
+          <span class="code-lbl">Resposta 409 — canal fechado</span>
+          <button class="copy" type="button">copiar</button>
+        </div>
+        <pre><code>{
+  <span class="k">"error"</span>: <span class="s">"Canal de faturamento ainda não está ligado para a API nesta empresa"</span>,
+  <span class="k">"code"</span>: <span class="s">"CANAL_FECHADO"</span>,
+  <span class="k">"statusCode"</span>: <span class="n">409</span>,
+  <span class="k">"canal"</span>: <span class="s">"faturamento"</span>,
+  <span class="k">"valor_atual"</span>: <span class="s">"manual"</span>
+}</code></pre>
+      </div>
+      <p>
+        <code>GET /status</code> mostra os três canais da sua empresa.
+        <code>GET /status</code>, <code>GET /conciliacao</code> e
+        <code>GET /pedidos/excluidos</code> funcionam com qualquer canal — só
+        leem. Um <span class="st wr">409</span> <code>CANAL_FECHADO</code> não é
+        erro do seu programa: é a fábrica que ainda não virou a chave; tente de
+        novo depois de combinar com o responsável.
       </p>
 
       <h3>Ciclo do pedido</h3>
@@ -948,9 +1046,19 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <pre><code>{
   <span class="k">"ok"</span>: <span class="n">true</span>,
   <span class="k">"parceiro"</span>: <span class="s">"nome-da-sua-empresa"</span>,
-  <span class="k">"servidor_hora"</span>: <span class="s">"2026-07-15T20:13:15.006Z"</span>
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-07-15T20:13:15.006Z"</span>,
+  <span class="k">"canais"</span>: { <span class="k">"pedido_erp"</span>: <span class="s">"api"</span>, <span class="k">"faturamento"</span>: <span class="s">"manual"</span>, <span class="k">"cadastro"</span>: <span class="s">"carga"</span> }
 }</code></pre>
           </div>
+          <p>
+            <code>canais</code> diz quais rotas estão ligadas para a API na sua
+            empresa (ver <a href="#canais">Canal por empresa</a>):
+            <code>pedido_erp</code> é <code>manual</code>, <code>api</code> ou
+            <code>sync_py</code>; <code>faturamento</code> é <code>manual</code> ou
+            <code>api</code>; <code>cadastro</code> é <code>carga</code>,
+            <code>api</code> ou <code>firebird</code>. Só <code>api</code> libera a
+            rota.
+          </p>
         </div>
       </div>
 
@@ -972,7 +1080,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             paginação do seu lado (não existe <code>?page</code> nem
             <code>?limit</code>), e <code>total</code> é a contagem real. Se a
             leitura falhar no meio, a resposta é <span class="st er">500</span> —
-            nunca uma lista parcial.
+            nunca uma lista parcial. Exige o canal de pedidos ligado para a API
+            (<span class="st wr">409</span> <code>CANAL_FECHADO</code>).
           </p>
 
           <h3>Parâmetros (opcionais)</h3>
@@ -1029,9 +1138,16 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       <span class="k">"pedido_erp"</span>: <span class="n">null</span>,
       <span class="k">"cliente"</span>: {
         <span class="k">"codigo_erp"</span>: <span class="s">"01234"</span>,
-        <span class="k">"cnpj"</span>: <span class="s">"12.345.678/0001-90"</span>,
-        <span class="k">"razao_social"</span>: <span class="s">"LOJA EXEMPLO COMERCIO LTDA"</span>,
-        <span class="k">"nome_fantasia"</span>: <span class="s">"LOJA EXEMPLO"</span>
+        <span class="k">"cnpj"</span>: <span class="s">"00.000.000/0001-00"</span>,
+        <span class="k">"razao_social"</span>: <span class="s">"CLIENTE TESTE LTDA"</span>,
+        <span class="k">"nome_fantasia"</span>: <span class="s">"LOJA TESTE"</span>,
+        <span class="k">"endereco"</span>: {
+          <span class="k">"cep"</span>: <span class="s">"00000000"</span>, <span class="k">"logradouro"</span>: <span class="s">"Rua Teste"</span>, <span class="k">"numero"</span>: <span class="s">"100"</span>,
+          <span class="k">"complemento"</span>: <span class="n">null</span>, <span class="k">"bairro"</span>: <span class="s">"Centro"</span>, <span class="k">"cidade"</span>: <span class="s">"Cidade Teste"</span>, <span class="k">"uf"</span>: <span class="s">"MG"</span>
+        },
+        <span class="k">"inscricao_estadual"</span>: <span class="n">null</span>,
+        <span class="k">"whatsapp"</span>: <span class="s">"00900000000"</span>,
+        <span class="k">"email"</span>: <span class="n">null</span>
       },
       <span class="k">"representante_erp"</span>: <span class="s">"00042"</span>,
       <span class="k">"tabela_preco"</span>: { <span class="k">"codigo_erp"</span>: <span class="s">"00007"</span>, <span class="k">"coluna"</span>: <span class="n">1</span> },
@@ -1161,6 +1277,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                       tentar de novo.</td>
                 </tr>
                 <tr>
+                  <td><span class="st wr">409</span></td>
+                  <td><code>CANAL_FECHADO</code></td>
+                  <td>O canal de pedidos da sua empresa ainda não está ligado para
+                      a API (<code>canal</code>, <code>valor_atual</code>).</td>
+                  <td class="t-mut">Não é defeito: combinar com o responsável.</td>
+                </tr>
+                <tr>
                   <td><span class="st er">500</span></td>
                   <td><code>INTERNAL_ERROR</code></td>
                   <td>Falha ao ler ou gravar o pedido. Não significa que o pedido
@@ -1200,6 +1323,141 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         </div>
       </div>
 
+      <h3 id="ep-passivo">Conciliação e excluídos</h3>
+      <p>
+        Antes da integração, parte dos pedidos foi lançada no ERP à mão e marcada
+        como “enviado ao ERP” no aplicativo <b>sem o número</b>. Esses pedidos
+        estão com situação <code>sent_erp</code> e <code>pedido_erp</code> nulo:
+        não voltam para a fila e o faturamento não os acha. As três rotas abaixo
+        acertam esse passado.
+      </p>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/pedidos/{id}/conciliar</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Dá a um pedido <code>sent_erp</code> sem número o número que o seu ERP
+            já tem. O número é normalizado como na confirmação. A situação do
+            pedido <b>não muda</b> (continua <code>sent_erp</code>); só o número é
+            gravado. Exige o canal de pedidos ligado para a API.
+          </p>
+
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"pedido_erp"</span>: <span class="s">"CS17379"</span> }</code></pre>
+          </div>
+
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Resposta</th><th><code>code</code></th><th>Significado</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><span class="st ok">200</span> <code>ja_conciliado: false</code></td><td class="t-mut">—</td><td>Número gravado agora.</td></tr>
+                <tr><td><span class="st ok">200</span> <code>ja_conciliado: true</code></td><td class="t-mut">—</td><td>O pedido já tinha esse mesmo número. Nada é regravado.</td></tr>
+                <tr><td><span class="st er">400</span></td><td><code>MISSING_PEDIDO_ERP</code> / <code>INVALID_PEDIDO_ERP</code></td><td>Como na confirmação.</td></tr>
+                <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>Não existe pedido com esse <code>id</code> na sua empresa.</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>O pedido já tem <em>outro</em> número (<code>pedido_erp_atual</code>).</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_RECONCILABLE</code></td><td>O pedido não é <code>sent_erp</code>; a resposta traz a <code>situacao</code>. Pedido aprovado usa o <code>/confirmar</code>.</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ERP_NUMBER_IN_USE</code></td><td>O número já está em outro pedido (<code>pedido_em_uso</code>).</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>CANAL_FECHADO</code></td><td>Canal de pedidos não ligado para a API.</td></tr>
+                <tr><td><span class="st er">500</span></td><td><code>INTERNAL_ERROR</code></td><td>Falha ao ler ou gravar — tente de novo.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p>
+            Ordem das checagens: campo presente → formato → pedido existe → já tem
+            número (o mesmo = 200, outro = 409) → situação <code>sent_erp</code> →
+            número livre → gravação (só se ninguém gravou no meio).
+          </p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/conciliacao</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Não devolve pedido nenhum, só quantos há em cada grupo da sua empresa.
+            Funciona com qualquer canal. Erro em qualquer contagem responde
+            <span class="st er">500</span>.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"fila_aprovados_sem_numero_nao_faturados"</span>: <span class="n">12</span>,
+  <span class="k">"enviados_sem_numero_nao_faturados"</span>: <span class="n">42</span>,
+  <span class="k">"enviados_sem_numero_faturados"</span>: <span class="n">7</span>,
+  <span class="k">"aprovados_faturados_sem_numero"</span>: <span class="n">3</span>,
+  <span class="k">"enviados_com_numero_sem_faturamento"</span>: <span class="n">18</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-15T13:00:00.000Z"</span>
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Campo</th><th>O que conta</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>fila_aprovados_sem_numero_nao_faturados</code></td><td>A fila do <code>GET /pedidos</code>.</td></tr>
+                <tr><td><code>enviados_sem_numero_nao_faturados</code></td><td>O passivo que o <code>/conciliar</code> resolve.</td></tr>
+                <tr><td><code>enviados_sem_numero_faturados</code></td><td>O mesmo passivo, já faturado à mão.</td></tr>
+                <tr><td><code>aprovados_faturados_sem_numero</code></td><td>Faturado à mão sem nunca ter ido ao ERP pelo aplicativo — não importe.</td></tr>
+                <tr><td><code>enviados_com_numero_sem_faturamento</code></td><td>No ERP, esperando o faturamento chegar.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/pedidos/excluidos</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Pedido com número do ERP não pode mais ser excluído no aplicativo; esta
+            lista traz os que foram excluídos <b>antes</b> dessa trava, para o seu
+            ERP cancelar do lado dele. <code>desde</code> é opcional e, quando vem,
+            precisa de fuso (<code>Z</code> ou <code>-03:00</code>) — sem fuso
+            responde <span class="st er">400</span> <code>INVALID_DESDE</code>. A
+            lista vem inteira, do mais antigo para o mais novo. Funciona com
+            qualquer canal.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"total"</span>: <span class="n">1</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-15T13:00:00.000Z"</span>,
+  <span class="k">"excluidos"</span>: [
+    { <span class="k">"id"</span>: <span class="s">"d31b5083-…"</span>, <span class="k">"numero"</span>: <span class="n">14535</span>, <span class="k">"pedido_erp"</span>: <span class="s">"CS17379"</span>, <span class="k">"excluido_em"</span>: <span class="s">"2026-09-10T18:22:01.000Z"</span> }
+  ]
+}</code></pre>
+          </div>
+          <p class="t-mut">
+            Só id, número no aplicativo, número no ERP e o momento — nunca o
+            pedido, o cliente ou quem excluiu.
+          </p>
+        </div>
+      </div>
+
+      <h3 id="ep-faturamento">Faturamento e notas</h3>
+
       <div class="ep">
         <div class="ep-head">
           <span class="verb post">POST</span>
@@ -1226,7 +1484,16 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </div>
             <pre><code>{
   <span class="k">"faturamento"</span>: [
-    { <span class="k">"pedido_erp"</span>: <span class="s">"CS17379"</span>, <span class="k">"faturado_em"</span>: <span class="s">"2026-08-13T14:02:00Z"</span>, <span class="k">"valor_faturado"</span>: <span class="n">870.50</span> },
+    {
+      <span class="k">"pedido_erp"</span>: <span class="s">"CS17379"</span>,
+      <span class="k">"faturado_em"</span>: <span class="s">"2026-08-13T14:02:00-03:00"</span>,
+      <span class="k">"valor_faturado"</span>: <span class="n">870.50</span>,
+      <span class="k">"nota"</span>: { <span class="k">"numero"</span>: <span class="s">"12345"</span>, <span class="k">"serie"</span>: <span class="s">"1"</span>, <span class="k">"emitida_em"</span>: <span class="s">"2026-08-13T14:02:00-03:00"</span>, <span class="k">"valor"</span>: <span class="n">870.50</span> },
+      <span class="k">"itens"</span>: [
+        { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"G"</span>, <span class="k">"quantidade"</span>: <span class="n">3</span>, <span class="k">"preco_unitario"</span>: <span class="n">42.90</span> },
+        { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"GG"</span>, <span class="k">"quantidade"</span>: <span class="n">2</span>, <span class="k">"preco_unitario"</span>: <span class="n">55.00</span> }
+      ]
+    },
     { <span class="k">"pedido_erp"</span>: <span class="s">"CS17380"</span> }
   ]
 }</code></pre>
@@ -1234,8 +1501,18 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           <p>
             O corpo pode vir como <code>{ "faturamento": [...] }</code>,
             <code>{ "dados": [...] }</code> ou a lista pura. Até 1000 pedidos por
-            requisição.
+            requisição. Exige o canal de faturamento ligado para a API
+            (<span class="st wr">409</span> <code>CANAL_FECHADO</code>).
           </p>
+
+          <div class="note">
+            <span class="note-t">Regra de ouro: campo que não veio não mexe</span>
+            <p>
+              <code>null</code> explícito limpa. Reenviar é seguro — o que chega
+              igual ao que está gravado não grava nada e conta em
+              <code>inalterados</code>.
+            </p>
+          </div>
 
           <div class="tw">
             <table>
@@ -1258,33 +1535,64 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 <tr>
                   <td><code>faturado</code></td>
                   <td>não</td>
-                  <td><code>false</code> desfaz um faturamento informado antes e
-                      <b>limpa a data e o valor</b>. Ausente = <code>true</code>.</td>
+                  <td><code>false</code> desfaz um faturamento informado antes:
+                      <b>limpa a data e o valor</b> e cancela as notas do pedido.
+                      Ausente = <code>true</code>.</td>
                 </tr>
                 <tr>
                   <td><code>faturado_em</code></td>
                   <td>não</td>
-                  <td>ISO da emissão da nota. Ausente = agora — reenviar sem ele
-                      move a data para o momento do reenvio, então mande sempre.</td>
+                  <td>Momento da emissão, <b>com fuso</b> (<code>Z</code> ou
+                      <code>-03:00</code>). Sem fuso o registro é ignorado.
+                      Ausente = mantém a data de quem já estava faturado; quem
+                      ainda não estava fica faturado agora.</td>
                 </tr>
                 <tr>
                   <td><code>valor_faturado</code></td>
                   <td>não</td>
                   <td>O valor que a nota fechou, maior que zero. É normal ser
                       <em>menor</em> que o pedido: o que faltou no estoque não é
-                      faturado. <b>Ausente = fica vazio no aplicativo</b> (e o
-                      painel volta a usar o valor do pedido). Reenviar sem o valor
-                      <b>apaga</b> o que foi informado antes — mande sempre.</td>
+                      faturado. <b>Ausente = mantém o que está gravado</b>;
+                      <code>null</code> limpa (o painel volta a usar o valor do
+                      pedido).</td>
+                </tr>
+                <tr>
+                  <td><code>nota</code></td>
+                  <td>não</td>
+                  <td><code>{ numero, serie?, chave?, emitida_em?, valor? }</code> —
+                      a nota fiscal. <code>numero</code> é obrigatório quando
+                      <code>nota</code> vem; <code>serie</code> ausente vale
+                      <code>""</code>; <code>emitida_em</code> com fuso;
+                      <code>valor</code> maior que zero. Nos campos opcionais vale a
+                      regra de ouro.</td>
+                </tr>
+                <tr>
+                  <td><code>itens</code></td>
+                  <td>não</td>
+                  <td><code>[{ produto, tamanho, quantidade, preco_unitario? }]</code>
+                      — as peças que <b>essa nota</b> levou. Só com
+                      <code>nota</code>. Substitui as peças daquela nota (as de
+                      outras notas do pedido ficam). <code>quantidade</code> inteira
+                      maior que zero.</td>
                 </tr>
               </tbody>
             </table>
           </div>
           <p class="t-mut">
             * Informe <strong>um</strong> dos dois; <code>pedido_erp</code> é o preferido,
-            e a busca é sempre dentro da sua empresa. Valor zero ou negativo é
-            recusado — nota cancelada se diz com <code>"faturado": false</code>, não
-            zerando o valor. O faturamento também atualiza a "última compra" do
-            cliente no aplicativo.
+            e a busca é sempre dentro da sua empresa. Só pedido <b>aprovado ou
+            enviado ao ERP</b> (<code>approved</code> ou <code>sent_erp</code>) é
+            faturado. Pedido com mais de uma nota: mande um registro por nota, com o
+            mesmo <code>pedido_erp</code>. <code>produto</code> é o mesmo código que
+            o <code>GET /pedidos</code> manda; a peça que não casar com o catálogo é
+            guardada assim mesmo, com aviso. Valor zero ou negativo é recusado —
+            nota cancelada se diz com <code>"faturado": false</code>, não zerando o
+            valor.
+          </p>
+          <p>
+            Na passagem para faturado, o aplicativo também avança a “última compra”
+            do cliente (pelo dia em Brasília, nunca para trás) e avisa o
+            representante. Desfazer não recua a última compra.
           </p>
 
           <div class="code">
@@ -1294,14 +1602,25 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </div>
             <pre><code>{
   <span class="k">"ok"</span>: <span class="n">true</span>,
-  <span class="k">"recebidos"</span>: <span class="n">2</span>,
+  <span class="k">"recebidos"</span>: <span class="n">3</span>,
   <span class="k">"atualizados"</span>: <span class="n">1</span>,
+  <span class="k">"inalterados"</span>: <span class="n">1</span>,
   <span class="k">"ignorados"</span>: [
     { <span class="k">"pedido"</span>: <span class="s">"CS17380"</span>, <span class="k">"motivo"</span>: <span class="s">"pedido não encontrado nesta empresa"</span> }
+  ],
+  <span class="k">"avisos"</span>: [
+    { <span class="k">"pedido"</span>: <span class="s">"CS17379"</span>, <span class="k">"aviso"</span>: <span class="s">"peça REF100 tamanho XG sem variante no catálogo: guardada sem vínculo"</span> }
   ],
   <span class="k">"servidor_hora"</span>: <span class="s">"2026-08-13T14:02:10.114Z"</span>
 }</code></pre>
           </div>
+          <p>
+            <code>atualizados</code> conta os registros em que algo foi gravado
+            (pedido, nota ou peças); <code>inalterados</code>, os que chegaram
+            iguais ao gravado. Registro com <code>nota</code> ou <code>itens</code>
+            malformados é recusado <b>inteiro</b> (nada dele é gravado), para ser
+            corrigido e reenviado junto.
+          </p>
 
           <div class="tw">
             <table>
@@ -1335,11 +1654,18 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                   <td>Mais de 1000 pedidos numa requisição.</td>
                   <td class="t-mut">Dividir em lotes.</td>
                 </tr>
+                <tr>
+                  <td><span class="st wr">409</span></td>
+                  <td><code>CANAL_FECHADO</code></td>
+                  <td>O canal de faturamento da sua empresa ainda não está ligado
+                      para a API. Nada foi lido nem gravado.</td>
+                  <td class="t-mut">Combinar com o responsável.</td>
+                </tr>
               </tbody>
             </table>
           </div>
 
-          <p>Os motivos possíveis em <code>ignorados</code> são seis:</p>
+          <p>Os motivos possíveis em <code>ignorados</code>:</p>
           <div class="tw">
             <table>
               <thead>
@@ -1347,14 +1673,32 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
               </thead>
               <tbody>
                 <tr><td><code>informe "pedido_erp" ou "id"</code></td><td>O registro veio sem os dois.</td></tr>
-                <tr><td><code>falha ao buscar: …</code></td><td>Erro ao procurar o pedido. Reenvie na próxima rodada.</td></tr>
+                <tr><td><code>falha ao buscar: …</code></td><td>Erro ao procurar o pedido, a nota ou as peças. Reenvie na próxima rodada.</td></tr>
                 <tr><td><code>pedido não encontrado nesta empresa</code></td><td>Nenhum pedido da sua empresa com esse número ou id.</td></tr>
+                <tr><td><code>pedido não está aprovado nem enviado ao ERP</code></td><td>A situação do pedido não aceita faturamento; o ignorado traz <code>situacao</code>.</td></tr>
                 <tr><td><code>"faturado_em" não é uma data ISO</code></td><td>Data fora do padrão.</td></tr>
+                <tr><td><code>"faturado_em" precisa de fuso (Z ou -03:00)</code></td><td>Data e hora sem fuso, ou só a data.</td></tr>
                 <tr><td><code>"valor_faturado" precisa ser maior que zero</code></td><td>Zero ou negativo.</td></tr>
-                <tr><td><code>falha ao gravar: …</code></td><td>Erro ao gravar o carimbo. Reenvie na próxima rodada.</td></tr>
+                <tr><td><code>"nota" precisa ser um objeto com "numero"</code></td><td><code>nota</code> não é objeto.</td></tr>
+                <tr><td><code>"nota.numero" é obrigatório quando "nota" vem</code></td><td>Nota sem número.</td></tr>
+                <tr><td><code>"nota.chave" precisa ser um texto</code></td><td>Chave que não é texto.</td></tr>
+                <tr><td><code>"nota.emitida_em" não é uma data ISO</code> / <code>"nota.emitida_em" precisa de fuso (Z ou -03:00)</code></td><td>Emissão fora do padrão ou sem fuso.</td></tr>
+                <tr><td><code>"nota.valor" precisa ser maior que zero</code></td><td>Valor da nota zero ou negativo.</td></tr>
+                <tr><td><code>"itens" precisa vir junto com "nota" (informe "nota.numero")</code></td><td>Peças sem a nota.</td></tr>
+                <tr><td><code>"itens" precisa ser uma lista</code></td><td><code>itens</code> não é lista.</td></tr>
+                <tr><td><code>"itens[i]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero</code></td><td>Peça incompleta (<code>i</code> é a posição).</td></tr>
+                <tr><td><code>"itens[i].preco_unitario" precisa ser um número maior ou igual a zero</code></td><td>Preço inválido.</td></tr>
+                <tr><td><code>falha ao gravar: …</code> / <code>falha ao gravar a nota: …</code> / <code>falha ao gravar as peças da nota: …</code></td><td>Erro ao gravar. Reenvie na próxima rodada.</td></tr>
               </tbody>
             </table>
           </div>
+          <p>
+            Os <code>avisos</code> possíveis: peça sem variante no catálogo
+            (guardada sem vínculo); <code>notas e itens faturados ficam guardados
+            depois da migração 048</code> (a instalação ainda não guarda notas — o
+            faturamento grava, a nota não); e <code>nota e itens ignorados:
+            "faturado": false cancela as notas do pedido</code>.
+          </p>
         </div>
       </div>
 
@@ -1366,16 +1710,33 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         base. Recomendação: a cada ~10 minutos, em lotes de até 500, mandando só
         os registros que mudaram.
       </p>
-      <p>
-        Regras que valem para os dois: só é recusado o registro que não dá para
-        usar (sem código ou sem nome) — ele volta em <code>ignorados</code> com o
-        motivo e o resto grava. Máximo de 1000 registros por requisição
-        (<span class="st er">400</span> <code>BATCH_TOO_LARGE</code> acima disso).
-        Nada é apagado por esta via. Se o banco falhar no meio do lote, a resposta
-        é <span class="st er">500</span> e o lote fica pela metade — os registros
-        anteriores já gravaram, os seguintes não; reenviar o lote inteiro é seguro,
-        e por isso lotes pequenos são melhores.
-      </p>
+      <p>Regras que valem para os dois:</p>
+      <ul>
+        <li><b>Campo que não veio não mexe; <code>null</code> explícito limpa.</b>
+            Texto vazio (<code>""</code> ou só espaços) conta como não veio. Pode
+            mandar só o que mudou dentro do registro — mas <code>codigo</code> e
+            <code>razao_social</code> (ou <code>nome</code>) vêm sempre.</li>
+        <li><b>Sem mudança, nada é gravado:</b> o registro que chega igual ao
+            cadastro conta em <code>sem_mudanca</code>. Reenviar o mesmo lote é
+            inofensivo.</li>
+        <li><b>Casamento pelo miolo do código:</b> <code>#2225</code>,
+            <code>2225</code> e <code>02225</code> são o mesmo cadastro. Dois
+            registros do mesmo lote com o mesmo miolo: vale o primeiro, o segundo
+            volta em <code>ignorados</code> (<code>código repetido no lote</code>).</li>
+        <li><b>Tolerante:</b> só é recusado o registro que não dá para usar (sem
+            código, sem nome, código repetido) — ele volta em
+            <code>ignorados</code> com o motivo e o resto grava.</li>
+        <li><b>Falha ao gravar um registro</b> não derruba o lote: ele volta em
+            <code>ignorados</code> com <code>falha ao gravar: …</code> e o resto
+            segue. <span class="st er">500</span> <code>INTERNAL_ERROR</code> só
+            quando a <b>leitura</b> do que já existe falha — e aí nada foi
+            gravado. Reenviar é seguro.</li>
+        <li>Máximo de 1000 registros por requisição
+            (<span class="st er">400</span> <code>BATCH_TOO_LARGE</code> acima
+            disso). Nada é apagado por esta via. As duas rotas exigem o canal de
+            cadastro ligado para a API (<span class="st wr">409</span>
+            <code>CANAL_FECHADO</code>).</li>
+      </ul>
 
       <div class="ep">
         <div class="ep-head">
@@ -1398,18 +1759,18 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
   <span class="k">"clientes"</span>: [
     {
       <span class="k">"codigo"</span>: <span class="s">"01234"</span>,
-      <span class="k">"razao_social"</span>: <span class="s">"LOJA DA MARIA LTDA"</span>,
-      <span class="k">"nome_fantasia"</span>: <span class="s">"Moda Maria"</span>,
-      <span class="k">"cnpj_cpf"</span>: <span class="s">"12.345.678/0001-90"</span>,
+      <span class="k">"razao_social"</span>: <span class="s">"CLIENTE TESTE LTDA"</span>,
+      <span class="k">"nome_fantasia"</span>: <span class="s">"Loja Teste"</span>,
+      <span class="k">"cnpj_cpf"</span>: <span class="s">"00.000.000/0001-00"</span>,
       <span class="k">"representante"</span>: <span class="s">"00779"</span>,
       <span class="k">"tabela_preco"</span>: <span class="s">"01"</span>,
       <span class="k">"endereco"</span>: {
-        <span class="k">"logradouro"</span>: <span class="s">"Rua das Flores"</span>, <span class="k">"numero"</span>: <span class="s">"123"</span>,
-        <span class="k">"bairro"</span>: <span class="s">"Centro"</span>, <span class="k">"cidade"</span>: <span class="s">"Juiz de Fora"</span>, <span class="k">"uf"</span>: <span class="s">"MG"</span>,
-        <span class="k">"cep"</span>: <span class="s">"36000-000"</span>
+        <span class="k">"logradouro"</span>: <span class="s">"Rua Teste"</span>, <span class="k">"numero"</span>: <span class="s">"100"</span>,
+        <span class="k">"bairro"</span>: <span class="s">"Centro"</span>, <span class="k">"cidade"</span>: <span class="s">"Cidade Teste"</span>, <span class="k">"uf"</span>: <span class="s">"MG"</span>,
+        <span class="k">"cep"</span>: <span class="s">"00000-000"</span>
       },
       <span class="k">"bloqueado"</span>: <span class="s">"N"</span>,
-      <span class="k">"whatsapp"</span>: <span class="s">"32988887777"</span>
+      <span class="k">"whatsapp"</span>: <span class="s">"00900000000"</span>
     }
   ]
 }</code></pre>
@@ -1430,7 +1791,9 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                   <td>sim</td>
                   <td>Código do cliente no ERP — a chave. O casamento é pelo "miolo":
                       <code>#2225</code>, <code>2225</code> e <code>02225</code> são
-                      o mesmo cliente.</td>
+                      o mesmo cliente. Cliente novo é gravado com 5 dígitos
+                      (<code>900</code> → <code>00900</code>); o código de quem já
+                      existe nunca é reescrito.</td>
                 </tr>
                 <tr>
                   <td><code>razao_social</code></td>
@@ -1452,38 +1815,49 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 <tr>
                   <td><code>representante</code></td>
                   <td>sim, na prática</td>
-                  <td>Código do representante no ERP. Fica gravado no cliente, sai
+                  <td>Código do representante no ERP, gravado com 5 dígitos
+                      (<code>779</code> → <code>00779</code>). Fica no cliente, sai
                       no pedido como <code>representante_erp</code> e é o que faz o
                       cliente aparecer para o representante que tem esse código no
-                      login do app. Sem ele, o cliente fica sem dono e o pedido sai
-                      com pendência.</td>
+                      login do app. <code>null</code> tira o cliente da carteira, e o
+                      pedido sai com pendência.</td>
                 </tr>
                 <tr>
                   <td><code>tabela_preco</code></td>
                   <td>recomendado</td>
-                  <td>Código da tabela no ERP. Só liga se a tabela no app tiver esse
-                      código preenchido; senão o cliente entra sem tabela e a
-                      resposta avisa em <code>avisos</code>.</td>
+                  <td>Código da tabela no ERP, casado pelo miolo. Código que não casa
+                      com nenhuma tabela <b>não mexe</b> na tabela do cliente e volta
+                      em <code>avisos</code>; <code>null</code> limpa.</td>
                 </tr>
                 <tr>
                   <td><code>endereco</code></td>
                   <td>recomendado</td>
                   <td>Objeto <code>{ logradouro, numero, complemento, bairro, cidade,
-                      uf, cep }</code> ou um texto pronto. O app grava <b>uma linha
-                      de texto</b> (<code>Rua das Flores, 123 - Centro - Juiz de
-                      Fora/MG - CEP 36000-000</code>); não há campos separados de
-                      endereço alimentados por esta rota.</td>
+                      uf, cep }</code> ou um texto pronto. Em objeto, cada pedaço é
+                      guardado no seu campo (onde a instalação já tem os campos) e a
+                      linha de texto é remontada; em texto, só a linha.
+                      <code>null</code> limpa o endereço inteiro.</td>
+                </tr>
+                <tr>
+                  <td><code>inscricao_estadual</code>, <code>observacoes</code></td>
+                  <td>não</td>
+                  <td>Guardados onde a instalação já tem os campos (senão, aviso).</td>
                 </tr>
                 <tr>
                   <td><code>bloqueado</code></td>
                   <td>não</td>
-                  <td><code>"S"</code> = cliente não fecha pedido. Ausente =
-                      <code>"N"</code>.</td>
+                  <td><code>S</code>, <code>SIM</code>, <code>1</code> ou
+                      <code>true</code> bloqueia (o cliente não fecha pedido);
+                      <code>N</code>, <code>NÃO</code>, <code>0</code> ou
+                      <code>false</code> desbloqueia; <code>null</code> desbloqueia;
+                      ausente não mexe; outro valor não mexe e dá aviso.</td>
                 </tr>
                 <tr>
                   <td><code>limite_credito</code></td>
                   <td>não</td>
-                  <td>Número. Informativo.</td>
+                  <td>Número ou texto (<code>1500.5</code> ou
+                      <code>"1.500,50"</code>). <code>null</code> limpa; negativo ou
+                      ilegível não mexe e dá aviso.</td>
                 </tr>
                 <tr>
                   <td><code>whatsapp</code>, <code>email</code></td>
@@ -1494,15 +1868,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </table>
           </div>
 
-          <div class="note warn">
-            <span class="note-t">Mande o cadastro inteiro</span>
+          <div class="note">
+            <span class="note-t">Mande só o que você tem</span>
             <p>
-              O registro é gravado <b>completo</b>, sempre: campo que não veio é
-              gravado vazio (e <code>bloqueado</code> ausente vira "N"). Um envio
-              só com <code>codigo</code> e <code>razao_social</code> apaga
-              fantasia, CNPJ, representante, tabela, endereço, WhatsApp e e-mail
-              que estavam lá — e desbloqueia um cliente bloqueado. Mande todos os
-              campos a cada envio.
+              Campo que não veio fica como está: um envio só com
+              <code>codigo</code> e <code>razao_social</code> não apaga fantasia,
+              CNPJ, representante, tabela, endereço, WhatsApp nem e-mail, e não
+              desbloqueia ninguém. Para limpar um campo, mande <code>null</code>.
             </p>
           </div>
 
@@ -1516,6 +1888,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
   <span class="k">"recebidos"</span>: <span class="n">1</span>,
   <span class="k">"criados"</span>: <span class="n">1</span>,
   <span class="k">"atualizados"</span>: <span class="n">0</span>,
+  <span class="k">"sem_mudanca"</span>: <span class="n">0</span>,
   <span class="k">"ignorados"</span>: [],
   <span class="k">"avisos"</span>: [],
   <span class="k">"servidor_hora"</span>: <span class="s">"2026-08-11T20:13:15.006Z"</span>
@@ -1523,10 +1896,15 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           </div>
           <p>
             <code>ignorados</code> traz <code>{ "codigo", "motivo" }</code> para cada
-            registro recusado (<code>sem código do ERP</code>,
-            <code>sem razão social</code>). <code>avisos</code> traz o que passou mas
-            merece conferência: tabelas de preço não encontradas, clientes casados
-            pelo CNPJ e o aviso de que nenhuma tabela tem código do ERP.
+            registro recusado: <code>registro inválido</code> (não é objeto),
+            <code>sem código do ERP</code>, <code>sem razão social</code>,
+            <code>código repetido no lote</code>, <code>código com mais de um
+            cadastro no app</code> ou <code>falha ao gravar: …</code>.
+            <code>avisos</code> traz o que passou mas merece conferência: tabelas de
+            preço não encontradas, clientes casados pelo CNPJ, código de
+            representante sem login no app, valores de <code>bloqueado</code> ou
+            <code>limite_credito</code> não entendidos e campos que a instalação
+            ainda não guarda.
           </p>
         </div>
       </div>
@@ -1538,10 +1916,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         </div>
         <div class="ep-body">
           <p>
-            Atualiza nome, e-mail e ativo dos representantes que <b>já têm login no
-            app com o seu código</b>. Não cria login: conta de acesso nasce com
-            senha, e senha não nasce de um POST. Rep que o ERP tem e o app ainda não
-            volta na resposta em <code>novos</code>, para o administrador criar o
+            Atualiza nome, razão social e ativo dos representantes que <b>já têm
+            login no app com o seu código</b>. Não cria login: conta de acesso nasce
+            com senha, e senha não nasce de um POST. Rep que o ERP tem e o app ainda
+            não volta na resposta em <code>novos</code>, para o administrador criar o
             acesso e atribuir o código na tela de Representantes.
           </p>
 
@@ -1552,7 +1930,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </div>
             <pre><code>{
   <span class="k">"representantes"</span>: [
-    { <span class="k">"codigo"</span>: <span class="s">"00779"</span>, <span class="k">"nome"</span>: <span class="s">"MARIA SOUZA"</span>, <span class="k">"email"</span>: <span class="s">"maria@exemplo.com"</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span> }
+    { <span class="k">"codigo"</span>: <span class="s">"00779"</span>, <span class="k">"nome"</span>: <span class="s">"REPRESENTANTE TESTE"</span>, <span class="k">"razao_social"</span>: <span class="s">"REPRESENTACOES TESTE LTDA"</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span> }
   ]
 }</code></pre>
           </div>
@@ -1566,9 +1944,9 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 <tr>
                   <td><code>codigo</code></td>
                   <td>sim</td>
-                  <td>Código do representante no ERP. Casa <b>exato</b> com o
-                      código atribuído ao login no app (<code>0779</code> e
-                      <code>779</code> não são o mesmo).</td>
+                  <td>Código do representante no ERP. Casa pelo miolo com o código
+                      atribuído ao login no app (<code>0779</code>, <code>779</code>
+                      e <code>00779</code> são o mesmo).</td>
                 </tr>
                 <tr>
                   <td><code>nome</code></td>
@@ -1576,20 +1954,26 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                   <td>Sem ele o registro volta em <code>ignorados</code>.</td>
                 </tr>
                 <tr>
+                  <td><code>razao_social</code></td>
+                  <td>não</td>
+                  <td>Gravada na razão social do representante. <code>null</code>
+                      limpa.</td>
+                </tr>
+                <tr>
                   <td><code>email</code></td>
                   <td>não</td>
-                  <td>Atualiza o e-mail de login (gravado em minúsculas) — só
-                      quando vem.</td>
+                  <td><b>Não é gravado</b>: o e-mail é o login do app e só muda
+                      pelas telas. Quando difere do login, volta o aviso
+                      <code>e-mail do Control não troca o login do
+                      representante</code>.</td>
                 </tr>
                 <tr>
                   <td><code>ativo</code></td>
                   <td>não</td>
-                  <td><code>"S"</code>/<code>"N"</code>. Só é alterado quando vem.</td>
-                </tr>
-                <tr>
-                  <td><code>razao_social</code></td>
-                  <td>não</td>
-                  <td>Aceito, mas não é gravado nesta versão.</td>
+                  <td><code>"S"</code>/<code>"N"</code> ou
+                      <code>true</code>/<code>false</code>. Só esses quatro mexem no
+                      acesso; ausente, vazio (<code>""</code>) ou <code>null</code>
+                      não mexem; outro valor não mexe e dá aviso.</td>
                 </tr>
               </tbody>
             </table>
@@ -1597,11 +1981,15 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
 
           <p>
             A resposta tem os mesmos campos do <code>POST /clientes</code>
-            (<code>criados</code> é sempre <code>0</code>) mais
-            <code>novos: [{ "codigo", "nome" }]</code>. Esta rota <b>não vincula a
-            carteira</b>: quem liga cliente a representante é o código que vem em
-            cada cliente (<code>representante</code>) contra o código atribuído ao
-            login do representante no app.
+            (<code>criados</code> é sempre <code>0</code>; <code>sem_mudanca</code>
+            inclusive) mais <code>novos: [{ "codigo", "nome" }]</code>. Motivos de
+            <code>ignorados</code>: <code>registro inválido</code>, <code>sem código
+            do ERP</code>, <code>sem nome</code>, <code>código repetido no
+            lote</code>, <code>código repetido no app (dois logins com o mesmo
+            código)</code> e <code>falha ao gravar: …</code>. Esta rota <b>não
+            vincula a carteira</b>: quem liga cliente a representante é o código que
+            vem em cada cliente (<code>representante</code>) contra o código
+            atribuído ao login do representante no app.
           </p>
         </div>
       </div>
@@ -1631,9 +2019,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <tr><td><code>pedido_erp</code></td><td class="t-mut">texto</td><td><b>O número do pedido no seu ERP</b> (ex.: <code>CS17379</code>), na forma normalizada. Vem <code>null</code> na fila; é preenchido pela sua confirmação.</td></tr>
             <tr><td><code>cliente.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código do cliente no seu ERP.</b></td></tr>
             <tr><td><code>cliente.cnpj</code></td><td class="t-mut">texto</td><td>CNPJ ou CPF, para dupla conferência.</td></tr>
+            <tr><td><code>cliente.razao_social</code> / <code>cliente.nome_fantasia</code></td><td class="t-mut">texto</td><td>Nomes do cadastro.</td></tr>
+            <tr><td><code>cliente.endereco</code></td><td class="t-mut">objeto</td><td><code>{ cep, logradouro, numero, complemento, bairro, cidade, uf }</code> — sempre com as sete chaves; cada uma sai <code>null</code> quando o cadastro não tem o dado.</td></tr>
+            <tr><td><code>cliente.inscricao_estadual</code></td><td class="t-mut">texto</td><td>Inscrição estadual do cadastro.</td></tr>
+            <tr><td><code>cliente.whatsapp</code> / <code>cliente.email</code></td><td class="t-mut">texto</td><td>Contato do cadastro.</td></tr>
             <tr><td><code>representante_erp</code></td><td class="t-mut">texto</td><td><b>Código do representante no seu ERP.</b></td></tr>
-            <tr><td><code>tabela_preco.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código da tabela de preço no seu ERP</b> — a tabela vinculada ao cliente no momento da consulta.</td></tr>
-            <tr><td><code>tabela_preco.coluna</code></td><td class="t-mut">inteiro</td><td>Coluna de preço usada, de 1 a 6.</td></tr>
+            <tr><td><code>tabela_preco.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código da tabela de preço no seu ERP</b> — a tabela que <b>precificou este pedido</b>. Pedido sem tabela gravada usa a tabela do cadastro do cliente. Tabela sem código do ERP sai <code>null</code> e gera a pendência <code>pedido sem tabela de preço vinculada no ERP</code> (nunca cai para outra tabela).</td></tr>
+            <tr><td><code>tabela_preco.coluna</code></td><td class="t-mut">inteiro</td><td>Coluna de preço dessa tabela, de 1 a 6 (<code>1</code> quando a tabela não tem coluna gravada).</td></tr>
             <tr><td><code>condicao_pagamento.codigo</code></td><td class="t-mut">texto</td><td><b>Código da condição de pagamento no seu ERP</b> (ex.: <code>"021"</code>) — o mesmo da célula C8 da planilha. O objeto inteiro vem <code>null</code> quando o pedido não tem condição escolhida — isso não gera pendência.</td></tr>
             <tr><td><code>condicao_pagamento.descricao</code></td><td class="t-mut">texto</td><td>Ex.: <code>"30/60/90"</code>, para conferência humana.</td></tr>
             <tr><td><code>desconto_percentual</code></td><td class="t-mut">número</td><td>Desconto do representante em pontos percentuais (10 = 10%). Os preços dos itens vêm <b>sem</b> ele; o <code>valor_total</code> já o aplica — o mesmo contrato da célula AB46 da planilha.</td></tr>
@@ -1667,8 +2059,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       <p>
         <b>Campos que dependem de recurso do banco:</b> <code>numero</code>,
         <code>condicao_pagamento</code>, <code>desconto_percentual</code>,
-        <code>faturado</code>, <code>faturado_em</code> e <code>valor_faturado</code>
-        dependem de recursos que podem ainda não estar ativos numa instalação.
+        <code>faturado</code>, <code>faturado_em</code>, <code>valor_faturado</code>,
+        os pedaços de <code>cliente.endereco</code> e
+        <code>cliente.inscricao_estadual</code> dependem de recursos que podem
+        ainda não estar ativos numa instalação.
         Quando não estão, saem <code>null</code> (<code>0</code> no desconto,
         <code>false</code> no faturado) — a resposta nunca quebra por isso.
       </p>
@@ -1685,13 +2079,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           </thead>
           <tbody>
             <tr><td>Código do cliente</td><td class="t-mut">ERP</td><td>O seu sistema envia por <code>POST /partner/v1/clientes</code> (código, razão social, CNPJ, representante, tabela, endereço, bloqueado, WhatsApp); o app guarda e devolve no pedido como <code>cliente.codigo_erp</code>.</td></tr>
-            <tr><td>Código do representante</td><td class="t-mut">ERP</td><td>Chega em cada cliente (<code>representante</code> do <code>POST /partner/v1/clientes</code>), mostra o cliente ao representante com o mesmo código no login e sai no pedido como <code>representante_erp</code>. <code>POST /partner/v1/representantes</code> só atualiza nome, e-mail e ativo de quem já tem login <b>e</b> já tem esse código gravado no app.</td></tr>
-            <tr><td>Tabela de preço</td><td class="t-mut">ERP</td><td>Código + coluna (1–6) da tabela vinculada ao cliente. O pedido sai com a tabela que o cliente tem no momento da consulta — o vínculo é do cadastro, não uma foto por pedido.</td></tr>
+            <tr><td>Código do representante</td><td class="t-mut">ERP</td><td>Chega em cada cliente (<code>representante</code> do <code>POST /partner/v1/clientes</code>), mostra o cliente ao representante com o mesmo código no login e sai no pedido como <code>representante_erp</code>. <code>POST /partner/v1/representantes</code> só atualiza nome, razão social e ativo de quem já tem login <b>e</b> já tem esse código gravado no app.</td></tr>
+            <tr><td>Tabela de preço</td><td class="t-mut">ERP</td><td>Código + coluna (1–6). O app guarda o vínculo no cliente e, em cada pedido, a tabela que o precificou; o pedido sai com a tabela dele (pedido antigo, sem tabela gravada, sai com a do cadastro do cliente).</td></tr>
             <tr><td>Condição de pagamento</td><td class="t-mut">ERP</td><td>As condições do ERP estão cadastradas no app; o representante só escolhe. O código volta intacto em <code>condicao_pagamento.codigo</code>.</td></tr>
             <tr><td>Referência do produto</td><td class="t-mut">ERP</td><td>O app só vende o que está no catálogo da coleção; a referência sai em <code>itens[].produto</code>.</td></tr>
             <tr><td>Pedido (itens, desconto, condição, observações)</td><td class="t-mut">App</td><td>Montado pelo representante ou pela loja; o seu sistema importa via <code>GET /partner/v1/pedidos</code>.</td></tr>
             <tr><td><b>Número do pedido no ERP</b></td><td class="t-mut">ERP</td><td>Nasce na importação (ex.: <code>CS17379</code>) e volta pelo <code>POST /confirmar</code>, sempre na forma normalizada. O app nunca inventa esse número.</td></tr>
-            <tr><td>Faturamento (nota, valor, data)</td><td class="t-mut">ERP</td><td>Volta pelo <code>POST /faturamento</code>; o app carimba o pedido sozinho.</td></tr>
+            <tr><td>Faturamento (nota, valor, data, peças)</td><td class="t-mut">ERP</td><td>Volta pelo <code>POST /faturamento</code>; o app carimba o pedido sozinho e guarda a nota e as peças que ela levou.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2146,6 +2540,13 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
                   ativas, responde <span class="st er">401</span>.</td>
               <td class="t-mut">Falar com o suporte.</td>
             </tr>
+            <tr>
+              <td><span class="st wr">409</span> <code>CANAL_FECHADO</code></td>
+              <td>A rota ainda não foi ligada para a API na sua empresa. Nada foi
+                  lido nem gravado.</td>
+              <td class="t-mut">Não é defeito: combinar com o responsável quando
+                  virar a chave.</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -2166,13 +2567,15 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
           <tbody>
             <tr><td><span class="st er">503</span></td><td><code>PARTNER_API_DISABLED</code></td><td>todas</td><td>A integração ainda não foi liberada no servidor.</td></tr>
             <tr><td><span class="st er">401</span></td><td><code>PARTNER_UNAUTHORIZED</code></td><td>todas</td><td>Chave ausente ou errada no <code>X-API-Key</code>.</td></tr>
-            <tr><td><span class="st er">400</span></td><td><code>INVALID_DESDE</code></td><td>GET /pedidos</td><td><code>desde</code> não é uma data ISO.</td></tr>
-            <tr><td><span class="st er">400</span></td><td><code>MISSING_PEDIDO_ERP</code></td><td>POST /confirmar</td><td>Corpo sem <code>pedido_erp</code>, ou vazio.</td></tr>
-            <tr><td><span class="st er">400</span></td><td><code>INVALID_PEDIDO_ERP</code></td><td>POST /confirmar</td><td>Número fora do formato (duas letras e até 10 dígitos).</td></tr>
-            <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>POST /confirmar</td><td>Não há pedido com esse <code>id</code> na sua empresa.</td></tr>
-            <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>POST /confirmar</td><td>Já confirmado com outro número (<code>pedido_erp_atual</code>).</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>CANAL_FECHADO</code></td><td>pedidos, confirmar, conciliar, faturamento, clientes, representantes</td><td>O canal da sua empresa não está ligado para a API (<code>canal</code>, <code>valor_atual</code>) — ver <a href="#canais">Canal por empresa</a>.</td></tr>
+            <tr><td><span class="st er">400</span></td><td><code>INVALID_DESDE</code></td><td>GET /pedidos, GET /pedidos/excluidos</td><td><code>desde</code> não é uma data ISO (nos excluídos, também sem fuso).</td></tr>
+            <tr><td><span class="st er">400</span></td><td><code>MISSING_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Corpo sem <code>pedido_erp</code>, ou vazio.</td></tr>
+            <tr><td><span class="st er">400</span></td><td><code>INVALID_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Número fora do formato (duas letras e até 10 dígitos).</td></tr>
+            <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>POST /confirmar, POST /conciliar</td><td>Não há pedido com esse <code>id</code> na sua empresa.</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>POST /confirmar, POST /conciliar</td><td>Já tem outro número (<code>pedido_erp_atual</code>).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_APPROVED</code></td><td>POST /confirmar</td><td>A situação do pedido não aceita confirmação (<code>situacao</code>).</td></tr>
-            <tr><td><span class="st wr">409</span></td><td><code>ERP_NUMBER_IN_USE</code></td><td>POST /confirmar</td><td>Número já gravado em outro pedido (<code>pedido_em_uso</code>).</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_RECONCILABLE</code></td><td>POST /conciliar</td><td>Só pedido <code>sent_erp</code> sem número é conciliado (<code>situacao</code>).</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ERP_NUMBER_IN_USE</code></td><td>POST /confirmar, POST /conciliar</td><td>Número já gravado em outro pedido (<code>pedido_em_uso</code>).</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_BODY</code></td><td>POSTs de lista</td><td>O corpo não é uma lista nem <code>{ "faturamento" / "clientes" / "representantes": [...] }</code>.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>BATCH_TOO_LARGE</code></td><td>POSTs de lista</td><td>Mais de 1000 registros numa requisição.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>INTERNAL_ERROR</code></td><td>todas</td><td>Corpo JSON vazio ou malformado com <code>Content-Type: application/json</code>. O <code>statusCode</code> diz 400 — corrija a chamada, não reenvie.</td></tr>
@@ -2203,7 +2606,10 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
 
       <ul class="check">
         <li>Receber a chave de API e guardá-la em arquivo de configuração.</li>
-        <li>Chamar <code>/partner/v1/status</code> e obter <code>ok: true</code>.</li>
+        <li>Chamar <code>/partner/v1/status</code> e obter <code>ok: true</code>; conferir
+            em <code>canais</code> quais rotas já estão ligadas para a API.</li>
+        <li>Chamar <code>/partner/v1/conciliacao</code> e, com o responsável, dar o
+            número aos pedidos do passivo por <code>/partner/v1/pedidos/{id}/conciliar</code>.</li>
         <li>Chamar <code>/partner/v1/pedidos</code> e inspecionar o JSON de um pedido real.</li>
         <li>Conferir se os códigos de cliente, representante, tabela e produto batem
             com os cadastros do seu ERP.</li>
@@ -2212,10 +2618,12 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         <li>Gravar o <code>id</code> do pedido do aplicativo junto ao pedido no seu ERP.</li>
         <li>Chamar a confirmação e verificar que o pedido saiu da fila.</li>
         <li>Tratar os <code>importavel: false</code> num relatório de pendências.</li>
-        <li>Chamar <code>/partner/v1/faturamento</code> quando a nota sair e conferir,
-            com <code>incluir=todos</code>, que o pedido aparece faturado.</li>
+        <li>Chamar <code>/partner/v1/faturamento</code> quando a nota sair — com a
+            data com fuso, e de preferência com a <code>nota</code> e os
+            <code>itens</code> — e conferir, com <code>incluir=todos</code>, que o
+            pedido aparece faturado.</li>
         <li>Ligar o envio dos cadastros (<code>/partner/v1/clientes</code> e
-            <code>/partner/v1/representantes</code>), com o cadastro inteiro a cada envio.</li>
+            <code>/partner/v1/representantes</code>), mandando só o que mudou.</li>
         <li>Agendar a rotina (serviço, tarefa agendada ou cron) a cada 1 a 5 minutos.</li>
         <li>Registrar log de cada importação: id, número gerado, data e resultado.</li>
       </ul>
@@ -2258,6 +2666,19 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         entraram em 15 de setembro de 2026 como correção de defeito da v1, antes da
         primeira chave ser emitida — não é uma versão nova, e nenhum programa em
         produção foi afetado.
+      </p>
+      <p>
+        No mesmo dia, ainda antes da primeira chave, entrou a <b>fase 0</b>: o
+        <span class="st wr">409</span> <code>CANAL_FECHADO</code> por empresa; as
+        rotas <code>/conciliar</code>, <code>/conciliacao</code> e
+        <code>/pedidos/excluidos</code>; os campos novos do cliente no pedido e a
+        tabela do próprio pedido em <code>tabela_preco</code>; no faturamento,
+        <code>faturado_em</code> com fuso, <code>valor_faturado</code> ausente
+        mantendo o gravado, situação exigida, <code>nota</code>,
+        <code>itens</code>, <code>inalterados</code> e <code>avisos</code>; nos
+        cadastros, campo ausente que não apaga, <code>sem_mudanca</code>,
+        casamento do representante pelo miolo e o e-mail do representante que não
+        troca o login.
       </p>
     </section>
   </main>

@@ -13,7 +13,9 @@
 > opção faz o Vercel devolver 404 em todas as rotas do app.
 >
 > Atualizado em 15/09/2026 — contrato endurecido antes da primeira chave
-> emitida (ver "Estabilidade da v1", no fim).
+> emitida, e a fase 0 da integração com o Control: canal por empresa,
+> conciliação do passivo, notas e peças faturadas, cadastros que não apagam o
+> que não veio (ver "Estabilidade da v1", no fim).
 
 Integração para o ERP da fábrica **buscar os pedidos** feitos pelos representantes
 no aplicativo e gravá-los no próprio sistema. O aplicativo nunca escreve no banco
@@ -27,20 +29,61 @@ do ERP — quem grava é o programa da fábrica, usando esta API como fonte.
   requisições por minuto por IP (acima disso, `429`); 1000 registros por lote
   em todos os `POST` de lista
 
-## Os seis endpoints
+## Os nove endpoints
 
-| Método e rota | Para quê |
-|---|---|
-| `GET /partner/v1/status` | Testar a conexão e a chave |
-| `GET /partner/v1/pedidos` | Buscar a fila de pedidos aprovados aguardando importação |
-| `POST /partner/v1/pedidos/{id}/confirmar` | Confirmar a importação com o número gerado no ERP |
-| `POST /partner/v1/faturamento` | Informar o que foi faturado — fecha o ciclo |
-| `POST /partner/v1/clientes` | O ERP envia os clientes (cadastro) |
-| `POST /partner/v1/representantes` | O ERP envia os representantes (cadastro) |
+| Método e rota | Para quê | Canal exigido |
+|---|---|---|
+| `GET /partner/v1/status` | Testar a conexão e a chave; diz quais canais estão ligados | — |
+| `GET /partner/v1/pedidos` | Buscar a fila de pedidos aprovados aguardando importação | pedidos |
+| `POST /partner/v1/pedidos/{id}/confirmar` | Confirmar a importação com o número gerado no ERP | pedidos |
+| `POST /partner/v1/pedidos/{id}/conciliar` | Dar o número a um pedido que foi para o ERP sem número (o passivo) | pedidos |
+| `GET /partner/v1/conciliacao` | Só contagens, para conferir o passivo antes e depois de cada rodada | — |
+| `GET /partner/v1/pedidos/excluidos` | Pedidos excluídos no app que já tinham número do ERP | — |
+| `POST /partner/v1/faturamento` | Informar o que foi faturado (com a nota e as peças) — fecha o ciclo | faturamento |
+| `POST /partner/v1/clientes` | O ERP envia os clientes (cadastro) | cadastro |
+| `POST /partner/v1/representantes` | O ERP envia os representantes (cadastro) | cadastro |
 
-Quatro chamadas fazem o ciclo do pedido (testar, buscar, confirmar, faturar); as
-outras duas mantêm os cadastros e rodam por conta própria, na frequência que o
+Quatro chamadas fazem o ciclo do pedido (testar, buscar, confirmar, faturar);
+conciliar, conciliação e excluídos acertam o que aconteceu antes da integração
+ou fora dela; as duas de cadastro rodam por conta própria, na frequência que o
 ERP quiser. Mesma chave, mesma URL base.
+
+## Canal por empresa
+
+Cada fluxo tem **um escritor só**. Enquanto a fábrica ainda lança o número do
+pedido e o faturado à mão no aplicativo, a API não pode escrever os mesmos
+dados — seria pedido lançado duas vezes e faturamento que se desfaz sozinho. Por
+isso cada empresa tem três canais, que o responsável pelo sistema liga para a
+API quando a fábrica estiver pronta:
+
+| Canal | Rotas que dependem dele | Valor que libera a API |
+|---|---|---|
+| `pedido_erp` | `GET /pedidos`, `POST /confirmar`, `POST /conciliar` | `api` |
+| `faturamento` | `POST /faturamento` | `api` |
+| `cadastro` | `POST /clientes`, `POST /representantes` | `api` |
+
+Com o canal em outro valor, a rota responde **antes de ler o corpo** e sem gravar
+nada:
+
+```json
+{
+  "error": "Canal de faturamento ainda não está ligado para a API nesta empresa",
+  "code": "CANAL_FECHADO",
+  "statusCode": 409,
+  "canal": "faturamento",
+  "valor_atual": "manual"
+}
+```
+
+`GET /status` mostra os três canais da sua empresa. `GET /status`,
+`GET /conciliacao` e `GET /pedidos/excluidos` funcionam com qualquer canal — só
+leem. Um `409 CANAL_FECHADO` não é erro do seu programa: é a fábrica que ainda
+não virou a chave; tente de novo depois de combinar com o responsável.
+
+**Toda chamada fica registrada** do nosso lado (rota, status HTTP, quantos
+registros chegaram, gravaram, ficaram iguais e foram ignorados, e os motivos) —
+sem a sua chave e sem dado de cliente. É por esse registro que respondemos "o
+que aconteceu com o envio das 14h".
 
 ## Fluxo recomendado
 
@@ -88,13 +131,22 @@ GET /partner/v1/status
 
 **Resposta 200:**
 ```json
-{ "ok": true, "parceiro": "suaempresa", "servidor_hora": "2026-07-15T20:13:15.006Z" }
+{
+  "ok": true,
+  "parceiro": "suaempresa",
+  "servidor_hora": "2026-07-15T20:13:15.006Z",
+  "canais": { "pedido_erp": "api", "faturamento": "manual", "cadastro": "carga" }
+}
 ```
+
+`canais` diz quais rotas estão ligadas para a API na sua empresa (ver "Canal por
+empresa"): `pedido_erp` é `manual`, `api` ou `sync_py`; `faturamento` é `manual`
+ou `api`; `cadastro` é `carga`, `api` ou `firebird`. Só `api` libera a rota.
 
 Sem chave ou com chave errada (inclusive quando a sua chave ainda não foi
 cadastrada): `401 PARTNER_UNAUTHORIZED`. Integração ainda não liberada no
 servidor (nenhuma chave configurada): `503 PARTNER_API_DISABLED`. Vale para as
-seis rotas.
+nove rotas.
 
 ---
 
@@ -145,9 +197,16 @@ seguinte.
       "pedido_erp": null,
       "cliente": {
         "codigo_erp": "05836",
-        "cnpj": "023.209.286-93",
-        "razao_social": "VERONICA ANGELICA DIAS FIGUEIREDO",
-        "nome_fantasia": null
+        "cnpj": "00.000.000/0001-00",
+        "razao_social": "CLIENTE TESTE LTDA",
+        "nome_fantasia": null,
+        "endereco": {
+          "cep": "00000000", "logradouro": "Rua Teste", "numero": "100",
+          "complemento": null, "bairro": "Centro", "cidade": "Cidade Teste", "uf": "MG"
+        },
+        "inscricao_estadual": null,
+        "whatsapp": "00900000000",
+        "email": null
       },
       "representante_erp": "04518",
       "tabela_preco": { "codigo_erp": "00016", "coluna": 1 },
@@ -184,9 +243,13 @@ seguinte.
 | `pedido_erp` | texto ou null | Número no ERP, na forma normalizada (ex.: `CS17379`). Nulo na fila; preenchido pela sua confirmação |
 | `cliente.codigo_erp` | texto | **Código do cliente no seu ERP** (campo CLIENTE) |
 | `cliente.cnpj` | texto ou null | CNPJ/CPF para conferência |
+| `cliente.razao_social` / `cliente.nome_fantasia` | texto ou null | Nomes do cadastro |
+| `cliente.endereco` | objeto | `{ cep, logradouro, numero, complemento, bairro, cidade, uf }` — sempre com as sete chaves; cada uma sai `null` quando o cadastro não tem o dado |
+| `cliente.inscricao_estadual` | texto ou null | Inscrição estadual do cadastro |
+| `cliente.whatsapp` / `cliente.email` | texto ou null | Contato do cadastro |
 | `representante_erp` | texto | **Código do representante no seu ERP** (campo REPRESENTANTE) — o código gravado no cliente |
-| `tabela_preco.codigo_erp` | texto ou null | **Código da tabela de preço no seu ERP** — a tabela vinculada ao cliente no momento da consulta |
-| `tabela_preco.coluna` | inteiro | Coluna de preço usada (1 a 6) |
+| `tabela_preco.codigo_erp` | texto ou null | **Código da tabela de preço no seu ERP** — a tabela que **precificou este pedido**. Pedido sem tabela gravada usa a tabela do cadastro do cliente. Tabela sem código do ERP sai `null` e gera a pendência `pedido sem tabela de preço vinculada no ERP` (nunca cai para outra tabela) |
+| `tabela_preco.coluna` | inteiro | Coluna de preço dessa tabela (1 a 6; `1` quando a tabela não tem coluna gravada) |
 | `condicao_pagamento` | objeto ou null | **Código da condição no seu ERP** (`codigo`, ex.: `"021"`) + `descricao`. O mesmo código da célula C8 da planilha. `null` quando o pedido não tem condição escolhida — isso **não** gera pendência |
 | `desconto_percentual` | número | Desconto do representante em **pontos percentuais** (10 = 10%). Os preços dos itens vêm SEM ele; o `valor_total` já o aplica — mesmo contrato da célula AB46 da planilha |
 | `faturado` | booleano | O carimbo de faturado (informado pelo passo 4, ou à mão no aplicativo). Na fila pendente vem sempre `false` — pedido faturado não entra na fila; aparece com `incluir=todos` |
@@ -230,10 +293,10 @@ parte do contrato v1 — se um dia entrar, será combinado antes e chegará como
 campo novo, sem mudar o que já existe.
 
 **Campos que dependem de recurso do banco:** `numero`, `condicao_pagamento`,
-`desconto_percentual`, `faturado`, `faturado_em` e `valor_faturado` dependem de
-recursos que podem ainda não estar ativos numa instalação. Quando não estão,
-saem `null` (`0` no desconto, `false` no faturado) — a resposta nunca quebra por
-isso.
+`desconto_percentual`, `faturado`, `faturado_em`, `valor_faturado`, os pedaços
+de `cliente.endereco` e `cliente.inscricao_estadual` dependem de recursos que
+podem ainda não estar ativos numa instalação. Quando não estão, saem `null`
+(`0` no desconto, `false` no faturado) — a resposta nunca quebra por isso.
 
 ---
 
@@ -285,6 +348,96 @@ informativo e pode mudar.
 
 ---
 
+## 3b. Conciliar o passivo (pedido enviado sem número)
+
+Antes da integração, parte dos pedidos foi lançada no ERP à mão e marcada como
+"enviado ao ERP" no aplicativo **sem o número**. Esses pedidos estão com
+situação `sent_erp` e `pedido_erp` nulo: não voltam para a fila e o faturamento
+não os acha. Esta rota dá a eles o número que o seu ERP já tem:
+
+```
+POST /partner/v1/pedidos/{id}/conciliar
+Content-Type: application/json
+
+{ "pedido_erp": "CS17379" }
+```
+
+O número é normalizado como na confirmação. A situação do pedido **não muda**
+(continua `sent_erp`); só o número é gravado.
+
+| Resposta | `code` | Significado |
+|---|---|---|
+| `200 {"ok":true,"ja_conciliado":false}` | — | Número gravado agora |
+| `200 {"ok":true,"ja_conciliado":true}` | — | O pedido já tinha esse mesmo número. Nada é regravado |
+| `400` | `MISSING_PEDIDO_ERP` / `INVALID_PEDIDO_ERP` | Como na confirmação |
+| `404` | `ORDER_NOT_FOUND` | Não existe pedido com esse `id` na sua empresa |
+| `409` | `ORDER_ALREADY_CONFIRMED` | O pedido já tem **outro** número (`pedido_erp_atual`) |
+| `409` | `ORDER_NOT_RECONCILABLE` | O pedido não é `sent_erp`; a resposta traz a `situacao`. Pedido aprovado usa o `/confirmar` |
+| `409` | `ERP_NUMBER_IN_USE` | O número já está em outro pedido (`pedido_em_uso`) |
+| `409` | `CANAL_FECHADO` | Canal de pedidos não ligado para a API |
+| `500` | `INTERNAL_ERROR` | Falha ao ler ou gravar — tente de novo |
+
+Ordem das checagens: campo presente → formato → pedido existe → já tem número
+(o mesmo = 200, outro = 409) → situação `sent_erp` → número livre → gravação
+(só se ninguém gravou no meio).
+
+## 3c. Conferir a conciliação (só contagens)
+
+```
+GET /partner/v1/conciliacao
+```
+
+Não devolve pedido nenhum, só quantos há em cada grupo da sua empresa:
+
+```json
+{
+  "fila_aprovados_sem_numero_nao_faturados": 12,
+  "enviados_sem_numero_nao_faturados": 42,
+  "enviados_sem_numero_faturados": 7,
+  "aprovados_faturados_sem_numero": 3,
+  "enviados_com_numero_sem_faturamento": 18,
+  "servidor_hora": "2026-09-15T13:00:00.000Z"
+}
+```
+
+| Campo | O que conta |
+|---|---|
+| `fila_aprovados_sem_numero_nao_faturados` | A fila do `GET /pedidos` |
+| `enviados_sem_numero_nao_faturados` | O passivo que o `/conciliar` resolve |
+| `enviados_sem_numero_faturados` | O mesmo passivo, já faturado à mão |
+| `aprovados_faturados_sem_numero` | Faturado à mão sem nunca ter ido ao ERP pelo app — não importe |
+| `enviados_com_numero_sem_faturamento` | No ERP, esperando o faturamento chegar |
+
+Funciona com qualquer canal. Erro em qualquer contagem responde `500`.
+
+## 3d. Pedidos excluídos que já tinham número
+
+```
+GET /partner/v1/pedidos/excluidos
+GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00
+```
+
+Pedido com número do ERP não pode mais ser excluído no aplicativo; esta lista
+traz os que foram excluídos **antes** dessa trava, para o seu ERP cancelar do
+lado dele. `desde` é opcional e, quando vem, precisa de fuso (`Z` ou `-03:00`) —
+sem fuso responde `400 INVALID_DESDE`. A lista vem inteira, do mais antigo para o
+mais novo.
+
+```json
+{
+  "total": 1,
+  "servidor_hora": "2026-09-15T13:00:00.000Z",
+  "excluidos": [
+    { "id": "d31b5083-…", "numero": 14535, "pedido_erp": "CS17379", "excluido_em": "2026-09-10T18:22:01.000Z" }
+  ]
+}
+```
+
+Só id, número no app, número no ERP e o momento — nunca o pedido, o cliente ou
+quem excluiu. Funciona com qualquer canal.
+
+---
+
 ## 4. Informar o faturamento
 
 Esta é a etapa que **fecha o ciclo**, e é a mais visível para o lojista.
@@ -302,7 +455,16 @@ Content-Type: application/json
 
 {
   "faturamento": [
-    { "pedido_erp": "CS17379", "faturado_em": "2026-08-13T14:02:00Z", "valor_faturado": 870.50 },
+    {
+      "pedido_erp": "CS17379",
+      "faturado_em": "2026-08-13T14:02:00-03:00",
+      "valor_faturado": 870.50,
+      "nota": { "numero": "12345", "serie": "1", "emitida_em": "2026-08-13T14:02:00-03:00", "valor": 870.50 },
+      "itens": [
+        { "produto": "0015", "tamanho": "G", "quantidade": 3, "preco_unitario": 42.90 },
+        { "produto": "0015", "tamanho": "EG", "quantidade": 2, "preco_unitario": 55.00 }
+      ]
+    },
     { "pedido_erp": "CS17380" }
   ]
 }
@@ -310,18 +472,30 @@ Content-Type: application/json
 
 O corpo pode vir como `{ "faturamento": [...] }`, `{ "dados": [...] }` ou a
 lista pura. Máximo de 1000 pedidos por requisição (`400 BATCH_TOO_LARGE`);
-corpo fora do formato → `400 INVALID_BODY`.
+corpo fora do formato → `400 INVALID_BODY`. Exige o canal de faturamento ligado
+para a API (`409 CANAL_FECHADO`).
+
+**Regra de ouro: campo que não veio não mexe; `null` explícito limpa.** Reenviar
+é seguro — o que chega igual ao que está gravado não grava nada e conta em
+`inalterados`.
 
 | Campo | Obrigatório | Significado |
 |---|---|---|
 | `pedido_erp` | sim¹ | O número do pedido no seu ERP (o mesmo do passo 3), **em qualquer grafia** — `cs-17379` acha `CS17379` |
 | `id` | sim¹ | Alternativa ao `pedido_erp`: o id que veio na fila |
-| `faturado` | não | `false` desfaz um faturamento informado antes e **limpa a data e o valor**. Ausente = `true` |
-| `faturado_em` | não | ISO da emissão da nota. Ausente = agora — reenviar sem ele move a data para o momento do reenvio, então mande sempre |
-| `valor_faturado` | não | O valor que a nota fechou, maior que zero. **Ausente = fica vazio (NULL) no aplicativo**, e o painel volta a usar o valor do pedido. Reenviar sem o valor **apaga** o que foi informado antes — mande sempre |
+| `faturado` | não | `false` desfaz um faturamento informado antes: **limpa a data e o valor** e cancela as notas do pedido. Ausente = `true` |
+| `faturado_em` | não | Momento da emissão, **com fuso** (`Z` ou `-03:00`). Sem fuso o registro é ignorado. Ausente = mantém a data de quem já estava faturado; quem ainda não estava fica faturado agora |
+| `valor_faturado` | não | O valor que a nota fechou, maior que zero. **Ausente = mantém o que está gravado**; `null` limpa (o painel volta a usar o valor do pedido) |
+| `nota` | não | `{ numero, serie?, chave?, emitida_em?, valor? }` — a nota fiscal. `numero` é obrigatório quando `nota` vem; `serie` ausente vale `""`; `emitida_em` com fuso; `valor` maior que zero. Nos campos opcionais vale a regra de ouro |
+| `itens` | não | `[{ produto, tamanho, quantidade, preco_unitario? }]` — as peças que **essa nota** levou. Só com `nota`. Substitui as peças daquela nota (as de outras notas do pedido ficam). `quantidade` inteira maior que zero |
 
 ¹ Informe **um** dos dois. `pedido_erp` é o preferido. A busca é sempre dentro
 da sua empresa: um parceiro nunca fatura pedido de outra fábrica.
+
+Só pedido **aprovado ou enviado ao ERP** (`approved` ou `sent_erp`) é faturado.
+Pedido com mais de uma nota: mande um registro por nota, com o mesmo
+`pedido_erp`. `produto` é o mesmo código que o `GET /pedidos` manda; a peça que
+não casar com o catálogo é guardada assim mesmo, com aviso.
 
 **Sobre o `valor_faturado`:** é normal ele ser menor que o total do pedido — o
 que faltou no estoque não é faturado. Mandando esse campo, a fábrica passa a ver
@@ -333,29 +507,53 @@ cancelada se diz com `"faturado": false`, não com valor zerado.
 ```json
 {
   "ok": true,
-  "recebidos": 2,
+  "recebidos": 3,
   "atualizados": 1,
+  "inalterados": 1,
   "ignorados": [
     { "pedido": "CS17380", "motivo": "pedido não encontrado nesta empresa" }
+  ],
+  "avisos": [
+    { "pedido": "CS17379", "aviso": "peça 0015 tamanho XG sem variante no catálogo: guardada sem vínculo" }
   ],
   "servidor_hora": "2026-08-13T14:02:10.114Z"
 }
 ```
 
-Um registro com problema não derruba o lote: ele volta em `ignorados` com o
-motivo, e o resto grava. Os motivos possíveis são seis:
+`atualizados` conta os registros em que algo foi gravado (pedido, nota ou
+peças); `inalterados`, os que chegaram iguais ao gravado. Um registro com
+problema não derruba o lote: ele volta em `ignorados` com o motivo, e o resto
+grava. Registro com `nota` ou `itens` malformados é recusado **inteiro** (nada
+dele é gravado), para ser corrigido e reenviado junto. Os motivos:
 
 | Motivo | Quando |
 |---|---|
 | `informe "pedido_erp" ou "id"` | O registro veio sem os dois |
-| `falha ao buscar: …` | Erro ao procurar o pedido. Reenvie na próxima rodada |
+| `falha ao buscar: …` | Erro ao procurar o pedido, a nota ou as peças. Reenvie na próxima rodada |
 | `pedido não encontrado nesta empresa` | Nenhum pedido da sua empresa com esse número ou id |
+| `pedido não está aprovado nem enviado ao ERP` | A situação do pedido não aceita faturamento; o ignorado traz `situacao` |
 | `"faturado_em" não é uma data ISO` | Data fora do padrão |
+| `"faturado_em" precisa de fuso (Z ou -03:00)` | Data e hora sem fuso, ou só a data |
 | `"valor_faturado" precisa ser maior que zero` | Zero ou negativo |
-| `falha ao gravar: …` | Erro ao gravar o carimbo. Reenvie na próxima rodada |
+| `"nota" precisa ser um objeto com "numero"` | `nota` não é objeto |
+| `"nota.numero" é obrigatório quando "nota" vem` | Nota sem número |
+| `"nota.chave" precisa ser um texto` | Chave que não é texto |
+| `"nota.emitida_em" não é uma data ISO` / `"nota.emitida_em" precisa de fuso (Z ou -03:00)` | Emissão fora do padrão ou sem fuso |
+| `"nota.valor" precisa ser maior que zero` | Valor da nota zero ou negativo |
+| `"itens" precisa vir junto com "nota" (informe "nota.numero")` | Peças sem a nota |
+| `"itens" precisa ser uma lista` | `itens` não é lista |
+| `"itens[i]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero` | Peça incompleta (`i` é a posição) |
+| `"itens[i].preco_unitario" precisa ser um número maior ou igual a zero` | Preço inválido |
+| `falha ao gravar: …` / `falha ao gravar a nota: …` / `falha ao gravar as peças da nota: …` | Erro ao gravar. Reenvie na próxima rodada |
 
-Repetir o mesmo envio, **com os mesmos campos**, é seguro. O faturamento também
-atualiza a "última compra" do cliente no aplicativo.
+Os `avisos` possíveis: peça sem variante no catálogo (guardada sem vínculo);
+`notas e itens faturados ficam guardados depois da migração 048` (a instalação
+ainda não guarda notas — o faturamento grava, a nota não); e `nota e itens
+ignorados: "faturado": false cancela as notas do pedido`.
+
+Na passagem para faturado, o aplicativo também avança a "última compra" do
+cliente (pelo dia em Brasília, nunca para trás) e avisa o representante.
+Desfazer não recua a última compra.
 
 ---
 
@@ -368,14 +566,16 @@ Toda resposta de erro tem o formato `{ "error": "<mensagem>", "code":
 |---|---|---|---|
 | `503` | `PARTNER_API_DISABLED` | todas | A integração ainda não foi liberada no servidor |
 | `401` | `PARTNER_UNAUTHORIZED` | todas | Chave ausente ou errada no `X-API-Key` |
-| `400` | `INVALID_DESDE` | `GET /pedidos` | `desde` não é uma data ISO |
-| `400` | `MISSING_PEDIDO_ERP` | `POST /confirmar` | Corpo sem `pedido_erp`, ou `pedido_erp` vazio / que não é texto (o corpo vazio é o caso da linha abaixo) |
+| `409` | `CANAL_FECHADO` | pedidos, confirmar, conciliar, faturamento, clientes, representantes | O canal da sua empresa não está ligado para a API (`canal`, `valor_atual`) — ver "Canal por empresa" |
+| `400` | `INVALID_DESDE` | `GET /pedidos`, `GET /pedidos/excluidos` | `desde` não é uma data ISO (nos excluídos, também sem fuso) |
+| `400` | `MISSING_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Corpo sem `pedido_erp`, ou `pedido_erp` vazio / que não é texto (o corpo vazio é o caso da linha abaixo) |
 | `400` | `INTERNAL_ERROR` | todas | Corpo JSON vazio ou malformado com `Content-Type: application/json` — o `statusCode` diz 400. Corrija a chamada, não reenvie |
-| `400` | `INVALID_PEDIDO_ERP` | `POST /confirmar` | Número fora do formato (duas letras e até 10 dígitos) |
-| `404` | `ORDER_NOT_FOUND` | `POST /confirmar` | Não há pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID) |
-| `409` | `ORDER_ALREADY_CONFIRMED` | `POST /confirmar` | Já confirmado com outro número (`pedido_erp_atual`) |
+| `400` | `INVALID_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Número fora do formato (duas letras e até 10 dígitos) |
+| `404` | `ORDER_NOT_FOUND` | `POST /confirmar`, `POST /conciliar` | Não há pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID) |
+| `409` | `ORDER_ALREADY_CONFIRMED` | `POST /confirmar`, `POST /conciliar` | Já tem outro número (`pedido_erp_atual`) |
 | `409` | `ORDER_NOT_APPROVED` | `POST /confirmar` | A situação do pedido não aceita confirmação (`situacao`) |
-| `409` | `ERP_NUMBER_IN_USE` | `POST /confirmar` | Número já gravado em outro pedido (`pedido_em_uso`) |
+| `409` | `ORDER_NOT_RECONCILABLE` | `POST /conciliar` | Só pedido `sent_erp` sem número é conciliado (`situacao`) |
+| `409` | `ERP_NUMBER_IN_USE` | `POST /confirmar`, `POST /conciliar` | Número já gravado em outro pedido (`pedido_em_uso`) |
 | `400` | `INVALID_BODY` | `POST` de lista | O corpo não é uma lista nem `{ "faturamento" / "clientes" / "representantes": [...] }` |
 | `400` | `BATCH_TOO_LARGE` | `POST` de lista | Mais de 1000 registros numa requisição |
 | `413` | `INTERNAL_ERROR` | todas | Corpo acima de 1 MB — o `statusCode` diz 413; divida o lote |
@@ -414,7 +614,10 @@ curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
   confirme — o pedido continua na fila para a próxima tentativa.
 - Trate `409` como alerta: `ORDER_ALREADY_CONFIRMED` e `ERP_NUMBER_IN_USE` são
   sinal de numeração ou importação duplicada do seu lado; `ORDER_NOT_APPROVED`
-  é pedido que não estava na fila.
+  é pedido que não estava na fila. `CANAL_FECHADO` não é defeito: a rota ainda
+  não foi ligada para a sua empresa.
+- Mande as datas **com fuso** (`Z` ou `-03:00`): sem ele, o mesmo texto é uma
+  hora no servidor e outra no ERP.
 - `5xx` não é resposta: tente de novo na próxima rodada, sem marcar nada.
 - A chave de API é secreta — não coloque em código-fonte compartilhado.
 
@@ -432,6 +635,12 @@ antes de configurar `PARTNER_API_KEYS`:
 - A tabela da migração 046 (`order_erp_sync`) precisa existir e estar visível
   para a API (`node _tools/conferir-046.mjs`), senão a confirmação grava o
   número mas não tira a foto do que o ERP conhece.
+- A migração 048 (canais, registro das chamadas, rastro do pedido, notas e
+  peças) precisa estar nos dois bancos (`node _tools/conferir-048.mjs`). Sem
+  ela, todos os canais valem o padrão — **a API fica fechada**
+  (`409 CANAL_FECHADO`) e as notas não são guardadas.
+- Virar o canal é um `UPDATE companies SET canal_… = 'api'` por empresa, feito
+  quando a fábrica parar de lançar à mão o mesmo dado.
 
 ---
 
@@ -444,25 +653,30 @@ no seu sistema. Mesma chave `X-API-Key`, mesma URL base.
 **Fluxo recomendado:** a cada ~10 minutos, envie os clientes e os representantes
 (em lotes de até 500). Clientes: upsert por **código do ERP** — quem já existe é
 atualizado, quem não existe é criado. Representantes: só atualização de quem já
-tem login (ver abaixo). Nada é apagado.
+tem login (ver abaixo). Nada é apagado. As duas rotas exigem o canal de cadastro
+ligado para a API (`409 CANAL_FECHADO`).
 
 ## Regras gerais
 
-- **Tolerante:** só é recusado o que não dá para usar (sem código ou sem nome).
-  A resposta lista o que foi ignorado e por quê; o resto grava.
-- **Registro sempre completo:** o cliente é gravado com todos os campos a cada
-  envio — campo que não veio é gravado vazio. **Mande o cadastro inteiro**, não
-  só o que mudou dentro do registro (ver o aviso em `/clientes`).
+- **Campo que não veio não mexe; `null` explícito limpa.** Texto vazio (`""` ou
+  só espaços) conta como não veio. Pode mandar só o que mudou dentro do
+  registro — mas `codigo` e `razao_social` (ou `nome`) vêm sempre.
+- **Sem mudança, nada é gravado:** o registro que chega igual ao cadastro conta
+  em `sem_mudanca`. Reenviar o mesmo lote é inofensivo.
+- **Tolerante:** só é recusado o que não dá para usar (sem código, sem nome,
+  código repetido). A resposta lista o que foi ignorado e por quê; o resto grava.
+- **Casamento pelo miolo do código:** `#2225`, `2225` e `02225` são o mesmo
+  cadastro. Dois registros do mesmo lote com o mesmo miolo: vale o primeiro, o
+  segundo volta em `ignorados` (`código repetido no lote`).
 - **Máximo 1000 por requisição** (recomendado 500). Acima de 1000 →
   `400 BATCH_TOO_LARGE`. Divida em lotes.
 - **Datas e números** no padrão JSON. CNPJ/telefone podem vir com ou sem
   pontuação.
 - **Desativar** um cliente é mandar `bloqueado: "S"` (ou `ativo: "N"` no rep). O
   app **nunca apaga** — cliente tem histórico de pedidos preso a ele.
-- **Erro de banco no meio do lote** → `500 INTERNAL_ERROR` e o lote fica pela
-  metade: os registros anteriores já gravaram, os seguintes não. Reenviar o lote
-  inteiro é seguro (o upsert não duplica) — e é por isso que lotes pequenos são
-  melhores.
+- **Falha ao gravar um registro** não derruba o lote: ele volta em `ignorados`
+  com `falha ao gravar: …` e o resto segue. `500 INTERNAL_ERROR` quando a
+  **leitura** do que já existe falha — e aí nada foi gravado. Reenviar é seguro.
 
 ## POST /partner/v1/clientes
 
@@ -470,28 +684,24 @@ Corpo: `{ "clientes": [ ... ] }`, `{ "dados": [ ... ] }` ou a lista pura.
 
 | Campo | Tipo | Precisa? | Observação |
 |---|---|---|---|
-| `codigo` | texto | **Sim** | Código do cliente no ERP. A chave do upsert. O casamento é pelo "miolo": `#2225`, `2225` e `02225` são o mesmo cliente |
+| `codigo` | texto | **Sim** | Código do cliente no ERP. A chave do upsert, casada pelo miolo. Cliente novo é gravado com 5 dígitos (`900` → `00900`); o código de quem já existe nunca é reescrito |
 | `razao_social` | texto | **Sim** | Sem ela o registro volta em `ignorados` |
 | `nome_fantasia` | texto | Não | — |
 | `cnpj_cpf` | texto | Recomendado | 11 (CPF) ou 14 (CNPJ) dígitos, com ou sem pontuação. Um cliente que já existia no app **sem código** e com esse CNPJ é *adotado*: recebe o código e não vira cadastro duplicado |
-| `representante` | texto | **Sim, na prática** | Código do rep no ERP. Fica gravado no cliente, sai no pedido como `representante_erp` e é o que faz o cliente aparecer para o representante que tem esse código no login do app. Sem ele, o cliente fica sem dono e o pedido sai com pendência |
-| `tabela_preco` | texto | Recomendado | Código da tabela no ERP. Ver nota abaixo |
-| `endereco` | objeto ou texto | Recomendado | `{ logradouro, numero, complemento, bairro, cidade, uf, cep }` ou um texto pronto. O app grava **uma linha de texto** (`Rua das Flores, 123 - Centro - Juiz de Fora/MG - CEP 36000-000`); não há campos separados de endereço alimentados por esta rota |
-| `bloqueado` | `"S"`/`"N"` | Não | `S` = cliente não fecha pedido. Ausente = `N` |
-| `limite_credito` | número | Não | Informativo |
+| `representante` | texto | **Sim, na prática** | Código do rep no ERP, gravado com 5 dígitos (`779` → `00779`). Fica no cliente, sai no pedido como `representante_erp` e é o que faz o cliente aparecer para o representante que tem esse código no login do app. `null` tira o cliente da carteira |
+| `tabela_preco` | texto | Recomendado | Código da tabela no ERP, casado pelo miolo. Código que não casa com nenhuma tabela **não mexe** na tabela do cliente e volta em `avisos`; `null` limpa |
+| `endereco` | objeto ou texto | Recomendado | `{ logradouro, numero, complemento, bairro, cidade, uf, cep }` ou um texto pronto. Em objeto, cada pedaço é guardado no seu campo (onde a instalação já tem os campos) e a linha de texto é remontada; em texto, só a linha. `null` limpa o endereço inteiro |
+| `inscricao_estadual` | texto | Não | Guardada onde a instalação já tem o campo (senão, aviso) |
+| `observacoes` | texto | Não | Idem |
+| `bloqueado` | `"S"`/`"N"` | Não | `S`, `SIM`, `1` ou `true` bloqueia; `N`, `NÃO`, `0` ou `false` desbloqueia; `null` desbloqueia; ausente não mexe; outro valor não mexe e dá aviso |
+| `limite_credito` | número ou texto | Não | `1500.5` ou `"1.500,50"`. `null` limpa; negativo ou ilegível não mexe e dá aviso |
 | `whatsapp` | texto | Não | Com DDD |
 | `email` | texto | Não | — |
 
-**Mande o cadastro inteiro.** O registro é gravado completo, sempre: um envio
-só com `codigo` e `razao_social` apaga fantasia, CNPJ, representante, tabela,
-endereço, WhatsApp e e-mail que estavam lá — e desbloqueia um cliente bloqueado
-(`bloqueado` ausente vira `N`).
-
-**Nota da tabela de preço:** o vínculo é pelo **código** do ERP. Hoje as tabelas
-no app estão sem esse código preenchido — enquanto isso, o cliente entra sem
-tabela e usa a do representante. Para o vínculo funcionar, o código do ERP de
-cada tabela precisa ser preenchido no app (uma vez). A resposta avisa quais
-códigos de tabela não foram encontrados.
+**Nota da tabela de preço:** o vínculo é pelo **código** do ERP. Tabela no app
+sem esse código não casa com nada — o cliente fica com a tabela que tinha, e a
+resposta avisa quais códigos não foram encontrados. Para o vínculo funcionar, o
+código do ERP de cada tabela precisa ser preenchido no app (uma vez).
 
 **Exemplo:**
 
@@ -504,15 +714,15 @@ Content-Type: application/json
   "clientes": [
     {
       "codigo": "01234",
-      "razao_social": "LOJA DA MARIA LTDA",
-      "nome_fantasia": "Moda Maria",
-      "cnpj_cpf": "12.345.678/0001-90",
+      "razao_social": "CLIENTE TESTE LTDA",
+      "nome_fantasia": "Loja Teste",
+      "cnpj_cpf": "00.000.000/0001-00",
       "representante": "00779",
       "tabela_preco": "01",
       "endereco": {
-        "logradouro": "Rua das Flores", "numero": "123",
-        "bairro": "Centro", "cidade": "Juiz de Fora", "uf": "MG",
-        "cep": "36000-000"
+        "logradouro": "Rua Teste", "numero": "100",
+        "bairro": "Centro", "cidade": "Cidade Teste", "uf": "MG",
+        "cep": "00000-000"
       },
       "bloqueado": "N",
       "whatsapp": "32988887777"
@@ -529,6 +739,7 @@ Content-Type: application/json
   "recebidos": 1,
   "criados": 1,
   "atualizados": 0,
+  "sem_mudanca": 0,
   "ignorados": [],
   "avisos": [],
   "servidor_hora": "2026-08-11T20:13:15.006Z"
@@ -536,9 +747,12 @@ Content-Type: application/json
 ```
 
 `ignorados` traz `{ "codigo": "...", "motivo": "..." }` para cada registro
-recusado (`sem código do ERP`, `sem razão social`). `avisos` traz o que passou
-mas merece conferência: tabelas de preço não encontradas, clientes casados pelo
-CNPJ e o aviso de que nenhuma tabela tem código do ERP.
+recusado: `registro inválido` (não é objeto), `sem código do ERP`,
+`sem razão social`, `código repetido no lote`, `código com mais de um cadastro
+no app` ou `falha ao gravar: …`. `avisos` traz o que passou mas merece
+conferência: tabelas de preço não encontradas, clientes casados pelo CNPJ,
+código de representante sem login no app, valores de `bloqueado` ou
+`limite_credito` não entendidos e campos que a instalação ainda não guarda.
 
 ## POST /partner/v1/representantes
 
@@ -546,14 +760,15 @@ Corpo: `{ "representantes": [ ... ] }`, `{ "dados": [ ... ] }` ou a lista pura.
 
 | Campo | Tipo | Precisa? | Observação |
 |---|---|---|---|
-| `codigo` | texto | **Sim** | Código do rep no ERP. Casa **exato** com o código atribuído ao login no app (`0779` e `779` não são o mesmo) |
+| `codigo` | texto | **Sim** | Código do rep no ERP. Casa pelo miolo com o código atribuído ao login no app (`0779`, `779` e `00779` são o mesmo) |
 | `nome` | texto | **Sim** | Sem ele o registro volta em `ignorados` |
-| `razao_social` | texto | Não | Aceito, mas não é gravado nesta versão |
-| `email` | texto | Não | Atualiza o e-mail de login (gravado em minúsculas) — só quando vem |
-| `ativo` | `"S"`/`"N"` | Não | Ou `true`/`false`. Só é alterado quando vem: ausente ou vazio (`""`) não mexe no acesso. Qualquer outro texto conta como `"N"` |
+| `razao_social` | texto | Não | Gravada na razão social do representante. `null` limpa |
+| `email` | texto | Não | **Não é gravado**: o e-mail é o login do app e só muda pelas telas. Quando difere do login, volta o aviso `e-mail do Control não troca o login do representante` |
+| `ativo` | `"S"`/`"N"` | Não | Ou `true`/`false`. Só esses quatro mexem no acesso; ausente, vazio (`""`) ou `null` não mexem; outro valor não mexe e dá aviso |
 
 **Importante — login não nasce por aqui.** Este endpoint **só atualiza** nome,
-e-mail e ativo dos representantes que já têm login no app **com o seu código**.
+razão social e ativo dos representantes que já têm login no app **com o seu
+código**.
 Um rep que existe no ERP mas ainda não tem acesso no app **não é criado** — ele
 volta na resposta em `novos`, para o administrador criar o acesso e atribuir o
 código na tela de Representantes (conta precisa de senha, e senha não nasce de
@@ -563,20 +778,24 @@ Esta rota **não vincula a carteira**: quem liga cliente a representante é o
 código que vem em cada cliente (`representante`, no `POST /clientes`) contra o
 código atribuído ao login do representante no app.
 
-**Resposta 200** (além dos campos comuns): `"novos": [ { "codigo": "...",
-"nome": "..." } ]`. Quando há `novos`, `avisos` lembra de criar o acesso deles.
+**Resposta 200** (além dos campos comuns, `sem_mudanca` inclusive): `"novos":
+[ { "codigo": "...", "nome": "..." } ]`. Quando há `novos`, `avisos` lembra de
+criar o acesso deles. Motivos de `ignorados`: `registro inválido`, `sem código
+do ERP`, `sem nome`, `código repetido no lote`, `código repetido no app (dois
+logins com o mesmo código)` e `falha ao gravar: …`.
 
 ## Erros
 
 Os códigos de todas as rotas estão na tabela **Códigos de erro** acima. Para os
-cadastros valem `400 INVALID_BODY`, `400 BATCH_TOO_LARGE`, `401`, `503` e o
-`500 INTERNAL_ERROR` de erro de banco no meio do lote.
+cadastros valem `400 INVALID_BODY`, `400 BATCH_TOO_LARGE`, `401`, `503`,
+`409 CANAL_FECHADO` e o `500 INTERNAL_ERROR` de falha ao ler o que já existe
+(nada gravado).
 
 ## Boas práticas (cadastros)
 
 - Envie a cada ~10 min. Não precisa mandar todos os clientes sempre — mandar só
-  os que mudaram (por `DATA_UPDATE`) deixa o lote pequeno. Mas cada cliente
-  enviado vai com o cadastro inteiro.
+  os que mudaram (por `DATA_UPDATE`) deixa o lote pequeno. Campo que você não
+  mandar fica como está; para limpar, mande `null`.
 - Leia a resposta: `ignorados` e `avisos` mostram o que precisa de ajuste no
   cadastro do ERP.
 - Preencha o código do ERP das tabelas de preço no app uma vez, senão os clientes
@@ -596,13 +815,13 @@ o outro lado recebe cópia, nunca inventa.
 | Dado | Dono (quem cria) | O outro lado |
 |---|---|---|
 | Código do cliente | **ERP** | O app recebe por `POST /clientes` e guarda como `codigo_erp` |
-| Código do representante | **ERP** | Chega em cada cliente (`representante`), mostra o cliente ao rep com o mesmo código no login e sai no pedido como `representante_erp`. `POST /representantes` só atualiza nome, e-mail e ativo de quem já tem login **e** já tem esse código gravado no app |
-| Tabela de preço (código e coluna) | **ERP** | O app guarda o vínculo no cliente; o pedido sai com a tabela que o cliente tem na hora da consulta |
+| Código do representante | **ERP** | Chega em cada cliente (`representante`), mostra o cliente ao rep com o mesmo código no login e sai no pedido como `representante_erp`. `POST /representantes` só atualiza nome, razão social e ativo de quem já tem login **e** já tem esse código gravado no app |
+| Tabela de preço (código e coluna) | **ERP** | O app guarda o vínculo no cliente e, em cada pedido, a tabela que o precificou; o pedido sai com a tabela dele |
 | Condição de pagamento (código) | **ERP** | O app tem as 146 cadastradas; rep e loja só escolhem |
 | Referência do produto | **ERP** | O app vende só o que está no catálogo da coleção |
 | Pedido (itens, desconto, condição, observações) | **App** | O ERP importa via `GET /pedidos` |
 | **Número do pedido no ERP** (ex.: CS17379) | **ERP** | Nasce na importação e volta pelo `POST /confirmar` — o app nunca inventa esse número |
-| Faturamento (nota, valor, data) | **ERP** | Volta pelo `POST /faturamento`; o app carimba sozinho |
+| Faturamento (nota, valor, data, peças) | **ERP** | Volta pelo `POST /faturamento`; o app carimba sozinho e guarda a nota e as peças que ela levou |
 
 ## Cliente
 
@@ -616,7 +835,8 @@ O que o app guarda de cada cliente (alimentado pelo ERP via `POST /clientes`):
 | CNPJ/CPF | `cnpj_cpf` | Conferência e casamento de cadastro (as cargas casam por CNPJ; cliente sem código é adotado por ele) |
 | Representante dono | `representante` | Código do rep no ERP — define de quem é a carteira |
 | Tabela de preço | `tabela_preco` | Código da tabela no ERP; sem ela o cliente usa a tabela do representante |
-| Endereço | `endereco` | Entrega e cadastro — gravado numa linha de texto |
+| Endereço | `endereco` | Entrega e cadastro — os pedaços e a linha de texto |
+| Inscrição estadual / observações | `inscricao_estadual`, `observacoes` | Cadastro |
 | Bloqueado | `bloqueado` | `"S"` = não fecha pedido no app |
 | Limite de crédito | `limite_credito` | Informativo |
 | WhatsApp / e-mail | `whatsapp`, `email` | Contato e o botão "Enviar pedido para o cliente" |
@@ -627,7 +847,8 @@ O que o app guarda de cada cliente (alimentado pelo ERP via `POST /clientes`):
 |---|---|---|
 | Código no ERP | `codigo` | Casa com o código atribuído ao login; é por ele que os clientes aparecem para o rep e que o pedido sai com `representante_erp` |
 | Nome | `nome` | Telas e planilha |
-| E-mail | `email` | O login no app (atualizado só quando vem) |
+| Razão social | `razao_social` | Cadastro do representante |
+| E-mail | `email` | Não é gravado — o login só muda pelas telas do app |
 | Ativo | `ativo` | `"N"` desativa o acesso |
 
 O app ainda tem dados **internos** do rep que o ERP não precisa conhecer:
@@ -642,9 +863,9 @@ balcão que nasce aprovado — para o ERP é um pedido igual aos outros).
 | Coluna (1–6) | `tabela_preco.coluna` | Qual coluna de preço do ERP o pedido usou |
 | T1/T2/T3 | interno do app | Os nomes das tabelas no catálogo; o ERP só vê código + coluna |
 
-O pedido sai com a tabela vinculada ao cliente **no momento da consulta** — o
-vínculo é do cadastro, não uma foto por pedido. Trocar a tabela do cliente muda
-o que sai para os pedidos ainda não puxados.
+O pedido sai com a tabela que **o precificou** (gravada no pedido quando ele foi
+montado). Pedido antigo, sem tabela gravada, sai com a tabela do cadastro do
+cliente no momento da consulta. A coluna é sempre a da tabela.
 
 ## Condição de pagamento
 
@@ -666,9 +887,9 @@ Pedido sem condição sai com `condicao_pagamento: null`, sem pendência.
 | Número no app | `numero` | App | O número que rep e cliente enxergam (ex.: 14600) |
 | **Número no ERP** | `pedido_erp` | **ERP** | Ex.: `CS17379`, sempre na forma normalizada. Nasce na importação, volta pela confirmação e aparece no app para todo mundo |
 | Situação | `situacao` | App | Ver "Situações do pedido" abaixo |
-| Cliente | `cliente.*` | ERP | Código, CNPJ, razão social, fantasia |
+| Cliente | `cliente.*` | ERP | Código, CNPJ, razão social, fantasia, endereço, inscrição estadual, WhatsApp, e-mail |
 | Representante | `representante_erp` | ERP | Código do rep gravado no cliente |
-| Tabela de preço | `tabela_preco.*` | ERP | Código + coluna da tabela do cliente |
+| Tabela de preço | `tabela_preco.*` | ERP | Código + coluna da tabela do pedido (na falta, a do cliente) |
 | Condição de pagamento | `condicao_pagamento.*` | ERP (código) | Escolhida no app entre as condições do Control; `null` se não escolhida |
 | Desconto | `desconto_percentual` | App | Pontos percentuais (10 = 10%). Preços dos itens SEM desconto; `valor_total` COM. Igual à planilha (AB46) |
 | Total | `valor_total` | App | Com o desconto aplicado |
@@ -716,7 +937,7 @@ fin. → aceita                              (pedido entra na fila da API)
 ERP  → GET /pedidos                        (lê tudo acima)
 ERP  → grava e gera o número               (ex.: CS17379)
 ERP  → POST /pedidos/{id}/confirmar        (o número volta para o app)
-ERP  → fatura e POST /faturamento          (nota, valor, data → carimbo)
+ERP  → fatura e POST /faturamento          (nota, peças, valor, data → carimbo)
 app  → página do cliente vira "Aprovado", painel conta a venda
 ```
 
@@ -732,6 +953,15 @@ As respostas `400 INVALID_PEDIDO_ERP`, `409 ORDER_NOT_APPROVED` e
 `409 ERP_NUMBER_IN_USE` da confirmação entraram em 15/09/2026 como **correção
 de defeito da v1**, antes da primeira chave ser emitida — não é versão nova e
 nenhum programa em produção foi afetado.
+
+No mesmo dia, ainda antes da primeira chave, entrou a **fase 0**: o
+`409 CANAL_FECHADO` por empresa; as rotas `/conciliar`, `/conciliacao` e
+`/pedidos/excluidos`; os campos novos do cliente no pedido e a tabela do
+próprio pedido em `tabela_preco`; no faturamento, `faturado_em` com fuso,
+`valor_faturado` ausente mantendo o gravado, situação exigida, `nota`, `itens`,
+`inalterados` e `avisos`; nos cadastros, campo ausente que não apaga,
+`sem_mudanca`, casamento do representante pelo miolo e o e-mail do
+representante que não troca o login.
 
 ## Dúvidas / suporte
 

@@ -168,6 +168,9 @@ apps/api/src/
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
 │   │                       eventosErp.service.ts → registrarEventoErp (order_erp_events) e
 │   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048
+│   │                       notasDoPedido.service.ts → notas fiscais e peças faturadas (048):
+│   │                       lerNotasDoPedido (GET /orders/:id → `notas`), detectarNotas e
+│   │                       cancelarNotasAtivas (desfazer o faturado pela tela)
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
@@ -175,30 +178,44 @@ apps/api/src/
 │   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
 │   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
 │   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
-│   │                       → 401 PARTNER_UNAUTHORIZED). SEIS rotas (partner.router.ts):
-│   │                         GET  /partner/v1/status
+│   │                       → 401 PARTNER_UNAUTHORIZED). NOVE rotas (partner.router.ts):
+│   │                         GET  /partner/v1/status                 (+ `canais` da empresa)
 │   │                         GET  /partner/v1/pedidos                (a fila que o ERP PUXA)
+│   │                         GET  /partner/v1/pedidos/excluidos      (excluídos com número; livre)
 │   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
+│   │                         POST /partner/v1/pedidos/:id/conciliar  (sent_erp sem número)
+│   │                         GET  /partner/v1/conciliacao            (só contagens; livre)
 │   │                         POST /partner/v1/faturamento            (partner.faturamento.service)
 │   │                         POST /partner/v1/clientes               (partner.sync.service)
 │   │                         POST /partner/v1/representantes         (partner.sync.service)
+│   │                       Canal por empresa (048, lib/canais.ts): pedidos/confirmar/conciliar
+│   │                       exigem canal_pedido_erp='api'; faturamento, canal_faturamento='api';
+│   │                       clientes/representantes, canal_cadastro='api'. Senão 409 CANAL_FECHADO.
 │   │                       É o CANAL OFICIAL com o Control (decisão de 15/09/2026 — ver
 │   │                       _tools/erp-sync/README.md). O contrato vive em docs/API-PARCEIRO.md
 │   │                       e apps/web/public/api-parceiro.html — a MESMA especificação.
 │   │                       partner.log.ts → registrarChamada: cada chamada em erp_sync_log (048);
-│   │                       nunca derruba a resposta; `detalhe` sem dado de cliente
+│   │                       nunca derruba a resposta; `detalhe` sem dado de cliente.
+│   │                       partner.chamada.ts → o resumo que o handler anota em request.partnerLog
+│   │                       e o hook onResponse do router grava (401/503 com company_id nulo)
 │   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
 │   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
 │   └── ia/               → relatório da carteira sob demanda (Anthropic ou OpenAI, por env)
 │
 ├── erp/                  → integração com o ERP (Firebird)
-│   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto)
-│   └── firebird/         → connection, queries, types, erpSyncService
+│   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto). sendOrder
+│   │                       LANÇA (EnvioAoErpDesligadoError): o número vem do Control
+│   └── firebird/         → connection, queries, types, erpSyncService. Além de
+│                           ERP_SYNC_ENABLED, cada parte exige o canal da empresa:
+│                           catálogo/preço/estoque só com canal_catalogo='firebird',
+│                           clientes só com canal_cadastro='firebird' (senão pula; as
+│                           rotas /erp/sync respondem 409 CANAL_FECHADO)
 │
 └── jobs/
     ├── seed.ts           → popula dados de teste (pnpm seed)
-    └── erpSyncScheduler.ts → agenda o sync periódico
+    ├── seedDemoOrders.ts → pedidos de demonstração: exige --empresa=<uuid>, recusa produção
+    └── erpSyncScheduler.ts → agenda o sync periódico (só empresas com canal 'firebird')
 ```
 
 **Padrão de cada módulo (siga sempre este trio):**
@@ -298,6 +315,9 @@ _tools/
 │   │                se faltar). Contradiz o contrato "nada é escrito no seu ERP".
 │   │                VETADO em produção até o Yan decidir com o Fábio. prices/full também
 │   │                estão vetados (upsert de preço duplicado) — ver o README.
+│   │                Trava no código (fase 0): os modos que gravam recusam sem a env
+│   │                ERP_SYNC_PY_LIBERADO=sim NA JANELA do terminal (no .env não vale); o
+│   │                push-orders exige ainda companies.canal_pedido_erp='sync_py'.
 │   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
 ├── SQL-PARA-RODAR-048.sql         → a 048 para colar nos DOIS bancos (termina com o NOTIFY). Conferir
@@ -315,7 +335,10 @@ _tools/
 │                    conferir-046, conferir-048 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
-                 → cargas e consertos pontuais direto no Supabase (fora do app)
+                 → cargas e consertos pontuais direto no Supabase (fora do app).
+                   faturar-retroativo.mjs exige --empresa=<uuid>, é ensaio por padrão
+                   (--aplicar grava) e recusa empresa com canal_faturamento='api'.
+                   apps/api/src/jobs/seedDemoOrders.ts também exige --empresa=<uuid>.
 ```
 
 > `_tools/firebird-reader/` **não existe no disco** (este mapa a listava). O `sync.py:38-42`
