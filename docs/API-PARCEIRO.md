@@ -1404,11 +1404,13 @@ Content-Type: application/json
 recusado: `registro inválido` (não é objeto), `sem código do ERP`,
 `sem razão social`, `código repetido no lote`, `CNPJ repetido no lote`, `código
 com mais de um cadastro no app`, `CNPJ com mais de um cadastro no app`,
-`cadastro já atualizado por outro registro do lote` ou `falha ao gravar: …`.
+`cadastro já atualizado por outro registro do lote`, `CNPJ já é do cliente de
+código X no app` (o CNPJ achou um cadastro que já tem **outro** código: nada é
+gravado — nem nome, nem representante, nem tabela; confira o cadastro
+duplicado no ERP) ou `falha ao gravar: …`.
 `avisos` traz, em texto, o que passou mas merece conferência: tabelas de preço
 não encontradas (ou nenhuma tabela com código do ERP, ou código usado por mais
-de uma tabela), clientes casados pelo CNPJ, CNPJ casado com um cadastro que já
-tem **outro** código (o código não é reescrito), código de representante sem
+de uma tabela), clientes casados pelo CNPJ, código de representante sem
 login no app ou gravado numa grafia diferente da do login, valores de
 `bloqueado`, `limite_credito` ou `pendencia_financeira` não entendidos,
 `data_update` sem fuso e campos que a instalação ainda não guarda.

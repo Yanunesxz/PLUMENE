@@ -28,7 +28,9 @@
  * miolo (`codigoMiolo`, de @csb/shared — "#2225", "2225" e "02225" são o mesmo
  * cadastro). Cliente que nasceu no app não tem código: o Control cria o cadastro
  * lá, manda o mesmo CNPJ com o código, e o cadastro daqui APRENDE o código. Quem
- * já tem código nunca tem o código reescrito. O índice único de
+ * já tem código nunca tem o código reescrito — e o registro cujo CNPJ acha um
+ * cadastro de OUTRO código é recusado inteiro (não troca nome, carteira nem
+ * tabela de outro cliente). O índice único de
  * `customers(company_id, erp_id)` é exato, então o upsert é feito por mapa
  * (busca os existentes, decide update ou insert) — não por `onConflict`.
  *
@@ -521,7 +523,6 @@ export async function receberClientes(
   const bloqueiosInvalidos = new Set<string>();
   const codigosDeRepresentante = new Set<string>();
   const cnpjAmbiguo = new Set<string>();
-  const codigoDivergente = new Set<string>();
   let camposQuePrecisamDa041 = false;
   let camposQuePrecisamDa049 = false;
   let algumaTabelaVeio = false;
@@ -589,6 +590,16 @@ export async function receberClientes(
       }
       existente = porMiolo.get(miolo);
     }
+    const mioloGravado = existente ? codigoMiolo(existente.erp_id) : null;
+    // O CNPJ achou um cadastro que JÁ TEM OUTRO código: não é este cliente para
+    // o app. Aplicar o registro trocaria nome, representante (a carteira, que o
+    // CRM lê) e tabela de outro código — e, com dois códigos do mesmo CNPJ no
+    // Control, o cliente mudaria de dono a cada lote conforme o registro que
+    // chegasse (revisão de 16/09/2026). Nada é gravado; o Control confere.
+    if (existente && mioloGravado && mioloGravado !== miolo) {
+      ignorados.push({ codigo, motivo: `CNPJ já é do cliente de código ${String(existente.erp_id)} no app` });
+      continue;
+    }
     // Um cadastro é alvo de UM registro do lote: dois registros (um pelo CNPJ,
     // outro pelo código) apontando para a mesma linha seriam dois updates brigando.
     if (existente) {
@@ -598,13 +609,8 @@ export async function receberClientes(
       }
       alvosNoLote.add(existente.id);
     }
-    const mioloGravado = existente ? codigoMiolo(existente.erp_id) : null;
-    // Quem não tinha código aprende o do Control; quem tem, mantém — o código
-    // que chega diferente vira aviso, nunca reescrita.
+    // Quem não tinha código aprende o do Control; quem tem, é o mesmo código.
     const adotado = existente !== undefined && !mioloGravado;
-    if (existente && mioloGravado && mioloGravado !== miolo) {
-      codigoDivergente.add(`${codigo} (no app: ${String(existente.erp_id)})`);
-    }
 
     // Só entram as chaves que vieram. `name` sempre vem (é obrigatório).
     const pedido: Record<string, unknown> = { name: nome };
@@ -858,11 +864,6 @@ export async function receberClientes(
   if (cnpjAmbiguo.size > 0) {
     avisos.push(
       `CNPJ com mais de um cadastro no app — o registro foi para o que tem este código, ou para o que não tem código; confira os outros: ${listar(cnpjAmbiguo)}.`,
-    );
-  }
-  if (codigoDivergente.size > 0) {
-    avisos.push(
-      `CNPJ casado com um cadastro que já tem OUTRO código no app — o código gravado não foi mexido; confira qual é o certo: ${listar(codigoDivergente)}.`,
     );
   }
 

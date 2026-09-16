@@ -2012,7 +2012,9 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             (<code>#2225</code>, <code>2225</code> e <code>02225</code> são o
             mesmo cadastro). Cliente achado pelo CNPJ <b>sem código</b> recebe o
             código que veio; cliente que já tem código <b>nunca</b> tem o código
-            reescrito (código diferente vira aviso). Dois registros do mesmo lote
+            reescrito — e, se o CNPJ achar um cadastro com <b>outro</b> código, o
+            registro volta em <code>ignorados</code> sem gravar nada (nem nome,
+            nem representante, nem tabela). Dois registros do mesmo lote
             com o mesmo miolo ou o mesmo CNPJ: vale o primeiro, o segundo volta em
             <code>ignorados</code> (<code>código repetido no lote</code> /
             <code>CNPJ repetido no lote</code>).</li>
@@ -2242,12 +2244,13 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <code>código repetido no lote</code>, <code>CNPJ repetido no
             lote</code>, <code>código com mais de um cadastro no app</code>,
             <code>CNPJ com mais de um cadastro no app</code>, <code>cadastro já
-            atualizado por outro registro do lote</code> ou <code>falha ao
-            gravar: …</code>. <code>avisos</code> traz, em texto, o que passou mas
-            merece conferência: tabelas de preço não encontradas (ou nenhuma
-            tabela com código do ERP, ou código usado por mais de uma tabela),
-            clientes casados pelo CNPJ, CNPJ casado com um cadastro que já tem
-            <b>outro</b> código (o código não é reescrito), código de
+            atualizado por outro registro do lote</code>, <code>CNPJ já é do
+            cliente de código X no app</code> (o CNPJ achou um cadastro que já tem
+            <b>outro</b> código: nada é gravado; confira o cadastro duplicado no
+            ERP) ou <code>falha ao gravar: …</code>. <code>avisos</code> traz, em
+            texto, o que passou mas merece conferência: tabelas de preço não
+            encontradas (ou nenhuma tabela com código do ERP, ou código usado por
+            mais de uma tabela), clientes casados pelo CNPJ, código de
             representante sem login no app ou gravado numa grafia diferente da do
             login, valores de <code>bloqueado</code>, <code>limite_credito</code>,
             <code>pendencia_financeira</code> ou <code>titulos_vencidos</code> não

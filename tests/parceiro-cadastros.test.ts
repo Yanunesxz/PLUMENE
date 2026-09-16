@@ -797,16 +797,14 @@ describe('clientes', () => {
 // ─── O CNPJ é a chave (decisão de 16/09/2026) ────────────────────────────────
 
 describe('clientes — o CNPJ é a chave entre os sistemas', () => {
-  it('casa PRIMEIRO pelo CNPJ: o cliente com outro código no app é atualizado, o código gravado fica e avisa', async () => {
-    // O Control e o app discordam do código: o CNPJ decide qual é o cadastro,
-    // e o código de quem já tem código nunca é reescrito — vira aviso.
+  it('casa PRIMEIRO pelo CNPJ: o mesmo código no cadastro achado pelo CNPJ é atualizado, mesmo com outro código no app para outro CNPJ', async () => {
     const { service, fake } = await carregar({
       price_tables: { data: [], error: null },
       customers: [
         {
           data: [
             { id: 'pelo-cnpj', erp_id: '00111', name: 'ANTIGO', cnpj: '00.000.000/0001-00' },
-            { id: 'pelo-codigo', erp_id: '00222', name: 'OUTRA LOJA', cnpj: '00.000.000/0002-00' },
+            { id: 'outro', erp_id: '00222', name: 'OUTRA LOJA', cnpj: '00.000.000/0002-00' },
           ],
           error: null,
         },
@@ -815,16 +813,40 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
     });
 
     const r = await service.receberClientes(EMPRESA, [
-      { codigo: '222', razao_social: 'LOJA RENOMEADA', cnpj_cpf: '00000000000100' },
+      { codigo: '#111', razao_social: 'LOJA RENOMEADA', cnpj_cpf: '00000000000100' },
     ]);
 
     expect(r).toMatchObject({ criados: 0, atualizados: 1, ignorados: [] });
-    const filtroPorId = fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id');
-    expect(filtroPorId?.args[1]).toBe('pelo-cnpj');
+    expect(fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id')?.args[1]).toBe('pelo-cnpj');
     const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
     expect(patch['name']).toBe('LOJA RENOMEADA');
     expect('erp_id' in patch).toBe(false);
-    expect(r.avisos.some((a) => a.includes('OUTRO código') && a.includes('222') && a.includes('00111'))).toBe(true);
+  });
+
+  it('CNPJ que já é de um cliente com OUTRO código: nada é gravado — nem nome, nem carteira, nem tabela', async () => {
+    // Dois códigos do mesmo CNPJ no Control (cadastro duplicado lá): aplicar o
+    // registro trocaria o representante e a tabela do cliente do app a cada
+    // lote, conforme o registro que chegasse.
+    const { service, fake } = await carregar({
+      price_tables: { data: [{ id: 't-9', erp_code: '00009' }], error: null },
+      customers: [
+        {
+          data: [
+            { id: 'da-carteira', erp_id: '00111', name: 'LOJA A', cnpj: '00.000.000/0001-00', rep_erp_id: '00779', price_table_id: 't-1' },
+          ],
+          error: null,
+        },
+        OK,
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '222', razao_social: 'LOJA A FILIAL', cnpj_cpf: '00000000000100', representante: '00888', tabela_preco: '9' },
+    ]);
+
+    expect(r).toMatchObject({ criados: 0, atualizados: 0, sem_mudanca: 0 });
+    expect(r.ignorados).toEqual([{ codigo: '222', motivo: 'CNPJ já é do cliente de código 00111 no app' }]);
+    expect(fake.gravacoes).toEqual([]);
   });
 
   it('cliente que NASCEU no app (sem código) recebe o código que vier, casado pelo CNPJ', async () => {
@@ -904,7 +926,7 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
     expect(outro.fake.gravacoes).toEqual([]);
   });
 
-  it('dois registros do lote apontando para o mesmo cadastro (um pelo CNPJ, outro pelo código): vale o primeiro', async () => {
+  it('dois registros do lote para o mesmo cadastro (um pelo CNPJ com outro código, outro pelo código): só o do código grava', async () => {
     const { service, fake } = await carregar({
       price_tables: { data: [], error: null },
       customers: [{ data: [{ id: 'c-1', erp_id: '00001', name: 'A', cnpj: '00000000000191' }], error: null }, OK],
@@ -915,8 +937,10 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
       { codigo: '1', razao_social: 'PELO CODIGO' },
     ]);
 
-    expect(r.ignorados).toEqual([{ codigo: '1', motivo: 'cadastro já atualizado por outro registro do lote' }]);
-    expect(fake.gravacoes.filter((g) => g.operacao === 'update')).toHaveLength(1);
+    expect(r.ignorados).toEqual([{ codigo: '500', motivo: 'CNPJ já é do cliente de código 00001 no app' }]);
+    const updates = fake.gravacoes.filter((g) => g.operacao === 'update');
+    expect(updates).toHaveLength(1);
+    expect(valoresDe(updates[0])['name']).toBe('PELO CODIGO');
   });
 
   it('motivo_bloqueio vai para block_reason (001); ausente não mexe, null limpa', async () => {
