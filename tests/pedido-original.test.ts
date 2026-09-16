@@ -1,5 +1,13 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { compararComOOriginal, type ItemDaFoto } from '@csb/shared';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import {
+  compararComOOriginal,
+  compararOriginalComNotas,
+  itensDasNotasAtivas,
+  lerFaturamentoDoPedido,
+  type ItemDaFoto,
+  type ItemDaNota,
+  type NotaDoPedido,
+} from '@csb/shared';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
 import { esquecerDeteccoes } from '../apps/api/src/lib/detectarColuna.js';
 
@@ -86,6 +94,9 @@ const PEDIDO = { id: 'o1', company_id: 'empresa-1', status: 'approved' as const 
 beforeEach(() => {
   vi.resetModules();
   esquecerDeteccoes();
+});
+afterEach(() => {
+  vi.doUnmock('../apps/api/src/config/supabase.js');
 });
 
 describe('guardarOriginal', () => {
@@ -190,5 +201,232 @@ describe('compararComOOriginal — corte separado de troca de preço', () => {
     const d = compararComOOriginal(iguais, [...iguais]);
     expect(d.mudou).toBe(false);
     expect(d.valorReprecificado).toBe(0);
+  });
+});
+
+/**
+ * O corte feito DENTRO do Control (048): as peças que cada nota levou.
+ *
+ * O carimbo manual não muda os itens do app, então o cartão comparava o
+ * original com ele mesmo e afirmava "nenhuma peça foi cortada" sem saber.
+ * Quando o Control manda os itens da nota, a coluna "Faturado" passa a ser o
+ * que as notas ativas levaram.
+ */
+const pecaDaFoto = (
+  product_id: string,
+  sku: string,
+  variant_id: string,
+  size: string,
+  quantity: number,
+  unit_price = 10,
+): ItemDaFoto =>
+  peca({
+    product_id,
+    variant_id,
+    quantity,
+    unit_price,
+    total: quantity * unit_price,
+    product: { sku, name: 'PEÇA TESTE' },
+    variant: { size },
+  });
+
+const itemDaNota = (p: Partial<ItemDaNota> & { produto: string; tamanho: string; quantidade: number }): ItemDaNota => ({
+  variant_id: null,
+  preco_unitario: null,
+  ...p,
+});
+
+const nota = (itens: ItemDaNota[], extra: Partial<NotaDoPedido> = {}): NotaDoPedido => ({
+  numero: '000123',
+  serie: '1',
+  emitida_em: '2026-08-13T17:02:00+00:00',
+  valor: null,
+  cancelada_em: null,
+  itens,
+  ...extra,
+});
+
+describe('compararOriginalComNotas — o que as notas levaram', () => {
+  const ORIGINAL = [
+    pecaDaFoto('p1', '0124', 'v-m', 'M', 12, 24.9),
+    pecaDaFoto('p2', '0703', 'v-g', 'G', 6, 28.5),
+  ];
+
+  it('casa pela variante e mostra a peça cortada no Control', () => {
+    const d = compararOriginalComNotas(ORIGINAL, [
+      itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 8 }),
+      itemDaNota({ produto: '0703', tamanho: 'G', variant_id: 'v-g', quantidade: 6 }),
+    ]);
+
+    expect(d.pecasAntes).toBe(18);
+    expect(d.pecasDepois).toBe(14);
+    expect(d.linhas).toHaveLength(1);
+    expect(d.linhas[0]).toMatchObject({ ref: '0124', tamanho: 'M', antes: 12, depois: 8, valor: 99.6 });
+    expect(d.valorQueSaiu).toBe(99.6);
+  });
+
+  it('sem variante, casa pelo par produto/tamanho — "124" e "0124" são a mesma referência', () => {
+    const d = compararOriginalComNotas(ORIGINAL, [
+      itemDaNota({ produto: '124', tamanho: 'm', quantidade: 12 }),
+      itemDaNota({ produto: '0703', tamanho: 'G', quantidade: 2 }),
+    ]);
+
+    expect(d.linhas).toEqual([
+      expect.objectContaining({ ref: '0703', tamanho: 'G', antes: 6, depois: 2, valor: 114 }),
+    ]);
+  });
+
+  it('referência que a nota não levou aparece com zero', () => {
+    const d = compararOriginalComNotas(ORIGINAL, [itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12 })]);
+
+    expect(d.linhas).toEqual([expect.objectContaining({ ref: '0703', antes: 6, depois: 0 })]);
+  });
+
+  it('peça que só a nota tem entra com o código do Control', () => {
+    const d = compararOriginalComNotas(ORIGINAL, [
+      itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12 }),
+      itemDaNota({ produto: '0703', tamanho: 'G', quantidade: 6 }),
+      itemDaNota({ produto: '0999', tamanho: 'P', quantidade: 1, preco_unitario: 15 }),
+    ]);
+
+    expect(d.linhas).toEqual([expect.objectContaining({ ref: '0999', tamanho: 'P', antes: 0, depois: 1, valor: -15 })]);
+  });
+
+  it('preço da nota diferente do original vai para a reprecificação, não para o corte', () => {
+    const d = compararOriginalComNotas(ORIGINAL, [
+      itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12, preco_unitario: 23.9 }),
+      itemDaNota({ produto: '0703', tamanho: 'G', quantidade: 6 }),
+    ]);
+
+    expect(d.mudou).toBe(false);
+    expect(d.valorReprecificado).toBe(-12);
+  });
+
+  it('nota cancelada não conta', () => {
+    const itens = itensDasNotasAtivas([
+      nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12 })], { cancelada_em: '2026-08-14T12:00:00Z' }),
+      nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 5 })], { numero: '000124' }),
+    ]);
+    expect(itens).toHaveLength(1);
+    expect(itens[0]?.quantidade).toBe(5);
+  });
+});
+
+describe('lerFaturamentoDoPedido — o que o cartão pode afirmar', () => {
+  const ORIGINAL = [pecaDaFoto('p1', '0124', 'v-m', 'M', 10, 20)];
+  const base = { original: ORIGINAL, itensAtuais: ORIGINAL, totalAtual: 200 };
+
+  it('faturado sem itens de nota e sem valor da nota: NUNCA "nenhuma peça foi cortada"', () => {
+    const l = lerFaturamentoDoPedido({ ...base, faturado: true, invoicedTotal: null, notas: [] });
+
+    expect(l.situacao).toBe('sem_detalhe');
+    expect(l.semDetalheDoControl).toBe(true);
+    expect(l.mostrar).toBe(true);
+    expect(l.rotuloDaDireita).toBe('Pedido no app');
+  });
+
+  it('só nota cancelada também é "sem detalhe"', () => {
+    const l = lerFaturamentoDoPedido({
+      ...base,
+      faturado: true,
+      notas: [nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 10 })], { cancelada_em: '2026-08-14T12:00:00Z', valor: 200 })],
+    });
+
+    expect(l.situacao).toBe('sem_detalhe');
+  });
+
+  it('com os itens da nota, a coluna "Faturado" é o que a nota levou e o corte aparece', () => {
+    const l = lerFaturamentoDoPedido({
+      ...base,
+      faturado: true,
+      notas: [nota([itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 7 })], { valor: 140 })],
+    });
+
+    expect(l.fonte).toBe('notas');
+    expect(l.rotuloDaDireita).toBe('Faturado');
+    expect(l.diferenca.pecasDepois).toBe(7);
+    expect(l.diferenca.linhas[0]).toMatchObject({ antes: 10, depois: 7, valor: 60 });
+    expect(l.valorDaNota).toBe(140);
+    expect(l.diferencaDaNota).toBe(60);
+    expect(l.situacao).toBe('mudou');
+  });
+
+  it('itens da nota iguais ao original: aí sim "faturado igual ao original"', () => {
+    const l = lerFaturamentoDoPedido({
+      ...base,
+      faturado: true,
+      notas: [nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 10 })], { valor: 200 })],
+    });
+
+    expect(l.situacao).toBe('igual');
+    expect(l.semDetalheDoControl).toBe(false);
+  });
+
+  it('só o valor da nota (027), igual ao pedido, sustenta o "igual"', () => {
+    const l = lerFaturamentoDoPedido({ ...base, faturado: true, invoicedTotal: 200 });
+
+    expect(l.fonte).toBe('pedido');
+    expect(l.situacao).toBe('igual');
+  });
+
+  it('pedido ainda não faturado e intacto: o cartão não aparece', () => {
+    const l = lerFaturamentoDoPedido({ ...base, faturado: false });
+
+    expect(l.mostrar).toBe(false);
+    expect(l.rotuloDaDireita).toBe('Hoje');
+  });
+});
+
+describe('lerNotasDoPedido — as notas no detalhe do pedido', () => {
+  async function carregarNotas(respostas: Record<string, RespostaTabela | RespostaTabela[]>) {
+    const fake = criarSupabaseFake(respostas);
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    const mod = await import('../apps/api/src/modules/orders/notasDoPedido.service.js');
+    return { ...mod, fake };
+  }
+
+  it('devolve as notas com as peças, filtrando pela empresa', async () => {
+    const { lerNotasDoPedido, fake } = await carregarNotas({
+      order_invoices: [
+        { data: [], error: null }, // detecção: a 048 rodou
+        { data: null, error: null },
+        {
+          data: [
+            {
+              numero: '000123',
+              serie: '1',
+              emitida_em: '2026-08-13T17:02:00+00:00',
+              valor: '150.00',
+              cancelada_em: null,
+              itens: [{ produto: '0124', tamanho: 'M', variant_id: 'v1', quantidade: 4, preco_unitario: '24.90' }],
+            },
+          ],
+          error: null,
+        },
+      ],
+      order_invoice_items: { data: [], error: null },
+    });
+
+    const notas = await lerNotasDoPedido('o1', 'empresa-1');
+
+    expect(notas).toEqual([
+      {
+        numero: '000123',
+        serie: '1',
+        emitida_em: '2026-08-13T17:02:00+00:00',
+        valor: 150,
+        cancelada_em: null,
+        itens: [{ produto: '0124', tamanho: 'M', variant_id: 'v1', quantidade: 4, preco_unitario: 24.9 }],
+      },
+    ]);
+    expect(fake.filtrosDe('order_invoices', 'eq').map((f) => f.args)).toContainEqual(['company_id', 'empresa-1']);
+  });
+
+  it('sem a 048, lista vazia (e o detalhe do pedido segue como antes)', async () => {
+    const { lerNotasDoPedido } = await carregarNotas({
+      order_invoices: { data: null, error: { message: 'relation "order_invoices" does not exist', code: '42P01' } },
+    });
+
+    expect(await lerNotasDoPedido('o1', 'empresa-1')).toEqual([]);
   });
 });

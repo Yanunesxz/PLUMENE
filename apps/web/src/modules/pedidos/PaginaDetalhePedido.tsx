@@ -124,9 +124,14 @@ export function PaginaDetalhePedido() {
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
-  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) =>
-    setToast({ message: mensagem, type: erro ? 'error' : 'success' }),
-  );
+  // A última recusa da API, com as palavras dela — o diálogo do lançamento
+  // mostra o motivo real (número repetido, canal na API) em vez de um genérico.
+  const ultimaRecusa = useRef<string | null>(null);
+  const lerUltimaRecusa = (): string | null => ultimaRecusa.current;
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) => {
+    if (erro) ultimaRecusa.current = mensagem;
+    setToast({ message: mensagem, type: erro ? 'error' : 'success' });
+  });
 
   // Quem abre um pedido parado quer decidir ali mesmo — obrigar a voltar para
   // uma lista para apertar o botão é o tipo de caminho que ninguém descobre.
@@ -172,8 +177,9 @@ export function PaginaDetalhePedido() {
     // Só fecha quando deu certo. Se a API recusa (número repetido, formato), o
     // diálogo fica aberto COM o que ela digitou — jogar o número fora e
     // reabrir com a sugestão de novo é o caminho curto para carimbar o errado.
+    ultimaRecusa.current = null;
     if (await handleDecisao('sent_erp', { erp_order_id: numeroErp })) setLancando(false);
-    else setErroDoLancamento('O número não foi aceito — confira no Control e tente de novo.');
+    else setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
   };
 
   // ─── Corrigir o número do Control (financeiro/admin, antes da nota) ────────
@@ -812,8 +818,14 @@ export function PaginaDetalhePedido() {
         token,
       );
       mudarPedido((atual) => ({ ...atual, invoiced: !!res.data.invoiced, invoiced_at: res.data.invoiced_at ?? null }));
-    } catch {
-      /* mantém estado anterior */
+    } catch (err) {
+      // Mantém o estado anterior, mas DIZ por quê: com o faturamento vindo do
+      // Control pela integração, o botão é recusado e quem clicou precisa saber
+      // que não foi falha de rede.
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível marcar o faturamento.',
+        type: 'error',
+      });
     } finally {
       setInvoicing(false);
     }
@@ -1153,6 +1165,7 @@ export function PaginaDetalhePedido() {
               totalAtual={order.total}
               invoicedTotal={order.invoiced_total}
               faturado={!!order.invoiced}
+              notas={order.notas}
             />
           )}
 

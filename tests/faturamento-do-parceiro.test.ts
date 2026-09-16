@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { valorDaVenda } from '@csb/shared';
-import { criarSupabaseFake } from './supabaseFake.js';
+import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
 
 /**
  * A mão do faturamento na API de Parceiro.
@@ -14,7 +14,10 @@ import { criarSupabaseFake } from './supabaseFake.js';
  *   1. um parceiro nunca fatura pedido de outra fábrica;
  *   2. cancelamento limpa o valor junto — senão o painel somaria nota morta;
  *   3. valor zerado ou negativo é recusado, nunca gravado;
- *   4. a rota aguenta rodar antes da migração 027.
+ *   4. a rota aguenta rodar antes da migração 027;
+ *   5. (fase 0) reenviar é seguro: ausente mantém, nada mudou não grava;
+ *   6. (fase 0) momento sem fuso e pedido não aprovado são recusados;
+ *   7. (fase 0) a nota e as peças que ela levou ficam guardadas (048).
  */
 
 const EMPRESA = 'empresa-1';
@@ -31,6 +34,10 @@ beforeEach(() => {
 });
 afterEach(() => {
   vi.doUnmock('../apps/api/src/config/supabase.js');
+  vi.doUnmock('../apps/api/src/lib/detectarColuna.js');
+  vi.doUnmock('../apps/api/src/modules/orders/pedidoOriginal.service.js');
+  vi.doUnmock('../apps/api/src/modules/orders/orders.service.js');
+  vi.doUnmock('../apps/api/src/modules/push/push.avisos.js');
 });
 
 describe('o ERP informa o que faturou', () => {
@@ -38,7 +45,7 @@ describe('o ERP informa o que faturou', () => {
     const { receberFaturamento, fake } = await servico({
       orders: [
         { data: [{ invoiced_total: null }], error: null }, // detector da 027
-        { data: { id: 'o1', invoiced: false, total: 1000 }, error: null },
+        { data: { id: 'o1', invoiced: false, total: 1000, status: 'approved' }, error: null },
       ],
     });
 
@@ -57,7 +64,7 @@ describe('o ERP informa o que faturou', () => {
     const { receberFaturamento, fake } = await servico({
       orders: [
         { data: [{ invoiced_total: null }], error: null },
-        { data: { id: 'o1', invoiced: false, total: 100 }, error: null },
+        { data: { id: 'o1', invoiced: false, total: 100, status: 'approved' }, error: null },
       ],
     });
 
@@ -73,7 +80,7 @@ describe('o ERP informa o que faturou', () => {
     const { receberFaturamento, fake } = await servico({
       orders: [
         { data: [{ invoiced_total: null }], error: null },
-        { data: { id: 'o1', invoiced: true, total: 100 }, error: null },
+        { data: { id: 'o1', invoiced: true, total: 100, status: 'approved' }, error: null },
       ],
     });
 
@@ -89,7 +96,7 @@ describe('o ERP informa o que faturou', () => {
     const { receberFaturamento } = await servico({
       orders: [
         { data: [{ invoiced_total: null }], error: null },
-        { data: { id: 'o1', invoiced: false, total: 100 }, error: null },
+        { data: { id: 'o1', invoiced: false, total: 100, status: 'approved' }, error: null },
       ],
     });
 
@@ -102,7 +109,7 @@ describe('o ERP informa o que faturou', () => {
     const { receberFaturamento } = await servico({
       orders: [
         { data: [{ invoiced_total: null }], error: null },
-        { data: { id: 'o1', invoiced: false, total: 100 }, error: null },
+        { data: { id: 'o1', invoiced: false, total: 100, status: 'approved' }, error: null },
       ],
     });
 
@@ -135,7 +142,7 @@ describe('o ERP informa o que faturou', () => {
       orders: [
         // Detector: a coluna ainda não existe.
         { data: null, error: { message: 'column orders.invoiced_total does not exist' } },
-        { data: { id: 'o1', invoiced: false, total: 100 }, error: null },
+        { data: { id: 'o1', invoiced: false, total: 100, status: 'approved' }, error: null },
       ],
     });
 
@@ -169,7 +176,7 @@ describe('o ERP informa o que faturou', () => {
  * api-parceiro.html): o parser do Fábio decide por eles. Texto exato, com acento.
  */
 describe('os seis motivos de ignorado, letra por letra', () => {
-  const PEDIDO = { data: { id: 'o1', invoiced: false, total: 100 }, error: null };
+  const PEDIDO = { data: { id: 'o1', invoiced: false, total: 100, status: 'approved' }, error: null };
   const SONDA = { data: [{ invoiced_total: null }], error: null };
   // Linha de enchimento: o dublê pré-busca a próxima resposta a cada consulta.
   // No "erro ao gravar" a foto da 044 (guardarOriginal) também lê `orders`.
@@ -210,5 +217,549 @@ describe('quanto o pedido vale como venda', () => {
 
   it('pedido sem total nenhum vale zero, não NaN', () => {
     expect(valorDaVenda({})).toBe(0);
+  });
+});
+
+// ─── Fase 0: reenvio seguro, fuso, situação, notas e peças ───────────────────
+
+/**
+ * O serviço com as sondas de schema, a foto da 044, a última compra e o push
+ * trocados por dublês — assim cada teste registra só as respostas das
+ * consultas que importam, e confere o que foi chamado e em que ordem.
+ */
+async function servicoDaFase0(
+  respostas: Record<string, RespostaTabela | RespostaTabela[]>,
+  opcoes: { ausentes?: string[]; avisoLanca?: boolean; soluco?: string[] } = {},
+) {
+  const fake = criarSupabaseFake(respostas);
+  const ausentes = new Set(opcoes.ausentes ?? []);
+  /** Sondas em que o banco "não respondeu": `detectar` diz não, `detectarOuFalhar` lança. */
+  const soluco = new Set(opcoes.soluco ?? []);
+  const chave = (tabela: string, coluna?: string) => (coluna ? `${tabela}.${coluna}` : tabela);
+  const existe = (tabela: string, coluna?: string) =>
+    !ausentes.has(chave(tabela, coluna)) && !soluco.has(chave(tabela, coluna));
+  const chamadas = {
+    /** Quantas gravações já tinham acontecido quando a foto da 044 foi pedida. */
+    original: [] as number[],
+    compra: [] as unknown[][],
+    aviso: [] as unknown[][],
+  };
+
+  vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+  vi.doMock('../apps/api/src/lib/detectarColuna.js', () => ({
+    detectar: async (t: string, c?: string) => existe(t, c),
+    detectarOuFalhar: async (t: string, c?: string) => {
+      if (soluco.has(chave(t, c))) throw new Error(`Falha ao sondar ${chave(t, c)}: o banco não respondeu sobre o schema`);
+      return existe(t, c);
+    },
+    detectarComCerteza: async (t: string, c?: string) =>
+      soluco.has(chave(t, c)) ? 'nao_sei' : existe(t, c) ? 'existe' : 'nao_existe',
+    esquecerDeteccoes: () => undefined,
+  }));
+  vi.doMock('../apps/api/src/modules/orders/pedidoOriginal.service.js', () => ({
+    guardarOriginal: async () => {
+      chamadas.original.push(fake.gravacoes.length);
+      return 'guardada';
+    },
+    lerOriginal: async () => null,
+  }));
+  vi.doMock('../apps/api/src/modules/orders/orders.service.js', () => ({
+    registrarCompraDoCliente: async (...args: unknown[]) => {
+      chamadas.compra.push(args);
+    },
+  }));
+  vi.doMock('../apps/api/src/modules/push/push.avisos.js', () => ({
+    avisarFaturadoAoRep: (...args: unknown[]) => {
+      chamadas.aviso.push(args);
+      if (opcoes.avisoLanca) throw new Error('push fora do ar');
+    },
+  }));
+
+  const mod = await import('../apps/api/src/modules/partner/partner.faturamento.service.js');
+  return { ...mod, fake, chamadas };
+}
+
+/**
+ * Fila de respostas para várias consultas seguidas na MESMA tabela: o dublê
+ * adianta uma resposta a cada consulta, então entre duas respostas vai uma
+ * linha de enchimento.
+ */
+function fila(...respostas: RespostaTabela[]): RespostaTabela[] {
+  return respostas.flatMap((r, i) => (i === 0 ? [r] : [{ data: null, error: null }, r]));
+}
+
+const NADA: RespostaTabela = { data: null, error: null };
+
+/** Pedido fictício aprovado e ainda não faturado. */
+const APROVADO = {
+  id: 'o1',
+  status: 'approved',
+  invoiced: false,
+  invoiced_at: null,
+  invoiced_total: null,
+  customer_id: 'cliente-teste',
+  order_number: 14600,
+  rep_id: 'rep-teste',
+  guest_name: null,
+};
+
+/** O mesmo pedido já faturado pelo ERP: 13/08 às 14:02 em Brasília, R$ 870,50. */
+const FATURADO = {
+  ...APROVADO,
+  invoiced: true,
+  invoiced_at: '2026-08-13T17:02:00+00:00',
+  invoiced_total: 870.5,
+};
+
+const pedidoNoBanco = (p: Record<string, unknown>): RespostaTabela => ({ data: p, error: null });
+
+function updateDoPedido(fake: { ultimaGravacao: (t: string, o?: 'update') => { valores: unknown } | undefined }) {
+  return fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown> | undefined;
+}
+
+function eventos(fake: { gravacoes: Array<{ tabela: string; operacao: string; valores: unknown }> }) {
+  return fake.gravacoes
+    .filter((g) => g.tabela === 'order_erp_events' && g.operacao === 'insert')
+    .map((g) => g.valores as Record<string, unknown>);
+}
+
+describe('reenviar é seguro: ausente mantém, nada mudou não grava', () => {
+  it('reenvio idêntico não grava nada e conta em "inalterados"', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({ orders: pedidoNoBanco(FATURADO) });
+
+    const r = await receberFaturamento(EMPRESA, [
+      { pedido_erp: 'ZZ0000001', faturado_em: '2026-08-13T14:02:00-03:00', valor_faturado: 870.5 },
+    ]);
+
+    expect(r).toMatchObject({ recebidos: 1, atualizados: 0, inalterados: 1, ignorados: [] });
+    expect(fake.gravacoes).toEqual([]);
+    expect(chamadas.original).toEqual([]);
+    expect(chamadas.compra).toEqual([]);
+    expect(chamadas.aviso).toEqual([]);
+  });
+
+  it('reenvio só com o número, em pedido já faturado, também é inalterado', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(FATURADO) });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001' }]);
+
+    expect(r.inalterados).toBe(1);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('valor novo sem "faturado_em": grava só o valor, a data da nota fica', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({ orders: pedidoNoBanco(FATURADO) });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', valor_faturado: 800 }], {
+      parceiro: 'Control Teste',
+    });
+
+    expect(r.atualizados).toBe(1);
+    const gravado = updateDoPedido(fake)!;
+    expect(Object.keys(gravado).sort()).toEqual(['invoiced_total', 'updated_at']);
+    expect(gravado['invoiced_total']).toBe(800);
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['faturamento_alterado']);
+    expect(eventos(fake)[0]).toMatchObject({ origem: 'api', parceiro: 'Control Teste', order_id: 'o1' });
+    // Não é compra nova nem notícia nova.
+    expect(chamadas.compra).toEqual([]);
+    expect(chamadas.aviso).toEqual([]);
+  });
+
+  it('"valor_faturado": null explícito limpa o valor (e não mexe na data)', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(FATURADO) });
+
+    await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', valor_faturado: null }]);
+
+    const gravado = updateDoPedido(fake)!;
+    expect(gravado['invoiced_total']).toBeNull();
+    expect('invoiced_at' in gravado).toBe(false);
+  });
+
+  it('pedido ainda não faturado sem "faturado_em" fatura agora', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+    const antes = Date.now();
+
+    await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001' }]);
+
+    const gravado = updateDoPedido(fake)!;
+    expect(gravado['invoiced']).toBe(true);
+    expect(Date.parse(String(gravado['invoiced_at']))).toBeGreaterThanOrEqual(antes - 1000);
+    // Valor ausente em pedido novo: não manda a coluna.
+    expect('invoiced_total' in gravado).toBe(false);
+  });
+});
+
+describe('momento com fuso e só pedido aprovado ou enviado ao ERP', () => {
+  it.each(['2026-08-13T14:02:00', '2026-08-13'])('"%s" sem fuso é recusado', async (faturado_em) => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', faturado_em }]);
+
+    expect(r.ignorados).toEqual([
+      { pedido: 'ZZ0000001', motivo: '"faturado_em" precisa de fuso (Z ou -03:00)' },
+    ]);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it.each(['2026-08-13T17:02:00Z', '2026-08-13T14:02:00-03:00', '2026-08-13T14:02:00.000-03:00'])(
+    '"%s" passa',
+    async (faturado_em) => {
+      const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+
+      const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', faturado_em }]);
+
+      expect(r.atualizados).toBe(1);
+      expect(updateDoPedido(fake)!['invoiced_at']).toBe(faturado_em);
+    },
+  );
+
+  it.each(['draft', 'pending_approval', 'rejected'])('pedido "%s" é ignorado com a situação', async (status) => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco({ ...APROVADO, status }) });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001' }]);
+
+    expect(r.ignorados).toEqual([
+      { pedido: 'ZZ0000001', motivo: 'pedido não está aprovado nem enviado ao ERP', situacao: status },
+    ]);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('pedido enviado ao ERP fatura', async () => {
+    const { receberFaturamento } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...APROVADO, status: 'sent_erp' }),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001' }]);
+
+    expect(r.atualizados).toBe(1);
+  });
+});
+
+describe('a transição para faturado', () => {
+  it('empurra a última compra pelo DIA de Brasília, avisa o representante uma vez e deixa rastro', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+
+    // 01:30 de 14/08 em UTC = 22:30 de 13/08 em São Paulo.
+    await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', faturado_em: '2026-08-14T01:30:00Z' }], {
+      parceiro: 'Control Teste',
+    });
+
+    expect(chamadas.compra).toEqual([['cliente-teste', '2026-08-13', EMPRESA]]);
+    expect(chamadas.aviso).toEqual([
+      [EMPRESA, { id: 'o1', order_number: 14600, rep_id: 'rep-teste', guest_name: null }, 'api-parceiro'],
+    ]);
+    // A foto da 044 antes de qualquer gravação.
+    expect(chamadas.original).toEqual([0]);
+    const [evento] = eventos(fake);
+    expect(evento).toMatchObject({ tipo: 'faturado', origem: 'api', parceiro: 'Control Teste' });
+    expect(evento?.['depois']).toMatchObject({ invoiced: true, invoiced_at: '2026-08-14T01:30:00Z' });
+  });
+
+  it('o aviso ao representante que falha não derruba a rota', async () => {
+    const { receberFaturamento, chamadas } = await servicoDaFase0(
+      { orders: pedidoNoBanco(APROVADO) },
+      { avisoLanca: true },
+    );
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001' }]);
+
+    expect(chamadas.aviso).toHaveLength(1);
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+  });
+
+  it('desfazer limpa data e valor, cancela as notas ativas e não recua a última compra', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({
+      orders: pedidoNoBanco(FATURADO),
+      order_invoices: fila(
+        { data: [{ id: 'n1', numero: '123', serie: '1' }], error: null }, // notas ativas
+        NADA, // o cancelamento
+      ),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', faturado: false }]);
+
+    expect(r.atualizados).toBe(1);
+    const pedido = updateDoPedido(fake)!;
+    expect(pedido).toMatchObject({ invoiced: false, invoiced_at: null, invoiced_total: null });
+    const cancelamento = fake.ultimaGravacao('order_invoices', 'update')?.valores as Record<string, unknown>;
+    expect(typeof cancelamento['cancelada_em']).toBe('string');
+    expect(fake.filtrosDe('order_invoices', 'is')[0]?.args).toEqual(['cancelada_em', null]);
+    // A nota cancelada é registrada logo depois de gravada, antes do pedido.
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_cancelada', 'faturamento_desfeito']);
+    expect(chamadas.compra).toEqual([]);
+    expect(chamadas.aviso).toEqual([]);
+    expect(chamadas.original).toEqual([]);
+  });
+
+  it('desfazer o que já estava desfeito não grava nada', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco(APROVADO),
+      order_invoices: { data: [], error: null },
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', faturado: false }]);
+
+    expect(r.inalterados).toBe(1);
+    expect(fake.gravacoes).toEqual([]);
+  });
+});
+
+describe('a nota fiscal e as peças que ela levou (048)', () => {
+  const NOTA = {
+    numero: '000123',
+    serie: '1',
+    chave: '0000',
+    emitida_em: '2026-08-13T14:02:00-03:00',
+    valor: 150,
+  };
+
+  it('nota nova: grava a nota, as peças com a variante do catálogo e toca o pedido', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({
+      orders: pedidoNoBanco(APROVADO),
+      order_invoices: fila(NADA /* ainda não existe */, { data: { id: 'n1' }, error: null } /* upsert */),
+      product_variants: fila(
+        { data: [{ id: 'v1', erp_sku: '0124|M' }], error: null }, // pelo erp_sku
+        { data: [{ id: 'v9', product_id: 'p9', size: 'G' }], error: null }, // pelo produto + tamanho
+      ),
+      products: { data: [{ id: 'p9', erp_id: '0777' }], error: null },
+      order_invoice_items: NADA,
+    });
+
+    const r = await receberFaturamento(
+      EMPRESA,
+      [
+        {
+          pedido_erp: 'ZZ0000001',
+          faturado_em: '2026-08-13T14:02:00-03:00',
+          valor_faturado: 150,
+          nota: NOTA,
+          itens: [
+            { produto: '0124', tamanho: 'm', quantidade: 4, preco_unitario: 24.9 },
+            { produto: '0777', tamanho: 'G', quantidade: 2 },
+            { produto: '9999', tamanho: 'P', quantidade: 1 },
+          ],
+        },
+      ],
+      { parceiro: 'Control Teste' },
+    );
+
+    expect(r).toMatchObject({ atualizados: 1, inalterados: 0, ignorados: [] });
+    expect(r.avisos).toEqual([
+      { pedido: 'ZZ0000001', aviso: 'peça 9999 tamanho P sem variante no catálogo: guardada sem vínculo' },
+    ]);
+
+    const nota = fake.ultimaGravacao('order_invoices', 'upsert')?.valores as Record<string, unknown>;
+    expect(nota).toMatchObject({
+      company_id: EMPRESA,
+      order_id: 'o1',
+      numero: '000123',
+      serie: '1',
+      chave: '0000',
+      emitida_em: '2026-08-13T14:02:00-03:00',
+      valor: 150,
+      cancelada_em: null,
+      origem: 'api',
+    });
+
+    const pecas = fake.ultimaGravacao('order_invoice_items', 'insert')?.valores as Array<Record<string, unknown>>;
+    expect(pecas.map((p) => [p['produto'], p['tamanho'], p['variant_id'], p['quantidade'], p['preco_unitario']])).toEqual([
+      ['0124', 'M', 'v1', 4, 24.9],
+      ['0777', 'G', 'v9', 2, null],
+      ['9999', 'P', null, 1, null],
+    ]);
+    expect(pecas.every((p) => p['invoice_id'] === 'n1' && p['order_id'] === 'o1' && p['company_id'] === EMPRESA)).toBe(true);
+    // Só as peças DAQUELA nota são substituídas.
+    const apagou = fake.filtrosDe('order_invoice_items', 'eq').map((f) => f.args);
+    expect(apagou).toContainEqual(['invoice_id', 'n1']);
+    expect(apagou).toContainEqual(['company_id', EMPRESA]);
+
+    // Ordem: foto da 044 → nota → peças → pedido.
+    expect(chamadas.original).toEqual([0]);
+    const ordem = fake.gravacoes.filter((g) => g.tabela !== 'order_erp_events').map((g) => `${g.tabela}.${g.operacao}`);
+    expect(ordem).toEqual([
+      'order_invoices.upsert',
+      'order_invoice_items.delete',
+      'order_invoice_items.insert',
+      'orders.update',
+    ]);
+    expect(updateDoPedido(fake)).toMatchObject({ invoiced: true, invoiced_total: 150 });
+
+    const tipos = eventos(fake).map((e) => e['tipo']);
+    expect(tipos).toEqual(['nota_registrada', 'faturado']);
+    expect(eventos(fake)[0]?.['depois']).toMatchObject({ numero: '000123', serie: '1', pecas: 7 });
+  });
+
+  it('o pedido falhou depois da nota: a nota fica com o rastro, o ERP reenvia e só o pedido grava', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: fila(pedidoNoBanco(APROVADO), { data: null, error: { message: 'caiu' } }),
+      order_invoices: fila(NADA, { data: { id: 'n1' }, error: null }),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: { numero: '000123' } }]);
+
+    expect(r.ignorados).toEqual([{ pedido: 'ZZ0000001', motivo: 'falha ao gravar: caiu' }]);
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_registrada']);
+  });
+
+  it('a mesma nota com as mesmas peças, reenviada, não grava nada', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: {
+        data: { id: 'n1', chave: '0000', emitida_em: '2026-08-13T17:02:00+00:00', valor: '150.00', cancelada_em: null },
+        error: null,
+      },
+      product_variants: { data: [{ id: 'v1', erp_sku: '0124|M' }], error: null },
+      order_invoice_items: {
+        data: [{ produto: '0124', tamanho: 'M', variant_id: 'v1', quantidade: 4, preco_unitario: '24.90' }],
+        error: null,
+      },
+    });
+
+    const r = await receberFaturamento(EMPRESA, [
+      {
+        pedido_erp: 'ZZ0000001',
+        faturado_em: '2026-08-13T14:02:00-03:00',
+        valor_faturado: 150,
+        nota: NOTA,
+        itens: [{ produto: '0124', tamanho: 'M', quantidade: 4, preco_unitario: 24.9 }],
+      },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 0, inalterados: 1, ignorados: [], avisos: [] });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('peças diferentes na mesma nota: substitui só as dela e toca o updated_at do pedido', async () => {
+    const { receberFaturamento, fake, chamadas } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: {
+        data: { id: 'n1', chave: '0000', emitida_em: '2026-08-13T17:02:00+00:00', valor: 150, cancelada_em: null },
+        error: null,
+      },
+      product_variants: { data: [{ id: 'v1', erp_sku: '0124|M' }], error: null },
+      order_invoice_items: fila(
+        { data: [{ produto: '0124', tamanho: 'M', variant_id: 'v1', quantidade: 4, preco_unitario: 24.9 }], error: null },
+        NADA, // delete
+        NADA, // insert
+      ),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [
+      {
+        pedido_erp: 'ZZ0000001',
+        nota: NOTA,
+        itens: [{ produto: '0124', tamanho: 'M', quantidade: 3, preco_unitario: 24.9 }],
+      },
+    ]);
+
+    expect(r.atualizados).toBe(1);
+    expect(fake.ultimaGravacao('order_invoices')).toBeUndefined();
+    const pecas = fake.ultimaGravacao('order_invoice_items', 'insert')?.valores as Array<Record<string, unknown>>;
+    expect(pecas).toHaveLength(1);
+    expect(pecas[0]).toMatchObject({ invoice_id: 'n1', quantidade: 3 });
+    expect(Object.keys(updateDoPedido(fake)!)).toEqual(['updated_at']);
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_registrada']);
+    // Já estava faturado: nem compra nova, nem aviso novo.
+    expect(chamadas.compra).toEqual([]);
+    expect(chamadas.aviso).toEqual([]);
+  });
+
+  it('campo da nota que não veio não apaga; null explícito limpa', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(
+        {
+          data: { id: 'n1', chave: '0000', emitida_em: '2026-08-13T17:02:00+00:00', valor: 150, cancelada_em: null },
+          error: null,
+        },
+        NADA,
+      ),
+    });
+
+    await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: { numero: '000123', serie: '1', chave: null } }]);
+
+    const patch = fake.ultimaGravacao('order_invoices', 'update')?.valores as Record<string, unknown>;
+    expect(Object.keys(patch).sort()).toEqual(['chave', 'updated_at']);
+    expect(patch['chave']).toBeNull();
+  });
+
+  it('sem a 048: nota e peças ficam de fora com aviso, e o faturamento grava', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0(
+      { orders: pedidoNoBanco(APROVADO) },
+      { ausentes: ['order_invoices.id', 'order_invoice_items.id', 'order_erp_events.id'] },
+    );
+
+    const r = await receberFaturamento(EMPRESA, [
+      { pedido_erp: 'ZZ0000001', nota: NOTA, itens: [{ produto: '0124', tamanho: 'M', quantidade: 4 }] },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+    expect(r.avisos).toEqual([
+      { pedido: 'ZZ0000001', aviso: 'notas e itens faturados ficam guardados depois da migração 048' },
+    ]);
+    expect(fake.gravacoes.map((g) => `${g.tabela}.${g.operacao}`)).toEqual(['orders.update']);
+    expect(updateDoPedido(fake)).toMatchObject({ invoiced: true });
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['nota com peças', { faturado: true }],
+    ['faturamento desfeito', { faturado: false }],
+  ])('%s com o banco sem responder sobre a 048: registro ignorado para reenvio, nada gravado', async (_nome, extra) => {
+    const pedido = extra['faturado'] === false ? FATURADO : APROVADO;
+    const { receberFaturamento, fake } = await servicoDaFase0(
+      { orders: pedidoNoBanco(pedido) },
+      { soluco: ['order_invoices.id'] },
+    );
+
+    const r = await receberFaturamento(EMPRESA, [
+      extra['faturado'] === false
+        ? { pedido_erp: 'ZZ0000001', faturado: false }
+        : { pedido_erp: 'ZZ0000001', nota: NOTA, itens: [{ produto: '0124', tamanho: 'M', quantidade: 4 }] },
+    ]);
+
+    expect(r.atualizados).toBe(0);
+    expect(r.avisos).toEqual([]);
+    expect(r.ignorados).toHaveLength(1);
+    expect(r.ignorados[0]?.motivo).toMatch(/^falha ao buscar: /);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it.each<[string, Record<string, unknown>, string]>([
+    ['nota sem número', { nota: { serie: '1' } }, '"nota.numero" é obrigatório quando "nota" vem'],
+    ['emissão sem fuso', { nota: { numero: '1', emitida_em: '2026-08-13T14:02:00' } }, '"nota.emitida_em" precisa de fuso (Z ou -03:00)'],
+    ['valor da nota zerado', { nota: { numero: '1', valor: 0 } }, '"nota.valor" precisa ser maior que zero'],
+    ['peças sem nota', { itens: [{ produto: '0124', tamanho: 'M', quantidade: 1 }] }, '"itens" precisa vir junto com "nota" (informe "nota.numero")'],
+    ['quantidade zero', { nota: { numero: '1' }, itens: [{ produto: '0124', tamanho: 'M', quantidade: 0 }] }, '"itens[0]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero'],
+    ['quantidade fracionada', { nota: { numero: '1' }, itens: [{ produto: '0124', tamanho: 'M', quantidade: 1.5 }] }, '"itens[0]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero'],
+    ['peça sem tamanho', { nota: { numero: '1' }, itens: [{ produto: '0124', quantidade: 2 }] }, '"itens[0]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero'],
+  ])('%s: o registro inteiro é recusado, nada gravado', async (_nome, extra, motivo) => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', ...extra }]);
+
+    expect(r.ignorados).toEqual([{ pedido: 'ZZ0000001', motivo }]);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('erro ao ler a nota é "falha ao buscar" — nada gravado, o ERP reenvia', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco(APROVADO),
+      order_invoices: { data: null, error: { message: 'timeout' } },
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: NOTA }]);
+
+    expect(r.ignorados).toEqual([{ pedido: 'ZZ0000001', motivo: 'falha ao buscar: timeout' }]);
+    expect(fake.gravacoes).toEqual([]);
+  });
+});
+
+describe('o dia de Brasília', () => {
+  it('converte o momento para o dia em São Paulo', async () => {
+    const { diaEmSaoPaulo } = await servicoDaFase0({});
+    expect(diaEmSaoPaulo('2026-08-13T23:30:00-03:00')).toBe('2026-08-13');
+    expect(diaEmSaoPaulo('2026-08-14T01:30:00Z')).toBe('2026-08-13');
+    expect(diaEmSaoPaulo('2026-08-14T03:00:00Z')).toBe('2026-08-14');
+    expect(diaEmSaoPaulo('ontem')).toBeNull();
   });
 });
