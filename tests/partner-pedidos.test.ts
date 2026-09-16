@@ -25,7 +25,13 @@ import { LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
  *      percentuais; coluna de migração ausente degrada para null/0 sem quebrar;
  *   5. o `confirmar` checa nesta ordem: formato → existe → já tem número →
  *      status permite → número livre → grava só se ninguém gravou no meio —
- *      e cada desfecho tem o seu código HTTP no controller.
+ *      e cada desfecho tem o seu código HTTP no controller;
+ *   6. (fase 0) a tabela é a DO PEDIDO com a coluna da tabela; o cliente ganha
+ *      endereço em pedaços, IE, WhatsApp e e-mail sem mudar nome de campo;
+ *   7. (fase 0) o confirmar diz de onde veio o número e deixa o rastro — sem a
+ *      048, o UPDATE é o de hoje;
+ *   8. (fase 0) sem canal_pedido_erp = 'api', a fila e o confirmar respondem
+ *      409 CANAL_FECHADO sem tocar em pedido.
  */
 
 const EMPRESA = 'empresa-1';
@@ -48,11 +54,12 @@ const COLUNA_AUSENTE: RespostaTabela = {
 const emSequencia = (...respostas: RespostaTabela[]) => respostas.flatMap((r) => [r, r]);
 
 /**
- * A fila de `orders` para a listagem: as QUATRO sondas de coluna
- * (order_number, invoiced, payment_condition_id, discount_percent) disparam
- * juntas antes de qualquer resposta, depois vêm as páginas.
+ * A fila de `orders` para a listagem: as CINCO sondas de coluna
+ * (order_number, invoiced, payment_condition_id, discount_percent,
+ * price_table_id) disparam juntas antes de qualquer resposta, depois vêm as
+ * páginas. A sonda da 041 é em `customers` e não entra nesta fila.
  */
-function filaDaListagem(paginas: RespostaTabela[], sondas: RespostaTabela[] = [OK, OK, OK, OK]) {
+function filaDaListagem(paginas: RespostaTabela[], sondas: RespostaTabela[] = [OK, OK, OK, OK, OK]) {
   return [...sondas, ...sondas, ...emSequencia(...paginas)];
 }
 
@@ -143,7 +150,7 @@ describe('a fila de pedidos para o ERP', () => {
 
   it('sem a coluna invoiced (banco antes da 027) a fila não pede o filtro de faturado', async () => {
     const { getPartnerOrders, fake } = await carregar({
-      orders: filaDaListagem([{ data: [pedido({ invoiced: undefined })], error: null }], [OK, COLUNA_AUSENTE, OK, OK]),
+      orders: filaDaListagem([{ data: [pedido({ invoiced: undefined })], error: null }], [OK, COLUNA_AUSENTE, OK, OK, OK]),
       price_tables: { data: [], error: null },
     });
 
@@ -160,7 +167,7 @@ describe('a fila de pedidos para o ERP', () => {
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem(
         [{ data: [pedido()], error: null }],
-        [OK, { data: null, error: { message: 'timeout' } }, OK, OK],
+        [OK, { data: null, error: { message: 'timeout' } }, OK, OK, OK],
       ),
       price_tables: { data: [], error: null },
     });
@@ -398,7 +405,7 @@ describe('o pedido como o ERP recebe', () => {
       // order_number e invoiced existem; payment_condition_id e discount_percent, não.
       orders: filaDaListagem(
         [{ data: [pedido({ payment_condition: undefined, discount_percent: undefined })], error: null }],
-        [OK, OK, COLUNA_AUSENTE, COLUNA_AUSENTE],
+        [OK, OK, COLUNA_AUSENTE, COLUNA_AUSENTE, OK],
       ),
       price_tables: { data: [], error: null },
     });
@@ -419,6 +426,175 @@ describe('o pedido como o ERP recebe', () => {
   });
 });
 
+// ─── Tabela do pedido e cadastro do cliente (fase 0) ─────────────────────────
+
+describe('a tabela de preço é a do PEDIDO, com a coluna da tabela', () => {
+  const TABELAS: RespostaTabela = {
+    data: [
+      { id: 't1', erp_code: 'T01', price_column: 2 },
+      { id: 't3', erp_code: '00016', price_column: 3 },
+      { id: 't4', erp_code: null, price_column: 4 },
+    ],
+    error: null,
+  };
+
+  it('pedido com price_table_id: sai a tabela do pedido com a coluna dela, não a do cliente nem orders.price_column', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [pedido({ price_table_id: 't3', price_table_erp_code: null, price_column: 1 })],
+          error: null,
+        },
+      ]),
+      price_tables: TABELAS,
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.tabela_preco).toEqual({ codigo_erp: '00016', coluna: 3 });
+    expect(p!.importavel).toBe(true);
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'));
+    expect(selectDaLista!.split('customer:customers')[0]).toContain('price_table_id');
+  });
+
+  it('tabela do pedido SEM erp_code é pendência — não cai para a tabela do cliente (preço de outra tabela)', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        { data: [pedido({ price_table_id: 't4', price_table_erp_code: null, price_column: 1 })], error: null },
+      ]),
+      price_tables: TABELAS,
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.tabela_preco).toEqual({ codigo_erp: null, coluna: 4 });
+    expect(p!.importavel).toBe(false);
+    expect(p!.pendencias).toEqual(['pedido sem tabela de preço vinculada no ERP']);
+  });
+
+  it('pedido sem tabela: a do cliente, com a price_column DA TABELA (orders.price_column = 1 não manda)', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({
+              price_table_id: null,
+              price_table_erp_code: null,
+              price_column: 1,
+              customer: { ...CLIENTE, price_table_id: 't3' },
+            }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: TABELAS,
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.tabela_preco).toEqual({ codigo_erp: '00016', coluna: 3 });
+  });
+
+  it('banco sem orders.price_table_id (antes da 025): não pede a coluna e usa a do cliente', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem(
+        [{ data: [pedido({ price_table_erp_code: null, price_column: 1 })], error: null }],
+        [OK, OK, OK, OK, COLUNA_AUSENTE],
+      ),
+      price_tables: TABELAS,
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.tabela_preco).toEqual({ codigo_erp: 'T01', coluna: 2 });
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'));
+    expect(selectDaLista!.split('customer:customers')[0]).not.toContain('price_table_id');
+  });
+});
+
+describe('o cliente do pedido ganha endereço em pedaços, IE, WhatsApp e e-mail (aditivo)', () => {
+  const CADASTRO_REAL = {
+    cep: '00000000',
+    logradouro: 'Rua Teste',
+    numero: '1',
+    complemento: '',
+    bairro: 'Bairro Teste',
+    cidade: 'Cidade Teste',
+    uf: 'SP',
+    inscricao_estadual: 'ISENTO',
+    whatsapp: '00000000000',
+    email: 'cliente.teste@exemplo.invalid',
+  };
+
+  it('com a 041: os campos saem do cadastro e os antigos continuam com o mesmo nome', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ customer: { ...CLIENTE, ...CADASTRO_REAL } })], error: null }]),
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.cliente).toEqual({
+      codigo_erp: 'C0001',
+      cnpj: '12345678000199',
+      razao_social: 'LOJA DA ESQUINA LTDA',
+      nome_fantasia: 'ESQUINA',
+      endereco: {
+        cep: '00000000',
+        logradouro: 'Rua Teste',
+        numero: '1',
+        complemento: null, // vazio sai null
+        bairro: 'Bairro Teste',
+        cidade: 'Cidade Teste',
+        uf: 'SP',
+      },
+      inscricao_estadual: 'ISENTO',
+      whatsapp: '00000000000',
+      email: 'cliente.teste@exemplo.invalid',
+    });
+    const embed = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(embed).toMatch(/customer:customers\([^)]*whatsapp, email, cep, logradouro, numero, complemento, bairro, cidade, uf, inscricao_estadual\)/);
+  });
+
+  it('sem a 041 (42703 em customers.cep): não pede as colunas e os campos saem null', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ customer: { ...CLIENTE, whatsapp: '00000000000', email: null } })], error: null }]),
+      customers: COLUNA_AUSENTE,
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.cliente.endereco).toEqual({
+      cep: null,
+      logradouro: null,
+      numero: null,
+      complemento: null,
+      bairro: null,
+      cidade: null,
+      uf: null,
+    });
+    expect(p!.cliente.inscricao_estadual).toBeNull();
+    expect(p!.cliente.whatsapp).toBe('00000000000');
+    expect(p!.cliente.email).toBeNull();
+    const embed = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(embed).not.toContain('cep');
+    expect(embed).not.toContain('inscricao_estadual');
+  });
+});
+
 // ─── O confirmar ─────────────────────────────────────────────────────────────
 
 const LIDO = (linha: Record<string, unknown> | null): RespostaTabela => ({ data: linha, error: null });
@@ -427,12 +603,17 @@ const APROVADO = LIDO({ id: 'o1', status: 'approved', erp_order_id: null });
 const SONDA = OK;
 const NUMERO_LIVRE: RespostaTabela = { data: [], error: null };
 const NUMERO_DO_O2: RespostaTabela = { data: [{ id: 'o2', order_number: 14600 }], error: null };
-const GRAVOU: RespostaTabela = { data: [{ id: 'o1' }], error: null };
+/**
+ * A sonda de `orders.erp_order_source` (048) que `gravarOrigemDoNumero` faz
+ * logo antes do UPDATE. OK = a coluna existe e a origem entra no patch.
+ */
+const SONDA_ORIGEM = OK;
+const GRAVOU: RespostaTabela = { data: [{ id: 'o1', order_number: 14627 }], error: null };
 
 describe('confirmOrderImport — o ERP devolve o número', () => {
   it('grava o número NORMALIZADO, força sent_erp, carimba synced_at/updated_at e tira a foto', async () => {
     const { confirmOrderImport, fake, registrarNoErp } = await carregar({
-      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, GRAVOU),
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
     });
 
     const r = await confirmOrderImport(EMPRESA, 'o1', ' cs-17379 ');
@@ -445,8 +626,65 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(fake.filtrosDe('orders', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
     // Grava só se ninguém gravou no meio, e pede as linhas afetadas para saber.
     expect(fake.filtrosDe('orders', 'is').map((f) => f.args)).toContainEqual(['erp_order_id', null]);
-    expect(fake.filtrosDe('orders', 'select').map((f) => f.args[0])).toContain('id');
+    // O select do UPDATE devolve a linha gravada com o número do app (para o rastro).
+    expect(fake.filtrosDe('orders', 'select').map((f) => f.args[0]).at(-1)).toBe('id, order_number');
     expect(registrarNoErp).toHaveBeenCalledWith('o1', EMPRESA, null);
+  });
+
+  it('com a 048: o UPDATE diz de onde veio o número (api) e o rastro ganha numero_gravado com o parceiro', async () => {
+    const { confirmOrderImport, fake } = await carregar({
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379', 'control-cs')).toEqual({
+      outcome: 'ok',
+      ja_confirmado: false,
+    });
+
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado).toMatchObject({ erp_order_source: 'api', erp_order_set_by: null });
+    // Um "agora" só na mesma gravação.
+    expect(gravado['erp_order_set_at']).toBe(gravado['updated_at']);
+
+    const evento = fake.ultimaGravacao('order_erp_events', 'insert')?.valores as Record<string, unknown>;
+    expect(evento).toMatchObject({
+      company_id: EMPRESA,
+      order_id: 'o1',
+      order_number: 14627,
+      tipo: 'numero_gravado',
+      origem: 'api',
+      parceiro: 'control-cs',
+      antes: { erp_order_id: null, status: 'approved' },
+      depois: { erp_order_id: 'CS17379', status: 'sent_erp' },
+    });
+  });
+
+  it('sem a 048: o UPDATE é o de hoje, sem as colunas de origem, e a confirmação passa', async () => {
+    const { confirmOrderImport, fake } = await carregar({
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, COLUNA_AUSENTE, GRAVOU),
+      order_erp_events: COLUNA_AUSENTE,
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379', 'control-cs')).toEqual({
+      outcome: 'ok',
+      ja_confirmado: false,
+    });
+
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(Object.keys(gravado).sort()).toEqual(['erp_order_id', 'status', 'synced_at', 'updated_at']);
+    expect(fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+  });
+
+  it('o rastro que falha ao gravar não muda a resposta da confirmação', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { confirmOrderImport } = await carregar({
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
+      order_erp_events: [OK, OK, { data: null, error: { message: 'insert recusado' } }],
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'ok', ja_confirmado: false });
+    expect(erro).toHaveBeenCalled();
+    erro.mockRestore();
   });
 
   it('número fora da máscara (duas letras + até 10 dígitos) é recusado ANTES de tocar no banco', async () => {
@@ -529,7 +767,7 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
 
   it('pedido em error_erp pode ser confirmado — é a única outra entrada de sent_erp no fluxo', async () => {
     const { confirmOrderImport } = await carregar({
-      orders: emSequencia(LIDO({ id: 'o1', status: 'error_erp', erp_order_id: null }), SONDA, NUMERO_LIVRE, GRAVOU),
+      orders: emSequencia(LIDO({ id: 'o1', status: 'error_erp', erp_order_id: null }), SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
     });
 
     expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'ok', ja_confirmado: false });
@@ -574,6 +812,7 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
         APROVADO,
         SONDA,
         NUMERO_LIVRE, // a pré-checagem não viu: outro confirmou no mesmo instante
+        SONDA_ORIGEM,
         { data: null, error: { message: 'duplicate key value violates unique constraint', code: '23505' } },
         NUMERO_DO_O2, // a segunda pergunta acha o dono (a sonda já está lembrada)
       ),
@@ -589,7 +828,7 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
 
   it('outro erro na gravação LANÇA (vira 500 no app)', async () => {
     const { confirmOrderImport } = await carregar({
-      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, { data: null, error: { message: 'caiu a conexão' } }),
+      orders: emSequencia(APROVADO, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, { data: null, error: { message: 'caiu a conexão' } }),
     });
 
     await expect(confirmOrderImport(EMPRESA, 'o1', 'CS17379')).rejects.toThrow(/caiu a conexão/);
@@ -601,6 +840,7 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
         APROVADO,
         SONDA,
         NUMERO_LIVRE,
+        SONDA_ORIGEM,
         { data: [], error: null }, // o `.is('erp_order_id', null)` não casou mais
         LIDO({ id: 'o1', status: 'sent_erp', erp_order_id: 'CS17379' }), // relido
       ),
@@ -617,6 +857,7 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
         APROVADO,
         SONDA,
         NUMERO_LIVRE,
+        SONDA_ORIGEM,
         { data: [], error: null },
         LIDO({ id: 'o1', status: 'sent_erp', erp_order_id: 'CS17000' }),
       ),
@@ -653,16 +894,122 @@ function requisicao(body: unknown, id = 'o1') {
   }>;
 }
 
-async function carregarController(resultado: unknown) {
-  vi.doMock(SUPABASE, () => ({ supabase: criarSupabaseFake({}).cliente }));
+/** A linha de `companies` com os canais (048). Fila de um item: fica grudada. */
+function canais(pedido_erp: string): RespostaTabela {
+  return {
+    data: {
+      canal_pedido_erp: pedido_erp,
+      canal_faturamento: 'manual',
+      canal_cadastro: 'carga',
+      canal_retrato: 'carga',
+      canal_catalogo: 'carga',
+    },
+    error: null,
+  };
+}
+
+async function carregarController(resultado: unknown, canalPedido = 'api') {
+  const fake = criarSupabaseFake({ companies: canais(canalPedido) });
+  vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
   vi.doMock(AUTH, () => ({
     requirePartner: () => Promise.resolve({ name: 'control', key: 'chave', company_id: EMPRESA }),
   }));
   const confirmOrderImport = vi.fn().mockResolvedValue(resultado);
-  vi.doMock(SERVICO, () => ({ confirmOrderImport, getPartnerOrders: vi.fn() }));
-  const { partnerConfirmOrderHandler } = await import('../apps/api/src/modules/partner/partner.controller.js');
-  return { partnerConfirmOrderHandler, confirmOrderImport };
+  const getPartnerOrders = vi.fn().mockResolvedValue(resultado);
+  vi.doMock(SERVICO, () => ({ confirmOrderImport, getPartnerOrders }));
+  const { partnerConfirmOrderHandler, partnerOrdersHandler } = await import(
+    '../apps/api/src/modules/partner/partner.controller.js'
+  );
+  return { partnerConfirmOrderHandler, partnerOrdersHandler, confirmOrderImport, getPartnerOrders, fake };
 }
+
+describe('o canal de pedidos (048) — a API só mexe na fila com canal_pedido_erp = api', () => {
+  const FECHADO = {
+    error: 'Canal de pedidos ainda não está ligado para a API nesta empresa',
+    code: 'CANAL_FECHADO',
+    statusCode: 409,
+    canal: 'pedido_erp',
+  };
+
+  it.each([['manual'], ['sync_py']])('GET /pedidos com canal %s é 409 CANAL_FECHADO e nem lê a fila', async (canal) => {
+    const { partnerOrdersHandler, getPartnerOrders } = await carregarController([], canal);
+    const { reply, enviado } = replyFalso();
+
+    await partnerOrdersHandler(requisicao(undefined) as never, reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toEqual({ ...FECHADO, valor_atual: canal });
+    expect(getPartnerOrders).not.toHaveBeenCalled();
+  });
+
+  it('POST /confirmar com canal manual é 409 CANAL_FECHADO — antes de olhar o corpo e sem gravar', async () => {
+    const { partnerConfirmOrderHandler, confirmOrderImport } = await carregarController({ outcome: 'ok' }, 'manual');
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'CS17379' }), reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toEqual({ ...FECHADO, valor_atual: 'manual' });
+    expect(confirmOrderImport).not.toHaveBeenCalled();
+  });
+
+  it('sem a 048 (coluna ausente) vale o padrão manual: fechado', async () => {
+    vi.doMock(SUPABASE, () => ({
+      supabase: criarSupabaseFake({
+        companies: { data: null, error: { message: 'column companies.canal_pedido_erp does not exist', code: '42703' } },
+      }).cliente,
+    }));
+    vi.doMock(AUTH, () => ({
+      requirePartner: () => Promise.resolve({ name: 'control', key: 'chave', company_id: EMPRESA }),
+    }));
+    const getPartnerOrders = vi.fn();
+    vi.doMock(SERVICO, () => ({ confirmOrderImport: vi.fn(), getPartnerOrders }));
+    const { partnerOrdersHandler } = await import('../apps/api/src/modules/partner/partner.controller.js');
+    const { reply, enviado } = replyFalso();
+
+    await partnerOrdersHandler(requisicao(undefined) as never, reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toMatchObject({ code: 'CANAL_FECHADO', valor_atual: 'manual' });
+    expect(getPartnerOrders).not.toHaveBeenCalled();
+  });
+
+  it('banco que não responde sobre o canal LANÇA (500) — soluço não abre nem fecha canal', async () => {
+    vi.doMock(SUPABASE, () => ({
+      supabase: criarSupabaseFake({ companies: { data: null, error: { message: 'timeout' } } }).cliente,
+    }));
+    vi.doMock(AUTH, () => ({
+      requirePartner: () => Promise.resolve({ name: 'control', key: 'chave', company_id: EMPRESA }),
+    }));
+    const getPartnerOrders = vi.fn();
+    vi.doMock(SERVICO, () => ({ confirmOrderImport: vi.fn(), getPartnerOrders }));
+    const { partnerOrdersHandler } = await import('../apps/api/src/modules/partner/partner.controller.js');
+    const { reply } = replyFalso();
+
+    await expect(partnerOrdersHandler(requisicao(undefined) as never, reply)).rejects.toThrow();
+    expect(getPartnerOrders).not.toHaveBeenCalled();
+  });
+
+  it('GET /pedidos com canal api entrega a fila e anota o resumo da chamada (sem dado de cliente)', async () => {
+    const lista = [{ id: 'o1', importavel: true }, { id: 'o2', importavel: false }];
+    const { partnerOrdersHandler, getPartnerOrders } = await carregarController(lista, 'api');
+    const { reply, enviado } = replyFalso();
+    const req = { ...requisicao(undefined), query: { incluir: 'todos' } } as unknown as FastifyRequest<{
+      Querystring: { desde?: string; incluir?: string };
+    }>;
+
+    await partnerOrdersHandler(req, reply);
+
+    expect(enviado.status).toBe(200);
+    expect(enviado.corpo).toMatchObject({ total: 2, pedidos: lista });
+    expect(getPartnerOrders).toHaveBeenCalledWith(EMPRESA, { desde: undefined, incluirImportados: true });
+    expect(req.partnerLog).toMatchObject({
+      company_id: EMPRESA,
+      parceiro: 'control',
+      detalhe: { incluir: 'todos', pedidos: 2, importaveis: 1 },
+    });
+  });
+});
 
 describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', () => {
   it.each([[{}], [{ pedido_erp: '   ' }], [{ pedido_erp: 17379 }], [null], [[]], ['CS17379']])(
@@ -767,7 +1114,8 @@ describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', ()
 
     expect(enviado.status).toBe(200);
     expect(enviado.corpo).toEqual({ ok: true, ja_confirmado: false });
-    expect(confirmOrderImport).toHaveBeenCalledWith(EMPRESA, 'o1', 'CS17379');
+    // O nome da chave desce para o rastro do pedido (048).
+    expect(confirmOrderImport).toHaveBeenCalledWith(EMPRESA, 'o1', 'CS17379', 'control');
   });
 
   it('desfecho que o controller não conhece responde 500 INTERNAL_ERROR — nunca fica pendurado', async () => {

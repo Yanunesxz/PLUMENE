@@ -15,6 +15,7 @@ import {
 } from '@csb/shared';
 import type { OrderStatus } from '@csb/shared';
 import { registrarNoErp } from '../orders/erpSync.service.js';
+import { gravarOrigemDoNumero, registrarEventoErp } from '../orders/eventosErp.service.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
 
@@ -46,8 +47,21 @@ export interface PartnerOrder {
     cnpj: string | null;
     razao_social: string | null;
     nome_fantasia: string | null;
+    /**
+     * O endereço em pedaços (colunas da 041). Sai sempre com as sete chaves;
+     * sem a 041 no banco, ou sem o dado no cadastro, cada uma sai null.
+     */
+    endereco: EnderecoDoCliente;
+    inscricao_estadual: string | null;
+    whatsapp: string | null;
+    email: string | null;
   };
   representante_erp: string | null;
+  /**
+   * A tabela que precificou ESTE pedido (orders.price_table_id); na falta, a
+   * do cadastro do cliente. `coluna` é a price_column dessa tabela (1 só
+   * quando a tabela não tem coluna gravada).
+   */
   tabela_preco: { codigo_erp: string | null; coluna: number };
   /** Código e descrição da condição no Control (ex.: "021" / "30/60/90"). */
   condicao_pagamento: { codigo: string; descricao: string | null } | null;
@@ -68,6 +82,16 @@ export interface PartnerOrder {
   pendencias: string[];
 }
 
+export interface EnderecoDoCliente {
+  cep: string | null;
+  logradouro: string | null;
+  numero: string | null;
+  complemento: string | null;
+  bairro: string | null;
+  cidade: string | null;
+  uf: string | null;
+}
+
 interface OrderRow {
   id: string;
   order_number?: number | null;
@@ -82,7 +106,12 @@ interface OrderRow {
   invoiced_at?: string | null;
   invoiced_total?: number | null;
   payment_condition?: { code: string; description: string | null } | null;
-  /** Foto da tabela de preço no momento do pedido (preferida sobre a do cliente) */
+  /** A tabela que precificou o pedido (025). Ausente em banco sem a coluna. */
+  price_table_id?: string | null;
+  /**
+   * Foto antiga da tabela (002). Nenhum código grava esta coluna; fica só como
+   * segunda opção para não quebrar um banco que a tenha preenchida à mão.
+   */
   price_table_erp_code: string | null;
   price_column: number | null;
   customer: {
@@ -92,6 +121,16 @@ interface OrderRow {
     trade_name: string | null;
     rep_erp_id: string | null;
     price_table_id: string | null;
+    whatsapp?: string | null;
+    email?: string | null;
+    cep?: string | null;
+    logradouro?: string | null;
+    numero?: string | null;
+    complemento?: string | null;
+    bairro?: string | null;
+    cidade?: string | null;
+    uf?: string | null;
+    inscricao_estadual?: string | null;
   } | null;
   items: Array<{
     quantity: number;
@@ -102,22 +141,33 @@ interface OrderRow {
   }>;
 }
 
-/** Quais colunas opcionais (migrações 009/027/028/029) este banco já tem. */
+/** Quais colunas opcionais (migrações 009/025/027/028/029/041) este banco já tem. */
 interface ColunasOpcionais {
   orderNumber: boolean;
   invoiced: boolean;
   condition: boolean;
   discount: boolean;
+  /** orders.price_table_id (025): a tabela que precificou o pedido. */
+  priceTable: boolean;
+  /** customers.cep e as demais colunas do cadastro real (041). */
+  cadastroReal: boolean;
 }
+
+/** As colunas da 041 que o ERP recebe no cliente do pedido. */
+const COLUNAS_DO_CADASTRO_REAL =
+  'cep, logradouro, numero, complemento, bairro, cidade, uf, inscricao_estadual';
 
 function buildOrderSelect(c: ColunasOpcionais): string {
   return `
     id, ${c.orderNumber ? 'order_number, ' : ''}status, total, notes,
     created_at, updated_at, erp_order_id, price_table_erp_code, price_column,
+    ${c.priceTable ? 'price_table_id, ' : ''}
     ${c.invoiced ? 'invoiced, invoiced_at, invoiced_total, ' : ''}
     ${c.discount ? 'discount_percent, ' : ''}
     ${c.condition ? 'payment_condition:payment_conditions(code, description), ' : ''}
-    customer:customers(erp_id, cnpj, name, trade_name, rep_erp_id, price_table_id),
+    customer:customers(erp_id, cnpj, name, trade_name, rep_erp_id, price_table_id, whatsapp, email${
+      c.cadastroReal ? `, ${COLUNAS_DO_CADASTRO_REAL}` : ''
+    }),
     items:order_items(quantity, unit_price, total,
       variant:product_variants(erp_sku, size),
       product:products(erp_id, sku))
@@ -125,8 +175,8 @@ function buildOrderSelect(c: ColunasOpcionais): string {
 }
 
 /**
- * Colunas de migrações que podem não estar aplicadas (009, 027, 028, 029).
- * Sem a coluna, o campo correspondente sai null/0.
+ * Colunas de migrações que podem não estar aplicadas (009, 025, 027, 028, 029,
+ * 041). Sem a coluna, o campo correspondente sai null/0.
  *
  * `detectar` lembra o "sim" para sempre e o "não" por 30 s: a migração pode
  * rodar com a API de pé e o campo passa a sair sozinho, sem reiniciar. O
@@ -140,32 +190,62 @@ function buildOrderSelect(c: ColunasOpcionais): string {
  * de novo na próxima rodada, como a doc manda.
  */
 async function detectarColunas(): Promise<ColunasOpcionais> {
-  const [orderNumber, invoiced, condition, discount] = await Promise.all([
+  // A ordem das sondas de `orders` é a que os testes do dublê seguem; a de
+  // `customers` vai por último e não mexe na fila de `orders`.
+  const [orderNumber, invoiced, condition, discount, priceTable, cadastroReal] = await Promise.all([
     detectar('orders', 'order_number'),
     detectarOuFalhar('orders', 'invoiced'),
     detectar('orders', 'payment_condition_id'),
     detectar('orders', 'discount_percent'),
+    detectar('orders', 'price_table_id'),
+    detectar('customers', 'cep'),
   ]);
-  return { orderNumber, invoiced, condition, discount };
+  return { orderNumber, invoiced, condition, discount, priceTable, cadastroReal };
 }
 
-function mapOrder(
-  row: OrderRow,
-  tableMap: Map<string, { erp_code: string | null; price_column: number }>,
-): PartnerOrder {
+type MapaDeTabelas = Map<string, { erp_code: string | null; price_column: number }>;
+
+/**
+ * A tabela e a coluna que o ERP deve usar para ESTE pedido.
+ *
+ * 1. A tabela do pedido (orders.price_table_id) — é ela que precificou os
+ *    itens. Sem `erp_code`, sai null e vira pendência: cair para a tabela do
+ *    cliente mandaria o pedido para o Control com o preço de outra tabela.
+ * 2. A foto antiga `price_table_erp_code`, com a `price_column` do pedido.
+ * 3. A tabela do cadastro do cliente.
+ *
+ * A coluna é a `price_column` da tabela escolhida. `orders.price_column` é 1
+ * em quase todo pedido (padrão do banco) e não diz nada sobre a tabela.
+ */
+function tabelaDoPedido(row: OrderRow, tableMap: MapaDeTabelas): { codigo_erp: string | null; coluna: number } {
+  if (row.price_table_id) {
+    const tabela = tableMap.get(row.price_table_id);
+    return { codigo_erp: tabela?.erp_code ?? null, coluna: tabela?.price_column ?? 1 };
+  }
+  const fotoAntiga = row.price_table_erp_code?.trim();
+  if (fotoAntiga) return { codigo_erp: fotoAntiga, coluna: row.price_column ?? 1 };
+
+  const idDoCliente = row.customer?.price_table_id;
+  const doCliente = idDoCliente ? tableMap.get(idDoCliente) : undefined;
+  return { codigo_erp: doCliente?.erp_code ?? null, coluna: doCliente?.price_column ?? 1 };
+}
+
+/** Texto aparado, ou null quando vazio. */
+function textoOuNull(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t ? t : null;
+}
+
+function mapOrder(row: OrderRow, tableMap: MapaDeTabelas): PartnerOrder {
   const pendencias: string[] = [];
   const customer = row.customer;
 
   if (!customer?.erp_id) pendencias.push('cliente sem código do ERP');
   if (!customer?.rep_erp_id) pendencias.push('cliente sem representante vinculado no ERP');
 
-  // Tabela de preço: prefere a foto gravada no pedido; senão, a do cliente.
-  const customerTable = customer?.price_table_id
-    ? tableMap.get(customer.price_table_id)
-    : undefined;
-  const tabelaErp = row.price_table_erp_code ?? customerTable?.erp_code ?? null;
-  const coluna = row.price_column ?? customerTable?.price_column ?? 1;
-  if (!tabelaErp) pendencias.push('pedido sem tabela de preço vinculada no ERP');
+  const tabela = tabelaDoPedido(row, tableMap);
+  if (!tabela.codigo_erp) pendencias.push('pedido sem tabela de preço vinculada no ERP');
 
   // A cor escolhida pelo cliente vive nas linhas "0015 3M azul" das notas —
   // o item vai sortido para o ERP e a escolha viaja na observação, igual à
@@ -221,9 +301,21 @@ function mapOrder(
       cnpj: customer?.cnpj ?? null,
       razao_social: customer?.name ?? null,
       nome_fantasia: customer?.trade_name ?? null,
+      endereco: {
+        cep: textoOuNull(customer?.cep),
+        logradouro: textoOuNull(customer?.logradouro),
+        numero: textoOuNull(customer?.numero),
+        complemento: textoOuNull(customer?.complemento),
+        bairro: textoOuNull(customer?.bairro),
+        cidade: textoOuNull(customer?.cidade),
+        uf: textoOuNull(customer?.uf),
+      },
+      inscricao_estadual: textoOuNull(customer?.inscricao_estadual),
+      whatsapp: textoOuNull(customer?.whatsapp),
+      email: textoOuNull(customer?.email),
     },
     representante_erp: customer?.rep_erp_id ?? null,
-    tabela_preco: { codigo_erp: tabelaErp, coluna },
+    tabela_preco: tabela,
     condicao_pagamento: row.payment_condition
       ? { codigo: row.payment_condition.code, descricao: row.payment_condition.description }
       : null,
@@ -256,7 +348,7 @@ async function getPriceTableMap(
   );
 
   return new Map(
-    tabelas.map((t) => [t.id, { erp_code: t.erp_code, price_column: t.price_column ?? 1 }]),
+    tabelas.map((t) => [t.id, { erp_code: textoOuNull(t.erp_code), price_column: t.price_column ?? 1 }]),
   );
 }
 
@@ -264,6 +356,11 @@ async function getPriceTableMap(
  * Pedidos aprovados aguardando importação no ERP (padrão), ou todos os
  * aprovados/importados quando `incluir=todos`. `desde` filtra por
  * atualizado_em >= data (a "data que eu puxei" do parceiro).
+ *
+ * `incluir=todos` continua trazendo `approved` e `sent_erp`, faturados
+ * inclusive: é a lista de reconciliação. Importar dela só o que tem
+ * `pedido_erp` nulo E `faturado` false — o resto já está no Control ou já foi
+ * faturado à mão.
  *
  * A lista vem INTEIRA: o PostgREST corta em 1.000 linhas em silêncio, e com
  * `incluir=todos` (a reconciliação) o ERP concluiria que o resto dos pedidos
@@ -383,6 +480,13 @@ function respostaParaJaConfirmado(atual: string, numero: string): ConfirmResult 
   return { outcome: 'conflict', pedido_erp_atual: atual };
 }
 
+/** A linha que o UPDATE devolveu (`.select(...)`), ou undefined. */
+function primeiraAfetada(afetadas: unknown): { id: string; order_number?: number | null } | undefined {
+  return Array.isArray(afetadas)
+    ? (afetadas[0] as { id: string; order_number?: number | null } | undefined)
+    : undefined;
+}
+
 /**
  * Confirma a importação: grava o número do pedido gerado no ERP e tira o
  * pedido da fila. Idempotente — repetir com o mesmo número responde ok.
@@ -391,11 +495,14 @@ function respostaParaJaConfirmado(atual: string, numero: string): ConfirmResult 
  * número → status permite → número livre → grava (só se ninguém gravou no
  * meio). O "já tem número" vem ANTES do status para reconfirmar um `sent_erp`
  * continuar idempotente.
+ *
+ * `parceiro` é o nome da chave que confirmou — vai só para o rastro (048).
  */
 export async function confirmOrderImport(
   company_id: string,
   order_id: string,
   pedido_erp: string,
+  parceiro: string | null = null,
 ): Promise<ConfirmResult> {
   // Uma grafia só para o número do Control: é por ele que o faturamento acha o
   // pedido depois, e "sx-14627" não pode virar um pedido diferente de "SX14627".
@@ -418,20 +525,26 @@ export async function confirmOrderImport(
   if (dono) return { outcome: 'number_in_use', pedido_em_uso: dono };
 
   const agora = new Date().toISOString();
+  const patch = {
+    status: 'sent_erp',
+    erp_order_id: numero,
+    synced_at: agora,
+    updated_at: agora,
+  };
+  // De onde veio o número (048): sem a coluna, o patch fica igual ao de hoje.
+  await gravarOrigemDoNumero(patch, 'api');
+  // A sonda já foi feita pelo `donoDoNumero` e está lembrada.
+  const temNumero = await detectar('orders', 'order_number');
+
   const { data: afetadas, error } = await supabase
     .from('orders')
-    .update({
-      status: 'sent_erp',
-      erp_order_id: numero,
-      synced_at: agora,
-      updated_at: agora,
-    })
+    .update(patch)
     .eq('id', order_id)
     .eq('company_id', company_id)
     // Só grava se ninguém gravou no meio: duas confirmações simultâneas com
     // números diferentes não podem passar as duas com a última vencendo.
     .is('erp_order_id', null)
-    .select('id');
+    .select(temNumero ? 'id, order_number' : 'id');
 
   if (error) {
     // O índice único da 042 pegou o que a pré-checagem não viu (corrida).
@@ -456,5 +569,247 @@ export async function confirmOrderImport(
   // para o ERP" quando a venda interna editasse. Acessório: não derruba a
   // confirmação.
   await registrarNoErp(order_id, company_id, null);
+  // O rastro (048). Nunca lança; sem a tabela, não grava.
+  await registrarEventoErp({
+    company_id,
+    order_id,
+    order_number: primeiraAfetada(afetadas)?.order_number ?? null,
+    tipo: 'numero_gravado',
+    origem: 'api',
+    parceiro,
+    antes: { erp_order_id: null, status: pedido.status },
+    depois: { erp_order_id: numero, status: 'sent_erp' },
+  });
   return { outcome: 'ok', ja_confirmado: false };
+}
+
+// ─── Conciliar: o passivo sent_erp sem número ────────────────────────────────
+
+export type ConciliarResult =
+  | { outcome: 'ok'; ja_conciliado: boolean }
+  /** `pedido_erp` fora da máscara duas letras + até 10 dígitos. */
+  | { outcome: 'invalid_number' }
+  | { outcome: 'not_found' }
+  /** Este pedido já tem OUTRO número do Control. */
+  | { outcome: 'conflict'; pedido_erp_atual: string }
+  /** Só `sent_erp` sem número é conciliado; aprovado usa o `confirmar`. */
+  | { outcome: 'not_reconcilable'; situacao: string }
+  /** O número já é de OUTRO pedido desta empresa. */
+  | { outcome: 'number_in_use'; pedido_em_uso: { id: string; numero: number | null } | null };
+
+function respostaParaJaConciliado(atual: string, numero: string): ConciliarResult {
+  if (normalizarNumeroErp(atual) === numero) return { outcome: 'ok', ja_conciliado: true };
+  return { outcome: 'conflict', pedido_erp_atual: atual };
+}
+
+/**
+ * Dá número do Control a um pedido que foi para o ERP SEM número.
+ *
+ * É o passivo de antes da API: o financeiro lançou no Control e marcou
+ * "enviado ao ERP" na tela sem digitar o número (CS 42 / PL 11 em 15/09). Sem
+ * o número, o faturamento pela API não acha esses pedidos. O `confirmar` não
+ * serve: ele existe para tirar pedido APROVADO da fila, e deixar ele aceitar
+ * `sent_erp` abriria a porta para renumerar pedido já lançado.
+ *
+ * Ordem (contrato da fase 0): formato → existe → já tem número (o mesmo é
+ * idempotente, outro é conflito) → status é sent_erp → número livre → grava só
+ * se ninguém gravou no meio e o pedido continua sent_erp. Não mexe no status.
+ */
+export async function conciliarPedidoErp(
+  company_id: string,
+  order_id: string,
+  pedido_erp: string,
+  parceiro: string | null = null,
+): Promise<ConciliarResult> {
+  const numero = normalizarNumeroErp(pedido_erp);
+  if (!numeroErpValido(numero)) return { outcome: 'invalid_number' };
+
+  const pedido = await lerPedido(company_id, order_id);
+  if (!pedido) return { outcome: 'not_found' };
+
+  if (pedido.erp_order_id) return respostaParaJaConciliado(pedido.erp_order_id, numero);
+  if (pedido.status !== 'sent_erp') return { outcome: 'not_reconcilable', situacao: pedido.status };
+
+  const dono = await donoDoNumero(company_id, numero, order_id);
+  if (dono) return { outcome: 'number_in_use', pedido_em_uso: dono };
+
+  const agora = new Date().toISOString();
+  const patch = { erp_order_id: numero, synced_at: agora, updated_at: agora };
+  await gravarOrigemDoNumero(patch, 'conciliacao');
+  const temNumero = await detectar('orders', 'order_number');
+
+  const { data: afetadas, error } = await supabase
+    .from('orders')
+    .update(patch)
+    .eq('id', order_id)
+    .eq('company_id', company_id)
+    // O pedido tem de continuar como estava na leitura: enviado e sem número.
+    .eq('status', 'sent_erp')
+    .is('erp_order_id', null)
+    .select(temNumero ? 'id, order_number' : 'id');
+
+  if (error) {
+    if ((error as { code?: string }).code === CHAVE_DUPLICADA) {
+      const emUso = await donoDoNumero(company_id, numero, order_id).catch(() => null);
+      return { outcome: 'number_in_use', pedido_em_uso: emUso };
+    }
+    throw new Error(`Falha ao conciliar pedido: ${error.message}`);
+  }
+
+  if (Array.isArray(afetadas) && afetadas.length === 0) {
+    // Alguém mexeu entre a leitura e a gravação: responde pelo estado de agora.
+    const relido = await lerPedido(company_id, order_id);
+    if (!relido) return { outcome: 'not_found' };
+    if (relido.erp_order_id) return respostaParaJaConciliado(relido.erp_order_id, numero);
+    if (relido.status !== 'sent_erp') return { outcome: 'not_reconcilable', situacao: relido.status };
+    throw new Error('Falha ao conciliar pedido: nenhuma linha gravada');
+  }
+
+  // A foto do que o Control conhece (046) e o rastro (048). Nenhum dos dois
+  // derruba a conciliação: o número já está gravado.
+  await registrarNoErp(order_id, company_id, null);
+  await registrarEventoErp({
+    company_id,
+    order_id,
+    order_number: primeiraAfetada(afetadas)?.order_number ?? null,
+    tipo: 'numero_conciliado',
+    origem: 'api',
+    parceiro,
+    antes: { erp_order_id: null, status: pedido.status },
+    depois: { erp_order_id: numero, status: pedido.status },
+  });
+  return { outcome: 'ok', ja_conciliado: false };
+}
+
+// ─── Conciliação: só contagens ───────────────────────────────────────────────
+
+export interface ContagensDaConciliacao {
+  /** A fila do `GET /pedidos`: aprovado, sem número, não faturado. */
+  fila_aprovados_sem_numero_nao_faturados: number;
+  /** O passivo que o `/conciliar` resolve, ainda sem faturamento. */
+  enviados_sem_numero_nao_faturados: number;
+  /** O mesmo passivo, já faturado à mão. */
+  enviados_sem_numero_faturados: number;
+  /** Faturado à mão sem nunca ter ido para o Control pelo app. */
+  aprovados_faturados_sem_numero: number;
+  /** No Control, esperando o faturamento chegar. */
+  enviados_com_numero_sem_faturamento: number;
+}
+
+interface Grandeza {
+  status: 'approved' | 'sent_erp';
+  comNumero: boolean;
+  faturado: boolean;
+}
+
+const GRANDEZAS: Record<keyof ContagensDaConciliacao, Grandeza> = {
+  fila_aprovados_sem_numero_nao_faturados: { status: 'approved', comNumero: false, faturado: false },
+  enviados_sem_numero_nao_faturados: { status: 'sent_erp', comNumero: false, faturado: false },
+  enviados_sem_numero_faturados: { status: 'sent_erp', comNumero: false, faturado: true },
+  aprovados_faturados_sem_numero: { status: 'approved', comNumero: false, faturado: true },
+  enviados_com_numero_sem_faturamento: { status: 'sent_erp', comNumero: true, faturado: false },
+};
+
+async function contarPedidos(company_id: string, g: Grandeza, temInvoiced: boolean): Promise<number> {
+  // Sem a coluna (banco antes da 027) nenhum pedido está faturado.
+  if (g.faturado && !temInvoiced) return 0;
+
+  // `count: 'exact'` com `limit(0)`: o banco devolve só a contagem, nenhuma
+  // linha. GET de verdade — HEAD já disse "existe" para tabela que não existia.
+  let query = supabase
+    .from('orders')
+    .select('id', { count: 'exact' })
+    .eq('company_id', company_id)
+    .eq('status', g.status);
+  query = g.comNumero ? query.not('erp_order_id', 'is', null) : query.is('erp_order_id', null);
+  if (temInvoiced) {
+    query = g.faturado ? query.eq('invoiced', true) : query.or('invoiced.is.null,invoiced.eq.false');
+  }
+
+  const { count, error } = await query.limit(0);
+  if (error) throw new Error(`Falha ao contar os pedidos da conciliação: ${error.message}`);
+  // Sem contagem não há número honesto para devolver: 500, e o ERP pergunta de novo.
+  if (typeof count !== 'number') {
+    throw new Error('Falha ao contar os pedidos da conciliação: o banco não devolveu a contagem');
+  }
+  return count;
+}
+
+/**
+ * As grandezas da conciliação da empresa da chave — só contagens, nenhuma
+ * linha, nenhum dado de cliente. É o painel que o Fábio e o Yan olham antes de
+ * ligar o canal e depois de cada rodada. Erro em qualquer contagem sobe (500).
+ */
+export async function contarConciliacao(company_id: string): Promise<ContagensDaConciliacao> {
+  // Como na fila: sonda de `invoiced` que falha por rede não pode virar "sem
+  // faturamento" e zerar as contagens de faturados em silêncio.
+  const temInvoiced = await detectarOuFalhar('orders', 'invoiced');
+  const nomes = Object.keys(GRANDEZAS) as Array<keyof ContagensDaConciliacao>;
+  const valores = await Promise.all(nomes.map((nome) => contarPedidos(company_id, GRANDEZAS[nome], temInvoiced)));
+
+  const contagens = {} as ContagensDaConciliacao;
+  nomes.forEach((nome, i) => {
+    contagens[nome] = valores[i] ?? 0;
+  });
+  return contagens;
+}
+
+// ─── Pedidos excluídos que já tinham número do Control ───────────────────────
+
+export interface PedidoExcluidoParceiro {
+  /** O id que o pedido tinha no app (o mesmo do `GET /pedidos`). */
+  id: string;
+  numero: number | null;
+  pedido_erp: string;
+  excluido_em: string;
+}
+
+interface LinhaExcluida {
+  order_id: string;
+  order_number: number | null;
+  deleted_at: string;
+  pedido_erp: string | null;
+}
+
+/**
+ * Os pedidos excluídos no app que já estavam no Control (com número na cópia
+ * da 040), para o ERP cancelar do lado dele.
+ *
+ * Nunca devolve o `snapshot` (tem cliente, peças e valores) nem quem excluiu:
+ * só id, número do app, número do Control e o momento. A lista vem inteira,
+ * e erro em qualquer página sobe.
+ */
+export async function listarExcluidosComNumero(
+  company_id: string,
+  desde?: string,
+): Promise<PedidoExcluidoParceiro[]> {
+  // Sem a 040 não existe cópia de pedido excluído. Um soluço na sonda, porém,
+  // não pode virar "nenhum excluído": aí o erro sobe.
+  if (!(await detectarOuFalhar('deleted_orders', 'order_id'))) return [];
+
+  const linhas = await buscarTudoOuFalhar<LinhaExcluida>((de, ate) => {
+    let query = supabase
+      .from('deleted_orders')
+      .select('order_id, order_number, deleted_at, pedido_erp:snapshot->>erp_order_id')
+      .eq('company_id', company_id)
+      .not('snapshot->>erp_order_id', 'is', null);
+    if (desde) query = query.gte('deleted_at', desde);
+    return query
+      .order('deleted_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(de, ate);
+  });
+
+  const excluidos: PedidoExcluidoParceiro[] = [];
+  for (const linha of linhas) {
+    const pedidoErp = textoOuNull(linha.pedido_erp);
+    if (!pedidoErp) continue;
+    excluidos.push({
+      id: linha.order_id,
+      numero: linha.order_number ?? null,
+      pedido_erp: pedidoErp,
+      excluido_em: linha.deleted_at,
+    });
+  }
+  return excluidos;
 }

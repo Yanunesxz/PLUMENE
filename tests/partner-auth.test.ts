@@ -11,7 +11,9 @@ import { criarSupabaseFake } from './supabaseFake.js';
  *     chave (é o que o Railway responde hoje, 15/09/2026: a env nunca existiu);
  *   • chave errada ou ausente é 401 PARTNER_UNAUTHORIZED;
  *   • chave certa amarra o parceiro à empresa dele — é o `company_id` que
- *     escopa toda consulta e gravação das seis rotas.
+ *     escopa toda consulta e gravação de todas as rotas;
+ *   • (fase 0) o status diz os canais de pedido, faturamento e cadastro, e
+ *     toda chamada — inclusive a recusada — fica em erp_sync_log sem a chave.
  */
 
 const EMPRESA = 'empresa-1';
@@ -117,11 +119,14 @@ describe('requirePartner', () => {
 
 describe('GET /partner/v1/status na aplicação de verdade', () => {
   let app: FastifyInstance;
+  let fake: ReturnType<typeof criarSupabaseFake>;
 
   beforeAll(async () => {
     process.env['PARTNER_API_KEYS'] = CHAVES;
     vi.resetModules();
-    const fake = criarSupabaseFake({});
+    // Sem `companies` registrada: a sonda do canal diz "existe" e a empresa
+    // não tem linha — valem os padrões de hoje (nenhum canal na API).
+    fake = criarSupabaseFake({});
     vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
     const { buildApp } = await import('../apps/api/src/app.js');
     app = await buildApp();
@@ -143,6 +148,83 @@ describe('GET /partner/v1/status na aplicação de verdade', () => {
     expect(Number.isNaN(Date.parse(corpo.servidor_hora))).toBe(false);
   });
 
+  it('o status diz quais mãos estão ligadas para a API — sem a virada, as de hoje', async () => {
+    const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+
+    expect(res.statusCode).toBe(200);
+    expect((res.json() as { canais: unknown }).canais).toEqual({
+      pedido_erp: 'manual',
+      faturamento: 'manual',
+      cadastro: 'carga',
+    });
+  });
+
+  it('toda chamada fica registrada em erp_sync_log com a empresa e o parceiro da chave', async () => {
+    const antes = fake.gravacoes.length;
+    const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+    expect(res.statusCode).toBe(200);
+
+    // O registro roda no onResponse, depois que a resposta saiu.
+    await vi.waitFor(() => {
+      expect(fake.gravacoes.slice(antes).some((g) => g.tabela === 'erp_sync_log')).toBe(true);
+    });
+    const linha = fake.ultimaGravacao('erp_sync_log', 'insert')?.valores as Record<string, unknown>;
+    expect(linha).toMatchObject({
+      company_id: EMPRESA,
+      parceiro: 'control-cs',
+      sync_type: 'parceiro',
+      status: 'success',
+      rota: '/partner/v1/status',
+      metodo: 'GET',
+      http_status: 200,
+    });
+    expect(typeof linha['started_at']).toBe('string');
+    expect(JSON.stringify(linha)).not.toContain(CHAVE);
+  });
+
+  it('chamada com chave errada também é registrada: 401, sem empresa, sem parceiro e sem a chave', async () => {
+    const antes = fake.gravacoes.length;
+    await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': 'chave-errada-de-teste' } });
+
+    await vi.waitFor(() => {
+      expect(fake.gravacoes.slice(antes).some((g) => g.tabela === 'erp_sync_log')).toBe(true);
+    });
+    const linha = fake.ultimaGravacao('erp_sync_log', 'insert')?.valores as Record<string, unknown>;
+    expect(linha).toMatchObject({
+      company_id: null,
+      parceiro: null,
+      http_status: 401,
+      status: 'error',
+      detalhe: { code: 'PARTNER_UNAUTHORIZED' },
+    });
+    expect(JSON.stringify(linha)).not.toContain('chave-errada-de-teste');
+  });
+
+  it('a rota registrada é o PADRÃO, não a URL com o id; o canal fechado fica no detalhe', async () => {
+    const antes = fake.gravacoes.length;
+    const res = await app.inject({
+      method: 'POST',
+      url: '/partner/v1/pedidos/00000000-0000-0000-0000-000000000001/confirmar',
+      headers: { 'x-api-key': CHAVE },
+      payload: { pedido_erp: 'ZZ0000001' },
+    });
+
+    expect(res.statusCode).toBe(409);
+    expect(res.json()).toMatchObject({ code: 'CANAL_FECHADO', canal: 'pedido_erp', valor_atual: 'manual' });
+    await vi.waitFor(() => {
+      expect(fake.gravacoes.slice(antes).some((g) => g.tabela === 'erp_sync_log')).toBe(true);
+    });
+    const linha = fake.ultimaGravacao('erp_sync_log', 'insert')?.valores as Record<string, unknown>;
+    expect(linha).toMatchObject({
+      rota: '/partner/v1/pedidos/:id/confirmar',
+      metodo: 'POST',
+      http_status: 409,
+      detalhe: { code: 'CANAL_FECHADO', canal: 'pedido_erp', valor_atual: 'manual' },
+    });
+    // Nada de pedido foi gravado.
+    expect(fake.gravacoes.slice(antes).filter((g) => g.tabela === 'orders')).toHaveLength(0);
+  });
+
   it('com chave errada responde 401 PARTNER_UNAUTHORIZED', async () => {
     const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': 'errada' } });
 
@@ -155,5 +237,50 @@ describe('GET /partner/v1/status na aplicação de verdade', () => {
 
     expect(res.statusCode).toBe(401);
     expect(res.json()).toMatchObject({ code: 'PARTNER_UNAUTHORIZED' });
+  });
+});
+
+describe('GET /partner/v1/status com os canais virados (048 aplicada)', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    process.env['PARTNER_API_KEYS'] = CHAVES;
+    vi.resetModules();
+    const fake = criarSupabaseFake({
+      // Fila de um item: a sonda e a leitura recebem a mesma linha.
+      companies: {
+        data: {
+          canal_pedido_erp: 'api',
+          canal_faturamento: 'api',
+          canal_cadastro: 'firebird',
+          canal_retrato: 'carga',
+          canal_catalogo: 'carga',
+        },
+        error: null,
+      },
+    });
+    vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
+    const { buildApp } = await import('../apps/api/src/app.js');
+    app = await buildApp();
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    vi.doUnmock(SUPABASE);
+    delete process.env['PARTNER_API_KEYS'];
+  });
+
+  it('responde os três canais que o parceiro precisa saber, sem mudar os campos antigos', async () => {
+    const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+
+    expect(res.statusCode).toBe(200);
+    const corpo = res.json() as Record<string, unknown>;
+    expect(Object.keys(corpo).sort()).toEqual(['canais', 'ok', 'parceiro', 'servidor_hora']);
+    expect(corpo).toMatchObject({
+      ok: true,
+      parceiro: 'control-cs',
+      canais: { pedido_erp: 'api', faturamento: 'api', cadastro: 'firebird' },
+    });
   });
 });
