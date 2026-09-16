@@ -1349,7 +1349,7 @@ Corpo: `{ "clientes": [ ... ] }`, `{ "dados": [ ... ] }` ou a lista pura.
 | `limite_credito` | número ou texto | Não | `1500.5` ou `"1.500,50"`. `null` limpa; negativo ou ilegível não mexe e dá aviso |
 | `whatsapp` | texto | Não | Com DDD. `null` limpa |
 | `email` | texto | Não | `null` limpa |
-| `data_update` | data ISO | Não | Quando o cadastro mudou no ERP (`DATA_UPDATE`), **com fuso**. Ausente = o momento do envio. É o carimbo que evita o eco: o que o Control gravou por último não volta no `GET /clientes?desde=` |
+| `data_update` | data ISO | Não | Quando o cadastro mudou no ERP (`DATA_UPDATE`), **com fuso**. Informativo: é conferido (sem fuso volta em `avisos`), mas **não é gravado e não conta como mudança** — o mesmo cadastro com outro `data_update` é `sem_mudanca`. O carimbo que evita o eco no `GET /clientes?desde=` é o momento em que o app gravou o registro |
 
 **Nota da tabela de preço:** o vínculo é pelo **código** do ERP. Tabela no app
 sem esse código não casa com nada — o cliente fica com a tabela que tinha, e a
@@ -1468,10 +1468,14 @@ registro como veio — mais estes campos só de leitura:
 | `atualizado_em` | Quando mudou no app |
 | `atualizado_pelo_control_em` | Quando o Control mandou pela última vez |
 
-**O que o próprio Control gravou por último não volta** (o app compara a data
-da mudança com a data da sua última gravação), então o eco é raro; se algum
-voltar, reenviar é `sem_mudanca`. Numa instalação sem a migração 049 a lista
-traz também o que o Control acabou de mandar, com aviso. Resposta:
+**O que o próprio Control gravou por último não volta** — nem pelo
+`POST /clientes`, nem pelo `POST /retrato`: o app guarda o momento de cada
+gravação sua e só devolve o cliente que mudou depois dela (com alguns segundos
+de folga, porque o banco carimba a alteração com a própria hora). Se o app
+mexeu num cliente e você ainda não puxou, uma gravação sua nesse meio tempo
+**não** esconde a mudança do app: ela continua saindo aqui. O eco é raro; se
+algum voltar, reenviar é `sem_mudanca`. Numa instalação sem a migração 049 a
+lista traz também o que o Control acabou de mandar, com aviso. Resposta:
 `{ total, servidor_hora, clientes: [...], avisos: [...] }`.
 
 **Exemplo** — um cliente que o representante cadastrou no app hoje:
@@ -1551,8 +1555,11 @@ gravação que não é recusa do banco).
 ## Boas práticas (cadastros)
 
 - Envie a cada ~5 min. Não precisa mandar todos os clientes sempre — mandar só
-  os que mudaram (por `DATA_UPDATE`, e mande-a em `data_update`) deixa o lote
-  pequeno. Campo que você não mandar fica como está; para limpar, mande `null`.
+  os que mudaram (por `DATA_UPDATE`) deixa o lote pequeno. Campo que você não
+  mandar fica como está; para limpar, mande `null`. Reenviar um cliente só
+  porque o `DATA_UPDATE` mudou (por exemplo, depois de gravar o que puxou do
+  `GET /clientes`) é inofensivo: sem outro campo diferente, é `sem_mudanca` e
+  nada volta no `GET`.
 - Na mesma rodada, puxe `GET /clientes?desde=` e `GET /representantes?desde=`
   com a hora da rodada anterior (`servidor_hora` da resposta) e crie no ERP os
   `novo_no_control`.

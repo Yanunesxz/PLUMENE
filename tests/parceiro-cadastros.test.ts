@@ -949,7 +949,7 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
     expect(fake.filtrosDe('customers', 'select')[0]!.args[0]).toContain('block_reason');
   });
 
-  it('COM a 049: pendência financeira (com o momento), títulos vencidos e data_update no cadastro, e o carimbo do Control', async () => {
+  it('COM a 049: pendência financeira (com o momento) e títulos vencidos no cadastro; o carimbo do Control é o momento da gravação, nunca o data_update', async () => {
     const { service, fake } = await carregar(
       {
         price_tables: { data: [], error: null },
@@ -977,11 +977,11 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
     expect(fake.filtrosDe('customers', 'select')[0]!.args[0]).toContain('pendencia_financeira');
 
     const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
-    expect(patch).toMatchObject({
-      pendencia_financeira: 1234.56,
-      titulos_vencidos: 3,
-      erp_updated_at: '2026-09-16T10:00:00-03:00',
-    });
+    expect(patch).toMatchObject({ pendencia_financeira: 1234.56, titulos_vencidos: 3 });
+    // O DATA_UPDATE do Control é passado: gravado como carimbo, o cliente
+    // voltaria no GET ?desde= logo depois (a trigger põe updated_at = agora).
+    expect(patch['erp_updated_at']).not.toBe('2026-09-16T10:00:00-03:00');
+    expect(patch['erp_updated_at']).toBe(patch['updated_at']);
     expect(typeof patch['pendencia_financeira_em']).toBe('string');
     esperarSoColunasReais(patch, 'customers', 49);
 
@@ -1020,6 +1020,89 @@ describe('clientes — o CNPJ é a chave entre os sistemas', () => {
     expect(r).toMatchObject({ atualizados: 1, sem_mudanca: 1 });
     const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
     expect(patch['erp_updated_at']).toBe(patch['updated_at']);
+  });
+
+  it('COM a 049: data_update sozinho NÃO é mudança — o Control recarimbando ao gravar o que puxou não vira pingue-pongue', async () => {
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: emSequencia(
+          {
+            data: [
+              {
+                id: 'a',
+                erp_id: '00001',
+                name: 'LOJA A',
+                cnpj: null,
+                erp_updated_at: '2026-09-16T12:00:00+00:00',
+                updated_at: '2026-09-16T12:00:00.250+00:00',
+              },
+            ],
+            error: null,
+          },
+          OK,
+        ),
+      },
+      { com049: true },
+    );
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'LOJA A', data_update: '2026-09-16T15:30:00-03:00' },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [] });
+    expect(fake.gravacoes).toHaveLength(0);
+  });
+
+  it('COM a 049: o app mexeu depois do último carimbo e o Control ainda não puxou — grava o que veio, mas NÃO carimba', async () => {
+    // Carimbar aqui esconderia do GET ?desde= a mudança que o app fez e o
+    // Control nunca viu. Em dia (updated_at dentro da folga), carimba.
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: emSequencia(
+          {
+            data: [
+              {
+                id: 'app-pendente',
+                erp_id: '00001',
+                name: 'LOJA A',
+                cnpj: null,
+                whatsapp: null,
+                erp_updated_at: '2026-09-16T12:00:00+00:00',
+                updated_at: '2026-09-16T12:10:00+00:00',
+              },
+              {
+                id: 'em-dia',
+                erp_id: '00002',
+                name: 'LOJA B',
+                cnpj: null,
+                whatsapp: null,
+                erp_updated_at: '2026-09-16T12:00:00+00:00',
+                // A trigger da 013: um pouco depois do carimbo, dentro da folga.
+                updated_at: '2026-09-16T12:00:01.500+00:00',
+              },
+            ],
+            error: null,
+          },
+          OK,
+        ),
+      },
+      { com049: true },
+    );
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'LOJA A', whatsapp: '00900000001' },
+      { codigo: '2', razao_social: 'LOJA B', whatsapp: '00900000002' },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 2 });
+    const updates = fake.gravacoes.filter((g) => g.tabela === 'customers' && g.operacao === 'update').map(valoresDe);
+    expect(updates[0]).toMatchObject({ whatsapp: '00900000001' });
+    expect('erp_updated_at' in updates[0]!).toBe(false);
+    expect(typeof updates[0]!['updated_at']).toBe('string');
+    expect(updates[1]).toMatchObject({ whatsapp: '00900000002' });
+    expect(updates[1]!['erp_updated_at']).toBe(updates[1]!['updated_at']);
   });
 
   it('valores ruins da 049 não mexem e avisam; SEM a 049 os campos ficam de fora com aviso', async () => {
@@ -1500,6 +1583,32 @@ describe('o que mudou no app — listarClientesAlterados', () => {
     const { registros } = await service.listarClientesAlterados(EMPRESA);
 
     expect(registros[0]).toMatchObject({ codigo: null, novo_no_control: true, chave: '00000000000191', tabela_preco: null });
+  });
+
+  it('COM a 049: a trigger da 013 (updated_at uns instantes depois do carimbo) não devolve o cliente; passou da folga, devolve', async () => {
+    const { service } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: {
+          data: [
+            // O Control gravou: o carimbo é a hora da API, updated_at a do banco.
+            { ...LOJA, id: 'trigger', erp_id: '00001', erp_updated_at: '2026-09-16T12:00:00.000+00:00', updated_at: '2026-09-16T12:00:00.180+00:00' },
+            // Sob carga, alguns segundos — ainda a mão do Control.
+            { ...LOJA, id: 'lento', erp_id: '00002', erp_updated_at: '2026-09-16T12:00:00Z', updated_at: '2026-09-16T12:00:04.900Z' },
+            // O rep trocou a tabela minutos depois.
+            { ...LOJA, id: 'app', erp_id: '00003', erp_updated_at: '2026-09-16T12:00:00Z', updated_at: '2026-09-16T12:03:00Z' },
+            // Carimbo em outro fuso, mesmo instante.
+            { ...LOJA, id: 'fuso', erp_id: '00004', erp_updated_at: '2026-09-16T09:00:00-03:00', updated_at: '2026-09-16T12:00:00.500Z' },
+          ],
+          error: null,
+        },
+      },
+      { com049: true },
+    );
+
+    const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-16T00:00:00Z');
+
+    expect(registros.map((r) => r.codigo)).toEqual(['00003']);
   });
 
   it('COM a 049: o que o próprio Control gravou por último não volta; o que o app mexeu depois volta com os campos da 049', async () => {

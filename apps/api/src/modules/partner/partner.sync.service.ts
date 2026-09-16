@@ -36,11 +36,19 @@
  * pendência financeira, títulos vencidos, motivo do bloqueio (block_reason, da
  * 001) e o carimbo `erp_updated_at`. Bloqueio do Control NÃO trava o
  * representante — o financeiro é avisado (o aviso é da tela).
+ *
+ * O CARIMBO (`erp_updated_at`) é o momento em que o app gravou o que o Control
+ * mandou — nunca o `data_update` do Control, que é passado e faria o cliente
+ * voltar no GET ?desde= logo em seguida. E `data_update` sozinho não é
+ * mudança: reenviar o mesmo cadastro com outro DATA_UPDATE é `sem_mudanca`
+ * (senão o Control, recarimbando ao gravar o que puxou, entraria num
+ * pingue-pongue sem fim). As regras do eco moram em partner.eco.ts.
  */
 import { apenasDigitos, codigoCanonico, codigoMiolo, linhaDeEndereco } from '@csb/shared';
 import { supabase } from '../../config/supabase.js';
 import { buscarTudoOuFalhar, emLotes } from '../../lib/paginacao.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
+import { podeCarimbar, ultimaMaoFoiDoControl } from './partner.eco.js';
 
 // ─── Tipos do corpo que o parceiro envia ─────────────────────────────────────
 
@@ -80,9 +88,10 @@ export interface ClienteParceiro {
   pendencia_financeira?: number | string | null;
   titulos_vencidos?: number | string | null;
   /**
-   * Quando o cadastro mudou no Control (DATA_UPDATE), momento COM fuso. Vai
-   * para customers.erp_updated_at; ausente (ou `null`), o carimbo é o momento
-   * do envio. Sem fuso, não mexe e avisa.
+   * Quando o cadastro mudou no Control (DATA_UPDATE), momento COM fuso.
+   * Informativo: é conferido (sem fuso vira aviso), mas não é gravado e não
+   * conta como mudança. O carimbo do Control (customers.erp_updated_at) é o
+   * momento em que o app gravou o registro.
    */
   data_update?: string | null;
 }
@@ -276,10 +285,9 @@ function lerInteiro(obj: Record<string, unknown>, chave: string): Recebido<numbe
 }
 
 /**
- * Momento com fuso (`data_update`). `null` e "" contam como não veio: um
- * carimbo não se "limpa" — na falta dele vale o momento do envio. Sem fuso ou
- * ilegível não mexe e avisa: "2026-09-16T10:00:00" é uma hora no Railway (UTC)
- * e outra no Control (Brasília).
+ * Momento com fuso (`data_update`). `null` e "" contam como não veio. Sem fuso
+ * ou ilegível volta como aviso: "2026-09-16T10:00:00" é uma hora no Railway
+ * (UTC) e outra no Control (Brasília).
  */
 function lerMomento(obj: Record<string, unknown>, chave: string): Recebido<string> | { veio: 'invalido' } {
   if (!tem(obj, chave)) return NAO_VEIO;
@@ -306,16 +314,6 @@ function mesmoValor(atual: unknown, novo: unknown): boolean {
     return Number.isFinite(n) && Math.round(n * 100) === Math.round(novo * 100);
   }
   return a === novo;
-}
-
-/** Colunas de momento comparam pelo instante: "10:00-03:00" e "13:00Z" são iguais. */
-const COLUNAS_DE_MOMENTO = new Set(['erp_updated_at']);
-
-function mesmoValorDaColuna(coluna: string, atual: unknown, novo: unknown): boolean {
-  if (COLUNAS_DE_MOMENTO.has(coluna) && typeof atual === 'string' && typeof novo === 'string') {
-    return Date.parse(atual) === Date.parse(novo);
-  }
-  return mesmoValor(atual, novo);
 }
 
 /** "a, b, c" com no máximo CODIGOS_POR_AVISO itens. */
@@ -478,7 +476,13 @@ export async function receberClientes(
   // PAGINADO e ordenado por id: o PostgREST corta em 1.000 linhas sem avisar,
   // e a CS já tem mais de 2.600 clientes. Sem paginar, todo cliente da página
   // 2 em diante ficava fora deste mapa — e a carga o CRIARIA de novo.
-  const colunas = [COLUNAS_DO_CLIENTE, cadastroReal ? COLUNAS_DA_041 : null, com049 ? COLUNAS_DA_049 : null]
+  // Com a 049, `updated_at` junto do carimbo: é o que diz se o app mexeu
+  // depois da última mão do Control (e aí o carimbo não é regravado).
+  const colunas = [
+    COLUNAS_DO_CLIENTE,
+    cadastroReal ? COLUNAS_DA_041 : null,
+    com049 ? `${COLUNAS_DA_049}, updated_at` : null,
+  ]
     .filter(Boolean)
     .join(', ');
   const existentes = await clientesDaEmpresa(company_id, colunas);
@@ -497,7 +501,14 @@ export async function receberClientes(
 
   // ── 2. Decide, registro a registro, o que gravar.
   const paraInserir: Array<{ codigo: string; linha: Record<string, unknown> }> = [];
-  const paraAtualizar: Array<{ codigo: string; id: string; patch: Record<string, unknown>; adotado: boolean }> = [];
+  const paraAtualizar: Array<{
+    codigo: string;
+    id: string;
+    patch: Record<string, unknown>;
+    adotado: boolean;
+    /** Grava o carimbo do Control nesta gravação (049, ver partner.eco.ts). */
+    carimbar: boolean;
+  }> = [];
   const vistosNoLote = new Set<string>();
   const cnpjsNoLote = new Set<string>();
   const alvosNoLote = new Set<string>();
@@ -649,12 +660,8 @@ export async function receberClientes(
       if (com049) pedido['titulos_vencidos'] = titulos.valor;
       else camposQuePrecisamDa049 = true;
     }
-    const dataUpdate = lerMomento(raw, 'data_update');
-    if (dataUpdate.veio === 'invalido') datasInvalidas.add(codigo);
-    else if (dataUpdate.veio && dataUpdate.valor !== null) {
-      if (com049) pedido['erp_updated_at'] = dataUpdate.valor;
-      else camposQuePrecisamDa049 = true;
-    }
+    // `data_update` é só conferido: não é gravado nem conta como mudança.
+    if (lerMomento(raw, 'data_update').veio === 'invalido') datasInvalidas.add(codigo);
 
     for (const [campo, coluna] of [
       ['inscricao_estadual', 'inscricao_estadual'],
@@ -673,7 +680,7 @@ export async function receberClientes(
     if (existente) {
       const patch: Record<string, unknown> = {};
       for (const [coluna, valor] of Object.entries(pedido)) {
-        if (!mesmoValorDaColuna(coluna, existente[coluna], valor)) patch[coluna] = valor;
+        if (!mesmoValor(existente[coluna], valor)) patch[coluna] = valor;
       }
       // O `erp_id` de quem já tem código nunca é reescrito — só casa. Quem é
       // achado pelo CNPJ sem código aprende o do Control.
@@ -682,13 +689,11 @@ export async function receberClientes(
         semMudanca++;
         continue;
       }
-      patch['updated_at'] = agora;
-      if (com049) {
-        // O carimbo do Control: o DATA_UPDATE dele, ou o momento deste envio.
-        if (!('erp_updated_at' in patch)) patch['erp_updated_at'] = agora;
-        if ('pendencia_financeira' in patch) patch['pendencia_financeira_em'] = agora;
-      }
-      paraAtualizar.push({ codigo, id: existente.id, patch, adotado });
+      if (com049 && 'pendencia_financeira' in patch) patch['pendencia_financeira_em'] = agora;
+      // `updated_at` e o carimbo entram na hora de gravar (passo 3), com o
+      // momento daquela gravação — não o do começo do lote.
+      const carimbar = com049 && podeCarimbar(existente['updated_at'], existente['erp_updated_at']);
+      paraAtualizar.push({ codigo, id: existente.id, patch, adotado, carimbar });
     } else {
       // Cliente novo não tem nada a preservar: a linha vai completa, com as
       // mesmas chaves em todas (o insert em lote do PostgREST grava NULL — e
@@ -776,6 +781,12 @@ export async function receberClientes(
   let atualizados = 0;
   let adotadosPorCnpj = 0;
   for (const u of paraAtualizar) {
+    // O momento desta gravação, tomado logo antes dela: é o carimbo que a
+    // trigger da 013 vai ultrapassar só pela folga (partner.eco.ts). Com o
+    // `agora` do começo do lote, um lote longo passaria da folga.
+    const momento = new Date().toISOString();
+    u.patch['updated_at'] = momento;
+    if (u.carimbar) u.patch['erp_updated_at'] = momento;
     const { error } = await supabase
       .from('customers')
       .update(u.patch)
@@ -826,7 +837,7 @@ export async function receberClientes(
   }
   if (datasInvalidas.size > 0) {
     avisos.push(
-      `"data_update" precisa ser um momento com fuso (Z ou -03:00) — o carimbo usado foi o do envio: ${listar(datasInvalidas)}.`,
+      `"data_update" precisa ser um momento com fuso (Z ou -03:00) — o registro foi tratado sem ele: ${listar(datasInvalidas)}.`,
     );
   }
   if (camposQuePrecisamDa041) {
@@ -836,7 +847,7 @@ export async function receberClientes(
   }
   if (camposQuePrecisamDa049) {
     avisos.push(
-      'Pendência financeira, títulos vencidos e data_update ficam guardados depois da migração 049 — por ora foram ignorados.',
+      'Pendência financeira e títulos vencidos ficam guardados depois da migração 049 — por ora foram ignorados.',
     );
   }
   if (adotadosPorCnpj > 0) {
@@ -1058,9 +1069,11 @@ export async function receberRepresentantes(
 // — se quiser — devolver como veio (reenviar é `sem_mudanca`).
 //
 // Com a 049, o que o próprio Control gravou e ninguém mexeu depois NÃO volta:
-// updated_at ≤ erp_updated_at é "a última mão foi a dele". Sem a 049 não há
-// como saber, e a lista traz tudo que mudou desde `desde` — inclusive o que o
-// Control acabou de mandar; inofensivo, só maior.
+// updated_at até a folga depois de erp_updated_at é "a última mão foi a dele"
+// (partner.eco.ts — a trigger da 013 grava updated_at com a hora do banco, um
+// pouco depois do carimbo). Sem a 049 não há como saber, e a lista traz tudo
+// que mudou desde `desde` — inclusive o que o Control acabou de mandar;
+// inofensivo, só maior.
 
 /**
  * Os clientes que mudaram no app desde `desde` (ou todos, sem `desde`),
@@ -1095,7 +1108,7 @@ export async function listarClientesAlterados(
   for (const c of linhas) {
     // A última mão foi a do Control? Então ele já tem isto.
     const carimboDoControl = typeof c['erp_updated_at'] === 'string' ? c['erp_updated_at'] : null;
-    if (com049 && carimboDoControl && Date.parse(c.updated_at) <= Date.parse(carimboDoControl)) continue;
+    if (com049 && ultimaMaoFoiDoControl(c.updated_at, carimboDoControl)) continue;
 
     const texto = (coluna: string): string | null => {
       const v = c[coluna];

@@ -115,6 +115,41 @@ describe('receberRetrato', () => {
     expect(fake.filtrosDe('customers', 'order').map((f) => f.args[0])).toContain('id');
   });
 
+  it('carimba só quem estava em dia com o Control: mudança do app ainda não puxada continua saindo no GET', async () => {
+    const { service, fake } = await carregar({
+      customers: emSequencia(
+        {
+          data: [
+            // Nunca carimbado: o Control passa a conhecer agora.
+            { ...LOJA, id: 'nunca', erp_id: '00001', cnpj: '00000000000101', erp_updated_at: null, updated_at: '2026-09-01T00:00:00Z' },
+            // A trigger ultrapassou o carimbo por milissegundos: em dia.
+            { ...LOJA, id: 'em-dia', erp_id: '00002', cnpj: '00000000000102', erp_updated_at: '2026-09-15T06:00:00Z', updated_at: '2026-09-15T06:00:00.300Z' },
+            // O rep trocou a tabela à tarde e o Control ainda não puxou.
+            { ...LOJA, id: 'app', erp_id: '00003', cnpj: '00000000000103', erp_updated_at: '2026-09-15T06:00:00Z', updated_at: '2026-09-15T15:00:00Z' },
+          ],
+          error: null,
+        },
+        OK,
+      ),
+    });
+
+    const referencia = '2026-09-16T06:00:00-03:00';
+    const r = await service.receberRetrato(EMPRESA, [
+      { cnpj: '00000000000101', total_comprado: 10, referencia },
+      { cnpj: '00000000000102', total_comprado: 20, referencia },
+      { cnpj: '00000000000103', total_comprado: 30, referencia },
+    ]);
+
+    expect(r.atualizados).toBe(3);
+    const updates = fake.gravacoes.filter((g) => g.tabela === 'customers' && g.operacao === 'update').map(valoresDe);
+    expect(updates[0]!['erp_updated_at']).toBe(updates[0]!['updated_at']);
+    expect(updates[1]!['erp_updated_at']).toBe(updates[1]!['updated_at']);
+    expect('erp_updated_at' in updates[2]!).toBe(false);
+    expect(updates[2]).toMatchObject({ total_purchased: 30 });
+    // O que decide o carimbo vem na leitura.
+    expect(String(fake.filtrosDe('customers', 'select')[0]!.args[0])).toContain('erp_updated_at');
+  });
+
   it('sem CNPJ, acha pelo código (miolo); cliente que não existe é ignorado; sem os dois também', async () => {
     const { service, fake } = await carregar({
       customers: [{ data: [LOJA], error: null }, OK],

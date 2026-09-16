@@ -253,6 +253,9 @@ apps/api/src/
 │   │                       name/description do CRM NUNCA regravados (descrição vai em erp_description)
 │   │                       partner.retrato.{controller,service}.ts → retrato do cliente (última
 │   │                       compra só para frente, total, vencido, pendência, títulos vencidos)
+│   │                       partner.eco.ts → o anti-eco do GET /clientes?desde=: a última mão foi do
+│   │                       Control (erp_updated_at com folga para a trigger da 013)? Carimbo só
+│   │                       quando já estava em dia — mudança do app não puxada nunca some do GET
 │   │                       partner.sincronizacao.controller.ts → o Control avisa que rodou a passada
 │   │                       pedida pelo botão da tela (limpa companies.sync_solicitado_em)
 │   ├── integracao/       → A TELA DA INTEGRAÇÃO (decisão 7): GET /erp/integracao/status (canais,

@@ -23,7 +23,10 @@
  *     ilegível ou negativo é recusado INTEIRO (o Control corrige e reenvia);
  *   • grava só o que mudou, com updated_at (e erp_updated_at, o carimbo da
  *     última mão do Control — é o que tira o cliente do GET ?desde= quando
- *     ninguém mexeu nele depois). Sem mudança, nada vai ao banco;
+ *     ninguém mexeu nele depois). O carimbo é o momento de CADA gravação e só
+ *     é regravado quando a última mão já era a do Control: se o app mexeu no
+ *     cadastro e o Control ainda não puxou, o retrato não esconde essa
+ *     mudança do GET (partner.eco.ts). Sem mudança, nada vai ao banco;
  *   • as colunas da 036 e da 049 são sondadas: sem elas, o campo fica de fora
  *     com aviso (e a rota não quebra).
  */
@@ -31,6 +34,7 @@ import { apenasDigitos, codigoMiolo } from '@csb/shared';
 import { supabase } from '../../config/supabase.js';
 import { detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
+import { podeCarimbar } from './partner.eco.js';
 
 export interface RetratoParceiro {
   /** Código do cliente no ERP. Um dos dois (com `cnpj`) é obrigatório. */
@@ -171,6 +175,9 @@ interface LinhaCliente {
   pendencia_financeira?: number | string | null;
   titulos_vencidos?: number | null;
   retrato_referencia_em?: string | null;
+  /** Para decidir o carimbo do Control (049). */
+  updated_at?: string | null;
+  erp_updated_at?: string | null;
 }
 
 /** As colunas da 036 (retrato) existem? Nascem juntas; a sonda é uma. */
@@ -195,7 +202,7 @@ export async function receberRetrato(company_id: string, lista: readonly unknown
   const colunas = [
     'id, erp_id, cnpj',
     com036 ? 'last_purchase_at, total_purchased, overdue_amount' : null,
-    com049 ? 'pendencia_financeira, titulos_vencidos, retrato_referencia_em' : null,
+    com049 ? 'pendencia_financeira, titulos_vencidos, retrato_referencia_em, updated_at, erp_updated_at' : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -334,10 +341,13 @@ export async function receberRetrato(company_id: string, lista: readonly unknown
       semMudanca++;
       continue;
     }
-    patch['updated_at'] = agora;
-    // A última mão foi a do Control: o cliente não volta no GET ?desde= até o
-    // app mexer nele de novo.
-    if (com049) patch['erp_updated_at'] = agora;
+    // O momento DESTA gravação (não o do começo do lote): a trigger da 013 só
+    // o ultrapassa pela folga. A última mão passa a ser a do Control — o
+    // cliente não volta no GET ?desde= até o app mexer nele de novo — só se já
+    // era: mudança do app ainda não puxada continua saindo no GET.
+    const momento = new Date().toISOString();
+    patch['updated_at'] = momento;
+    if (com049 && podeCarimbar(cliente.updated_at, cliente.erp_updated_at)) patch['erp_updated_at'] = momento;
 
     const { error } = await supabase.from('customers').update(patch).eq('id', cliente.id).eq('company_id', company_id);
     if (error) {

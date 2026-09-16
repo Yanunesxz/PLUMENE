@@ -2187,9 +2187,11 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                   <td><code>data_update</code></td>
                   <td>não</td>
                   <td>Quando o cadastro mudou no ERP, momento <b>com fuso</b>.
-                      Ausente = o momento do envio. É o carimbo que evita o eco: o
-                      que o Control gravou por último não volta no
-                      <code>GET /clientes?desde=</code>.</td>
+                      Informativo: é conferido (sem fuso vira aviso), mas <b>não é
+                      gravado e não conta como mudança</b> — o mesmo cadastro com
+                      outro <code>data_update</code> é <code>sem_mudanca</code>. O
+                      carimbo que evita o eco no <code>GET /clientes?desde=</code>
+                      é o momento em que o app gravou o registro.</td>
                 </tr>
                 <tr>
                   <td><code>limite_credito</code></td>
@@ -2741,8 +2743,13 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <code>titulos_vencidos</code> (o que o próprio Control mandou por
             último), <code>atualizado_em</code> e
             <code>atualizado_pelo_control_em</code>. <b>O que o próprio Control
-            gravou por último não volta</b>; se algum eco voltar, reenviar é
-            <code>sem_mudanca</code>.
+            gravou por último não volta</b> — nem pelo <code>POST /clientes</code>,
+            nem pelo <code>POST /retrato</code>: o app guarda o momento de cada
+            gravação sua e só devolve o cliente que mudou depois dela (com alguns
+            segundos de folga, porque o banco carimba a alteração com a própria
+            hora). Se o app mexeu num cliente e você ainda não puxou, uma gravação
+            sua nesse meio tempo <b>não</b> esconde a mudança do app. Se algum eco
+            voltar, reenviar é <code>sem_mudanca</code>.
           </p>
           <div class="code">
             <div class="code-bar">
