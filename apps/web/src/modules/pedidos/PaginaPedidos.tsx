@@ -202,7 +202,10 @@ export function PaginaPedidos() {
   // navegador ou no Drive vê "erro" e acha que a exportação falhou — aconteceu
   // na Plumene em 03/09/2026. A tela explica que é para extrair antes.
   const [pacoteDaExportacao, setPacoteDaExportacao] = useState<{ nome: string; planilhas: number } | null>(null);
-  const { tabelas } = useMinhasTabelas();
+  // `todas`, não `tabelas`: pedido de cliente numa tabela desligada no Control
+  // continua saindo na planilha dela. A lista de escolha (só ativas) deixaria o
+  // pedido "tabela não identificada".
+  const { todas: tabelas } = useMinhasTabelas();
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);

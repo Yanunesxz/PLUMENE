@@ -12,6 +12,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { PainelDaMeta } from '../../components/comercial/PainelDaMeta.js';
 import { cn } from '@/lib/utils';
 import { mesmoCodigoErp } from '../../lib/codigoErp.js';
+import { rotuloDaTabela, tabelaEstaAtiva } from '@csb/shared';
 import type {
   RepListItem,
   PriceTable,
@@ -48,7 +49,15 @@ export function PaginaRepresentantes() {
   // mostra botão que só responderia "acesso negado" no toque.
   const somenteLeitura = user?.role === 'financeiro';
   const [reps, setReps] = useState<RepListItem[] | null>(null);
+  /** Todas as tabelas da empresa, com as desligadas no Control (`active: false`). */
   const [tables, setTables] = useState<PriceTable[]>([]);
+  /**
+   * O conjunto que o representante tinha quando a edição abriu. Tabela desligada
+   * no Control não é oferecida a ninguém — mas a que ele JÁ tem continua na
+   * lista, marcada, para o gerente enxergar e poder tirar. Sem isto ela ficaria
+   * invisível no formulário e iria junto no salvar sem ninguém saber.
+   */
+  const [conjuntoAoAbrir, setConjuntoAoAbrir] = useState<string[]>([]);
   const [showForm, setShowForm] = useState(false);
   /** Representante com o painel de meta aberto. */
   const [metaDe, setMetaDe] = useState<{ id: string; name: string } | null>(null);
@@ -66,6 +75,14 @@ export function PaginaRepresentantes() {
   const jaDestacou = useRef(false);
 
   const isEditing = editingId !== null;
+
+  // O que o formulário oferece: as ativas, mais as inativas que já eram dele.
+  // Filtrar pelo conjunto de quando ABRIU (e não pelo marcado agora) evita a
+  // linha sumir debaixo do dedo no instante em que o gerente a desmarca.
+  const tabelasDoFormulario = useMemo(
+    () => tables.filter((t) => tabelaEstaAtiva(t) || conjuntoAoAbrir.includes(t.id)),
+    [tables, conjuntoAoAbrir],
+  );
 
   const filteredReps = useMemo(() => {
     const q = repSearch.trim().toLowerCase();
@@ -120,18 +137,23 @@ export function PaginaRepresentantes() {
   useEffect(() => {
     if (!token) return;
     void api.get<ApiResponse<RepListItem[]>>('/reps', token).then((r) => setReps(r.data)).catch(() => setReps([]));
-    void api.get<ApiResponse<PriceTable[]>>('/price-tables', token).then((r) => setTables(r.data)).catch(() => {});
+    void api
+      .get<ApiResponse<PriceTable[]>>('/price-tables?incluir_inativas=1', token)
+      .then((r) => setTables(r.data))
+      .catch(() => {});
   }, [token]);
 
   const closeForm = () => {
     setShowForm(false);
     setEditingId(null);
+    setConjuntoAoAbrir([]);
     setForm({ ...EMPTY });
     setError('');
   };
 
   const startCreate = () => {
     setEditingId(null);
+    setConjuntoAoAbrir([]);
     setForm({ ...EMPTY });
     setError('');
     setShowForm(true);
@@ -139,6 +161,10 @@ export function PaginaRepresentantes() {
 
   const startEdit = (rep: RepListItem) => {
     setEditingId(rep.id);
+    setConjuntoAoAbrir([
+      ...(rep.price_table_ids ?? []),
+      ...(rep.price_table_id ? [rep.price_table_id] : []),
+    ]);
     setForm({
       name: rep.name,
       email: rep.email,
@@ -350,10 +376,10 @@ export function PaginaRepresentantes() {
               </p>
 
               <div className="mt-1 divide-y divide-border overflow-hidden rounded-lg border border-input">
-                {tables.length === 0 && (
+                {tabelasDoFormulario.length === 0 && (
                   <p className="p-3 text-sm text-muted-foreground">Nenhuma tabela cadastrada.</p>
                 )}
-                {tables.map((t) => {
+                {tabelasDoFormulario.map((t) => {
                   const marcada = form.price_table_ids.includes(t.id);
                   const principal = form.price_table_id === t.id;
                   return (
@@ -375,13 +401,15 @@ export function PaginaRepresentantes() {
                         htmlFor={`tabela-${t.id}`}
                         className="min-w-0 flex-1 cursor-pointer truncate text-sm text-foreground"
                       >
-                        {t.name}
+                        {rotuloDaTabela(t)}
                       </label>
 
+                      {/* Tornar principal é escolha nova: não se oferece para
+                          tabela desligada no Control. */}
                       {marcada &&
                         (principal ? (
                           <Badge>principal</Badge>
-                        ) : (
+                        ) : !tabelaEstaAtiva(t) ? null : (
                           <button
                             type="button"
                             onClick={() => setForm((f) => ({ ...f, price_table_id: t.id }))}
@@ -579,7 +607,12 @@ export function PaginaRepresentantes() {
                     <p className="flex items-center gap-1.5">
                       <Tag className="h-3.5 w-3.5 shrink-0" />
                       {rep.price_table_name ? (
-                        <Badge variant="green">{rep.price_table_name}</Badge>
+                        <Badge variant="green">
+                          {rotuloDaTabela({
+                            name: rep.price_table_name,
+                            active: tables.find((t) => t.id === rep.price_table_id)?.active,
+                          })}
+                        </Badge>
                       ) : (
                         <span className="italic">Sem tabela</span>
                       )}

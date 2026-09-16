@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { PriceTable } from '@csb/shared';
+import { tabelasEscolhiveis, type PriceTable } from '@csb/shared';
 
 interface Props {
   tabelas: PriceTable[];
@@ -21,8 +21,12 @@ interface Props {
  * Nada vem marcado de propósito. Vir com a principal já selecionada é
  * exatamente o erro caro: cadastro no piloto automático e o cliente da região 3
  * nascendo na tabela 2, sem ninguém perceber até a fatura.
+ *
+ * Tabela desligada no Control nunca vira opção, mesmo que alguém passe a lista
+ * inteira: o filtro mora aqui também, não só em quem chama.
  */
-export function SeletorDeTabela({ tabelas, valor, onEscolher, contexto }: Props) {
+export function SeletorDeTabela({ tabelas: recebidas, valor, onEscolher, contexto }: Props) {
+  const tabelas = tabelasEscolhiveis(recebidas);
   if (tabelas.length < 2) return null;
 
   return (

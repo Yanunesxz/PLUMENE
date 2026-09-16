@@ -24,29 +24,41 @@ export async function listRepsHandler(request: FastifyRequest, reply: FastifyRep
   await reply.send({ data: reps });
 }
 
+/**
+ * `?incluir_inativas=1` traz também as tabelas desligadas no Control, cada uma
+ * com `active: false`. Sem o parâmetro a lista é só de escolha (ativas) — é o
+ * que um app antigo, que não conhece a marca, continua recebendo.
+ */
+function querInativas(request: FastifyRequest): boolean {
+  const valor = (request.query as { incluir_inativas?: string } | undefined)?.incluir_inativas;
+  return valor === '1' || valor === 'true';
+}
+
 export async function listPriceTablesHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
   const { company_id } = request.user;
-  const tables = await listPriceTables(company_id);
+  const tables = await listPriceTables(company_id, { incluirInativas: querInativas(request) });
   await reply.send({ data: tables });
 }
 
 /**
  * Tabelas que quem pediu pode atribuir. Gerente/admin recebem todas; o
  * representante recebe só o conjunto dele — é isso que impede o João de
- * descobrir que a tabela da Maria existe.
+ * descobrir que a tabela da Maria existe. As inativas, quando pedidas, também
+ * só as do conjunto dele.
  */
 export async function minhasPriceTablesHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
   const { company_id, sub, role } = request.user;
+  const opcoes = { incluirInativas: querInativas(request) };
   const tables =
     role === 'manager' || role === 'admin'
-      ? await listPriceTables(company_id)
-      : await listRepPriceTables(company_id, sub);
+      ? await listPriceTables(company_id, opcoes)
+      : await listRepPriceTables(company_id, sub, opcoes);
   await reply.send({ data: tables });
 }
 

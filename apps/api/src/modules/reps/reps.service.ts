@@ -1,7 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { hashPassword } from '../../lib/password.js';
-import { priceTableBelongsToCompany } from '../catalog/catalog.service.js';
+import { detectarTabelaAtiva, tabelaEscolhivelDaEmpresa } from '../catalog/catalog.service.js';
 import type { CreateRepRequest, UpdateRepRequest, RepListItem, PriceTable } from '@csb/shared';
 
 // O embed price_tables(name) pode vir como objeto (1:1) ou array, dependendo da
@@ -165,14 +165,28 @@ export async function listReps(company_id: string): Promise<RepListItem[]> {
 }
 
 /**
+ * Quais tabelas entram numa listagem.
+ *
+ * Por padrão só as ativas no Control (migração 049): a listagem existe para
+ * alguém ESCOLHER, e tabela desligada não se escolhe. `incluirInativas` é para
+ * quem precisa reconhecer a tabela que um cliente ou pedido JÁ usa — o nome na
+ * tela, o número da planilha, o catálogo aberto na tabela do cliente. Nessas,
+ * cada linha traz `active` para a tela marcar "(inativa no Control)".
+ */
+export interface OpcoesDeListagem {
+  incluirInativas?: boolean;
+}
+
+/**
  * As tabelas que ESTE representante pode atribuir. É a rota que o app do rep
  * consome: com uma tabela só ele recebe uma, e nunca fica sabendo das outras.
  */
 export async function listRepPriceTables(
   company_id: string,
   user_id: string,
+  opcoes: OpcoesDeListagem = {},
 ): Promise<PriceTable[]> {
-  const todas = await listPriceTables(company_id);
+  const todas = await listPriceTables(company_id, opcoes);
 
   if (!(await detectarRepPriceTables())) {
     const { data: rep } = await supabase
@@ -188,13 +202,21 @@ export async function listRepPriceTables(
   return todas.filter((t) => conjunto.includes(t.id));
 }
 
-/** O rep pode atribuir esta tabela? Revalidação de servidor — a tela não protege. */
+/**
+ * O rep pode abrir o catálogo nesta tabela? Revalidação de servidor — a tela
+ * não protege.
+ *
+ * Conta as tabelas INATIVAS do conjunto dele: é assim que o pedido do cliente
+ * que continua numa tabela desligada no Control mostra na tela o mesmo preço
+ * que o servidor vai cobrar. Recusar aqui deixaria o representante vendo o
+ * preço da tabela dele e recebendo o total da tabela do cliente.
+ */
 export async function repPodeUsarTabela(
   company_id: string,
   user_id: string,
   price_table_id: string,
 ): Promise<boolean> {
-  const permitidas = await listRepPriceTables(company_id, user_id);
+  const permitidas = await listRepPriceTables(company_id, user_id, { incluirInativas: true });
   return permitidas.some((t) => t.id === price_table_id);
 }
 
@@ -219,6 +241,11 @@ export type TabelaResolvida =
  *   ninguém percebendo até a fatura.
  *
  * Com uma tabela só não há o que escolher — usa a dele e nada muda.
+ *
+ * Tabela desligada no Control (049) não é escolha: fica fora do conjunto que
+ * conta aqui. Quem tem duas e uma foi desligada passa a ter uma só — e não é
+ * mais obrigado a escolher, exatamente como a tela, que também não mostra a
+ * desligada. Pedir uma inativa pela API cai em `fora_do_conjunto`.
  */
 export async function resolverTabelaEscolhida(
   company_id: string,
@@ -226,12 +253,14 @@ export async function resolverTabelaEscolhida(
   role: string,
   escolhida: string | null | undefined,
 ): Promise<TabelaResolvida> {
-  // Gerente e admin atribuem qualquer tabela da empresa — são eles que definem
-  // o conjunto dos outros.
+  // Gerente e admin atribuem qualquer tabela ATIVA da empresa — são eles que
+  // definem o conjunto dos outros.
   if (role === 'manager' || role === 'admin') {
     if (!escolhida) return { ok: true, price_table_id: null };
-    const daEmpresa = await priceTableBelongsToCompany(escolhida, company_id);
-    return daEmpresa ? { ok: true, price_table_id: escolhida } : { ok: false, motivo: 'fora_do_conjunto' };
+    const escolhivel = await tabelaEscolhivelDaEmpresa(escolhida, company_id);
+    return escolhivel
+      ? { ok: true, price_table_id: escolhida }
+      : { ok: false, motivo: 'fora_do_conjunto' };
   }
 
   const conjunto = await listRepPriceTables(company_id, user_id);
@@ -245,12 +274,21 @@ export async function resolverTabelaEscolhida(
   return { ok: true, price_table_id: conjunto[0]?.id ?? null };
 }
 
-export async function listPriceTables(company_id: string): Promise<PriceTable[]> {
-  const { data, error } = await supabase
-    .from('price_tables')
-    .select('*')
-    .eq('company_id', company_id)
-    .order('name');
+/**
+ * Tabelas da empresa. Sem opção, só as ativas no Control — ver
+ * `OpcoesDeListagem`. Sem a 049 a coluna não existe e a lista é a de hoje.
+ */
+export async function listPriceTables(
+  company_id: string,
+  opcoes: OpcoesDeListagem = {},
+): Promise<PriceTable[]> {
+  // Com as inativas não há por que perguntar pela coluna: o `*` já a traz
+  // quando ela existe, e a tela lê `active` de cada linha.
+  const soAtivas = !opcoes.incluirInativas && (await detectarTabelaAtiva());
+
+  let consulta = supabase.from('price_tables').select('*').eq('company_id', company_id);
+  if (soAtivas) consulta = consulta.eq('active', true);
+  const { data, error } = await consulta.order('name');
 
   if (error || !data) return [];
   return data as PriceTable[];

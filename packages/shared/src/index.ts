@@ -14,6 +14,8 @@ export * from './constants/permissoes.js';
 export * from './constants/userRole.js';
 export * from './pricing/faixaDeTamanho.js';
 export * from './pricing/priceTier.js';
+export * from './pricing/tabelaAtiva.js';
+export * from './pedidos/valorMinimo.js';
 export * from './pedidos/observacaoCores.js';
 export * from './pedidos/numeroErp.js';
 export * from './pedidos/pedidoOriginal.js';

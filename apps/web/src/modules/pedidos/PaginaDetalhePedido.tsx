@@ -40,7 +40,8 @@ import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFatura
 import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
-import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
+import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
+import { precoDoTamanho, coresPorSku, semLinhasDeCor, minimoDaCondicao } from '@csb/shared';
 import type {
   Order,
   OrderWithItems,
@@ -597,6 +598,12 @@ export function PaginaDetalhePedido() {
     (order?.payment_condition_id
       ? (condicoes.find((c) => c.id === order.payment_condition_id)?.description ?? null)
       : null);
+  // A condição inteira, pelo cache: o pedido mínimo dela (049) vira aviso junto
+  // do total — na edição das peças e na troca de condição. Só avisa (decisão do
+  // Yan, 16/09/2026): nada aqui entra em `disabled` de botão nenhum.
+  const condicaoAtual = order?.payment_condition_id
+    ? condicoes.find((c) => c.id === order.payment_condition_id)
+    : undefined;
 
   // ─── O preço que a EDIÇÃO mostra sai da tabela DO PEDIDO ───────────────────
   /**
@@ -1079,13 +1086,18 @@ export function PaginaDetalhePedido() {
                   emptyText="Nenhuma condição encontrada"
                   options={[
                     { value: '', label: 'Sem condição' },
-                    ...condicoes.map((c) => ({
-                      value: c.id,
-                      label: c.description,
-                      sublabel: `Código ${c.code}`,
-                    })),
+                    ...condicoes.map((c) => {
+                      const minimo = minimoDaCondicao(c.valor_minimo);
+                      return {
+                        value: c.id,
+                        label: c.description,
+                        sublabel:
+                          minimo != null ? `Código ${c.code} · mínimo ${formatBRL(minimo)}` : `Código ${c.code}`,
+                      };
+                    }),
                   ]}
                 />
+                {!editando && <AvisoDeValorMinimo condicao={condicaoAtual} total={order.total ?? 0} />}
               </div>
             ) : (
               condicaoDoPedido && (
@@ -1430,6 +1442,7 @@ export function PaginaDetalhePedido() {
                   <p className="text-[11px] leading-tight text-subtle">
                     Ao salvar, os preços saem da tabela do pedido — é o valor do servidor que vale.
                   </p>
+                  {linhasEdit.length > 0 && <AvisoDeValorMinimo condicao={condicaoAtual} total={totalEditPrevia} />}
                   <div className="flex gap-2">
                     <Button
                       variant="outline"

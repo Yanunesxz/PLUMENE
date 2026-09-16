@@ -3,18 +3,58 @@ import { detectar } from '../../lib/detectarColuna.js';
 import { buscarPorIds, buscarTudo } from '../../lib/paginacao.js';
 import type { CatalogColor, CatalogVariant, ProductWithPrice } from '@csb/shared';
 
-/** Tabelas de preço da empresa (id + nome) — para o seletor de consulta no catálogo. */
+/**
+ * `price_tables.active` vem da migração 049: o Control desliga a tabela e ela
+ * sai de toda ESCOLHA. Até o SQL rodar a coluna não existe — filtrar por ela
+ * derrubaria a lista inteira, então sem a coluna a lista é a de hoje.
+ *
+ * O que NÃO usa este filtro, de propósito: conferir se a tabela é da empresa
+ * (`priceTableBelongsToCompany`) e abrir o catálogo numa tabela. Cliente e
+ * pedido que já estão numa tabela inativa continuam precificados por ela.
+ */
+export async function detectarTabelaAtiva(): Promise<boolean> {
+  return detectar('price_tables', 'active');
+}
+
+/**
+ * Tabelas de preço da empresa (id + nome) — para o seletor de consulta no
+ * catálogo. Só as ativas no Control: consultar é escolher.
+ */
 export async function listCompanyPriceTables(
   company_id: string,
 ): Promise<{ id: string; name: string }[]> {
-  const { data, error } = await supabase
-    .from('price_tables')
-    .select('id, name')
-    .eq('company_id', company_id)
-    .order('name');
+  const soAtivas = await detectarTabelaAtiva();
+
+  let consulta = supabase.from('price_tables').select('id, name').eq('company_id', company_id);
+  if (soAtivas) consulta = consulta.eq('active', true);
+  const { data, error } = await consulta.order('name');
 
   if (error || !data) return [];
   return data as { id: string; name: string }[];
+}
+
+/**
+ * A tabela pode ser atribuída AGORA por quem escolhe qualquer tabela da empresa
+ * (gerente e admin)? Precisa ser da empresa e não estar desligada no Control.
+ *
+ * Diferente de `priceTableBelongsToCompany`, que só confere a empresa: aquela
+ * serve para ler o catálogo numa tabela que alguém já usa, esta para uma
+ * escolha nova. Sem a 049, é a mesma conferência de antes.
+ */
+export async function tabelaEscolhivelDaEmpresa(
+  price_table_id: string,
+  company_id: string,
+): Promise<boolean> {
+  const comAtiva = await detectarTabelaAtiva();
+  const { data } = await supabase
+    .from('price_tables')
+    .select(comAtiva ? 'id, active' : 'id')
+    .eq('id', price_table_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+
+  const tabela = data as { id: string; active?: boolean | null } | null;
+  return !!tabela && tabela.active !== false;
 }
 
 /** Garante que a tabela de preço pertence à empresa (evita consultar tabela de outra empresa). */

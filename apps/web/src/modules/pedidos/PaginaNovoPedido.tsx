@@ -13,6 +13,7 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
+import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { Textarea } from '../../components/interface/Textarea.js';
@@ -22,7 +23,7 @@ import { observacaoDeCores, juntarObservacao } from '@csb/shared';
 import { compararReferencia } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
-import { precoDoTamanho } from '@csb/shared';
+import { minimoDaCondicao, precoDoTamanho } from '@csb/shared';
 
 export function PaginaNovoPedido() {
   const navigate = useNavigate();
@@ -65,6 +66,11 @@ export function PaginaNovoPedido() {
   const activeProducts = useMemo(() => (allProducts ?? []).filter((p) => p.active), [allProducts]);
 
   const selectedCustomer = customers?.find((c) => c.id === customerId);
+  // A condição escolhida inteira: o pedido mínimo dela (049) vira aviso perto
+  // do total. Sem a condição no cache (primeiro acesso offline) ou sem a 049
+  // no servidor, não há mínimo a conferir e nada aparece.
+  const condicaoEscolhida = condicaoId ? condicoes.find((c) => c.id === condicaoId) : undefined;
+  const minimoEscolhido = minimoDaCondicao(condicaoEscolhida?.valor_minimo);
 
   useEffect(() => {
     if (preselectedCustomerId) setCustomerId(preselectedCustomerId);
@@ -73,6 +79,9 @@ export function PaginaNovoPedido() {
   // ─── A tabela vem do cadastro do cliente ───────────────────────────────────
   // Ninguém escolhe aqui: quem manda no preço é o cadastro. O que a tela faz é
   // não deixar o representante ver um preço e o servidor cobrar outro.
+  // `nomeDe` já devolve a tabela desligada no Control com a marca "(inativa no
+  // Control)": o cliente que está nela continua comprando por ela, e a
+  // confirmação precisa dizer isso em vez de fingir que é uma tabela vigente.
   const { nomeDe, precisaEscolher } = useMinhasTabelas();
 
   /** A tabela que precifica ESTE pedido: a do cliente, caindo para a do rep. */
@@ -494,16 +503,24 @@ export function PaginaNovoPedido() {
               placeholder="Buscar condição (ex.: 30/60/90)…"
               searchPlaceholder="Digite os prazos ou o código…"
               emptyText="Nenhuma condição encontrada"
-              options={condicoes.map((c) => ({
-                value: c.id,
-                label: c.description,
-                sublabel: `Código ${c.code}`,
-              }))}
+              options={condicoes.map((c) => {
+                const minimo = minimoDaCondicao(c.valor_minimo);
+                return {
+                  value: c.id,
+                  label: c.description,
+                  sublabel:
+                    minimo != null
+                      ? `Código ${c.code} · mínimo ${formatBRL(minimo)}`
+                      : `Código ${c.code}`,
+                };
+              })}
             />
             <p className="text-xs text-muted-foreground">
               {condicaoId
                 ? 'Vai no pedido, no e-mail e na planilha da fábrica.'
                 : 'Opcional. Sem escolha, a fábrica define no lançamento.'}
+              {minimoEscolhido != null &&
+                ` Pedido mínimo desta condição: ${formatBRL(minimoEscolhido)}.`}
             </p>
           </div>
         )}
@@ -838,6 +855,12 @@ export function PaginaNovoPedido() {
             </span>
             <span className="text-xl font-bold text-foreground">{formatBRL(total)}</span>
           </div>
+          {/* O aviso do pedido mínimo mora junto do total e do botão: é aqui
+              que o representante olha antes de salvar. Não entra no
+              `missingReason` de propósito — aquele trava o envio, este só avisa. */}
+          {items.length > 0 && (
+            <AvisoDeValorMinimo condicao={condicaoEscolhida} total={total} className="mb-3" />
+          )}
           {missingReason && (
             <div className="mb-3 flex items-start gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.5} />
