@@ -317,6 +317,7 @@ describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
     const iss = fake.filtrosDe('orders', 'is').map((f) => f.args);
     expect(iss).toContainEqual(['erp_order_id', null]);
     expect(iss).toContainEqual(['erp_requested_at', null]);
+    expect(fake.filtrosDe('orders', 'or').map((f) => f.args)).toEqual([['invoiced.is.null,invoiced.eq.false']]);
 
     expect(valores(fake, 'order_erp_events', 'insert')).toMatchObject({
       company_id: EMPRESA,
@@ -428,6 +429,14 @@ describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
     });
     // Este clique não gravou: não deixa evento.
     expect(outroClique.fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+
+    vi.resetModules();
+    const faturouNoMeio = await servicoDePedidos({
+      orders: [aprovado(), VAZIO, NINGUEM, VAZIO, aprovado({ invoiced: true })],
+      companies: CANAIS_API,
+    });
+    expect(await faturouNoMeio.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'ja_faturado' });
+    expect(faturouNoMeio.fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
 
     vi.resetModules();
     const confirmou = await servicoDePedidos({

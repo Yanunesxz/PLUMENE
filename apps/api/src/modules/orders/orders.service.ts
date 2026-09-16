@@ -1203,10 +1203,14 @@ export async function solicitarLancamentoNoErp(
     .update({ erp_requested_at: agora, erp_requested_by: quem.id, updated_at: agora })
     .eq('id', id)
     .eq('company_id', company_id)
-    // Só se o pedido continua como foi lido: aprovado, sem número e ainda não
-    // solicitado. Dois cliques ao mesmo tempo gravam um só (e um só evento).
+    // Só se o pedido continua como foi lido: aprovado, sem número, NÃO
+    // faturado e ainda não solicitado. Dois cliques ao mesmo tempo gravam um só
+    // (e um só evento); um carimbo manual que caia entre a leitura e o UPDATE
+    // não deixa pedido faturado marcado como "Solicitado ao Control" — o
+    // relido responde ja_faturado.
     .eq('status', 'approved')
     .is('erp_order_id', null)
+    .or('invoiced.is.null,invoiced.eq.false')
     .is('erp_requested_at', null)
     .select('id');
   if (error) {
