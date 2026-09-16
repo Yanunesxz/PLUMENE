@@ -326,6 +326,16 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
       });
       return;
     }
+    // O banco não disse se o faturamento desta empresa vem do Control. Nada
+    // foi gravado, e a mensagem diz isso — 500 sem código deixaria a dúvida.
+    if (r.reason === 'canal_indisponivel') {
+      await reply.status(503).send({
+        error: 'Não deu para conferir o canal desta empresa. Nada foi alterado — tente de novo em instantes.',
+        code: 'CANAL_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    }
     if (r.reason === 'erro') {
       await reply.status(500).send({
         error: 'Não foi possível gravar o faturamento — tente de novo',
@@ -631,6 +641,17 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
         error: 'Aprovar, recusar e lançar pedido no ERP é do financeiro',
         code: 'FORBIDDEN',
         statusCode: 403,
+      });
+      return;
+    }
+    // O banco não respondeu sobre o canal desta empresa: nada foi lançado, e o
+    // 503 diz isso. Sem este ramo a exceção virava 500 sem código e o diálogo
+    // do lançamento deixava a dúvida de o número ter sido gravado ou não.
+    if (err instanceof Error && err.message === 'CANAL_INDISPONIVEL') {
+      await reply.status(503).send({
+        error: 'Não deu para conferir o canal desta empresa. Nada foi alterado — tente de novo em instantes.',
+        code: 'CANAL_INDISPONIVEL',
+        statusCode: 503,
       });
       return;
     }

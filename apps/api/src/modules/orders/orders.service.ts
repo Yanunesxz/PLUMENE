@@ -7,7 +7,7 @@ import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
 import { gravarOrigemDoNumero, registrarEventoErp } from './eventosErp.service.js';
-import { lerCanais } from '../../lib/canais.js';
+import { lerCanais, type Canais } from '../../lib/canais.js';
 import type {
   Order,
   OrderWithItems,
@@ -24,6 +24,27 @@ import {
   numeroErpValido,
 } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
+
+/**
+ * O canal da empresa para uma ação da TELA, com desfecho próprio quando o
+ * banco não responde.
+ *
+ * `lerCanais` lança de propósito (soluço de rede não pode abrir nem fechar
+ * canal). Só que "lançar" atravessa dois botões que antes nem consultavam
+ * `companies` — lançar no ERP e faturar pedido com número —, e uma exceção
+ * solta ali vira 500 sem código: a Larissa lê "Erro interno do servidor" e não
+ * sabe se o número foi gravado. Aqui a falha vira CANAL_INDISPONIVEL, que o
+ * controller traduz em 503 com a frase "tente de novo".
+ */
+async function lerCanaisDaTela(company_id: string): Promise<Canais> {
+  try {
+    return await lerCanais(company_id);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[canais] sem resposta do banco sobre os canais da empresa ${company_id}: ${msg}`);
+    throw new Error('CANAL_INDISPONIVEL');
+  }
+}
 
 export async function getOrders(
   company_id: string,
@@ -976,12 +997,20 @@ export async function corrigirNumeroErp(
   const numero = normalizarNumeroErp(numeroDigitado);
   if (!numero || !numeroErpValido(numero)) return { ok: false, motivo: 'formato' };
 
-  const { data: pedido } = await supabase
+  // `*` de propósito: `order_number` (009/012) é opcional em todo o resto do
+  // código, e pedi-la pelo nome faria um banco sem ela responder 42703 — que,
+  // lido só pelo `data`, viraria "pedido não encontrado" para um pedido que
+  // existe. E o erro é lido: falha de banco não pode virar 404.
+  const { data: pedido, error: erroLeitura } = await supabase
     .from('orders')
-    .select('id, order_number, status, invoiced, erp_order_id')
+    .select('*')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
+  if (erroLeitura) {
+    console.error(`[numero] falha ao ler o pedido ${id} para corrigir o número: ${erroLeitura.message}`);
+    return { ok: false, motivo: 'erro' };
+  }
   if (!pedido) return { ok: false, motivo: 'not_found' };
   const o = pedido as {
     order_number?: number | null;
@@ -1184,7 +1213,7 @@ export type FaturadoResult =
       /** `false` = o pedido já estava assim; nada foi gravado nem avisado. */
       mudou: boolean;
     }
-  | { ok: false; reason: 'not_found' | 'faturamento_pelo_control' | 'erro' };
+  | { ok: false; reason: 'not_found' | 'faturamento_pelo_control' | 'canal_indisponivel' | 'erro' };
 
 /**
  * O botão manual de faturado (e o desfazer).
@@ -1220,9 +1249,16 @@ export async function setOrderInvoiced(
   if (!atual) return { ok: false, reason: 'not_found' };
 
   // O canal só é lido quando importa (pedido com número). Banco que não
-  // responde LANÇA: um soluço não pode reabrir o botão com o canal na API.
+  // responde não carimba: um soluço não pode reabrir o botão com o canal na
+  // API. Mas também não vira 500 mudo — o desfecho é CANAL_INDISPONIVEL (503),
+  // e a tela mostra "tente de novo em instantes".
   if (atual.erp_order_id) {
-    const canais = await lerCanais(company_id);
+    let canais: Canais;
+    try {
+      canais = await lerCanaisDaTela(company_id);
+    } catch {
+      return { ok: false, reason: 'canal_indisponivel' };
+    }
     if (canais.faturamento === 'api') return { ok: false, reason: 'faturamento_pelo_control' };
   }
 
@@ -1393,8 +1429,10 @@ export async function updateOrderStatus(
     // Com o canal de pedidos ligado na API (048), o número vem do Control pela
     // API de parceiro — a tela deixa de ser um segundo escritor do mesmo campo.
     // Antes de validar o número: não adianta a Larissa acertar a digitação de
-    // algo que a tela não pode mais gravar. Banco que não responde LANÇA (500).
-    const canais = await lerCanais(company_id);
+    // algo que a tela não pode mais gravar. Banco que não responde recusa o
+    // lançamento com CANAL_INDISPONIVEL (503, "tente de novo") — nunca grava
+    // no escuro, e nunca sem dizer o porquê.
+    const canais = await lerCanaisDaTela(company_id);
     if (canais.pedido_erp === 'api') throw new Error('CANAL_API');
 
     const numero = normalizarNumeroErp(body.erp_order_id);

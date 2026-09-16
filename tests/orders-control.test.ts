@@ -165,6 +165,42 @@ describe('lançar no ERP pela tela', () => {
     expect(fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
   });
 
+  it('banco sem resposta sobre o canal recusa com CANAL_INDISPONIVEL — nada é gravado', async () => {
+    // `fetch failed` chega com code vazio: não é "coluna não existe", é "não
+    // sei". O canal fecha, mas com desfecho próprio (503 na rota), nunca 500 mudo.
+    const { updateOrderStatus, fake } = await servicoDePedidos({
+      orders: aprovado,
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: NUMERO }, 'financeiro'),
+    ).rejects.toThrow('CANAL_INDISPONIVEL');
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('a rota traduz o CANAL_INDISPONIVEL em 503 com a mensagem para a tela', async () => {
+    const { app, fake } = await subirApp({
+      orders: aprovado,
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+    try {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/status',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+        payload: { status: 'sent_erp', erp_order_id: NUMERO },
+      });
+      expect(res.statusCode).toBe(503);
+      const corpo = res.json() as { code: string; error: string };
+      expect(corpo.code).toBe('CANAL_INDISPONIVEL');
+      expect(corpo.error).toMatch(/Nada foi alterado/);
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
   it('com o canal manual grava a origem "lancamento", quem lançou, e o evento numero_gravado', async () => {
     const { updateOrderStatus, fake } = await servicoDePedidos({
       orders: [aprovado, VAZIO, ninguem, VAZIO, lancado],
@@ -264,6 +300,18 @@ describe('corrigir o número do Control', () => {
     });
   });
 
+  it('falha de banco na leitura vira "erro", não "pedido não encontrado"', async () => {
+    const { corrigirNumeroErp, fake } = await servicoDePedidos({
+      orders: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+
+    expect(await corrigirNumeroErp('o1', EMPRESA, 'ZZ0000002', { id: 'fin-1' })).toEqual({
+      ok: false,
+      motivo: 'erro',
+    });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
   it('o mesmo número de novo não grava nada', async () => {
     const { corrigirNumeroErp, fake } = await servicoDePedidos({ orders: LANCADO });
 
@@ -318,6 +366,53 @@ describe('botão manual de faturado', () => {
     expect(r.ok && r.mudou).toBe(true);
     expect(valores(fake, 'orders', 'update')).toMatchObject({ invoiced: true });
   });
+
+  it('sem a 048 o botão carimba pedido COM número e nem lê companies', async () => {
+    // O ramo que a produção percorre no dia do deploy: a coluna não existe,
+    // lerCanais devolve os padrões e `companies` nem é consultada.
+    const { setOrderInvoiced, fake } = await servicoDePedidos(
+      { orders: [pedido({}), VAZIO, pedido({ invoiced: true, invoiced_at: '2026-08-14T01:30:00.000Z' })] },
+      [...FORA_DO_ASSUNTO, 'companies.canal_pedido_erp', 'order_erp_events'],
+    );
+
+    const r = await setOrderInvoiced('o1', EMPRESA, true, { por: 'fin-1' });
+
+    expect(r.ok && r.mudou).toBe(true);
+    expect(valores(fake, 'orders', 'update')).toMatchObject({ invoiced: true });
+    expect(fake.filtrosDe('companies', 'eq')).toEqual([]);
+  });
+
+  it('banco sem resposta sobre o canal não carimba e devolve canal_indisponivel', async () => {
+    const { setOrderInvoiced, fake } = await servicoDePedidos({
+      orders: pedido({}),
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+
+    const r = await setOrderInvoiced('o1', EMPRESA, true, { por: 'fin-1' });
+
+    expect(r).toEqual({ ok: false, reason: 'canal_indisponivel' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('a rota traduz o canal indisponível em 503 e não avisa ninguém', async () => {
+    const { app, avisarFaturadoAoRep } = await subirApp({
+      orders: pedido({}),
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+    try {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/invoice',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+        payload: { invoiced: true },
+      });
+      expect(res.statusCode).toBe(503);
+      expect((res.json() as { code: string }).code).toBe('CANAL_INDISPONIVEL');
+      expect(avisarFaturadoAoRep).not.toHaveBeenCalled();
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
 
   it('o carimbo empurra a última compra com o DIA de São Paulo, filtrado pela empresa, e deixa o evento', async () => {
     const { setOrderInvoiced, fake } = await servicoDePedidos({
