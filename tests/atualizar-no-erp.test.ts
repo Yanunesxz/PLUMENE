@@ -183,7 +183,7 @@ describe('a confirmação pela API do parceiro também tira a foto', () => {
         { data: [], error: null }, // espaço
         { data: [{ id: 'o1' }], error: null }, // o update (uma linha afetada)
         { data: [], error: null }, // espaço
-        { data: { ...PEDIDO_LANCADO, erp_order_id: 'SX14627' }, error: null }, // a foto
+        { data: { ...PEDIDO_LANCADO, erp_order_id: 'CS17379' }, error: null }, // a foto
       ],
       order_erp_sync: [
         { data: [], error: null }, // detecção
@@ -193,14 +193,14 @@ describe('a confirmação pela API do parceiro também tira a foto', () => {
     vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
     const { confirmOrderImport } = await import('../apps/api/src/modules/partner/partner.service.js');
 
-    const r = await confirmOrderImport(EMPRESA, 'o1', 'sx-14627');
+    const r = await confirmOrderImport(EMPRESA, 'o1', 'cs-17379');
 
     expect(r).toEqual({ outcome: 'ok', ja_confirmado: false });
     const foto = fake.ultimaGravacao('order_erp_sync', 'upsert')?.valores as {
       erp_order_id: string;
       pecas: number;
     };
-    expect(foto).toMatchObject({ erp_order_id: 'SX14627', pecas: 20 });
+    expect(foto).toMatchObject({ erp_order_id: 'CS17379', pecas: 20 });
   });
 });
 

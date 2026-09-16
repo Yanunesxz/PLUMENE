@@ -183,13 +183,13 @@ describe('quem decide o pedido na fila', () => {
   // "Os pedidos só vão ser incluídos pela Larissa" (Yan, 10/09/2026) — e ao
   // lançar ela digita o número que o Control deu ("duas letras e a numeração").
   const aprovado = { data: { status: 'approved', rep_id: REP }, error: null };
-  const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: 'SX14627' }, error: null };
+  const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: 'CS17379' }, error: null };
   const ninguem = { data: [], error: null };
 
   it('o gerente não inclui pedido no Control', async () => {
     const { updateOrderStatus } = await carregarServico({ orders: [aprovado] });
     await expect(
-      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '', erp_order_id: 'SX14627' }, 'manager'),
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '', erp_order_id: 'CS17379' }, 'manager'),
     ).rejects.toThrow('FORBIDDEN_ROLE');
   });
 
@@ -199,10 +199,10 @@ describe('quem decide o pedido na fila', () => {
     const { updateOrderStatus, fake } = await carregarServico({
       orders: [aprovado, aprovado, ninguem, ninguem, lancado],
     });
-    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'sx 14627' }, 'financeiro');
+    const r = await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'cs 17379' }, 'financeiro');
     expect(r?.status).toBe('sent_erp');
     const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
-    expect(gravado.erp_order_id).toBe('SX14627');
+    expect(gravado.erp_order_id).toBe('CS17379');
     expect(gravado.synced_at).toBeTruthy();
   });
 
@@ -218,7 +218,7 @@ describe('quem decide o pedido na fila', () => {
       orders: [aprovado, aprovado, { data: [{ id: 'o2' }], error: null }],
     });
     await expect(
-      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'SX14627' }, 'financeiro'),
+      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'CS17379' }, 'financeiro'),
     ).rejects.toThrow('ERP_NUMBER_IN_USE');
   });
 

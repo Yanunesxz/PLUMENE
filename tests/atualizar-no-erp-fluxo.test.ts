@@ -77,12 +77,12 @@ beforeEach(() => {
 describe('o lançamento fotografa o que o Control passou a conhecer', () => {
   it('a Larissa lança com o número e a foto sai com quem lançou', async () => {
     const aprovado = { data: { status: 'approved', rep_id: REP }, error: null };
-    const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: 'SX14627' }, error: null };
+    const lancado = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: 'CS17379' }, error: null };
     const ninguem = { data: [], error: null };
     // Mesma fila do tests/pedidos.test.ts (o dublê adianta a resposta seguinte).
     const { updateOrderStatus } = await carregarServico({ orders: [aprovado, aprovado, ninguem, ninguem, lancado] });
 
-    await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'SX14627' }, 'financeiro');
+    await updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'CS17379' }, 'financeiro');
 
     const foto = chamadas.find((c) => c.fn === 'registrarNoErp');
     expect(foto?.args).toEqual(['o1', EMPRESA, 'fin-1']);
