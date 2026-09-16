@@ -231,7 +231,7 @@ que aconteceu com o envio das 14h".
 | **Faturamento** | `POST /faturamento` | **assim que a nota sair** (ou a cada 5 minutos) |
 | **Catálogo, preço e estoque** | `POST /tabelas-preco`, `/condicoes-pagamento`, `/produtos`, `/precos`, `/estoque` | **a cada 30 minutos** |
 | **Retrato do cliente** | `POST /retrato` | **1x por dia** |
-| **Sincronizar agora** | `GET /status` → `sincronizar_agora: true` → tudo acima → `POST /sincronizacao` | **sempre que o `/status` pedir** (o `/status` é barato: chame-o junto com a fila) |
+| **Sincronizar agora** | `GET /status` → `sincronizar_agora: true` → tudo acima → `POST /sincronizacao` | **sempre que o `/status` pedir** (o `/status` é barato: chame-o junto com a fila; o pedido expira em 15 minutos) |
 | Passivo (uma vez) | `GET /conciliacao`, `POST /pedidos/{id}/conciliar` | na implantação, com o Yan |
 
 ```
@@ -328,6 +328,14 @@ mãos, faturamento, catálogo, retrato) e avise com `POST /partner/v1/sincroniza
 `{ "concluida": true, "solicitado_em": <o mesmo texto que veio aqui> }` — só
 aí o campo volta a `false`. `solicitado_em` é o momento do pedido (ISO com
 fuso) ou `null`. Ver a seção "Sincronizar agora".
+
+**O pedido expira em 15 minutos.** Se o Control não avisar a conclusão em até
+15 minutos depois de `solicitado_em`, `sincronizar_agora` passa a vir `false` —
+um robô que volta depois de horas parado não roda uma rodada que ninguém espera
+mais. `solicitado_em` continua saindo com o momento do pedido expirado (só para
+diagnóstico), e mandar o `POST /sincronizacao` com ele continua seguro. Quando
+alguém pede de novo na tela, vem um `solicitado_em` novo com
+`sincronizar_agora: true`.
 
 `canais` vem **`null`** quando o app não conseguiu ler os canais agora (banco
 sem responder). O `/status` é a rota de diagnóstico e nunca vira 500 por isso —
@@ -1150,8 +1158,10 @@ Content-Type: application/json
 `solicitado_em` é opcional, mas mande o que veio no `/status`: um pedido mais
 novo que ele fica de pé. Sem pedido pendente a rota responde `200` sem gravar
 nada (repetir é seguro). Funciona com qualquer canal. **Enquanto o Control não
-chamar esta rota, `sincronizar_agora` continua `true`** — e a tela do app mostra
-há quanto tempo o pedido espera.
+chamar esta rota, `sincronizar_agora` continua `true` — por até 15 minutos.**
+Passado isso o pedido expira: o `/status` devolve `sincronizar_agora: false`
+(com o `solicitado_em` do pedido expirado), a tela do app mostra "pedido
+expirado" e quem pediu pode pedir de novo.
 
 ---
 
@@ -1765,8 +1775,9 @@ emitida): a fila passa a ser só o que o financeiro solicitou (`solicitado_em`);
 pedido, com a pendência `cliente sem CNPJ` no lugar de `cliente sem código do
 ERP`; uma nota por pedido (a nova substitui a anterior); `POST
 /pedidos/{id}/excluir`; as cinco rotas de catálogo, o `POST /retrato`, os `GET
-/clientes` e `/representantes` com `?desde=`; `sincronizar_agora` e
-`solicitado_em` no `GET /status` com o `POST /sincronizacao`; nos cadastros, o
+/clientes` e `/representantes` com `?desde=`; `sincronizar_agora` (que
+expira em 15 minutos) e `solicitado_em` no `GET /status` com o `POST
+/sincronizacao`; nos cadastros, o
 casamento primeiro pelo CNPJ, `motivo_bloqueio`, `pendencia_financeira`,
 `titulos_vencidos`, `data_update` e o `email` do representante guardado como
 e-mail do Control; `aprovados_solicitados_ao_control` na conciliação; os cinco

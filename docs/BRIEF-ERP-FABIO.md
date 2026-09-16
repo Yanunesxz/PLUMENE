@@ -110,6 +110,47 @@ As treze decisões abaixo fecham as perguntas 1, 7, 9, 10, 11, 13, 16 e 20 do §
 
 O que ainda depende do Yan, além dos passos de 0.5: rodar a **049** nos dois bancos **depois** da 048 (`_tools/SQL-PARA-RODAR-049.sql`, conferir com `node _tools/conferir-049.mjs [raiz da PLUMENE]`) — sem ela tudo degrada para o comportamento de hoje; e criar o aviso ao financeiro da decisão 8.
 
+### 0.7 Fechamento de 16/09 (à tarde)
+
+Entrou na mesma branch (`mudanca/app-control-fase-0`), com a migração **050**:
+
+- **Excluir cliente (só admin)**: `POST /customers/:id/excluir { juntar_em?, motivo? }`. Cliente com pedido, login de loja, convite, vitrine ou tarefa só sai **juntado** em outro cadastro da mesma empresa, que herda tudo; a cópia vai antes para `deleted_customers`. Login de loja nunca é apagado: o que fica herda o de acesso mais recente, os outros são desligados. Falha no meio desfaz o que já tinha mudado.
+- **Dono na ficha do cliente**: "Representante: NOME (código …)" pelo código do Control e "Cadastrado por" quando quem cadastrou no app é outro.
+- **Tabela de preço inativa no Control** (`price_tables.active = false`) some de toda escolha; cliente e pedido que já estão nela continuam, marcados "(inativa no Control)".
+- **Pedido mínimo da condição** (`payment_conditions.valor_minimo`): a tela avisa quando o total fica abaixo; ninguém bloqueia.
+- **Cancelar solicitação** (financeiro/admin): `PATCH /orders/:id/cancelar-solicitacao` tira da fila do Control o pedido solicitado que ainda não tem número. Status não muda; evento `solicitacao_cancelada` só com a 050.
+- **"Sincronizar agora" expira em 15 minutos**: depois disso o `GET /partner/v1/status` devolve `sincronizar_agora: false` (o `solicitado_em` continua saindo) e a tela mostra "pedido expirado". **É a única mudança no contrato do Fábio nesta rodada.**
+
+**O que depende do Yan:** a 048 e a 049 já estão nos dois bancos, e a 013 na Corpo Sensual (o índice da 042 na Corpo Sensual se confere à parte, como em 0.5). Falta colar `_tools/SQL-PARA-RODAR-050.sql` nos **DOIS bancos**, **depois** da 049 (o bloco 0 recusa se a 049 não rodou), e conferir com `node _tools/conferir-050.mjs [raiz da PLUMENE]`. Depois da 050, **não rerodar a 048 nem a 049** (recolocariam a lista antiga no CHECK de tipo). Sem a 050: excluir cliente responde `409 MIGRACAO_PENDENTE` sem mexer em nada, e o cancelamento de solicitação acontece sem evento.
+
+#### Para a sessão do CRM
+
+**`deleted_customers` (050)** — uma linha por cliente excluído pelo app. Quem preenche: **só o app**, no "Excluir cliente" do admin (nunca o Control, nunca carga). É a tabela que o CRM deve ler para apagar ou juntar o cliente do lado dele: o cliente some de `customers` sem nenhum outro sinal.
+
+| Coluna | Significado |
+|---|---|
+| `id` | a linha da cópia |
+| `company_id` | a empresa (FK `companies`, CASCADE) |
+| `customer_id` | o `customers.id` que saiu — o mesmo que o CRM guardou como origem. Sem FK: a linha não existe mais |
+| `erp_id` | o código do Control do cliente que saiu (`null` se não tinha) |
+| `cnpj_digits` | o documento só com dígitos |
+| `juntado_em` | o `customers.id` do cadastro que **ficou** com tudo; `null` = excluído sem juntar (cliente sem nenhum vínculo). Sem FK |
+| `snapshot` | a linha inteira de `customers` como estava antes do DELETE (JSONB) |
+| `pedidos_movidos` | quantos pedidos passaram para `juntado_em` |
+| `deleted_at` | quando saiu — é por ela que o CRM lê o que é novo |
+| `deleted_by` / `deleted_by_name` | o admin que excluiu (id pode ficar nulo se o login sumir; o nome fica) |
+| `motivo` | o que o admin escreveu. Se contiver `EXCLUSÃO NÃO CONCLUÍDA`, a exclusão falhou no meio e o desfazer não voltou tudo: **conferir se `customer_id` ainda existe em `customers` antes de agir** |
+| `created_at` / `updated_at` | carimbos da linha (sem trigger da 013; o app grava `updated_at` quando anota a cópia) |
+
+Como ler: filtrar por `deleted_at` (paginando — o PostgREST corta em 1.000 em silêncio). Com `juntado_em`, juntar no CRM o cliente de `customer_id` no de `juntado_em`; sem ele, apagar ou inativar. Os pedidos **já mudaram de dono no app** (`orders.customer_id` = `juntado_em`, com `updated_at`), então a rodada normal por `updated_at` traz os pedidos com o cliente novo; o cadastro que ficou também ganha `updated_at`. Cliente excluído que ainda existe no Control pode voltar pelo `POST /partner/v1/clientes` (hoje nada impede).
+
+**Colunas da 048/049 que o CRM pode passar a ler** (nenhuma é obrigatória; nenhuma renomeia o que já é lido):
+
+- **`users.erp_email`** (049, TEXT): o e-mail do representante **no Control**, gravado pelo `POST /partner/v1/representantes`. `users.email` continua sendo o login do app e não muda por causa do Control.
+- **`customers.pendencia_financeira`** (NUMERIC 12,2, R$ em aberto; `null` = o Control não informou), **`pendencia_financeira_em`** (quando o valor chegou), **`titulos_vencidos`** (INTEGER) e **`retrato_referencia_em`** (TIMESTAMPTZ, de quando é o retrato: `last_purchase_at`, `total_purchased`, `overdue_amount`). Gravados pelo Control no `POST /partner/v1/retrato` (e pendência/títulos também no `POST /clientes`), com `updated_at`. Retrato mais velho que o guardado é recusado. Bloqueio e pendência **não travam** o representante.
+- **`order_invoices`** (048, uma linha por nota: `numero`, `serie`, `chave`, `emitida_em`, `valor`, `cancelada_em`, e da 049 `substituida_por`/`substituida_em`) e **`order_invoice_items`** (`invoice_id`, `order_id`, `produto` = o SKU, `tamanho`, `variant_id` que pode ser nulo, `quantidade`, `preco_unitario`). Gravadas pelo `POST /partner/v1/faturamento`. **Nota ativa = `cancelada_em IS NULL`**; um pedido tem uma nota ativa, e a nova substitui a anterior. São as peças FATURADAS (o corte da 044 aparece aqui). Mudança só na nota também carimba `orders.updated_at`.
+- **`orders.erp_requested_at`** / **`erp_requested_by`** (049): quando e quem do financeiro solicitou o lançamento ao Control (canal `api`). `null` = não solicitado, lançado à mão ou **solicitação cancelada**. Não é status: `orders.status` não ganhou valor novo, e o `mapearStatus` do CRM não muda.
+
 ---
 
 ## 1. ESTADO ATUAL

@@ -43,7 +43,9 @@ packages/shared/src/
 │   ├── control.ts        → SolicitacaoErp (o pedido solicitado ao Control, esperando o número) e
 │   │                       NotaSubstituida (a nota nova por cima da anterior) — migração 049
 │   ├── user.ts           → User, AuthPayload, Login*, RepListItem, Create/UpdateRepRequest
-│   ├── customer.ts       → Customer, CustomerWithPriceTable, PriceTable, CreateCustomerRequest
+│   ├── customer.ts       → Customer, CustomerWithPriceTable, PriceTable, CreateCustomerRequest,
+│   │                       DonoDoCliente (o `dono` da ficha) e os tipos do "Excluir cliente"
+│   │                       (VinculosDoCliente, VinculosParaExcluir, ExcluirClienteRequest, ClienteExcluido)
 │   ├── product.ts        → Product, ProductVariant (tamanho), ProductWithPrice, CatalogProduct
 │   └── order.ts          → Order, OrderItem, OrderWithItems, CreateOrderRequest, tipos de sync
 ├── constants/            → uniões + rótulos PT
@@ -54,6 +56,8 @@ packages/shared/src/
 │   │                       valida, sugere o próximo
 │   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido)
 │   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
+│   ├── valorMinimo.ts    → o pedido mínimo da condição (049, payment_conditions.valor_minimo):
+│   │                       avisoDeValorMinimo — só AVISA, nem a tela nem o servidor bloqueiam
 │   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
 │                           (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
 ├── cadastro/
@@ -64,6 +68,9 @@ packages/shared/src/
     ├── faixaDeTamanho.ts → EG/XG/48-54 custam mais: qual tamanho é "faixa maior"
     │                       e qual preço cobrar. Usado pela API (grava o pedido)
     │                       E pelo app (mostra a tela) — precisa ser o MESMO.
+    ├── tabelaAtiva.ts    → tabela desligada no Control (049, price_tables.active): some de toda
+    │                       ESCOLHA, mas quem já está nela continua; rotuloDaTabela marca
+    │                       "(inativa no Control)"
     └── priceTier.ts      → (LEGADO/abandonado) regra de preço por total do pedido
 ```
 
@@ -191,8 +198,18 @@ apps/api/src/
 │   ├── access/           → convite da loja, vitrine temporária e a área da loja
 │   │                       (invites, showcase, loja.service = GET /minha-area)
 │   ├── auth/             → login, refresh (auth.service tem findUserByEmail, buildAuthPayload)
-│   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep)
-│   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
+│   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep). As listas de
+│   │                       escolha de tabela só trazem as ativas (detectar price_tables.active, 049);
+│   │                       priceTableBelongsToCompany continua aceitando a inativa já em uso
+│   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos). ?cnpj= filtra
+│   │                       pelo documento (cnpj_digits). GET /customers/:id devolve `dono` (quem
+│   │                       cadastrou por rep_id + o rep do código do Control pelo miolo).
+│   │                       customers.exclusao.service.ts → "Excluir cliente" (SÓ admin, 050):
+│   │                       GET /customers/:id/vinculos (as contagens do diálogo) e POST
+│   │                       /customers/:id/excluir { juntar_em?, motivo? } — cópia em
+│   │                       deleted_customers ANTES; pedidos, convites, vitrines e tarefas vão para
+│   │                       juntar_em; login de loja herdado ou desligado (nunca apagado); falha no
+│   │                       meio desfaz o que já moveu. Sem a 050: 409 MIGRACAO_PENDENTE
 │   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
@@ -213,16 +230,26 @@ apps/api/src/
 │   │                       orders.service.ts: solicitarLancamentoNoErp (049) — com
 │   │                       canal_pedido_erp='api' o "Lançar" SOLICITA (erp_requested_at)
 │   │                       e a tela espera a confirmação do Control; cliente bloqueado
-│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026)
+│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026).
+│   │                       cancelarSolicitacaoAoErp → PATCH /orders/:id/cancelar-solicitacao
+│   │                       (financeiro/admin): tira da fila do Control o solicitado sem número
+│   │                       (UPDATE condicional; número que chega no meio = 409 JA_IMPORTADO);
+│   │                       evento solicitacao_cancelada só com a 050; sem a 049, 409
+│   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
+│   │                       valor_minimo (detectar), que a tela usa só para AVISAR
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
-│   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
+│   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin). As listas
+│   │                       /price-tables e /price-tables/minhas trazem só as ATIVAS no Control;
+│   │                       ?incluir_inativas=1 traz também as desligadas (com active=false), para a
+│   │                       tela reconhecer a tabela que cliente ou pedido já usa.
+│   │                       resolverTabelaEscolhida recusa escolha NOVA de tabela inativa
 │   ├── sync/             → POST /sync (fila offline) + controle de sync do ERP
 │   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
 │   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
 │   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
 │   │                       → 401 PARTNER_UNAUTHORIZED). DEZENOVE rotas (partner.router.ts):
-│   │                         GET  /partner/v1/status                 (+ `canais`, sincronizar_agora, solicitado_em)
+│   │                         GET  /partner/v1/status                 (+ `canais`, sincronizar_agora — expira em 15 min —, solicitado_em)
 │   │                         GET  /partner/v1/pedidos                (a fila: aprovado + SOLICITADO ao Control)
 │   │                         GET  /partner/v1/pedidos/excluidos      (excluídos com número; livre)
 │   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
@@ -273,7 +300,12 @@ apps/api/src/
 │   │                       pedido de sync, última chamada por rota, contagens da fila; financeiro/
 │   │                       gerente/admin) e PATCH /erp/integracao/sincronizar (o botão "Pedir
 │   │                       sincronização agora", financeiro/admin; grava companies.sync_solicitado_em).
-│   │                       lerSolicitacaoDeSync é o que o GET /partner/v1/status usa.
+│   │                       lerSolicitacaoDeSync é o que o GET /partner/v1/status usa; ela diz
+│   │                       também se o pedido EXPIROU. expiracaoDoSync.ts →
+│   │                       EXPIRACAO_DO_PEDIDO_DE_SYNC_MS (15 min, o único lugar da regra):
+│   │                       expirado, o /status do parceiro dá sincronizar_agora=false (o
+│   │                       solicitado_em continua saindo), o GET da tela devolve sincronizacao:
+│   │                       { solicitado_em, expirado } e pedir de novo grava um carimbo novo.
 │   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
 │   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
@@ -328,10 +360,17 @@ apps/web/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
     │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
     │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp; com
-    │   │                                 canal api o "Lançar" SOLICITA ao Control e espera o número)
+    │   │                                 canal api o "Lançar" SOLICITA ao Control e espera o número;
+    │   │                                 "Cancelar solicitação" enquanto o número não chega
+    │   │                                 [financeiro/admin])
     │   ├── integracao/PaginaIntegracao → estado da integração com o Control e o botão
-    │   │                                 "Pedir sincronização agora" [financeiro/gerente/admin]
-    │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
+    │   │                                 "Pedir sincronização agora" [financeiro/gerente/admin];
+    │   │                                 "pedido expirado" depois de 15 min sem o Control responder
+    │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar; mostra o aviso da exclusão)
+    │   ├── clientes/PaginaCliente      → a ficha: "Representante: NOME (código …)" e "Cadastrado
+    │   │                                 por" perto do CNPJ; botão "Excluir cliente" [só admin]
+    │   ├── clientes/ExcluirCliente     → o diálogo da exclusão: contagens, o cadastro que fica
+    │   │                                 (mesmo documento, ou busca por nome/CNPJ) e confirmação
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]
     │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
     │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (triagem, faturado, sync)
@@ -346,8 +385,9 @@ apps/web/
     │   │                    BotaoTema (claro/escuro/automático)
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
     │   └── comercial/     → CartaoProduto, SeletorTamanho, CartaoDecisao (aprovar/recusar),
-    │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela,
-    │                        PedidoOriginal (o original x o faturado, peça por peça),
+    │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela
+    │                        (nunca oferece tabela inativa), AvisoDeValorMinimo (o pedido mínimo
+    │                        da condição; só avisa), PedidoOriginal (o original x o faturado, peça por peça),
     │                        grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)
@@ -360,11 +400,16 @@ apps/web/
     │   └── authCache.ts  → login offline (hash da senha guardado local)
     │
     ├── services/api.ts   → cliente HTTP (fetch + Bearer token) — fala com a API
-    ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido
+    ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido, useMinhasTabelas
+    │                       (`tabelas` = só as ativas, para escolher; `todas` = com as inativas, para
+    │                       reconhecer a tabela em uso; `nomeDe` marca "(inativa no Control)")
     ├── lib/
     │   ├── utils.ts      → cn (classes) + formatBRL (R$)
     │   ├── pedido.ts     → nome do comprador, origem, cor do status e
-    │   │                   `decisaoDoPedido` (que decisão cada papel pode tomar)
+    │   │                   `decisaoDoPedido` (que decisão cada papel pode tomar);
+    │   │                   podeCancelarSolicitacao e a frase da confirmação
+    │   ├── donoDoCliente.ts → as linhas "Representante" / "Cadastrado por" da ficha
+    │   ├── exclusaoDeCliente.ts → as contas e frases do diálogo "Excluir cliente"
     │   ├── exportOrders.ts → gera a planilha do Control (32 linhas por arquivo,
     │   │                   o excedente vai num .zip) e entrega por download ou
     │   │                   pela folha de compartilhamento do iPhone
