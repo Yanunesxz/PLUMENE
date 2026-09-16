@@ -46,7 +46,8 @@ export interface NotaParceiro {
   chave?: string | null;
   /** Momento da emissão, com fuso (Z ou -03:00). */
   emitida_em?: string | null;
-  valor?: number | null;
+  /** Número ou texto numérico ("870.50"), como o `valor_faturado`. */
+  valor?: number | string | null;
 }
 
 /** Uma peça que a nota levou (048). */
@@ -54,9 +55,9 @@ export interface ItemFaturadoParceiro {
   /** O mesmo código de produto que o GET /partner/v1/pedidos manda. */
   produto?: string | number | null;
   tamanho?: string | number | null;
-  /** Inteiro maior que zero. */
-  quantidade?: number | null;
-  preco_unitario?: number | null;
+  /** Inteiro maior que zero (número ou texto numérico). */
+  quantidade?: number | string | null;
+  preco_unitario?: number | string | null;
 }
 
 export interface FaturamentoParceiro {
@@ -75,8 +76,9 @@ export interface FaturamentoParceiro {
    * O valor que a nota realmente fechou. Ausente = mantém o gravado; `null`
    * explícito limpa (o painel volta ao valor do pedido); zero não é nota. É
    * normal ser MENOR que o pedido: o que faltou no estoque não é faturado.
+   * Número ou texto numérico ("870.50") — muito ERP manda NUMERIC como texto.
    */
-  valor_faturado?: number | null;
+  valor_faturado?: number | string | null;
   /** A nota fiscal (048). Sem a migração, é ignorada com aviso. */
   nota?: NotaParceiro | null;
   /**
@@ -151,6 +153,22 @@ function temCampo(obj: object, campo: string): boolean {
   return Object.prototype.hasOwnProperty.call(obj, campo) && (obj as Record<string, unknown>)[campo] !== undefined;
 }
 
+/**
+ * Número que veio como número JSON OU como texto numérico ("870.50").
+ *
+ * O `valor_faturado` sempre aceitou as duas grafias, e é comum o ERP mandar
+ * NUMERIC como texto. Exigir número JSON só na nota faria o mesmo registro ser
+ * aceito num campo e recusado no outro — e a recusa derruba o registro inteiro.
+ */
+function numeroDoJson(v: unknown): number | null {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string' && v.trim() !== '') {
+    const n = Number(v.trim());
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
+
 /** Centavos: é o que o NUMERIC(12,2) guarda — comparar sem isso nunca dá "igual". */
 function centavos(v: unknown): number | null {
   if (v == null || v === '') return null;
@@ -217,7 +235,7 @@ function lerNota(bruta: unknown): Leitura<NotaLida> {
   if (temCampo(nota, 'valor')) {
     if (nota['valor'] === null) campos.valor = null;
     else {
-      const valor = typeof nota['valor'] === 'number' ? centavos(nota['valor']) : null;
+      const valor = centavos(numeroDoJson(nota['valor']));
       if (valor == null || !(valor > 0)) return { ok: false, motivo: '"nota.valor" precisa ser maior que zero' };
       campos.valor = valor;
     }
@@ -232,8 +250,8 @@ function lerItens(brutos: unknown): Leitura<ItemLido[]> {
     const item = (typeof bruto === 'object' && bruto !== null ? bruto : {}) as Record<string, unknown>;
     const produto = texto(item['produto']);
     const tamanho = texto(item['tamanho'])?.toUpperCase();
-    const quantidade = item['quantidade'];
-    if (!produto || !tamanho || typeof quantidade !== 'number' || !Number.isInteger(quantidade) || quantidade <= 0) {
+    const quantidade = numeroDoJson(item['quantidade']);
+    if (!produto || !tamanho || quantidade == null || !Number.isInteger(quantidade) || quantidade <= 0) {
       return {
         ok: false,
         motivo: `"itens[${posicao}]" precisa de "produto", "tamanho" e "quantidade" inteira maior que zero`,
@@ -241,7 +259,7 @@ function lerItens(brutos: unknown): Leitura<ItemLido[]> {
     }
     let preco_unitario: number | null = null;
     if (item['preco_unitario'] != null) {
-      const preco = typeof item['preco_unitario'] === 'number' ? centavos(item['preco_unitario']) : null;
+      const preco = centavos(numeroDoJson(item['preco_unitario']));
       if (preco == null || preco < 0) {
         return { ok: false, motivo: `"itens[${posicao}].preco_unitario" precisa ser um número maior ou igual a zero` };
       }
@@ -332,7 +350,8 @@ interface PedidoLido {
   invoiced_at: string | null;
   invoiced_total?: number | string | null;
   customer_id: string | null;
-  order_number: number | null;
+  /** Migração 009/012: pode não existir no banco. */
+  order_number?: number | null;
   rep_id: string | null;
   guest_name: string | null;
 }
@@ -437,11 +456,15 @@ async function processarItem(
 
   // Sempre dentro da empresa da chave: um parceiro nunca fatura pedido de
   // outra fábrica, mesmo acertando o número por acaso.
+  //
+  // `*` de propósito, como o botão manual (orders.service.ts): pedir colunas
+  // pelo nome faria o lote inteiro falhar num banco onde alguma delas ainda não
+  // existe — `order_number` vem da 009/012 e é tratada como opcional em todo o
+  // resto do código, e `invoiced_total` vem da 027. Com `*`, o que existe vem e
+  // o que não existe simplesmente não vem.
   let busca = supabase
     .from('orders')
-    .select(
-      `id, status, invoiced, invoiced_at, customer_id, order_number, rep_id, guest_name${comValor ? ', invoiced_total' : ''}`,
-    )
+    .select('*')
     .eq('company_id', company_id);
   busca = pedidoErp
     // As duas grafias: o normalizado (app) e o texto cru que o parceiro
@@ -477,7 +500,7 @@ async function processarItem(
   }
 
   const veioValor = temCampo(item, 'valor_faturado');
-  if (item.valor_faturado != null && !(item.valor_faturado > 0)) {
+  if (item.valor_faturado != null && !((numeroDoJson(item.valor_faturado) ?? 0) > 0)) {
     // Zero não é nota: cancelamento se diz com faturado: false.
     return { tipo: 'ignorado', motivo: '"valor_faturado" precisa ser maior que zero' };
   }
@@ -752,7 +775,7 @@ async function processarItem(
       try {
         avisarFaturadoAoRep(
           company_id,
-          { id: pedido.id, order_number: pedido.order_number, rep_id: pedido.rep_id, guest_name: pedido.guest_name },
+          { id: pedido.id, order_number: pedido.order_number ?? null, rep_id: pedido.rep_id, guest_name: pedido.guest_name },
           'api-parceiro',
         );
       } catch (e) {
@@ -785,7 +808,7 @@ async function registrarRastro(
   const base = {
     company_id: ctx.company_id,
     order_id: pedido.id,
-    order_number: pedido.order_number,
+    order_number: pedido.order_number ?? null,
     origem: 'api' as const,
     parceiro: ctx.parceiro,
   };

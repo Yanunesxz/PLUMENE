@@ -589,6 +589,46 @@ describe('a nota fiscal e as peças que ela levou (048)', () => {
     expect(eventos(fake)[0]?.['depois']).toMatchObject({ numero: '000123', serie: '1', pecas: 7 });
   });
 
+  it('número em texto ("870.50", "2") é aceito na nota e nas peças, como no valor_faturado', async () => {
+    // Muito ERP manda NUMERIC como texto. Exigir número JSON só na nota faria o
+    // MESMO registro ser aceito no valor_faturado e recusado na nota — e a
+    // recusa derruba o registro inteiro, faturamento junto.
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco(APROVADO),
+      order_invoices: fila(NADA, { data: { id: 'n1' }, error: null }),
+      product_variants: fila({ data: [{ id: 'v1', erp_sku: '0124|M' }], error: null }, { data: [], error: null }),
+      products: { data: [], error: null },
+      order_invoice_items: NADA,
+    });
+
+    const r = await receberFaturamento(EMPRESA, [
+      {
+        pedido_erp: 'ZZ0000001',
+        valor_faturado: '870.50',
+        nota: { numero: '000123', valor: '870.50' },
+        itens: [{ produto: '0124', tamanho: 'M', quantidade: '2', preco_unitario: '24.90' }],
+      },
+    ]);
+
+    expect(r.ignorados).toEqual([]);
+    expect(r.atualizados).toBe(1);
+    expect(fake.ultimaGravacao('order_invoices', 'upsert')?.valores).toMatchObject({ valor: 870.5 });
+    const pecas = fake.ultimaGravacao('order_invoice_items', 'insert')?.valores as Array<Record<string, unknown>>;
+    expect(pecas[0]).toMatchObject({ quantidade: 2, preco_unitario: 24.9 });
+    expect(updateDoPedido(fake)).toMatchObject({ invoiced_total: 870.5 });
+  });
+
+  it('texto que não é número continua recusado, com o motivo de sempre', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({ orders: pedidoNoBanco(APROVADO) });
+
+    const r = await receberFaturamento(EMPRESA, [
+      { pedido_erp: 'ZZ0000001', nota: { numero: '000123', valor: 'muito' } },
+    ]);
+
+    expect(r.ignorados).toEqual([{ pedido: 'ZZ0000001', motivo: '"nota.valor" precisa ser maior que zero' }]);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
   it('o pedido falhou depois da nota: a nota fica com o rastro, o ERP reenvia e só o pedido grava', async () => {
     const { receberFaturamento, fake } = await servicoDaFase0({
       orders: fila(pedidoNoBanco(APROVADO), { data: null, error: { message: 'caiu' } }),

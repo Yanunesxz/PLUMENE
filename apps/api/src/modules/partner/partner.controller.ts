@@ -180,18 +180,33 @@ export async function partnerStatusHandler(
   const partner = await autenticar(request, reply);
   if (!partner) return;
 
-  const canais = await lerCanais(partner.company_id);
+  // O /status é a rota de DIAGNÓSTICO: é ela que o parceiro chama para saber se
+  // a chave e a conexão estão boas. Um soluço do banco não pode transformá-la
+  // em 500 — aí ele perde justamente o instrumento de distinguir "minha chave
+  // está errada" de "o app está com problema". Então aqui o canal degrada:
+  // `canais: null` significa "não deu para ler agora". As rotas que GRAVAM
+  // continuam lançando (canal fechado por falta de resposta).
+  let canais: { pedido_erp: string; faturamento: string; cadastro: string } | null = null;
+  try {
+    const lidos = await lerCanais(partner.company_id);
+    canais = {
+      pedido_erp: lidos.pedido_erp,
+      faturamento: lidos.faturamento,
+      cadastro: lidos.cadastro,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[parceiro] /status sem resposta do banco sobre os canais: ${msg}`);
+    anotarChamada(request, { detalhe: { canais: 'nao_lidos' } });
+  }
 
   await reply.send({
     ok: true,
     parceiro: partner.name,
     servidor_hora: new Date().toISOString(),
     // Quais mãos estão ligadas para a API nesta empresa. Aditivo.
-    canais: {
-      pedido_erp: canais.pedido_erp,
-      faturamento: canais.faturamento,
-      cadastro: canais.cadastro,
-    },
+    // `null` = o banco não respondeu agora; tente de novo.
+    canais,
   });
 }
 

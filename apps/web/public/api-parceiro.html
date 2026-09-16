@@ -1110,6 +1110,13 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <code>api</code> ou <code>firebird</code>. Só <code>api</code> libera a
             rota.
           </p>
+          <p>
+            <code>canais</code> vem <b><code>null</code></b> quando o app não
+            conseguiu ler os canais agora (banco sem responder). O
+            <code>/status</code> é a rota de diagnóstico e nunca vira 500 por
+            isso — <code>ok: true</code> continua significando "a chave e a
+            conexão estão boas". Tente de novo para ver os canais.
+          </p>
         </div>
       </div>
 
@@ -1646,9 +1653,10 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                       <code>nota</code> vem; <code>serie</code> ausente vale
                       <code>""</code> (número e série identificam a nota dentro do
                       pedido); <code>emitida_em</code> com fuso;
-                      <code>valor</code> maior que zero. Em <code>chave</code>,
-                      <code>emitida_em</code> e <code>valor</code> vale a regra de
-                      ouro.</td>
+                      <code>valor</code> maior que zero (número ou texto
+                      numérico, como o <code>valor_faturado</code>). Em
+                      <code>chave</code>, <code>emitida_em</code> e
+                      <code>valor</code> vale a regra de ouro.</td>
                 </tr>
                 <tr>
                   <td><code>itens</code></td>
@@ -1659,7 +1667,9 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                       daquela nota (as de outras notas do pedido ficam);
                       <code>[]</code> apaga as peças daquela nota; ausente não
                       mexe nelas. <code>quantidade</code> inteira maior que zero;
-                      <code>preco_unitario</code> maior ou igual a zero.</td>
+                      <code>preco_unitario</code> maior ou igual a zero. Os dois
+                      aceitam número ou texto numérico (<code>2</code> ou
+                      <code>"2"</code>).</td>
                 </tr>
               </tbody>
             </table>
@@ -1670,7 +1680,10 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             formato UUID dá <code>pedido não encontrado nesta empresa</code>). Só
             pedido <b>aprovado ou enviado ao ERP</b> (<code>approved</code> ou
             <code>sent_erp</code>) é faturado. Pedido com mais de uma nota: mande um
-            registro por nota, com o mesmo <code>pedido_erp</code>.
+            registro por nota, com o mesmo <code>pedido_erp</code> — enquanto as
+            notas levarem menos peças que o pedido e o <code>valor_faturado</code>
+            não tiver vindo, o app mostra “faturado em partes” e <b>não</b> afirma
+            que o resto foi cortado.
             <code>produto</code> é o mesmo código que o <code>GET /pedidos</code>
             manda; a peça que não casar com o catálogo é guardada assim mesmo, com
             aviso. Nota cancelada que chega de novo (mesmo número e série) volta a

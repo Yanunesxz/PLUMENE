@@ -174,6 +174,11 @@ GET /partner/v1/status
 empresa"): `pedido_erp` é `manual`, `api` ou `sync_py`; `faturamento` é `manual`
 ou `api`; `cadastro` é `carga`, `api` ou `firebird`. Só `api` libera a rota.
 
+`canais` vem **`null`** quando o app não conseguiu ler os canais agora (banco
+sem responder). O `/status` é a rota de diagnóstico e nunca vira 500 por isso —
+`ok: true` continua significando "a chave e a conexão estão boas". Tente de novo
+para ver os canais.
+
 Sem chave ou com chave errada (inclusive a chave de uma marca na URL da outra, e
 a chave que ainda não foi cadastrada): `401 PARTNER_UNAUTHORIZED`. Integração
 ainda não liberada naquele servidor (nenhuma chave configurada):
@@ -527,8 +532,8 @@ para a API (`409 CANAL_FECHADO`).
 | `faturado` | não | `false` (o booleano) desfaz um faturamento informado antes: **limpa a data e o valor** e cancela as notas ativas do pedido. Ausente = `true`. Só o booleano `false` desfaz — o texto `"false"` conta como `true` |
 | `faturado_em` | não | Momento da emissão, **com fuso** (`Z` ou `-03:00`). Sem fuso o registro é ignorado. Ausente (ou `null`) = mantém a data de quem já estava faturado; quem ainda não estava fica faturado agora |
 | `valor_faturado` | não | O valor que a nota fechou, maior que zero. **Ausente = mantém o que está gravado**; `null` limpa (o painel volta a usar o valor do pedido) |
-| `nota` | não | `{ numero, serie?, chave?, emitida_em?, valor? }` — a nota fiscal. `numero` é obrigatório quando `nota` vem; `serie` ausente vale `""` (número e série identificam a nota dentro do pedido); `emitida_em` com fuso; `valor` maior que zero. Em `chave`, `emitida_em` e `valor` vale a regra de ouro |
-| `itens` | não | `[{ produto, tamanho, quantidade, preco_unitario? }]` — as peças que **essa nota** levou. Só com `nota`. Quando vem, **substitui** as peças daquela nota (as de outras notas do pedido ficam); `[]` apaga as peças daquela nota; ausente não mexe nelas. `quantidade` inteira maior que zero; `preco_unitario` maior ou igual a zero |
+| `nota` | não | `{ numero, serie?, chave?, emitida_em?, valor? }` — a nota fiscal. `numero` é obrigatório quando `nota` vem; `serie` ausente vale `""` (número e série identificam a nota dentro do pedido); `emitida_em` com fuso; `valor` maior que zero (número ou texto numérico, como o `valor_faturado`). Em `chave`, `emitida_em` e `valor` vale a regra de ouro |
+| `itens` | não | `[{ produto, tamanho, quantidade, preco_unitario? }]` — as peças que **essa nota** levou. Só com `nota`. Quando vem, **substitui** as peças daquela nota (as de outras notas do pedido ficam); `[]` apaga as peças daquela nota; ausente não mexe nelas. `quantidade` inteira maior que zero; `preco_unitario` maior ou igual a zero. Os dois aceitam número ou texto numérico (`2` ou `"2"`) |
 
 ¹ Informe **um** dos dois. `pedido_erp` é o preferido. A busca é sempre dentro
 da sua empresa: um parceiro nunca fatura pedido de outra fábrica. `id` fora do
@@ -536,7 +541,9 @@ formato UUID dá `pedido não encontrado nesta empresa`.
 
 Só pedido **aprovado ou enviado ao ERP** (`approved` ou `sent_erp`) é faturado.
 Pedido com mais de uma nota: mande um registro por nota, com o mesmo
-`pedido_erp`. `produto` é o mesmo código que o `GET /pedidos` manda; a peça que
+`pedido_erp`. Enquanto as notas levarem MENOS peças que o pedido e o
+`valor_faturado` não tiver vindo, o app mostra "faturado em partes" e **não**
+afirma que o resto foi cortado — é o `valor_faturado` que fecha a conta. `produto` é o mesmo código que o `GET /pedidos` manda; a peça que
 não casar com o catálogo é guardada assim mesmo, com aviso. Nota cancelada que
 chega de novo (mesmo número e série) volta a valer.
 
@@ -963,7 +970,7 @@ Pedido sem condição sai com `condicao_pagamento: null`, sem pendência.
 | Situação | `situacao` | App | Ver "Situações do pedido" abaixo |
 | Cliente | `cliente.*` | ERP | Código, CNPJ, razão social, fantasia, endereço, inscrição estadual, WhatsApp, e-mail |
 | Representante | `representante_erp` | ERP | Código do rep gravado no cliente |
-| Tabela de preço | `tabela_preco.*` | ERP | Código + coluna da tabela do pedido (na falta, a do cliente) |
+| Tabela de preço | `tabela_preco.*` | ERP | Código + coluna da **tabela que precificou o pedido**. Pedido sem tabela gravada usa a do cadastro do cliente; tabela gravada sem código do ERP sai `null` e vira pendência — **nunca** cai para outra tabela |
 | Condição de pagamento | `condicao_pagamento.*` | ERP (código) | Escolhida no app entre as condições do Control; `null` se não escolhida |
 | Desconto | `desconto_percentual` | App | Pontos percentuais (10 = 10%). Preços dos itens SEM desconto; `valor_total` COM. Igual à planilha (AB46) |
 | Total | `valor_total` | App | Com o desconto aplicado |

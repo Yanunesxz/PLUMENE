@@ -9,7 +9,8 @@
  *
  * Chamada que morre antes da anotação (401, 503, 429, exceção no meio) grava
  * mesmo assim, com o que houver: `company_id` e `parceiro` nulos quando a chave
- * não passou.
+ * não passou. A exceção é a requisição SEM chave nenhuma (`vaiParaOLog`): essa
+ * não vira linha no banco.
  */
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { ChamadaDoParceiro } from './partner.log.js';
@@ -62,6 +63,23 @@ const PORTA: Partial<Record<number, string>> = {
   401: 'PARTNER_UNAUTHORIZED',
   503: 'PARTNER_API_DISABLED',
 };
+
+/**
+ * Esta chamada merece uma linha em `erp_sync_log`?
+ *
+ * Requisição que nem mandou o header `X-API-Key` é varredura de robô: as URLs
+ * de produção estão numa página pública, e registrar cada batida daria a
+ * qualquer um do mundo uma escrita no banco — a tabela que o Yan e o Fábio leem
+ * para diagnosticar o Control ficaria afogada em ruído.
+ *
+ * Chave ERRADA continua registrada: aí alguém está tentando usar a API, e é
+ * exatamente o que interessa ver.
+ */
+export function vaiParaOLog(request: FastifyRequest): boolean {
+  if (typeof request.headers['x-api-key'] === 'string' && request.headers['x-api-key'].length > 0) return true;
+  // Sem header, só entra o que já se identificou por outro caminho (nunca hoje).
+  return Boolean(request.partnerLog?.company_id);
+}
 
 /** O que o hook `onResponse` manda para `registrarChamada`. */
 export function montarChamada(request: FastifyRequest, reply: FastifyReply): ChamadaDoParceiro {

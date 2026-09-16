@@ -182,6 +182,16 @@ describe('GET /partner/v1/status na aplicação de verdade', () => {
     expect(JSON.stringify(linha)).not.toContain(CHAVE);
   });
 
+  it('requisição SEM chave nenhuma não vira linha no banco — varredura de robô não escreve aqui', async () => {
+    const antes = fake.gravacoes.length;
+    const res = await app.inject({ method: 'GET', url: '/partner/v1/status' });
+    expect(res.statusCode).toBe(401);
+
+    // O onResponse roda depois da resposta: dá um respiro e confere que nada veio.
+    await new Promise((r) => setTimeout(r, 50));
+    expect(fake.gravacoes.slice(antes).filter((g) => g.tabela === 'erp_sync_log')).toEqual([]);
+  });
+
   it('chamada com chave errada também é registrada: 401, sem empresa, sem parceiro e sem a chave', async () => {
     const antes = fake.gravacoes.length;
     await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': 'chave-errada-de-teste' } });
@@ -237,6 +247,39 @@ describe('GET /partner/v1/status na aplicação de verdade', () => {
 
     expect(res.statusCode).toBe(401);
     expect(res.json()).toMatchObject({ code: 'PARTNER_UNAUTHORIZED' });
+  });
+});
+
+describe('GET /partner/v1/status com o banco sem responder sobre o canal', () => {
+  let app: FastifyInstance;
+
+  beforeAll(async () => {
+    process.env['PARTNER_API_KEYS'] = CHAVES;
+    vi.resetModules();
+    // A leitura de companies falha com code vazio ("fetch failed"): não é
+    // "coluna não existe", é "não sei".
+    const fake = criarSupabaseFake({
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+    vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    const { buildApp } = await import('../apps/api/src/app.js');
+    app = await buildApp();
+    await app.ready();
+  });
+
+  afterAll(async () => {
+    await app?.close();
+    vi.doUnmock(SUPABASE);
+    vi.restoreAllMocks();
+    delete process.env['PARTNER_API_KEYS'];
+  });
+
+  it('degrada para canais: null em vez de 500 — é a rota de diagnóstico', async () => {
+    const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toMatchObject({ ok: true, parceiro: 'control-cs', canais: null });
   });
 });
 

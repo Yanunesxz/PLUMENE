@@ -7,9 +7,10 @@
  *  • pedidos SAEM — o parceiro busca GET /partner/v1/pedidos e confirma;
  *  • cadastros ENTRAM — o parceiro empurra clientes e representantes com POST.
  *
- * Toda chamada fica registrada em `erp_sync_log` (migração 048), com o resumo
- * que o handler anotou (partner.chamada.ts). O registro roda depois que a
- * resposta saiu e nunca a derruba.
+ * Toda chamada COM chave (certa ou errada) fica registrada em `erp_sync_log`
+ * (migração 048), com o resumo que o handler anotou (partner.chamada.ts). O
+ * registro roda depois que a resposta saiu e nunca a derruba. Requisição sem
+ * header nenhum não é registrada — ver `vaiParaOLog`.
  */
 import type { FastifyInstance } from 'fastify';
 import {
@@ -23,7 +24,7 @@ import {
   partnerRepresentantesHandler,
   partnerFaturamentoHandler,
 } from './partner.controller.js';
-import { anotarChamada, montarChamada } from './partner.chamada.js';
+import { anotarChamada, montarChamada, vaiParaOLog } from './partner.chamada.js';
 import { registrarChamada } from './partner.log.js';
 
 export async function partnerRouter(fastify: FastifyInstance): Promise<void> {
@@ -36,6 +37,9 @@ export async function partnerRouter(fastify: FastifyInstance): Promise<void> {
   });
 
   fastify.addHook('onResponse', async (request, reply) => {
+    // Robô que varre a internet não escreve no nosso banco: sem o header
+    // X-API-Key, a chamada não vira linha em `erp_sync_log`.
+    if (!vaiParaOLog(request)) return;
     // `registrarChamada` nunca lança; o try é só para um defeito na montagem
     // do resumo não virar log de erro do Fastify a cada chamada.
     try {
