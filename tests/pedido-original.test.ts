@@ -276,6 +276,30 @@ describe('compararOriginalComNotas — o que as notas levaram', () => {
     ]);
   });
 
+  it('casa pelo erp_id do produto — é o código que o Control manda, e ele pode diferir do sku', () => {
+    // Produto cadastrado à mão: sku '0130 PLUS' no app, erp_id '0130' no
+    // Control. A peça da nota veio sem variante resolvida; só o erp_id casa.
+    const original = [
+      peca({
+        product_id: 'p1',
+        variant_id: 'v-m',
+        quantity: 12,
+        unit_price: 24.9,
+        total: 298.8,
+        product: { sku: '0130 PLUS', erp_id: '0130', name: 'PEÇA TESTE' },
+        variant: { size: 'M' },
+      }),
+    ];
+
+    const d = compararOriginalComNotas(original, [itemDaNota({ produto: '0130', tamanho: 'M', quantidade: 12 })]);
+
+    // Sem o erp_id, a peça entraria como linha nova e o original sairia com
+    // depois=0: 12 peças "cortadas" e 12 "entradas" num pedido que saiu inteiro.
+    expect(d.mudou).toBe(false);
+    expect(d.linhas).toEqual([]);
+    expect(d.pecasDepois).toBe(12);
+  });
+
   it('referência que a nota não levou aparece com zero', () => {
     const d = compararOriginalComNotas(ORIGINAL, [itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12 })]);
 
@@ -335,20 +359,59 @@ describe('lerFaturamentoDoPedido — o que o cartão pode afirmar', () => {
     expect(l.situacao).toBe('sem_detalhe');
   });
 
-  it('com os itens da nota, a coluna "Faturado" é o que a nota levou e o corte aparece', () => {
+  it('com os itens da nota e o valor fechado, a coluna "Faturado" é o que a nota levou e o corte aparece', () => {
     const l = lerFaturamentoDoPedido({
       ...base,
       faturado: true,
+      // O Control fechou o valor do pedido: o que a nota não levou foi cortado.
+      invoicedTotal: 140,
       notas: [nota([itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 7 })], { valor: 140 })],
     });
 
     expect(l.fonte).toBe('notas');
     expect(l.rotuloDaDireita).toBe('Faturado');
+    expect(l.faturamentoParcial).toBe(false);
     expect(l.diferenca.pecasDepois).toBe(7);
     expect(l.diferenca.linhas[0]).toMatchObject({ antes: 10, depois: 7, valor: 60 });
     expect(l.valorDaNota).toBe(140);
     expect(l.diferencaDaNota).toBe(60);
     expect(l.situacao).toBe('mudou');
+  });
+
+  it('nota com PARTE das peças e sem o valor fechado é faturamento em partes, não corte', () => {
+    // O pedido pode sair em mais de uma nota: a segunda chega amanhã. Enquanto
+    // o Control não fecha o valor, chamar a diferença de corte seria afirmar
+    // um corte que talvez não tenha havido.
+    const l = lerFaturamentoDoPedido({
+      ...base,
+      faturado: true,
+      invoicedTotal: null,
+      notas: [nota([itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 7 })], { valor: 140 })],
+    });
+
+    expect(l.situacao).toBe('parcial');
+    expect(l.faturamentoParcial).toBe(true);
+    expect(l.pecasFaturadas).toBe(7);
+    expect(l.rotuloDaDireita).toBe('Faturado até agora');
+    // Nada de "a nota fechou R$ 60 abaixo": o resto ainda pode vir.
+    expect(l.diferencaDaNota).toBeNull();
+    expect(l.notaDiferente).toBe(false);
+    expect(l.mostrar).toBe(true);
+  });
+
+  it('as notas que chegaram já levaram tudo: aí a leitura é normal, não parcial', () => {
+    const l = lerFaturamentoDoPedido({
+      ...base,
+      faturado: true,
+      invoicedTotal: null,
+      notas: [
+        nota([itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 6 })], { numero: '000123' }),
+        nota([itemDaNota({ produto: '0124', tamanho: 'M', variant_id: 'v-m', quantidade: 4 })], { numero: '000124' }),
+      ],
+    });
+
+    expect(l.faturamentoParcial).toBe(false);
+    expect(l.situacao).toBe('igual');
   });
 
   it('itens da nota iguais ao original: aí sim "faturado igual ao original"', () => {

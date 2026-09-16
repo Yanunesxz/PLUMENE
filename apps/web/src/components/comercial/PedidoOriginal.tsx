@@ -38,7 +38,9 @@ interface Props {
  * confirmação de que nada foi cortado é justamente a informação. E essa
  * confirmação só sai quando o Control disse alguma coisa (itens da nota ou o
  * valor dela): o corte acontece DENTRO do Control, e sem o detalhe o app não
- * sabe o que saiu. A conta inteira mora em `lerFaturamentoDoPedido` (shared).
+ * sabe o que saiu. Pelo mesmo motivo, nota que levou parte das peças sem o
+ * valor fechado é FATURAMENTO EM PARTES, não corte. A conta inteira mora em
+ * `lerFaturamentoDoPedido` (shared).
  */
 export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTotal, faturado, notas }: Props) {
   const [aberto, setAberto] = useState(false);
@@ -153,6 +155,13 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
               </>
             )}
             {fecho}
+          </p>
+        )}
+
+        {leitura.situacao === 'parcial' && (
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Faturado em partes: as notas que chegaram levaram {leitura.pecasFaturadas} das {d.pecasAntes} peças
+            do pedido. O restante pode vir em outra nota — por enquanto não dá para dizer o que foi cortado.
           </p>
         )}
 

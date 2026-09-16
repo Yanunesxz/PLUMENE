@@ -24,9 +24,14 @@ async function detectarTabela(): Promise<boolean> {
 /**
  * O select rico: as peças já com referência e tamanho, para a tela não
  * depender de um produto que pode ser renomeado (ou sair do catálogo) depois.
+ *
+ * `erp_id` vai junto porque é o código que o Control usa nos itens da nota
+ * (048): sem ele, a peça faturada de um produto cujo `sku` difere do `erp_id`
+ * não casaria com a linha do original. `erp_id` existe em `products` desde a
+ * 001, então pedi-lo não arrisca o select.
  */
 const COLUNAS_DA_FOTO =
-  '*, items:order_items(*, product:products(sku, name), variant:product_variants(size))';
+  '*, items:order_items(*, product:products(sku, erp_id, name), variant:product_variants(size))';
 
 function contarPecas(itens: Array<{ quantity?: number | null }>): number {
   return itens.reduce((s, i) => s + Number(i.quantity ?? 0), 0);

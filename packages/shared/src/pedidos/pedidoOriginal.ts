@@ -12,9 +12,16 @@ import { codigoMiolo } from '../cadastro/codigoErp.js';
  * duas listas de peças, sai o que mudou entre elas.
  */
 
-/** Uma peça na foto: com a referência e o tamanho resolvidos. */
+/**
+ * Uma peça na foto: com a referência e o tamanho resolvidos.
+ *
+ * `product.erp_id` é o código do produto NO CONTROL — é ele que volta nos itens
+ * da nota. Hoje o catálogo entra com `erp_id` igual ao `sku`, mas produto
+ * cadastrado à mão pode ter os dois diferentes, e aí só o `erp_id` casa. Fotos
+ * antigas (044) não têm o campo: por isso é opcional.
+ */
 export interface ItemDaFoto extends OrderItem {
-  product?: { sku: string; name: string } | null;
+  product?: { sku: string; name: string; erp_id?: string | null } | null;
   variant?: { size: string } | null;
 }
 
@@ -191,10 +198,11 @@ interface LinhaAcumulada {
  * O original × o que as notas ativas levaram, referência por referência.
  *
  * Cada item da nota procura a sua linha no original primeiro pela VARIANTE
- * (quando o app achou a variante do item) e depois pelo par produto/tamanho
- * (o código do Control casado pelo miolo com a referência da foto: "124" e
- * "0124" são a mesma). O que a nota levou e o original não tinha entra como
- * peça que ENTROU, com o código que o Control mandou.
+ * (quando o app achou a variante do item) e depois pelo par produto/tamanho —
+ * o código do Control casado pelo miolo com a referência da foto ("124" e
+ * "0124" são a mesma), tanto com o `sku` quanto com o `erp_id` do produto. O
+ * que a nota levou e o original não tinha entra como peça que ENTROU, com o
+ * código que o Control mandou.
  *
  * `valorReprecificado` compara o preço da nota com o do original nas peças que
  * ficaram; item de nota sem `preco_unitario` não conta como troca de preço.
@@ -221,8 +229,14 @@ export function compararOriginalComNotas(
       });
     }
     if (i.variant_id && !porVariante.has(i.variant_id)) porVariante.set(i.variant_id, chave);
-    const par = parProdutoTamanho(i.product?.sku, i.variant?.size);
-    if (par && !porPar.has(par)) porPar.set(par, chave);
+    // As DUAS grafias da referência: o `sku` do app e o `erp_id` do Control. O
+    // item da nota vem com o código do Control, e os dois só coincidem porque
+    // as cargas de catálogo gravam um igual ao outro — produto cadastrado à mão
+    // pode divergir, e aí casar só pelo `sku` inventaria um corte que não houve.
+    for (const codigo of [i.product?.sku, i.product?.erp_id]) {
+      const par = parProdutoTamanho(codigo, i.variant?.size);
+      if (par && !porPar.has(par)) porPar.set(par, chave);
+    }
   }
 
   const depois = new Map<string, LinhaAcumulada>();
@@ -298,7 +312,7 @@ export interface LeituraDoFaturamento {
    */
   fonte: 'notas' | 'pedido';
   /** O título da coluna da direita. */
-  rotuloDaDireita: 'Faturado' | 'Hoje' | 'Pedido no app';
+  rotuloDaDireita: 'Faturado' | 'Hoje' | 'Pedido no app' | 'Faturado até agora';
   /** O valor que a coluna da direita mostra. */
   valorDaDireita: number | null;
   /** O valor que a nota fechou: `invoiced_total` ou a soma das notas ativas. */
@@ -312,15 +326,25 @@ export interface LeituraDoFaturamento {
    * Control cortou. Nesse caso o cartão nunca diz que nada foi cortado.
    */
   semDetalheDoControl: boolean;
+  /**
+   * As notas que chegaram levaram MENOS peças que o original e o Control ainda
+   * não fechou o valor do pedido (`invoiced_total` vazio). Um pedido pode sair
+   * em mais de uma nota: até o fechamento, a diferença é "o resto ainda não
+   * veio", não "foi cortado".
+   */
+  faturamentoParcial: boolean;
+  /** Quantas peças as notas ativas já levaram (só quando a fonte é `notas`). */
+  pecasFaturadas: number | null;
   /** `false` = nada a comparar, o cartão não aparece. */
   mostrar: boolean;
   /**
    * A frase principal:
    *   mudou       → o que saiu, entrou, mudou de preço, ou a nota diferente;
    *   igual       → faturado igual ao original (há nota para dizer isso);
+   *   parcial     → as notas de até agora levaram parte das peças;
    *   sem_detalhe → o detalhe do faturamento ainda não chegou do Control.
    */
-  situacao: 'mudou' | 'igual' | 'sem_detalhe';
+  situacao: 'mudou' | 'igual' | 'parcial' | 'sem_detalhe';
 }
 
 /**
@@ -345,27 +369,49 @@ export function lerFaturamentoDoPedido(entrada: {
       : compararComOOriginal(original, itensAtuais);
 
   const valorDaNota = faturado ? (entrada.invoicedTotal ?? valorDasNotasAtivas(entrada.notas)) : null;
+
+  // FATURAMENTO EM PARTES. Um pedido pode sair em mais de uma nota (é um
+  // registro por nota, e a segunda pode chegar no dia seguinte). Enquanto as
+  // notas somam MENOS peças que o original e o Control não fechou o valor do
+  // pedido (`invoiced_total` vazio), a diferença é "o resto ainda não veio" —
+  // e o cartão não pode anunciar um corte que talvez não tenha havido.
+  const faturamentoParcial =
+    fonte === 'notas' && entrada.invoicedTotal == null && diferenca.pecasDepois < diferenca.pecasAntes;
+
   const diferencaDaNota =
-    faturado && valorDaNota != null && totalAtual != null
+    faturado && !faturamentoParcial && valorDaNota != null && totalAtual != null
       ? Number((totalAtual - valorDaNota).toFixed(2))
       : null;
   const notaDiferente = diferencaDaNota != null && Math.abs(diferencaDaNota) >= 0.01;
   const reprecificou = Math.abs(diferenca.valorReprecificado) >= 0.01;
   const semDetalheDoControl = faturado && fonte === 'pedido' && valorDaNota == null;
 
-  const situacao: LeituraDoFaturamento['situacao'] =
-    diferenca.mudou || reprecificou || notaDiferente ? 'mudou' : semDetalheDoControl ? 'sem_detalhe' : 'igual';
+  const situacao: LeituraDoFaturamento['situacao'] = faturamentoParcial
+    ? 'parcial'
+    : diferenca.mudou || reprecificou || notaDiferente
+      ? 'mudou'
+      : semDetalheDoControl
+        ? 'sem_detalhe'
+        : 'igual';
 
   return {
     diferenca,
     fonte,
-    rotuloDaDireita: !faturado ? 'Hoje' : semDetalheDoControl ? 'Pedido no app' : 'Faturado',
+    rotuloDaDireita: !faturado
+      ? 'Hoje'
+      : faturamentoParcial
+        ? 'Faturado até agora'
+        : semDetalheDoControl
+          ? 'Pedido no app'
+          : 'Faturado',
     valorDaDireita: valorDaNota ?? totalAtual ?? null,
     valorDaNota,
     diferencaDaNota,
     reprecificou,
     notaDiferente,
     semDetalheDoControl,
+    faturamentoParcial,
+    pecasFaturadas: fonte === 'notas' ? diferenca.pecasDepois : null,
     mostrar: diferenca.mudou || reprecificou || notaDiferente || faturado,
     situacao,
   };
