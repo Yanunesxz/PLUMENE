@@ -1,5 +1,6 @@
 /**
- * Recebe dados que o ERP do parceiro empurra e grava no Supabase.
+ * Recebe dados que o ERP do parceiro empurra e grava no Supabase — e devolve
+ * ao parceiro o que mudou no app (a sincronização nas duas mãos).
  *
  * É a mão inversa da API de pedidos: em vez de o parceiro BUSCAR pedidos, ele
  * MANDA clientes e representantes atualizados. Leitura do lado dele, escrita do
@@ -22,10 +23,19 @@
  *     inofensivo;
  *   • a falha ao gravar UM registro vira ignorado com o motivo, e o lote segue.
  *
- * Chave de tudo é o CÓDIGO do ERP, casado pelo miolo (`codigoMiolo`, de
- * @csb/shared): "#2225", "2225" e "02225" são o mesmo cadastro. O índice único
- * de `customers(company_id, erp_id)` é exato, então o upsert é feito por mapa
+ * A CHAVE DO CLIENTE É O CNPJ (decisão do Yan, 16/09/2026): o casamento é
+ * PRIMEIRO pelo documento só em dígitos e DEPOIS pelo código do ERP, casado pelo
+ * miolo (`codigoMiolo`, de @csb/shared — "#2225", "2225" e "02225" são o mesmo
+ * cadastro). Cliente que nasceu no app não tem código: o Control cria o cadastro
+ * lá, manda o mesmo CNPJ com o código, e o cadastro daqui APRENDE o código. Quem
+ * já tem código nunca tem o código reescrito. O índice único de
+ * `customers(company_id, erp_id)` é exato, então o upsert é feito por mapa
  * (busca os existentes, decide update ou insert) — não por `onConflict`.
+ *
+ * O que o Control passou a mandar (049) fica em coluna própria, com `detectar`:
+ * pendência financeira, títulos vencidos, motivo do bloqueio (block_reason, da
+ * 001) e o carimbo `erp_updated_at`. Bloqueio do Control NÃO trava o
+ * representante — o financeiro é avisado (o aviso é da tela).
  */
 import { apenasDigitos, codigoCanonico, codigoMiolo, linhaDeEndereco } from '@csb/shared';
 import { supabase } from '../../config/supabase.js';
@@ -60,13 +70,32 @@ export interface ClienteParceiro {
   /** Colunas da migração 041 — guardadas só onde ela rodou. */
   inscricao_estadual?: string | null;
   observacoes?: string | null;
+  /** O motivo do bloqueio no Control (customers.block_reason). `null` limpa. */
+  motivo_bloqueio?: string | null;
+  /**
+   * O que o Control informa da situação financeira (049): R$ em aberto e
+   * quantos títulos vencidos. `null` limpa; negativo ou ilegível não mexe e
+   * avisa. Sem a 049, ficam de fora com aviso.
+   */
+  pendencia_financeira?: number | string | null;
+  titulos_vencidos?: number | string | null;
+  /**
+   * Quando o cadastro mudou no Control (DATA_UPDATE), momento COM fuso. Vai
+   * para customers.erp_updated_at; ausente (ou `null`), o carimbo é o momento
+   * do envio. Sem fuso, não mexe e avisa.
+   */
+  data_update?: string | null;
 }
 
 export interface RepresentanteParceiro {
   codigo?: string | null;
   nome?: string | null;
   razao_social?: string | null;
-  /** Aceito e IGNORADO: o e-mail do login só muda pelas telas do app. */
+  /**
+   * O e-mail do representante NO CONTROL. Vai para users.erp_email (049);
+   * NUNCA para users.email, que é o login e só muda pelas telas. Sem a 049, é
+   * ignorado (com aviso quando difere do login, como sempre foi).
+   */
   email?: string | null;
   ativo?: string | boolean | null;
 }
@@ -81,6 +110,60 @@ export interface ResultadoSync {
   avisos: string[];
 }
 
+// ─── O que volta ao parceiro (GET ?desde=) ───────────────────────────────────
+
+/**
+ * Um cliente como o app o tem, NO MESMO FORMATO que o POST /clientes aceita —
+ * o parceiro pode devolver o registro como veio. Os campos a mais são só
+ * leitura e o POST os ignora.
+ */
+export interface ClienteAlterado {
+  /** O código no Control. `null` = nasceu no app e ainda não tem código. */
+  codigo: string | null;
+  /** A chave entre os sistemas: CNPJ/CPF só dígitos. `null` = sem documento. */
+  chave: string | null;
+  /** `true` = o Control ainda não conhece este cliente (sem código): crie e devolva o código. */
+  novo_no_control: boolean;
+  razao_social: string;
+  nome_fantasia: string | null;
+  cnpj_cpf: string | null;
+  representante: string | null;
+  /** O código da tabela de preço no ERP (`null` = sem tabela, ou tabela sem código). */
+  tabela_preco: string | null;
+  /** Os pedaços (onde a 041 rodou) ou a linha de texto. */
+  endereco: EnderecoParceiro | string | null;
+  inscricao_estadual?: string | null;
+  observacoes?: string | null;
+  bloqueado: 'S' | 'N';
+  motivo_bloqueio: string | null;
+  limite_credito: number | null;
+  whatsapp: string | null;
+  email: string | null;
+  pendencia_financeira?: number | null;
+  titulos_vencidos?: number | null;
+  /** Quando mudou no app (customers.updated_at). */
+  atualizado_em: string;
+  /** Quando o Control mandou pela última vez (049). Ausente sem a migração. */
+  atualizado_pelo_control_em?: string | null;
+}
+
+/** Um representante como o app o tem, no formato do POST /representantes. */
+export interface RepresentanteAlterado {
+  codigo: string;
+  nome: string;
+  razao_social: string | null;
+  /** O e-mail que o Control mandou (users.erp_email). Ausente sem a 049. */
+  email?: string | null;
+  ativo: 'S' | 'N';
+  /** Quando mudou no app (users.updated_at, da 048). `null` sem a migração. */
+  atualizado_em: string | null;
+}
+
+export interface ListaAlterados<T> {
+  registros: T[];
+  avisos: string[];
+}
+
 // ─── Leitura do que veio ─────────────────────────────────────────────────────
 
 /** O campo não veio (ou veio vazio), ou veio com um valor — `null` = limpar. */
@@ -90,6 +173,9 @@ const NAO_VEIO = { veio: false } as const;
 
 /** Até quantos códigos um aviso lista (o resto vira "e mais N"). */
 const CODIGOS_POR_AVISO = 20;
+
+/** Momento com data, hora e fuso: `Z` ou `±hh:mm`. */
+const MOMENTO_COM_FUSO = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:\d{2})$/i;
 
 const ehObjeto = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null && !Array.isArray(v);
@@ -157,13 +243,14 @@ function lerAtivo(obj: Record<string, unknown>): boolean | 'invalido' | undefine
 }
 
 /**
- * `limite_credito`: número ou texto numérico ("1500.50", "1.500,50"). `null`
- * limpa. Negativo ou ilegível não mexe e volta como aviso (a 013 recusa
- * negativo no banco — antes isso derrubava o lote inteiro).
+ * Valor em reais (`limite_credito`, `pendencia_financeira`): número ou texto
+ * numérico ("1500.50", "1.500,50"). `null` limpa. Negativo ou ilegível não
+ * mexe e volta como aviso (a 013 recusa limite negativo no banco — antes isso
+ * derrubava o lote inteiro).
  */
-function lerLimite(obj: Record<string, unknown>): Recebido<number> | { veio: 'invalido' } {
-  if (!tem(obj, 'limite_credito')) return NAO_VEIO;
-  const v = obj['limite_credito'];
+function lerValor(obj: Record<string, unknown>, chave: string): Recebido<number> | { veio: 'invalido' } {
+  if (!tem(obj, chave)) return NAO_VEIO;
+  const v = obj[chave];
   if (v === null) return { veio: true, valor: null };
   let n: number;
   if (typeof v === 'number') n = v;
@@ -174,6 +261,32 @@ function lerLimite(obj: Record<string, unknown>): Recebido<number> | { veio: 'in
   }
   if (!Number.isFinite(n) || n < 0) return { veio: 'invalido' };
   return { veio: true, valor: Math.round(n * 100) / 100 };
+}
+
+/** Contagem (`titulos_vencidos`): inteiro não negativo, número ou texto. `null` limpa. */
+function lerInteiro(obj: Record<string, unknown>, chave: string): Recebido<number> | { veio: 'invalido' } {
+  if (!tem(obj, chave)) return NAO_VEIO;
+  const v = obj[chave];
+  if (v === null) return { veio: true, valor: null };
+  const s = textoSimples(v);
+  if (s === null) return NAO_VEIO;
+  const n = Number(s);
+  if (!Number.isInteger(n) || n < 0) return { veio: 'invalido' };
+  return { veio: true, valor: n };
+}
+
+/**
+ * Momento com fuso (`data_update`). `null` e "" contam como não veio: um
+ * carimbo não se "limpa" — na falta dele vale o momento do envio. Sem fuso ou
+ * ilegível não mexe e avisa: "2026-09-16T10:00:00" é uma hora no Railway (UTC)
+ * e outra no Control (Brasília).
+ */
+function lerMomento(obj: Record<string, unknown>, chave: string): Recebido<string> | { veio: 'invalido' } {
+  if (!tem(obj, chave)) return NAO_VEIO;
+  const s = textoSimples(obj[chave]);
+  if (s === null) return NAO_VEIO;
+  if (!MOMENTO_COM_FUSO.test(s) || Number.isNaN(Date.parse(s))) return { veio: 'invalido' };
+  return { veio: true, valor: s };
 }
 
 /** CNPJ/CPF só dígitos — 11 (CPF) ou mais; menos que isso é lixo de digitação. */
@@ -195,11 +308,28 @@ function mesmoValor(atual: unknown, novo: unknown): boolean {
   return a === novo;
 }
 
+/** Colunas de momento comparam pelo instante: "10:00-03:00" e "13:00Z" são iguais. */
+const COLUNAS_DE_MOMENTO = new Set(['erp_updated_at']);
+
+function mesmoValorDaColuna(coluna: string, atual: unknown, novo: unknown): boolean {
+  if (COLUNAS_DE_MOMENTO.has(coluna) && typeof atual === 'string' && typeof novo === 'string') {
+    return Date.parse(atual) === Date.parse(novo);
+  }
+  return mesmoValor(atual, novo);
+}
+
 /** "a, b, c" com no máximo CODIGOS_POR_AVISO itens. */
 function listar(codigos: Iterable<string>): string {
   const todos = [...codigos];
   const mostrados = todos.slice(0, CODIGOS_POR_AVISO).join(', ');
   return todos.length > CODIGOS_POR_AVISO ? `${mostrados} e mais ${todos.length - CODIGOS_POR_AVISO}` : mostrados;
+}
+
+/** Número de uma coluna NUMERIC que o banco pode devolver como texto. */
+function numeroOuNull(v: unknown): number | null {
+  if (v == null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
 }
 
 // ─── Clientes ────────────────────────────────────────────────────────────────
@@ -210,11 +340,18 @@ type PecaDoEndereco = (typeof PECAS_DO_ENDERECO)[number];
 
 /** Colunas de `customers` que esta rota compara e grava. */
 const COLUNAS_DO_CLIENTE =
-  'id, erp_id, name, trade_name, cnpj, rep_erp_id, price_table_id, blocked, credit_limit, whatsapp, email, address';
+  'id, erp_id, name, trade_name, cnpj, rep_erp_id, price_table_id, blocked, block_reason, credit_limit, whatsapp, email, address';
 /** As da migração 041, só onde ela rodou. */
 const COLUNAS_DA_041 = `${PECAS_DO_ENDERECO.join(', ')}, inscricao_estadual, observacoes`;
+/** As da migração 049 que esta rota grava, só onde ela rodou. */
+const COLUNAS_DA_049 = 'erp_updated_at, pendencia_financeira, pendencia_financeira_em, titulos_vencidos';
 
 type LinhaCliente = { id: string; erp_id: string | null; cnpj: string | null } & Record<string, unknown>;
+
+/** A 041 em customers existe? Lança quando o banco não respondeu. */
+const detectarCadastroReal = () => detectarOuFalhar('customers', 'cep');
+/** As colunas da 049 em customers existem? Nascem juntas; a sonda é uma. */
+const detectarClienteDa049 = () => detectarOuFalhar('customers', 'pendencia_financeira');
 
 /**
  * O que o `endereco` recebido pede para gravar.
@@ -296,6 +433,23 @@ async function codigosDosLogins(company_id: string): Promise<Map<string, Set<str
   return mapa;
 }
 
+/** As tabelas de preço da empresa: id ↔ código do ERP. Lança quando a leitura falha. */
+async function tabelasDePreco(company_id: string): Promise<Array<{ id: string; erp_code: string | null }>> {
+  const { data, error } = await supabase
+    .from('price_tables')
+    .select('id, erp_code')
+    .eq('company_id', company_id);
+  if (error) throw new Error(`Ler as tabelas de preço falhou: ${error.message}`);
+  return (Array.isArray(data) ? data : []) as Array<{ id: string; erp_code: string | null }>;
+}
+
+/** Todos os clientes da empresa, paginados e ordenados por id (o PostgREST corta em 1.000 sem avisar). */
+async function clientesDaEmpresa(company_id: string, colunas: string): Promise<LinhaCliente[]> {
+  return buscarTudoOuFalhar<LinhaCliente>((de, ate) =>
+    supabase.from('customers').select(colunas).eq('company_id', company_id).order('id').range(de, ate),
+  );
+}
+
 export async function receberClientes(
   company_id: string,
   clientes: readonly unknown[],
@@ -307,62 +461,58 @@ export async function receberClientes(
   // ── 1. Leituras. Todas antes da primeira gravação: se uma falhar, lança
   // (500) sem ter gravado nada. Engolir o erro seria tratar a base inteira
   // como vazia — e criar de novo cada cliente que já existe.
-  const cadastroReal = await detectarOuFalhar('customers', 'cep');
+  const cadastroReal = await detectarCadastroReal();
+  const com049 = await detectarClienteDa049();
 
-  const { data: tabelas, error: erroTabelas } = await supabase
-    .from('price_tables')
-    .select('id, erp_code')
-    .eq('company_id', company_id);
-  if (erroTabelas) throw new Error(`Ler as tabelas de preço falhou: ${erroTabelas.message}`);
   const tabelaPorMiolo = new Map<string, string>();
   const tabelasComCodigoRepetido = new Set<string>();
-  for (const t of (Array.isArray(tabelas) ? tabelas : []) as Array<{ id: string; erp_code: string | null }>) {
+  for (const t of await tabelasDePreco(company_id)) {
     const m = codigoMiolo(t.erp_code);
     if (!m) continue;
     if (tabelaPorMiolo.has(m) && tabelaPorMiolo.get(m) !== t.id) tabelasComCodigoRepetido.add(m);
     else tabelaPorMiolo.set(m, t.id);
   }
 
-  // Existentes por código (miolo) — e por CNPJ os que estão SEM código. Estes
-  // últimos vieram das cargas de carteira (relatório Curva ABC, que não traz
-  // código): quando o ERP mandar o mesmo cliente COM código, é adoção, não
-  // criação — senão a mesma loja vira duas.
+  // Existentes por CNPJ (a chave entre os sistemas) e por código (miolo).
   //
   // PAGINADO e ordenado por id: o PostgREST corta em 1.000 linhas sem avisar,
   // e a CS já tem mais de 2.600 clientes. Sem paginar, todo cliente da página
   // 2 em diante ficava fora deste mapa — e a carga o CRIARIA de novo.
-  const colunas = cadastroReal ? `${COLUNAS_DO_CLIENTE}, ${COLUNAS_DA_041}` : COLUNAS_DO_CLIENTE;
-  const existentes = await buscarTudoOuFalhar<LinhaCliente>((de, ate) =>
-    supabase.from('customers').select(colunas).eq('company_id', company_id).order('id').range(de, ate),
-  );
+  const colunas = [COLUNAS_DO_CLIENTE, cadastroReal ? COLUNAS_DA_041 : null, com049 ? COLUNAS_DA_049 : null]
+    .filter(Boolean)
+    .join(', ');
+  const existentes = await clientesDaEmpresa(company_id, colunas);
   const porMiolo = new Map<string, LinhaCliente>();
   const mioloComDoisCadastros = new Set<string>();
-  const semCodigoPorCnpj = new Map<string, LinhaCliente>();
-  const cnpjComDoisCadastros = new Set<string>();
+  const porCnpj = new Map<string, LinhaCliente[]>();
   for (const c of existentes) {
     const m = codigoMiolo(c.erp_id);
     if (m) {
       if (porMiolo.has(m)) mioloComDoisCadastros.add(m);
       else porMiolo.set(m, c);
-      continue;
     }
     const d = digitosDoDocumento(c.cnpj);
-    if (!d) continue;
-    if (semCodigoPorCnpj.has(d)) cnpjComDoisCadastros.add(d);
-    else semCodigoPorCnpj.set(d, c);
+    if (d) porCnpj.set(d, [...(porCnpj.get(d) ?? []), c]);
   }
 
   // ── 2. Decide, registro a registro, o que gravar.
   const paraInserir: Array<{ codigo: string; linha: Record<string, unknown> }> = [];
   const paraAtualizar: Array<{ codigo: string; id: string; patch: Record<string, unknown>; adotado: boolean }> = [];
   const vistosNoLote = new Set<string>();
+  const cnpjsNoLote = new Set<string>();
+  const alvosNoLote = new Set<string>();
   const tabelasNaoAchadas = new Set<string>();
   const tabelasAmbiguas = new Set<string>();
   const limitesInvalidos = new Set<string>();
+  const pendenciasInvalidas = new Set<string>();
+  const titulosInvalidos = new Set<string>();
+  const datasInvalidas = new Set<string>();
   const bloqueiosInvalidos = new Set<string>();
   const codigosDeRepresentante = new Set<string>();
-  const adocaoAmbigua = new Set<string>();
+  const cnpjAmbiguo = new Set<string>();
+  const codigoDivergente = new Set<string>();
   let camposQuePrecisamDa041 = false;
+  let camposQuePrecisamDa049 = false;
   let algumaTabelaVeio = false;
   let semMudanca = 0;
 
@@ -389,25 +539,60 @@ export async function receberClientes(
       continue;
     }
     vistosNoLote.add(miolo);
-    if (mioloComDoisCadastros.has(miolo)) {
-      ignorados.push({ codigo, motivo: 'código com mais de um cadastro no app' });
-      continue;
+    const documento = digitosDoDocumento(raw['cnpj_cpf']);
+    if (documento) {
+      if (cnpjsNoLote.has(documento)) {
+        ignorados.push({ codigo, motivo: 'CNPJ repetido no lote' });
+        continue;
+      }
+      cnpjsNoLote.add(documento);
     }
 
-    let existente = porMiolo.get(miolo);
-    let adotado = false;
-    if (!existente) {
-      // Adoção por CNPJ: o cliente já existe sem código (veio da carga de
-      // carteira) e agora aprende o código do Control — daqui em diante ele
-      // casa pelo caminho normal.
-      const d = digitosDoDocumento(raw['cnpj_cpf']);
-      const alvo = d ? semCodigoPorCnpj.get(d) : undefined;
-      if (d && alvo) {
-        existente = alvo;
-        adotado = true;
-        semCodigoPorCnpj.delete(d); // duas linhas não adotam o mesmo cadastro
-        if (cnpjComDoisCadastros.has(d)) adocaoAmbigua.add(codigo);
+    // O casamento: PRIMEIRO pelo CNPJ, DEPOIS pelo código.
+    //
+    // O CNPJ é a chave entre os sistemas. O cliente que nasceu no app (sem
+    // código) e o que veio da carga de carteira (Curva ABC, também sem código)
+    // são achados por ele — e aprendem o código do Control. CNPJ com mais de
+    // um cadastro no app: fica com o que tem este código; senão com o que não
+    // tem código nenhum (com aviso); senão o registro é recusado — escolher às
+    // cegas fundiria duas lojas.
+    let existente: LinhaCliente | undefined;
+    if (documento) {
+      const candidatos = porCnpj.get(documento) ?? [];
+      if (candidatos.length === 1) existente = candidatos[0];
+      else if (candidatos.length > 1) {
+        const peloCodigo = candidatos.find((c) => codigoMiolo(c.erp_id) === miolo);
+        const semCodigo = candidatos.find((c) => !codigoMiolo(c.erp_id));
+        existente = peloCodigo ?? semCodigo;
+        if (!existente) {
+          ignorados.push({ codigo, motivo: 'CNPJ com mais de um cadastro no app' });
+          continue;
+        }
+        cnpjAmbiguo.add(codigo);
       }
+    }
+    if (!existente) {
+      if (mioloComDoisCadastros.has(miolo)) {
+        ignorados.push({ codigo, motivo: 'código com mais de um cadastro no app' });
+        continue;
+      }
+      existente = porMiolo.get(miolo);
+    }
+    // Um cadastro é alvo de UM registro do lote: dois registros (um pelo CNPJ,
+    // outro pelo código) apontando para a mesma linha seriam dois updates brigando.
+    if (existente) {
+      if (alvosNoLote.has(existente.id)) {
+        ignorados.push({ codigo, motivo: 'cadastro já atualizado por outro registro do lote' });
+        continue;
+      }
+      alvosNoLote.add(existente.id);
+    }
+    const mioloGravado = existente ? codigoMiolo(existente.erp_id) : null;
+    // Quem não tinha código aprende o do Control; quem tem, mantém — o código
+    // que chega diferente vira aviso, nunca reescrita.
+    const adotado = existente !== undefined && !mioloGravado;
+    if (existente && mioloGravado && mioloGravado !== miolo) {
+      codigoDivergente.add(`${codigo} (no app: ${String(existente.erp_id)})`);
     }
 
     // Só entram as chaves que vieram. `name` sempre vem (é obrigatório).
@@ -420,6 +605,7 @@ export async function receberClientes(
     copiarTexto('cnpj_cpf', 'cnpj'); // como veio (aparado); o casamento é por dígitos
     copiarTexto('whatsapp', 'whatsapp');
     copiarTexto('email', 'email');
+    copiarTexto('motivo_bloqueio', 'block_reason');
 
     const rep = lerTexto(raw, 'representante');
     if (rep.veio) {
@@ -446,9 +632,29 @@ export async function receberClientes(
     if (bloqueado.veio === true) pedido['blocked'] = bloqueado.valor;
     else if (bloqueado.veio === 'invalido') bloqueiosInvalidos.add(codigo);
 
-    const limite = lerLimite(raw);
+    const limite = lerValor(raw, 'limite_credito');
     if (limite.veio === true) pedido['credit_limit'] = limite.valor;
     else if (limite.veio === 'invalido') limitesInvalidos.add(codigo);
+
+    // O que o Control informa da situação financeira e o carimbo dele (049).
+    const pendencia = lerValor(raw, 'pendencia_financeira');
+    if (pendencia.veio === 'invalido') pendenciasInvalidas.add(codigo);
+    else if (pendencia.veio) {
+      if (com049) pedido['pendencia_financeira'] = pendencia.valor;
+      else camposQuePrecisamDa049 = true;
+    }
+    const titulos = lerInteiro(raw, 'titulos_vencidos');
+    if (titulos.veio === 'invalido') titulosInvalidos.add(codigo);
+    else if (titulos.veio) {
+      if (com049) pedido['titulos_vencidos'] = titulos.valor;
+      else camposQuePrecisamDa049 = true;
+    }
+    const dataUpdate = lerMomento(raw, 'data_update');
+    if (dataUpdate.veio === 'invalido') datasInvalidas.add(codigo);
+    else if (dataUpdate.veio && dataUpdate.valor !== null) {
+      if (com049) pedido['erp_updated_at'] = dataUpdate.valor;
+      else camposQuePrecisamDa049 = true;
+    }
 
     for (const [campo, coluna] of [
       ['inscricao_estadual', 'inscricao_estadual'],
@@ -467,16 +673,21 @@ export async function receberClientes(
     if (existente) {
       const patch: Record<string, unknown> = {};
       for (const [coluna, valor] of Object.entries(pedido)) {
-        if (!mesmoValor(existente[coluna], valor)) patch[coluna] = valor;
+        if (!mesmoValorDaColuna(coluna, existente[coluna], valor)) patch[coluna] = valor;
       }
       // O `erp_id` de quem já tem código nunca é reescrito — só casa. Quem é
-      // adotado pelo CNPJ não tinha código: aprende o do Control.
+      // achado pelo CNPJ sem código aprende o do Control.
       if (adotado) patch['erp_id'] = codigoCanonico(codigo);
       if (Object.keys(patch).length === 0) {
         semMudanca++;
         continue;
       }
       patch['updated_at'] = agora;
+      if (com049) {
+        // O carimbo do Control: o DATA_UPDATE dele, ou o momento deste envio.
+        if (!('erp_updated_at' in patch)) patch['erp_updated_at'] = agora;
+        if ('pendencia_financeira' in patch) patch['pendencia_financeira_em'] = agora;
+      }
       paraAtualizar.push({ codigo, id: existente.id, patch, adotado });
     } else {
       // Cliente novo não tem nada a preservar: a linha vai completa, com as
@@ -490,6 +701,7 @@ export async function receberClientes(
         rep_erp_id: null,
         price_table_id: null,
         blocked: false,
+        block_reason: null,
         credit_limit: null,
         whatsapp: null,
         email: null,
@@ -500,7 +712,15 @@ export async function receberClientes(
         base['inscricao_estadual'] = null;
         base['observacoes'] = null;
       }
-      paraInserir.push({ codigo, linha: { ...base, ...pedido, updated_at: agora } });
+      if (com049) {
+        base['erp_updated_at'] = agora;
+        base['pendencia_financeira'] = null;
+        base['pendencia_financeira_em'] = null;
+        base['titulos_vencidos'] = null;
+      }
+      const linha: Record<string, unknown> = { ...base, ...pedido, updated_at: agora };
+      if (com049 && linha['pendencia_financeira'] != null) linha['pendencia_financeira_em'] = agora;
+      paraInserir.push({ codigo, linha });
     }
   }
 
@@ -594,9 +814,29 @@ export async function receberClientes(
       `"limite_credito" negativo ou ilegível — o limite não foi mexido: ${listar(limitesInvalidos)}.`,
     );
   }
+  if (pendenciasInvalidas.size > 0) {
+    avisos.push(
+      `"pendencia_financeira" negativa ou ilegível — a pendência não foi mexida: ${listar(pendenciasInvalidas)}.`,
+    );
+  }
+  if (titulosInvalidos.size > 0) {
+    avisos.push(
+      `"titulos_vencidos" precisa ser um inteiro não negativo — não foi mexido: ${listar(titulosInvalidos)}.`,
+    );
+  }
+  if (datasInvalidas.size > 0) {
+    avisos.push(
+      `"data_update" precisa ser um momento com fuso (Z ou -03:00) — o carimbo usado foi o do envio: ${listar(datasInvalidas)}.`,
+    );
+  }
   if (camposQuePrecisamDa041) {
     avisos.push(
       'Endereço em campos separados, inscrição estadual e observações ficam guardados depois da migração 041 — por ora só a linha do endereço foi gravada.',
+    );
+  }
+  if (camposQuePrecisamDa049) {
+    avisos.push(
+      'Pendência financeira, títulos vencidos e data_update ficam guardados depois da migração 049 — por ora foram ignorados.',
     );
   }
   if (adotadosPorCnpj > 0) {
@@ -604,9 +844,14 @@ export async function receberClientes(
       `${adotadosPorCnpj} cliente(s) já existiam sem código e foram casados pelo CNPJ — agora têm o código do Control.`,
     );
   }
-  if (adocaoAmbigua.size > 0) {
+  if (cnpjAmbiguo.size > 0) {
     avisos.push(
-      `CNPJ com mais de um cadastro sem código no app — o código foi para o primeiro deles; confira os outros: ${listar(adocaoAmbigua)}.`,
+      `CNPJ com mais de um cadastro no app — o registro foi para o que tem este código, ou para o que não tem código; confira os outros: ${listar(cnpjAmbiguo)}.`,
+    );
+  }
+  if (codigoDivergente.size > 0) {
+    avisos.push(
+      `CNPJ casado com um cadastro que já tem OUTRO código no app — o código gravado não foi mexido; confira qual é o certo: ${listar(codigoDivergente)}.`,
     );
   }
 
@@ -628,22 +873,29 @@ type LinhaLogin = {
   name?: string | null;
   legal_name?: string | null;
   email?: string | null;
+  erp_email?: string | null;
   active?: boolean | null;
+  updated_at?: string | null;
 };
 
-/** Aviso fixo quando o Control manda um e-mail diferente do login. */
+/** Aviso fixo quando o Control manda um e-mail diferente do login (sem a 049). */
 export const AVISO_EMAIL_DO_REPRESENTANTE = 'e-mail do Control não troca o login do representante';
 
+/** users.erp_email (049) existe? Lança quando o banco não respondeu. */
+const detectarEmailDoControl = () => detectarOuFalhar('users', 'erp_email');
+
 /**
- * Atualiza os representantes que JÁ EXISTEM (nome, razão social, ativo),
- * casando pelo miolo do código do ERP dentro da empresa e do papel `rep`.
+ * Atualiza os representantes que JÁ EXISTEM (nome, razão social, ativo, e o
+ * e-mail do Control), casando pelo miolo do código do ERP dentro da empresa e
+ * do papel `rep`.
  *
  * Não cria login novo: conta de acesso nasce com senha, e uma senha vinda de um
  * POST externo é risco que ninguém pediu. Rep que o Control tem mas o app ainda
  * não vem na lista `novos`, para o admin criar à mão.
  *
  * NÃO grava `users.email`: é o login (e único no banco inteiro). O e-mail que
- * chega é ignorado, com aviso quando difere do login.
+ * chega vai para `users.erp_email` (049); sem a coluna, é ignorado com aviso
+ * quando difere do login.
  */
 export async function receberRepresentantes(
   company_id: string,
@@ -654,9 +906,15 @@ export async function receberRepresentantes(
 
   // Leitura antes de gravar; falhou, lança (500) — sem ela todo rep viraria
   // "novo" e o Control concluiria que ninguém tem login.
+  const comEmailDoControl = await detectarEmailDoControl();
+  // `string` de propósito: o select dinâmico (com/sem erp_email) tira do
+  // supabase-js a inferência do shape, e a linha é lida como LinhaLogin.
+  const colunasDoLogin: string = comEmailDoControl
+    ? 'id, erp_rep_id, name, legal_name, email, erp_email, active'
+    : 'id, erp_rep_id, name, legal_name, email, active';
   const { data: existentes, error: erroLeitura } = await supabase
     .from('users')
-    .select('id, erp_rep_id, name, legal_name, email, active')
+    .select(colunasDoLogin)
     .eq('company_id', company_id)
     .eq('role', 'rep')
     .not('erp_rep_id', 'is', null);
@@ -664,7 +922,7 @@ export async function receberRepresentantes(
 
   const porMiolo = new Map<string, LinhaLogin>();
   const mioloComDoisLogins = new Set<string>();
-  for (const u of (Array.isArray(existentes) ? existentes : []) as LinhaLogin[]) {
+  for (const u of (Array.isArray(existentes) ? existentes : []) as unknown as LinhaLogin[]) {
     const m = codigoMiolo(u.erp_rep_id);
     if (!m) continue;
     if (porMiolo.has(m)) mioloComDoisLogins.add(m);
@@ -723,10 +981,14 @@ export async function receberRepresentantes(
     if (ativo === 'invalido') ativosInvalidos.add(codigo);
     else if (ativo !== undefined) pedido['active'] = ativo;
 
+    // O e-mail do Control: coluna própria (049). O login (users.email) nunca.
     const email = lerTexto(raw, 'email');
-    if (email.veio && email.valor !== null) {
-      const doLogin = (login.email ?? '').trim().toLowerCase();
-      if (email.valor.toLowerCase() !== doLogin) emailsDiferentes.add(codigo);
+    if (email.veio) {
+      if (comEmailDoControl) pedido['erp_email'] = email.valor;
+      else if (email.valor !== null) {
+        const doLogin = (login.email ?? '').trim().toLowerCase();
+        if (email.valor.toLowerCase() !== doLogin) emailsDiferentes.add(codigo);
+      }
     }
 
     const patch: Record<string, unknown> = {};
@@ -768,7 +1030,7 @@ export async function receberRepresentantes(
   }
   if (emailsDiferentes.size > 0) {
     avisos.push(
-      `${AVISO_EMAIL_DO_REPRESENTANTE} — e-mail diferente do login, não gravado: ${listar(emailsDiferentes)}.`,
+      `${AVISO_EMAIL_DO_REPRESENTANTE} — e-mail diferente do login, não gravado (fica guardado depois da migração 049): ${listar(emailsDiferentes)}.`,
     );
   }
   if (ativosInvalidos.size > 0) {
@@ -786,4 +1048,157 @@ export async function receberRepresentantes(
     avisos,
     novos,
   };
+}
+
+// ─── O que mudou no app (a outra mão: o Control PUXA) ────────────────────────
+//
+// O Control busca a cada ~5 min o que o app mudou (GET ?desde=): cliente
+// cadastrado ou editado pelo representante, representante mexido pelo admin.
+// Sai no MESMO formato que o POST aceita, para o Control gravar do lado dele e
+// — se quiser — devolver como veio (reenviar é `sem_mudanca`).
+//
+// Com a 049, o que o próprio Control gravou e ninguém mexeu depois NÃO volta:
+// updated_at ≤ erp_updated_at é "a última mão foi a dele". Sem a 049 não há
+// como saber, e a lista traz tudo que mudou desde `desde` — inclusive o que o
+// Control acabou de mandar; inofensivo, só maior.
+
+/**
+ * Os clientes que mudaram no app desde `desde` (ou todos, sem `desde`),
+ * ordenados por `updated_at`. Paginado; erro em qualquer página sobe (500)
+ * para o Control tentar de novo — uma lista pela metade seria lida como "o
+ * resto não mudou".
+ */
+export async function listarClientesAlterados(
+  company_id: string,
+  desde?: string | null,
+): Promise<ListaAlterados<ClienteAlterado>> {
+  const cadastroReal = await detectarCadastroReal();
+  const com049 = await detectarClienteDa049();
+
+  const codigoDaTabela = new Map<string, string | null>();
+  for (const t of await tabelasDePreco(company_id)) codigoDaTabela.set(t.id, t.erp_code);
+
+  const colunas = [
+    `${COLUNAS_DO_CLIENTE}, updated_at`,
+    cadastroReal ? COLUNAS_DA_041 : null,
+    com049 ? COLUNAS_DA_049 : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const linhas = await buscarTudoOuFalhar<LinhaCliente & { updated_at: string }>((de, ate) => {
+    let query = supabase.from('customers').select(colunas).eq('company_id', company_id);
+    if (desde) query = query.gte('updated_at', desde);
+    return query.order('updated_at', { ascending: true }).order('id', { ascending: true }).range(de, ate);
+  });
+
+  const registros: ClienteAlterado[] = [];
+  for (const c of linhas) {
+    // A última mão foi a do Control? Então ele já tem isto.
+    const carimboDoControl = typeof c['erp_updated_at'] === 'string' ? c['erp_updated_at'] : null;
+    if (com049 && carimboDoControl && Date.parse(c.updated_at) <= Date.parse(carimboDoControl)) continue;
+
+    const texto = (coluna: string): string | null => {
+      const v = c[coluna];
+      return typeof v === 'string' && v.trim() !== '' ? v : null;
+    };
+    const erpId = texto('erp_id');
+    const tabelaId = texto('price_table_id');
+    const registro: ClienteAlterado = {
+      codigo: erpId,
+      chave: digitosDoDocumento(c.cnpj),
+      novo_no_control: erpId === null,
+      razao_social: texto('name') ?? '',
+      nome_fantasia: texto('trade_name'),
+      cnpj_cpf: texto('cnpj'),
+      representante: texto('rep_erp_id'),
+      tabela_preco: tabelaId ? (codigoDaTabela.get(tabelaId) ?? null) : null,
+      endereco: cadastroReal
+        ? {
+            logradouro: texto('logradouro'),
+            numero: texto('numero'),
+            complemento: texto('complemento'),
+            bairro: texto('bairro'),
+            cidade: texto('cidade'),
+            uf: texto('uf'),
+            cep: texto('cep'),
+          }
+        : texto('address'),
+      bloqueado: c['blocked'] === true ? 'S' : 'N',
+      motivo_bloqueio: texto('block_reason'),
+      limite_credito: numeroOuNull(c['credit_limit']),
+      whatsapp: texto('whatsapp'),
+      email: texto('email'),
+      atualizado_em: c.updated_at,
+    };
+    if (cadastroReal) {
+      registro.inscricao_estadual = texto('inscricao_estadual');
+      registro.observacoes = texto('observacoes');
+    }
+    if (com049) {
+      registro.pendencia_financeira = numeroOuNull(c['pendencia_financeira']);
+      registro.titulos_vencidos = numeroOuNull(c['titulos_vencidos']);
+      registro.atualizado_pelo_control_em = carimboDoControl;
+    }
+    registros.push(registro);
+  }
+
+  const avisos: string[] = [];
+  if (!com049) {
+    avisos.push(
+      'Sem a migração 049 a lista inclui também o que o próprio Control gravou nesta janela — reenviar é inofensivo (sem_mudanca).',
+    );
+  }
+  return { registros, avisos };
+}
+
+/**
+ * Os representantes (logins com código do ERP) que mudaram no app desde
+ * `desde`, ordenados por `updated_at`. `users.updated_at` vem da 048: sem ela
+ * não há como saber o que mudou — a lista vem inteira, com aviso.
+ */
+export async function listarRepresentantesAlterados(
+  company_id: string,
+  desde?: string | null,
+): Promise<ListaAlterados<RepresentanteAlterado>> {
+  const temUpdatedAt = await detectarOuFalhar('users', 'updated_at');
+  const comEmailDoControl = await detectarEmailDoControl();
+
+  const colunas = [
+    'id, erp_rep_id, name, legal_name, active',
+    temUpdatedAt ? 'updated_at' : null,
+    comEmailDoControl ? 'erp_email' : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+  const linhas = await buscarTudoOuFalhar<LinhaLogin>((de, ate) => {
+    let query = supabase
+      .from('users')
+      .select(colunas)
+      .eq('company_id', company_id)
+      .eq('role', 'rep')
+      .not('erp_rep_id', 'is', null);
+    if (desde && temUpdatedAt) query = query.gte('updated_at', desde);
+    if (temUpdatedAt) query = query.order('updated_at', { ascending: true });
+    return query.order('id', { ascending: true }).range(de, ate);
+  });
+
+  const registros: RepresentanteAlterado[] = [];
+  for (const u of linhas) {
+    if (typeof u.erp_rep_id !== 'string' || u.erp_rep_id.trim() === '') continue;
+    const registro: RepresentanteAlterado = {
+      codigo: u.erp_rep_id,
+      nome: u.name ?? '',
+      razao_social: u.legal_name ?? null,
+      ativo: u.active === false ? 'N' : 'S',
+      atualizado_em: temUpdatedAt ? (u.updated_at ?? null) : null,
+    };
+    if (comEmailDoControl) registro.email = u.erp_email ?? null;
+    registros.push(registro);
+  }
+
+  const avisos: string[] = [];
+  if (desde && !temUpdatedAt) {
+    avisos.push('Sem a migração 048 não há como saber o que mudou nos representantes — a lista veio inteira.');
+  }
+  return { registros, avisos };
 }

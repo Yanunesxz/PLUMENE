@@ -794,6 +794,169 @@ describe('a nota fiscal e as peças que ela levou (048)', () => {
   });
 });
 
+// ─── Uma nota por pedido: a nova substitui a anterior (049) ──────────────────
+
+describe('um pedido tem UMA nota: nota nova substitui a anterior (049)', () => {
+  const NOTA_NOVA = { numero: '000124', serie: '1', valor: 140 };
+  const ANTIGA = { id: 'n1', numero: '000123', serie: '1' };
+
+  it('nota com número diferente: grava a nova, a antiga fica cancelada e substituída por ela, com o rastro', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(
+        NADA, // a nova ainda não existe
+        { data: [ANTIGA], error: null }, // as outras ativas do pedido
+        { data: { id: 'n2' }, error: null }, // o upsert da nova
+        NADA, // a substituição da antiga
+      ),
+      product_variants: fila({ data: [{ id: 'v1', erp_sku: '0124|M' }], error: null }, { data: [], error: null }),
+      products: { data: [], error: null },
+      order_invoice_items: NADA,
+    });
+
+    const r = await receberFaturamento(
+      EMPRESA,
+      [{ pedido_erp: 'ZZ0000001', valor_faturado: 140, nota: NOTA_NOVA, itens: [{ produto: '0124', tamanho: 'M', quantidade: 3 }] }],
+      { parceiro: 'Control Teste' },
+    );
+
+    expect(r).toMatchObject({ atualizados: 1, inalterados: 0, ignorados: [], avisos: [] });
+
+    // A leitura das outras ativas é do pedido, da empresa, sem a própria nota.
+    expect(fake.filtrosDe('order_invoices', 'is').map((f) => f.args)).toContainEqual(['cancelada_em', null]);
+
+    const substituicao = fake.gravacoes.filter((g) => g.tabela === 'order_invoices' && g.operacao === 'update');
+    expect(substituicao).toHaveLength(1);
+    expect(substituicao[0]!.valores).toMatchObject({ substituida_por: 'n2' });
+    const valores = substituicao[0]!.valores as Record<string, unknown>;
+    expect(typeof valores['cancelada_em']).toBe('string');
+    expect(valores['substituida_em']).toBe(valores['cancelada_em']);
+    expect(valores['updated_at']).toBe(valores['cancelada_em']);
+    // Só as OUTRAS notas ativas do pedido: nunca a nova.
+    expect(fake.filtrosDe('order_invoices', 'neq').map((f) => f.args)).toContainEqual(['id', 'n2']);
+
+    // Ordem: nota nova → peças → substituição → pedido.
+    const ordem = fake.gravacoes.filter((g) => g.tabela !== 'order_erp_events').map((g) => `${g.tabela}.${g.operacao}`);
+    expect(ordem).toEqual([
+      'order_invoices.upsert',
+      'order_invoice_items.delete',
+      'order_invoice_items.insert',
+      'order_invoices.update',
+      'orders.update',
+    ]);
+    expect(updateDoPedido(fake)).toMatchObject({ invoiced_total: 140 });
+
+    const tipos = eventos(fake).map((e) => e['tipo']);
+    expect(tipos).toEqual(['nota_registrada', 'nota_substituida', 'faturamento_alterado']);
+    const substituida = eventos(fake)[1]!;
+    expect(substituida).toMatchObject({
+      origem: 'api',
+      parceiro: 'Control Teste',
+      motivo: 'nota 000123 série 1 substituída pela nota 000124 série 1',
+      antes: { numero: '000123', serie: '1', cancelada_em: null },
+    });
+    expect(substituida['depois']).toMatchObject({ numero: '000124', serie: '1' });
+    expect(typeof (substituida['depois'] as Record<string, unknown>)['cancelada_em']).toBe('string');
+  });
+
+  it('a MESMA nota reenviada (sem outra ativa) continua inalterada', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(
+        { data: { id: 'n1', chave: null, emitida_em: null, valor: '150.00', cancelada_em: null }, error: null },
+        { data: [], error: null }, // nenhuma outra ativa
+      ),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', valor_faturado: 150, nota: { numero: '000123', serie: '1', valor: 150 } }]);
+
+    expect(r).toMatchObject({ atualizados: 0, inalterados: 1, ignorados: [] });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('a mesma nota reenviada com OUTRA ativa por perto (reenvio que caiu no meio, ou duas de antes da 049): acerta', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(
+        { data: { id: 'n2', chave: null, emitida_em: null, valor: '150.00', cancelada_em: null }, error: null },
+        { data: [ANTIGA], error: null },
+        NADA,
+      ),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', valor_faturado: 150, nota: { numero: '000124', serie: '1', valor: 150 } }]);
+
+    expect(r).toMatchObject({ atualizados: 1, inalterados: 0 });
+    expect(fake.ultimaGravacao('order_invoices', 'upsert')).toBeUndefined();
+    expect(fake.ultimaGravacao('order_invoices', 'update')?.valores).toMatchObject({ substituida_por: 'n2' });
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_substituida']);
+    // O pedido só ganha o carimbo de alteração.
+    expect(Object.keys(updateDoPedido(fake)!)).toEqual(['updated_at']);
+  });
+
+  it('a nota substituída que o Control manda de novo volta a valer e tira a outra de cena', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(
+        { data: { id: 'n1', chave: null, emitida_em: null, valor: '150.00', cancelada_em: '2026-09-16T12:00:00Z' }, error: null },
+        { data: [{ id: 'n2', numero: '000124', serie: '1' }], error: null },
+        NADA, // o update da que volta
+        NADA, // a substituição da outra
+      ),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: { numero: '000123', serie: '1' } }]);
+
+    expect(r.atualizados).toBe(1);
+    const updates = fake.gravacoes.filter((g) => g.tabela === 'order_invoices' && g.operacao === 'update').map((g) => g.valores as Record<string, unknown>);
+    expect(updates[0]).toMatchObject({ cancelada_em: null, substituida_por: null, substituida_em: null });
+    expect(updates[1]).toMatchObject({ substituida_por: 'n1' });
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_registrada', 'nota_substituida']);
+  });
+
+  it('SEM a 049: a nota nova convive com a antiga, como era', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0(
+      {
+        orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+        order_invoices: fila(NADA, { data: { id: 'n2' }, error: null }),
+      },
+      { ausentes: ['order_invoices.substituida_por'] },
+    );
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: NOTA_NOVA }]);
+
+    expect(r.atualizados).toBe(1);
+    expect(fake.gravacoes.filter((g) => g.tabela === 'order_invoices' && g.operacao === 'update')).toEqual([]);
+    expect(eventos(fake).map((e) => e['tipo'])).toEqual(['nota_registrada']);
+  });
+
+  it('o banco sem responder sobre a 049: registro ignorado para reenvio, nada gravado', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0(
+      { orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }), order_invoices: NADA },
+      { soluco: ['order_invoices.substituida_por'] },
+    );
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: NOTA_NOVA }]);
+
+    expect(r.ignorados).toHaveLength(1);
+    expect(r.ignorados[0]?.motivo).toMatch(/^falha ao buscar: /);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('a substituição que falha ao gravar é "falha ao gravar a nota" — o reenvio acerta', async () => {
+    const { receberFaturamento, fake } = await servicoDaFase0({
+      orders: pedidoNoBanco({ ...FATURADO, invoiced_total: 150 }),
+      order_invoices: fila(NADA, { data: [ANTIGA], error: null }, { data: { id: 'n2' }, error: null }, { data: null, error: { message: 'caiu' } }),
+    });
+
+    const r = await receberFaturamento(EMPRESA, [{ pedido_erp: 'ZZ0000001', nota: NOTA_NOVA }]);
+
+    expect(r.ignorados).toEqual([{ pedido: 'ZZ0000001', motivo: 'falha ao gravar a nota: caiu' }]);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(eventos(fake)).toEqual([]);
+  });
+});
+
 describe('o dia de Brasília', () => {
   it('converte o momento para o dia em São Paulo', async () => {
     const { diaEmSaoPaulo } = await servicoDaFase0({});

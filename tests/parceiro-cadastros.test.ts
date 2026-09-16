@@ -17,7 +17,15 @@ import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
  *  • as colunas da 041 só são lidas e gravadas onde a migração rodou;
  *  • representante é só ATUALIZADO (nome, razão social, ativo); nunca nasce
  *    login por POST, o e-mail do Control não troca o login, e `users.updated_at`
- *    só é gravado com a coluna existindo (048).
+ *    só é gravado com a coluna existindo (048);
+ *  • (16/09/2026) o CNPJ é a chave: o casamento é primeiro pelo documento e
+ *    depois pelo código; quem nasceu no app recebe o código que vier; o código
+ *    de quem já tem nunca é reescrito; pendência financeira, títulos vencidos,
+ *    motivo do bloqueio e data_update ficam guardados (049, com detectar); o
+ *    e-mail do Control vai para users.erp_email (049), nunca para o login;
+ *  • (16/09/2026) a outra mão: `listarClientesAlterados` e
+ *    `listarRepresentantesAlterados` devolvem o que mudou no app desde `desde`,
+ *    no MESMO formato que o POST aceita, com a chave (CNPJ) e `novo_no_control`.
  *
  * Dados fictícios de propósito — nada de cliente real aqui.
  */
@@ -41,6 +49,10 @@ interface Opcoes {
   cadastroReal?: boolean;
   /** users.updated_at existe (migração 048). Padrão: não. */
   usersUpdatedAt?: boolean;
+  /** users.erp_email existe (migração 049). Padrão: não. */
+  usersErpEmail?: boolean;
+  /** As colunas da 049 em customers existem (pendencia_financeira etc.). Padrão: não. */
+  com049?: boolean;
   /** Usa o detectarColuna de verdade, sondando pelo dublê. */
   sondaReal?: boolean;
 }
@@ -52,7 +64,9 @@ async function carregar(respostas: Record<string, RespostaTabela | RespostaTabel
   if (!opcoes.sondaReal) {
     const existe: Record<string, boolean> = {
       'customers.cep': opcoes.cadastroReal ?? true,
+      'customers.pendencia_financeira': opcoes.com049 ?? false,
       'users.updated_at': opcoes.usersUpdatedAt ?? false,
+      'users.erp_email': opcoes.usersErpEmail ?? false,
     };
     const responder = async (tabela: string, coluna?: string) => {
       const chave = `${tabela}.${coluna ?? ''}`;
@@ -780,6 +794,272 @@ describe('clientes', () => {
   });
 });
 
+// ─── O CNPJ é a chave (decisão de 16/09/2026) ────────────────────────────────
+
+describe('clientes — o CNPJ é a chave entre os sistemas', () => {
+  it('casa PRIMEIRO pelo CNPJ: o cliente com outro código no app é atualizado, o código gravado fica e avisa', async () => {
+    // O Control e o app discordam do código: o CNPJ decide qual é o cadastro,
+    // e o código de quem já tem código nunca é reescrito — vira aviso.
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [
+        {
+          data: [
+            { id: 'pelo-cnpj', erp_id: '00111', name: 'ANTIGO', cnpj: '00.000.000/0001-00' },
+            { id: 'pelo-codigo', erp_id: '00222', name: 'OUTRA LOJA', cnpj: '00.000.000/0002-00' },
+          ],
+          error: null,
+        },
+        OK,
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '222', razao_social: 'LOJA RENOMEADA', cnpj_cpf: '00000000000100' },
+    ]);
+
+    expect(r).toMatchObject({ criados: 0, atualizados: 1, ignorados: [] });
+    const filtroPorId = fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id');
+    expect(filtroPorId?.args[1]).toBe('pelo-cnpj');
+    const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
+    expect(patch['name']).toBe('LOJA RENOMEADA');
+    expect('erp_id' in patch).toBe(false);
+    expect(r.avisos.some((a) => a.includes('OUTRO código') && a.includes('222') && a.includes('00111'))).toBe(true);
+  });
+
+  it('cliente que NASCEU no app (sem código) recebe o código que vier, casado pelo CNPJ', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [
+        { data: [{ id: 'nascido-no-app', erp_id: null, name: 'LOJA NOVA', cnpj: '00000000000191' }], error: null },
+        OK,
+      ],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '#3001', razao_social: 'LOJA NOVA', cnpj_cpf: '00.000.000/0001-91' },
+    ]);
+
+    expect(r).toMatchObject({ criados: 0, atualizados: 1, sem_mudanca: 0 });
+    const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
+    expect(patch['erp_id']).toBe('03001');
+    // O documento continua o mesmo cadastro: nada foi criado.
+    expect(fake.gravacoes.some((g) => g.operacao === 'insert')).toBe(false);
+    expect(r.avisos.some((a) => a.includes('casados pelo CNPJ'))).toBe(true);
+  });
+
+  it('sem CNPJ no registro, casa pelo código como sempre', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [{ data: [{ id: 'c-1', erp_id: '00001', name: 'A', cnpj: '00000000000191' }], error: null }, OK],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [{ codigo: '1', razao_social: 'A NOVO' }]);
+
+    expect(r.atualizados).toBe(1);
+    expect(fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id')?.args[1]).toBe('c-1');
+  });
+
+  it('CNPJ com dois cadastros: fica com o que tem este código; sem nenhum com código, o registro é recusado', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: emSequencia(
+        {
+          data: [
+            { id: 'dup-a', erp_id: '00001', name: 'A', cnpj: '00000000000191' },
+            { id: 'dup-b', erp_id: '00002', name: 'B', cnpj: '00000000000191' },
+          ],
+          error: null,
+        },
+        OK,
+      ),
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '2', razao_social: 'B NOVO', cnpj_cpf: '00000000000191' },
+      { codigo: '3', razao_social: 'C', cnpj_cpf: '00.000.000/0001-91' },
+    ]);
+
+    // O segundo registro tem o mesmo CNPJ no lote: recusado antes de olhar o banco.
+    expect(r.ignorados).toEqual([{ codigo: '3', motivo: 'CNPJ repetido no lote' }]);
+    expect(r.atualizados).toBe(1);
+    expect(fake.filtrosDe('customers', 'eq').find((f) => f.args[0] === 'id')?.args[1]).toBe('dup-b');
+    expect(r.avisos.some((a) => a.includes('CNPJ com mais de um cadastro'))).toBe(true);
+
+    vi.resetModules();
+    const outro = await carregar({
+      price_tables: { data: [], error: null },
+      customers: {
+        data: [
+          { id: 'dup-a', erp_id: '00001', name: 'A', cnpj: '00000000000191' },
+          { id: 'dup-b', erp_id: '00002', name: 'B', cnpj: '00000000000191' },
+        ],
+        error: null,
+      },
+    });
+    const r2 = await outro.service.receberClientes(EMPRESA, [
+      { codigo: '9', razao_social: 'NOVO', cnpj_cpf: '00000000000191' },
+    ]);
+    expect(r2.ignorados).toEqual([{ codigo: '9', motivo: 'CNPJ com mais de um cadastro no app' }]);
+    expect(outro.fake.gravacoes).toEqual([]);
+  });
+
+  it('dois registros do lote apontando para o mesmo cadastro (um pelo CNPJ, outro pelo código): vale o primeiro', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [{ data: [{ id: 'c-1', erp_id: '00001', name: 'A', cnpj: '00000000000191' }], error: null }, OK],
+    });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '500', razao_social: 'PELO CNPJ', cnpj_cpf: '00000000000191' },
+      { codigo: '1', razao_social: 'PELO CODIGO' },
+    ]);
+
+    expect(r.ignorados).toEqual([{ codigo: '1', motivo: 'cadastro já atualizado por outro registro do lote' }]);
+    expect(fake.gravacoes.filter((g) => g.operacao === 'update')).toHaveLength(1);
+  });
+
+  it('motivo_bloqueio vai para block_reason (001); ausente não mexe, null limpa', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: emSequencia(
+        {
+          data: [
+            { id: 'a', erp_id: '00001', name: 'A', cnpj: null, block_reason: null },
+            { id: 'b', erp_id: '00002', name: 'B', cnpj: null, block_reason: 'motivo antigo' },
+            { id: 'c', erp_id: '00003', name: 'C', cnpj: null, block_reason: 'motivo guardado' },
+          ],
+          error: null,
+        },
+        OK,
+      ),
+    });
+
+    await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'A', bloqueado: 'S', motivo_bloqueio: 'títulos vencidos' },
+      { codigo: '2', razao_social: 'B', motivo_bloqueio: null },
+      { codigo: '3', razao_social: 'C NOVO' },
+    ]);
+
+    const updates = fake.gravacoes.filter((g) => g.operacao === 'update').map(valoresDe);
+    expect(updates[0]).toMatchObject({ blocked: true, block_reason: 'títulos vencidos' });
+    expect(updates[1]).toMatchObject({ block_reason: null });
+    expect('block_reason' in updates[2]!).toBe(false);
+    // A leitura compara block_reason: sem ele no select, todo envio regravaria.
+    expect(fake.filtrosDe('customers', 'select')[0]!.args[0]).toContain('block_reason');
+  });
+
+  it('COM a 049: pendência financeira (com o momento), títulos vencidos e data_update no cadastro, e o carimbo do Control', async () => {
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: emSequencia(
+          {
+            data: [
+              { id: 'a', erp_id: '00001', name: 'A', cnpj: null, pendencia_financeira: null, titulos_vencidos: 0 },
+              { id: 'b', erp_id: '00002', name: 'B', cnpj: null, pendencia_financeira: '150.00', titulos_vencidos: 2 },
+            ],
+            error: null,
+          },
+          OK,
+        ),
+      },
+      { com049: true },
+    );
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'A', pendencia_financeira: '1.234,56', titulos_vencidos: '3', data_update: '2026-09-16T10:00:00-03:00' },
+      { codigo: '2', razao_social: 'B', pendencia_financeira: 150, titulos_vencidos: 2 },
+      { codigo: '3', razao_social: 'NOVO', pendencia_financeira: 10 },
+    ]);
+
+    expect(r).toMatchObject({ criados: 1, atualizados: 1, sem_mudanca: 1, ignorados: [] });
+    expect(fake.filtrosDe('customers', 'select')[0]!.args[0]).toContain('pendencia_financeira');
+
+    const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
+    expect(patch).toMatchObject({
+      pendencia_financeira: 1234.56,
+      titulos_vencidos: 3,
+      erp_updated_at: '2026-09-16T10:00:00-03:00',
+    });
+    expect(typeof patch['pendencia_financeira_em']).toBe('string');
+    esperarSoColunasReais(patch, 'customers', 49);
+
+    const linha = (fake.ultimaGravacao('customers', 'insert')!.valores as Record<string, unknown>[])[0]!;
+    expect(linha['pendencia_financeira']).toBe(10);
+    expect(typeof linha['pendencia_financeira_em']).toBe('string');
+    expect(linha['titulos_vencidos']).toBeNull();
+    // Sem data_update, o carimbo do Control é o momento do envio.
+    expect(linha['erp_updated_at']).toBe(linha['updated_at']);
+    esperarSoColunasReais(linha, 'customers', 49);
+  });
+
+  it('COM a 049: um update qualquer carimba erp_updated_at; reenvio igual (mesmo instante em outro fuso) é sem_mudanca', async () => {
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: emSequencia(
+          {
+            data: [
+              { id: 'a', erp_id: '00001', name: 'ANTIGO', cnpj: null, erp_updated_at: '2026-09-16T13:00:00+00:00' },
+              { id: 'b', erp_id: '00002', name: 'B', cnpj: null, erp_updated_at: '2026-09-16T13:00:00+00:00' },
+            ],
+            error: null,
+          },
+          OK,
+        ),
+      },
+      { com049: true },
+    );
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'NOVO NOME' },
+      { codigo: '2', razao_social: 'B', data_update: '2026-09-16T10:00:00-03:00' },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, sem_mudanca: 1 });
+    const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
+    expect(patch['erp_updated_at']).toBe(patch['updated_at']);
+  });
+
+  it('valores ruins da 049 não mexem e avisam; SEM a 049 os campos ficam de fora com aviso', async () => {
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: [{ data: [], error: null }, OK],
+      },
+      { com049: true },
+    );
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'A', pendencia_financeira: -5, titulos_vencidos: 1.5, data_update: '2026-09-16T10:00:00' },
+    ]);
+
+    const linha = (fake.ultimaGravacao('customers', 'insert')!.valores as Record<string, unknown>[])[0]!;
+    expect(linha['pendencia_financeira']).toBeNull();
+    expect(linha['titulos_vencidos']).toBeNull();
+    expect(linha['erp_updated_at']).toBe(linha['updated_at']);
+    expect(r.avisos.some((a) => a.includes('pendencia_financeira'))).toBe(true);
+    expect(r.avisos.some((a) => a.includes('titulos_vencidos'))).toBe(true);
+    expect(r.avisos.some((a) => a.includes('data_update'))).toBe(true);
+
+    vi.resetModules();
+    const sem = await carregar({
+      price_tables: { data: [], error: null },
+      customers: [{ data: [], error: null }, OK],
+    });
+    const r2 = await sem.service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'A', pendencia_financeira: 10, titulos_vencidos: 1, data_update: '2026-09-16T10:00:00Z' },
+    ]);
+    const semLinha = (sem.fake.ultimaGravacao('customers', 'insert')!.valores as Record<string, unknown>[])[0]!;
+    for (const coluna of ['pendencia_financeira', 'pendencia_financeira_em', 'titulos_vencidos', 'erp_updated_at']) {
+      expect(coluna in semLinha, coluna).toBe(false);
+    }
+    expect(sem.fake.filtrosDe('customers', 'select')[0]!.args[0]).not.toContain('pendencia_financeira');
+    expect(r2.avisos.some((a) => a.includes('migração 049'))).toBe(true);
+  });
+});
+
 // ─── Representantes ──────────────────────────────────────────────────────────
 
 describe('representantes', () => {
@@ -895,6 +1175,7 @@ describe('representantes', () => {
     const { service, fake } = await carregar(
       {
         users: emSequencia(
+          { data: null, error: { code: '42703', message: 'column users.erp_email does not exist' } }, // sonda da 049
           { data: [{ id: 'u1', erp_rep_id: '00779', name: 'NOME ANTIGO' }], error: null }, // select
           { data: null, error: { code: '42703', message: 'column users.updated_at does not exist' } }, // sonda
           OK, // update
@@ -917,6 +1198,7 @@ describe('representantes', () => {
     const { service, fake } = await carregar(
       {
         users: emSequencia(
+          { data: null, error: { code: '42703', message: 'column users.erp_email does not exist' } }, // sonda da 049
           { data: [{ id: 'u1', erp_rep_id: '00779', name: 'NOME ANTIGO' }], error: null },
           { data: [{ updated_at: null }], error: null }, // sonda: a coluna existe
           OK,
@@ -930,6 +1212,59 @@ describe('representantes', () => {
     const campos = valoresDe(fake.ultimaGravacao('users', 'update'));
     expect(typeof campos['updated_at']).toBe('string');
     esperarSoColunasReais(campos, 'users', 48);
+  });
+
+  it('COM a 049: o e-mail do Control vai para users.erp_email, sem aviso e sem tocar no login', async () => {
+    const { service, fake } = await carregar(
+      {
+        users: [
+          { data: [{ id: 'u1', erp_rep_id: '00779', name: 'REP TESTE', email: 'login@teste.invalid', erp_email: null }], error: null },
+          OK,
+        ],
+      },
+      { usersErpEmail: true, usersUpdatedAt: true },
+    );
+
+    const r = await service.receberRepresentantes(EMPRESA, [
+      { codigo: '779', nome: 'REP TESTE', email: 'control@teste.invalid' },
+    ]);
+
+    expect(r.atualizados).toBe(1);
+    expect(r.avisos.some((a) => a.includes('e-mail do Control'))).toBe(false);
+    const campos = valoresDe(fake.ultimaGravacao('users', 'update'));
+    expect(campos['erp_email']).toBe('control@teste.invalid');
+    expect('email' in campos).toBe(false);
+    expect(typeof campos['updated_at']).toBe('string');
+    esperarSoColunasReais(campos, 'users', 49);
+    // A leitura já pede a coluna nova.
+    expect(fake.filtrosDe('users', 'select')[0]!.args[0]).toContain('erp_email');
+  });
+
+  it('COM a 049: e-mail igual ao guardado é sem_mudanca; null limpa', async () => {
+    const { service, fake } = await carregar(
+      {
+        users: emSequencia(
+          {
+            data: [
+              { id: 'u1', erp_rep_id: '00001', name: 'A', erp_email: 'a@teste.invalid' },
+              { id: 'u2', erp_rep_id: '00002', name: 'B', erp_email: 'b@teste.invalid' },
+            ],
+            error: null,
+          },
+          OK,
+        ),
+      },
+      { usersErpEmail: true },
+    );
+
+    const r = await service.receberRepresentantes(EMPRESA, [
+      { codigo: '1', nome: 'A', email: 'a@teste.invalid' },
+      { codigo: '2', nome: 'B', email: null },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, sem_mudanca: 1 });
+    const updates = fake.gravacoes.filter((g) => g.tabela === 'users' && g.operacao === 'update').map(valoresDe);
+    expect(updates).toEqual([{ erp_email: null }]);
   });
 
   it('razao_social vai para users.legal_name; ausente não mexe; null limpa', async () => {
@@ -1080,5 +1415,230 @@ describe('representantes', () => {
     expect(r).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [], novos: [] });
     expect(fake.gravacoes).toHaveLength(0);
     expect(sondas).not.toContain('users.updated_at');
+  });
+});
+
+// ─── A outra mão: o que mudou no app (GET ?desde=) ───────────────────────────
+
+describe('o que mudou no app — listarClientesAlterados', () => {
+  const LOJA = {
+    id: 'c-1',
+    erp_id: '00123',
+    name: 'LOJA TESTE LTDA',
+    trade_name: 'Loja Teste',
+    cnpj: '00.000.000/0001-91',
+    rep_erp_id: '00779',
+    price_table_id: 't-16',
+    blocked: true,
+    block_reason: 'em atraso',
+    credit_limit: '1500.50',
+    whatsapp: '00900000000',
+    email: 'loja@teste.invalid',
+    address: 'Rua Teste, 1 - Centro - Cidade Teste/XX - CEP 00000-001',
+    cep: '00000001',
+    logradouro: 'Rua Teste',
+    numero: '1',
+    complemento: null,
+    bairro: 'Centro',
+    cidade: 'Cidade Teste',
+    uf: 'XX',
+    inscricao_estadual: 'ISENTO',
+    observacoes: null,
+    updated_at: '2026-09-16T12:00:00+00:00',
+  };
+
+  it('devolve o cliente NO FORMATO DO POST, com chave (CNPJ só dígitos), filtrando por empresa e desde', async () => {
+    const { service, fake } = await carregar({
+      price_tables: { data: [{ id: 't-16', erp_code: '00016' }], error: null },
+      customers: { data: [LOJA], error: null },
+    });
+
+    const { registros, avisos } = await service.listarClientesAlterados(EMPRESA, '2026-09-16T00:00:00Z');
+
+    expect(registros).toEqual([
+      {
+        codigo: '00123',
+        chave: '00000000000191',
+        novo_no_control: false,
+        razao_social: 'LOJA TESTE LTDA',
+        nome_fantasia: 'Loja Teste',
+        cnpj_cpf: '00.000.000/0001-91',
+        representante: '00779',
+        tabela_preco: '00016',
+        endereco: {
+          logradouro: 'Rua Teste',
+          numero: '1',
+          complemento: null,
+          bairro: 'Centro',
+          cidade: 'Cidade Teste',
+          uf: 'XX',
+          cep: '00000001',
+        },
+        inscricao_estadual: 'ISENTO',
+        observacoes: null,
+        bloqueado: 'S',
+        motivo_bloqueio: 'em atraso',
+        limite_credito: 1500.5,
+        whatsapp: '00900000000',
+        email: 'loja@teste.invalid',
+        atualizado_em: '2026-09-16T12:00:00+00:00',
+      },
+    ]);
+    // Sem a 049 a lista pode trazer o eco do próprio Control: fica dito.
+    expect(avisos.some((a) => a.includes('049'))).toBe(true);
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
+    expect(fake.filtrosDe('customers', 'gte').map((f) => f.args)).toEqual([['updated_at', '2026-09-16T00:00:00Z']]);
+    expect(fake.filtrosDe('customers', 'order').map((f) => f.args[0])).toEqual(['updated_at', 'id']);
+  });
+
+  it('cliente nascido no app sai com codigo null, novo_no_control true e a chave = CNPJ', async () => {
+    const { service } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: { data: [{ ...LOJA, id: 'c-2', erp_id: null, price_table_id: null }], error: null },
+    });
+
+    const { registros } = await service.listarClientesAlterados(EMPRESA);
+
+    expect(registros[0]).toMatchObject({ codigo: null, novo_no_control: true, chave: '00000000000191', tabela_preco: null });
+  });
+
+  it('COM a 049: o que o próprio Control gravou por último não volta; o que o app mexeu depois volta com os campos da 049', async () => {
+    const { service, fake } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: {
+          data: [
+            // A última mão foi a do Control: updated_at = erp_updated_at.
+            { ...LOJA, id: 'do-control', erp_updated_at: '2026-09-16T12:00:00+00:00', pendencia_financeira: '10.00', titulos_vencidos: 1 },
+            // O app mexeu depois do Control.
+            {
+              ...LOJA,
+              id: 'do-app',
+              updated_at: '2026-09-16T13:00:00+00:00',
+              erp_updated_at: '2026-09-16T12:00:00+00:00',
+              pendencia_financeira: null,
+              titulos_vencidos: null,
+            },
+            // O Control nunca mandou este (nasceu no app).
+            { ...LOJA, id: 'nunca', erp_id: null, erp_updated_at: null },
+          ],
+          error: null,
+        },
+      },
+      { com049: true },
+    );
+
+    const { registros, avisos } = await service.listarClientesAlterados(EMPRESA, '2026-09-16T00:00:00Z');
+
+    expect(registros.map((r) => r.codigo)).toEqual(['00123', null]);
+    expect(registros[0]).toMatchObject({
+      pendencia_financeira: null,
+      titulos_vencidos: null,
+      atualizado_em: '2026-09-16T13:00:00+00:00',
+      atualizado_pelo_control_em: '2026-09-16T12:00:00+00:00',
+    });
+    expect(registros[1]).toMatchObject({ novo_no_control: true, atualizado_pelo_control_em: null });
+    expect(avisos).toEqual([]);
+    expect(fake.filtrosDe('customers', 'select')[0]!.args[0]).toContain('erp_updated_at');
+  });
+
+  it('SEM a 041: o endereço sai como linha, sem IE e observações', async () => {
+    const { service } = await carregar(
+      {
+        price_tables: { data: [], error: null },
+        customers: { data: [LOJA], error: null },
+      },
+      { cadastroReal: false },
+    );
+
+    const { registros } = await service.listarClientesAlterados(EMPRESA);
+
+    expect(registros[0]!.endereco).toBe(LOJA.address);
+    expect('inscricao_estadual' in registros[0]!).toBe(false);
+  });
+
+  it('a lista vem inteira (paginada) e erro numa página LANÇA', async () => {
+    const pagina = Array.from({ length: 1000 }, (_, i) => ({ ...LOJA, id: `c-${i}`, erp_id: `X${i}` }));
+    const { service } = await carregar({
+      price_tables: { data: [], error: null },
+      customers: emSequencia({ data: pagina, error: null }, { data: [{ ...LOJA, id: 'ultimo' }], error: null }),
+    });
+
+    const { registros } = await service.listarClientesAlterados(EMPRESA);
+    expect(registros).toHaveLength(1001);
+
+    vi.resetModules();
+    const outro = await carregar({
+      price_tables: { data: [], error: null },
+      customers: emSequencia({ data: pagina, error: null }, { data: null, error: { message: 'soluço' } }),
+    });
+    await expect(outro.service.listarClientesAlterados(EMPRESA)).rejects.toThrow(/soluço/);
+  });
+});
+
+describe('o que mudou no app — listarRepresentantesAlterados', () => {
+  it('COM a 048 e a 049: filtra por desde, ordena por updated_at e sai no formato do POST com o e-mail do Control', async () => {
+    const { service, fake } = await carregar(
+      {
+        users: {
+          data: [
+            {
+              id: 'u1',
+              erp_rep_id: '00779',
+              name: 'REP TESTE',
+              legal_name: 'REP TESTE LTDA',
+              active: true,
+              erp_email: 'rep@teste.invalid',
+              updated_at: '2026-09-16T12:00:00+00:00',
+            },
+            {
+              id: 'u2',
+              erp_rep_id: '00780',
+              name: 'REP DOIS',
+              legal_name: null,
+              active: false,
+              erp_email: null,
+              updated_at: '2026-09-16T12:30:00+00:00',
+            },
+          ],
+          error: null,
+        },
+      },
+      { usersUpdatedAt: true, usersErpEmail: true },
+    );
+
+    const { registros, avisos } = await service.listarRepresentantesAlterados(EMPRESA, '2026-09-16T00:00:00Z');
+
+    expect(registros).toEqual([
+      {
+        codigo: '00779',
+        nome: 'REP TESTE',
+        razao_social: 'REP TESTE LTDA',
+        ativo: 'S',
+        atualizado_em: '2026-09-16T12:00:00+00:00',
+        email: 'rep@teste.invalid',
+      },
+      { codigo: '00780', nome: 'REP DOIS', razao_social: null, ativo: 'N', atualizado_em: '2026-09-16T12:30:00+00:00', email: null },
+    ]);
+    expect(avisos).toEqual([]);
+    expect(fake.filtrosDe('users', 'eq').map((f) => f.args)).toEqual([
+      ['company_id', EMPRESA],
+      ['role', 'rep'],
+    ]);
+    expect(fake.filtrosDe('users', 'gte').map((f) => f.args)).toEqual([['updated_at', '2026-09-16T00:00:00Z']]);
+    expect(fake.filtrosDe('users', 'order').map((f) => f.args[0])).toEqual(['updated_at', 'id']);
+  });
+
+  it('SEM a 048 (users.updated_at): não filtra, a lista vem inteira com aviso, e sem e-mail sem a 049', async () => {
+    const { service, fake } = await carregar({
+      users: { data: [{ id: 'u1', erp_rep_id: '00779', name: 'REP TESTE', legal_name: null, active: true }], error: null },
+    });
+
+    const { registros, avisos } = await service.listarRepresentantesAlterados(EMPRESA, '2026-09-16T00:00:00Z');
+
+    expect(registros).toEqual([{ codigo: '00779', nome: 'REP TESTE', razao_social: null, ativo: 'S', atualizado_em: null }]);
+    expect(avisos.some((a) => a.includes('048'))).toBe(true);
+    expect(fake.filtrosDe('users', 'gte')).toEqual([]);
+    expect(fake.filtrosDe('users', 'select')[0]!.args[0]).not.toContain('updated_at');
   });
 });

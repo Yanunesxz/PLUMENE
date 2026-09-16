@@ -4,6 +4,8 @@ import {
   compararOriginalComNotas,
   itensDasNotasAtivas,
   lerFaturamentoDoPedido,
+  notasAtivas,
+  valorDasNotasAtivas,
   type ItemDaFoto,
   type ItemDaNota,
   type NotaDoPedido,
@@ -479,6 +481,10 @@ describe('lerNotasDoPedido — as notas no detalhe do pedido', () => {
         emitida_em: '2026-08-13T17:02:00+00:00',
         valor: 150,
         cancelada_em: null,
+        // A 049 (sondada pelo dublê como existente): a nota ativa sai com os
+        // dois campos da substituição nulos.
+        substituida_por: null,
+        substituida_em: null,
         itens: [{ produto: '0124', tamanho: 'M', variant_id: 'v1', quantidade: 4, preco_unitario: 24.9 }],
       },
     ]);
@@ -491,5 +497,75 @@ describe('lerNotasDoPedido — as notas no detalhe do pedido', () => {
     });
 
     expect(await lerNotasDoPedido('o1', 'empresa-1')).toEqual([]);
+  });
+
+  it('sem a 049, as notas saem sem os campos da substituição', async () => {
+    const { lerNotasDoPedido, fake } = await carregarNotas({
+      order_invoices: [
+        { data: [], error: null }, // 048: existe
+        { data: null, error: null },
+        { data: null, error: { code: '42703', message: 'column order_invoices.substituida_por does not exist' } }, // 049: não
+        { data: null, error: null },
+        { data: [{ numero: '1', serie: '', emitida_em: null, valor: null, cancelada_em: null, itens: [] }], error: null },
+      ],
+      order_invoice_items: { data: [], error: null },
+    });
+
+    const notas = await lerNotasDoPedido('o1', 'empresa-1');
+
+    expect(notas).toHaveLength(1);
+    expect('substituida_por' in notas[0]!).toBe(false);
+    const select = fake.filtrosDe('order_invoices', 'select').at(-1)!.args[0] as string;
+    expect(select).not.toContain('substituida');
+  });
+
+  it('a nota ativa e o histórico saem juntos; lerSubstituicoesDoPedido resolve "qual substituiu qual"', async () => {
+    const linhas = [
+      { id: 'n1', numero: '000123', serie: '1', substituida_por: 'n2', substituida_em: '2026-09-16T12:00:00Z' },
+      { id: 'n2', numero: '000124', serie: '1', substituida_por: 'n3', substituida_em: '2026-09-17T12:00:00Z' },
+      { id: 'n3', numero: '000130', serie: '', substituida_por: null, substituida_em: null },
+      { id: 'n9', numero: '000999', serie: '', substituida_por: 'nao-existe', substituida_em: '2026-09-17T13:00:00Z' },
+    ];
+    const { lerSubstituicoesDoPedido, fake } = await carregarNotas({
+      order_invoices: [{ data: [], error: null }, { data: null, error: null }, { data: [], error: null }, { data: null, error: null }, { data: linhas, error: null }],
+      order_invoice_items: { data: [], error: null },
+    });
+
+    const historico = await lerSubstituicoesDoPedido('o1', 'empresa-1');
+
+    expect(historico).toEqual([
+      { anterior: { numero: '000123', serie: '1' }, nova: { numero: '000124', serie: '1' }, substituida_em: '2026-09-16T12:00:00Z' },
+      { anterior: { numero: '000124', serie: '1' }, nova: { numero: '000130', serie: '' }, substituida_em: '2026-09-17T12:00:00Z' },
+    ]);
+    expect(fake.filtrosDe('order_invoices', 'eq').map((f) => f.args)).toContainEqual(['company_id', 'empresa-1']);
+  });
+
+  it('lerSubstituicoesDoPedido nunca lança: sem a 049, lista vazia', async () => {
+    const { lerSubstituicoesDoPedido } = await carregarNotas({
+      order_invoices: [
+        { data: [], error: null },
+        { data: null, error: null },
+        { data: null, error: { code: '42703', message: 'column order_invoices.substituida_por does not exist' } },
+      ],
+      order_invoice_items: { data: [], error: null },
+    });
+
+    expect(await lerSubstituicoesDoPedido('o1', 'empresa-1')).toEqual([]);
+  });
+});
+
+describe('nota substituída (049) fica fora da conta, como a cancelada', () => {
+  it('itensDasNotasAtivas e valorDasNotasAtivas ignoram a substituída mesmo sem cancelada_em', () => {
+    const substituida = {
+      ...nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 12 })], { valor: 300 }),
+      cancelada_em: null,
+      substituida_por: 'n2',
+      substituida_em: '2026-09-16T12:00:00Z',
+    };
+    const ativa = nota([itemDaNota({ produto: '0124', tamanho: 'M', quantidade: 5 })], { numero: '000124', valor: 125 });
+
+    expect(notasAtivas([substituida, ativa])).toEqual([ativa]);
+    expect(itensDasNotasAtivas([substituida, ativa]).map((i) => i.quantidade)).toEqual([5]);
+    expect(valorDasNotasAtivas([substituida, ativa])).toBe(125);
   });
 });

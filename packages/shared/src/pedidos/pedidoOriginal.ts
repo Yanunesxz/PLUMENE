@@ -160,9 +160,24 @@ export function compararComOOriginal(
 // Control manda os itens de cada nota, a coluna "Faturado" passa a ser o que as
 // notas ativas levaram — e o corte aparece peça por peça.
 
-/** As peças das notas que valem: nota cancelada não conta. */
+/**
+ * A nota vale? Cancelada não; substituída (049 — outra nota subiu por cima
+ * dela) também não. A substituída sempre chega com `cancelada_em`, mas o par
+ * `substituida_*` entra na conta por conta própria: uma nota que só tem a
+ * marca da substituição nunca pode voltar a somar peça.
+ */
+export function notaAtiva(n: NotaDoPedido): boolean {
+  return !n.cancelada_em && !n.substituida_em && !n.substituida_por;
+}
+
+/** Só as notas que valem — a tela nunca olha para cancelada ou substituída. */
+export function notasAtivas(notas: NotaDoPedido[] | null | undefined): NotaDoPedido[] {
+  return (notas ?? []).filter(notaAtiva);
+}
+
+/** As peças das notas que valem: nota cancelada ou substituída não conta. */
 export function itensDasNotasAtivas(notas: NotaDoPedido[] | null | undefined): ItemDaNota[] {
-  return (notas ?? []).filter((n) => !n.cancelada_em).flatMap((n) => n.itens ?? []);
+  return notasAtivas(notas).flatMap((n) => n.itens ?? []);
 }
 
 /**
@@ -170,7 +185,7 @@ export function itensDasNotasAtivas(notas: NotaDoPedido[] | null | undefined): I
  * "o Control não disse" não é zero.
  */
 export function valorDasNotasAtivas(notas: NotaDoPedido[] | null | undefined): number | null {
-  const comValor = (notas ?? []).filter((n) => !n.cancelada_em && n.valor != null);
+  const comValor = notasAtivas(notas).filter((n) => n.valor != null);
   if (comValor.length === 0) return null;
   return Number(comValor.reduce((s, n) => s + Number(n.valor), 0).toFixed(2));
 }

@@ -20,7 +20,9 @@ interface Props {
   faturado: boolean;
   /**
    * As notas que o Control mandou, com os itens de cada uma (048). Quando há
-   * itens em nota ativa, a coluna "Faturado" é o que as notas levaram.
+   * itens em nota ativa, a coluna "Faturado" é o que as notas levaram. Nota
+   * cancelada ou SUBSTITUÍDA (049 — outra nota subiu por cima dela) fica de
+   * fora da conta: `lerFaturamentoDoPedido` só olha `notasAtivas`.
    */
   notas?: NotaDoPedido[] | null | undefined;
 }

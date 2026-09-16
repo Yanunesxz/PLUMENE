@@ -26,14 +26,21 @@
  *     ou UTC, e três horas de diferença trocam o dia da última compra;
  *   • só fatura pedido aprovado ou enviado ao ERP;
  *   • com a 048, guarda a NOTA (número, série, chave, emissão, valor) e as
- *     peças que ela levou — o corte feito dentro do Control, peça por peça.
+ *     peças que ela levou — o corte feito dentro do Control, peça por peça;
+ *   • UM PEDIDO TEM UMA NOTA (decisão de 16/09/2026, 049): nota com número
+ *     diferente para o mesmo pedido SUBSTITUI a anterior — a antiga recebe
+ *     cancelada_em, substituida_por (a nova) e substituida_em, as peças dela
+ *     deixam de contar e o rastro ganha 'nota_substituida'. Nota cancelada ou
+ *     devolvida no Control não chega como aviso: chega a nota que subiu no
+ *     lugar. A MESMA nota reenviada continua sendo `inalterado`. Sem a 049, a
+ *     nota nova convive com a antiga, como era até aqui.
  */
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { registrarCompraDoCliente } from '../orders/orders.service.js';
 import { guardarOriginal } from '../orders/pedidoOriginal.service.js';
 import { registrarEventoErp, type TipoEventoErp } from '../orders/eventosErp.service.js';
-import { detectarNotasOuFalhar } from '../orders/notasDoPedido.service.js';
+import { detectarNotasOuFalhar, detectarSubstituicaoOuFalhar } from '../orders/notasDoPedido.service.js';
 import { avisarFaturadoAoRep } from '../push/push.avisos.js';
 import { normalizarNumeroErp } from '@csb/shared';
 
@@ -370,13 +377,35 @@ type Desfecho =
   | { tipo: 'inalterado' }
   | { tipo: 'ignorado'; motivo: string; situacao?: string };
 
+/** Uma nota ativa que a nota nova vai tirar de cena. */
+interface NotaASubstituir {
+  id: string;
+  numero: string;
+  serie: string;
+}
+
 interface Contexto {
   company_id: string;
   parceiro: string | null;
   comValor: boolean;
   /** Lança quando o banco não respondeu sobre o schema. */
   temNotas: () => Promise<boolean>;
+  /** A 049 em order_invoices (substituida_por/em). Lança como `temNotas`. */
+  temSubstituicao: () => Promise<boolean>;
   avisar: (aviso: string) => void;
+}
+
+/**
+ * Sonda de schema lembrada só quando respondeu: a que falha por rede não fica
+ * gravada, e o próximo registro pergunta de novo.
+ */
+function sondaLembrada(sondar: () => Promise<boolean>): () => Promise<boolean> {
+  let lembrada: Promise<boolean> | null = null;
+  return () =>
+    (lembrada ??= sondar().catch((e: unknown) => {
+      lembrada = null;
+      throw e;
+    }));
 }
 
 export async function receberFaturamento(
@@ -390,22 +419,19 @@ export async function receberFaturamento(
   let inalterados = 0;
 
   const comValor = await detectarColunaDoValor();
-  // A 048 só é sondada quando algum registro precisa dela. Sonda que falha por
-  // rede não fica lembrada: o registro é ignorado e o próximo pergunta de novo.
-  let comNotas: Promise<boolean> | null = null;
-  const temNotas = () =>
-    (comNotas ??= detectarNotasOuFalhar().catch((e: unknown) => {
-      comNotas = null;
-      throw e;
-    }));
+  // A 048 (e a 049) só é sondada quando algum registro precisa dela. Sonda que
+  // falha por rede não fica lembrada: o registro é ignorado e o próximo
+  // pergunta de novo.
+  const temNotas = sondaLembrada(detectarNotasOuFalhar);
+  const temSubstituicao = sondaLembrada(detectarSubstituicaoOuFalhar);
 
   for (const bruto of lista) {
     // Registro que nem objeto é (null, número) cai em "sem identificação" em
     // vez de virar TypeError e derrubar o lote inteiro.
     const item: FaturamentoParceiro = typeof bruto === 'object' && bruto !== null ? bruto : {};
     // O MESMO numero, escrito de dois jeitos: o app grava normalizado
-    // ("SX14627") desde 10/09/2026, e o ERP pode mandar "sx-14627" ou
-    // "SX 14627". Sem normalizar aqui, o pedido lancado nunca fatura.
+    // ("CS17379") desde 10/09/2026, e o ERP pode mandar "cs-17379" ou
+    // "CS 17379". Sem normalizar aqui, o pedido lancado nunca fatura.
     const pedidoErpCru = texto(item.pedido_erp);
     const pedidoErp = pedidoErpCru ? normalizarNumeroErp(pedidoErpCru) : undefined;
     const id = texto(item.id);
@@ -418,6 +444,7 @@ export async function receberFaturamento(
         parceiro: opcoes.parceiro ?? null,
         comValor,
         temNotas,
+        temSubstituicao,
         avisar: (aviso) => avisosDoItem.add(aviso),
       },
       item,
@@ -562,6 +589,9 @@ async function processarItem(
   let notaNova = false;
   let itensParaGravar: Array<ItemLido & { variant_id: string | null }> | null = null;
   let notasACancelar: Array<{ id: string; numero: string; serie: string }> = [];
+  // As notas ativas que a nota deste registro tira de cena (049): só quando a
+  // nota (re)entra em vigor — nova, ou cancelada que o Control mandou de novo.
+  let notasASubstituir: NotaASubstituir[] = [];
 
   if ((veioNota || veioItens) && !faturado) {
     ctx.avisar('nota e itens ignorados: "faturado": false cancela as notas do pedido');
@@ -610,6 +640,41 @@ async function processarItem(
       if (notaAtual.cancelada_em != null) notaPatch['cancelada_em'] = null;
     }
 
+    // UMA NOTA POR PEDIDO. A nota que o Control mandou é A nota do pedido:
+    // qualquer OUTRA ativa sai de cena — é assim que ele diz "cancelei/devolvi
+    // a anterior", subindo outra. Vale também para o reenvio da mesma nota:
+    // se um reenvio anterior gravou a nota e caiu antes de substituir, ou se
+    // duas notas conviviam de antes da 049, o próximo envio acerta — e, com o
+    // pedido já certo, reenviar continua sendo `inalterado`. Só com a 049
+    // (sem ela, convivem como antes); a sonda que falha ignora o registro para
+    // reenvio, como a da 048.
+    let comSubstituicao = false;
+    try {
+      comSubstituicao = await ctx.temSubstituicao();
+    } catch (e) {
+      return { tipo: 'ignorado', motivo: `falha ao buscar: ${e instanceof Error ? e.message : String(e)}` };
+    }
+    if (comSubstituicao) {
+      let outras = supabase
+        .from('order_invoices')
+        .select('id, numero, serie')
+        .eq('company_id', company_id)
+        .eq('order_id', pedido.id)
+        .is('cancelada_em', null);
+      if (notaAtual) outras = outras.neq('id', notaAtual.id);
+      const ativas = await outras;
+      if (ativas.error) return { tipo: 'ignorado', motivo: `falha ao buscar: ${ativas.error.message}` };
+      const idDaAtual = notaAtual?.id;
+      notasASubstituir = ((Array.isArray(ativas.data) ? ativas.data : []) as NotaASubstituir[]).filter(
+        (n) => n.id !== idDaAtual,
+      );
+      if (notaPatch['cancelada_em'] === null) {
+        // A nota que volta a valer deixa de ser "substituída por" quem quer que seja.
+        notaPatch['substituida_por'] = null;
+        notaPatch['substituida_em'] = null;
+      }
+    }
+
     if (itens) {
       const resolvidas = await resolverVariantes(company_id, itens);
       if (!resolvidas.ok) return { tipo: 'ignorado', motivo: `falha ao buscar: ${resolvidas.erro}` };
@@ -653,7 +718,13 @@ async function processarItem(
 
   const notaMudou = notaNova || Object.keys(notaPatch).length > 0;
   const itensMudaram = itensParaGravar !== null;
-  if (!pedidoMudou && !notaMudou && !itensMudaram && notasACancelar.length === 0) {
+  if (
+    !pedidoMudou &&
+    !notaMudou &&
+    !itensMudaram &&
+    notasACancelar.length === 0 &&
+    notasASubstituir.length === 0
+  ) {
     return { tipo: 'inalterado' };
   }
 
@@ -729,6 +800,19 @@ async function processarItem(
     }
   }
 
+  if (notasASubstituir.length > 0 && invoiceId) {
+    // A antiga sai de cena apontando para a nova: cancelada (a tela deixa de
+    // somar as peças dela, desde a 048) e substituída por (o rastro diz qual).
+    const { error } = await supabase
+      .from('order_invoices')
+      .update({ cancelada_em: agora, substituida_por: invoiceId, substituida_em: agora, updated_at: agora })
+      .eq('company_id', company_id)
+      .eq('order_id', pedido.id)
+      .is('cancelada_em', null)
+      .neq('id', invoiceId);
+    if (error) return { tipo: 'ignorado', motivo: `falha ao gravar a nota: ${error.message}` };
+  }
+
   if (notasACancelar.length > 0) {
     const { error } = await supabase
       .from('order_invoices')
@@ -749,6 +833,7 @@ async function processarItem(
     notaAtual,
     pecas: itensParaGravar ? itensParaGravar.reduce((s, i) => s + i.quantidade, 0) : undefined,
     notasACancelar,
+    notasASubstituir: invoiceId ? notasASubstituir : [],
     agora,
   };
   // O rastro da nota sai logo depois de a nota ser gravada: se o pedido falhar
@@ -801,6 +886,7 @@ async function registrarRastro(
     notaAtual: NotaGravada | null;
     pecas: number | undefined;
     notasACancelar: Array<{ numero: string; serie: string }>;
+    notasASubstituir: Array<{ numero: string; serie: string }>;
     agora: string;
   },
   parte: 'notas' | 'pedido',
@@ -853,6 +939,19 @@ async function registrarRastro(
     });
   }
 
+  // A substituição (049): `antes` é a nota que saiu de cena, `depois` a que
+  // tomou o lugar dela; o motivo diz o mesmo em palavras.
+  for (const n of r.notasASubstituir) {
+    if (!r.nota) break;
+    await registrarEventoErp({
+      ...base,
+      tipo: 'nota_substituida',
+      motivo: `nota ${nomeDaNota(n)} substituída pela nota ${nomeDaNota(r.nota)}`,
+      antes: { numero: n.numero, serie: n.serie, cancelada_em: null },
+      depois: { numero: r.nota.numero, serie: r.nota.serie, cancelada_em: r.agora },
+    });
+  }
+
   for (const n of r.notasACancelar) {
     await registrarEventoErp({
       ...base,
@@ -861,4 +960,9 @@ async function registrarRastro(
       depois: { numero: n.numero, serie: n.serie, cancelada_em: r.agora },
     });
   }
+}
+
+/** "000124 série 1" ou só "000124" quando o Control não manda série. */
+function nomeDaNota(n: { numero: string; serie: string }): string {
+  return n.serie ? `${n.numero} série ${n.serie}` : n.numero;
 }
