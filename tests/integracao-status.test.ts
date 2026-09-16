@@ -295,6 +295,15 @@ describe('pedirSincronizacao', () => {
     expect(fake.gravacoes).toEqual([]);
   });
 
+  it('sonda da coluna sem resposta (rede): LANÇA — nunca "a 049 não rodou" — e nada é gravado', async () => {
+    const { pedirSincronizacao, lerSolicitacaoDeSync, concluirSincronizacao, fake } = await carregar({ companies: SOLUCO });
+
+    await expect(pedirSincronizacao(EMPRESA, { id: USUARIO, nome: 'Ana Financeiro' })).rejects.toThrow(/sync_solicitado_em/);
+    await expect(lerSolicitacaoDeSync(EMPRESA)).rejects.toThrow(/sync_solicitado_em/);
+    await expect(concluirSincronizacao(EMPRESA)).rejects.toThrow(/sync_solicitado_em/);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
   it('sem pedido pendente: grava agora + quem pediu, só onde ainda não há pedido', async () => {
     const GRAVOU: RespostaTabela = {
       data: [{ sync_solicitado_em: PEDIDO_EM, sync_solicitado_por: USUARIO }],
@@ -545,6 +554,14 @@ describe('as rotas /erp/integracao', () => {
     expect(recusa.statusCode).toBe(503);
     expect((recusa.json() as { code: string }).code).toBe('MIGRACAO_PENDENTE');
     expect(semMigracao.fake.gravacoes).toEqual([]);
+
+    // Soluço de rede na sonda: 503 "tente de novo", nunca MIGRACAO_PENDENTE.
+    vi.resetModules();
+    const soluco = await comBanco({ companies: SOLUCO });
+    const semResposta = await chamar(soluco.app, 'PATCH', '/erp/integracao/sincronizar', TOKEN.financeiro);
+    expect(semResposta.statusCode).toBe(503);
+    expect((semResposta.json() as { code: string }).code).toBe('BANCO_INDISPONIVEL');
+    expect(soluco.fake.gravacoes).toEqual([]);
 
     vi.resetModules();
     const GRAVOU: RespostaTabela = { data: [{ sync_solicitado_em: PEDIDO_EM, sync_solicitado_por: USUARIO }], error: null };

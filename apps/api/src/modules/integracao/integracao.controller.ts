@@ -17,13 +17,25 @@ export async function statusDaIntegracaoHandler(request: FastifyRequest, reply: 
  *
  * Grava o carimbo em `companies` (049). Com pedido já pendente, devolve o que
  * está lá sem gravar (`ja_solicitado: true`). Sem a 049 no banco, 503 com o
- * código que a tela sabe explicar.
+ * código que a tela sabe explicar. Banco que não respondeu (nem sobre o
+ * schema) é outro 503: "tente de novo" — nunca "a migração não rodou".
  */
 export async function pedirSincronizacaoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const r = await pedirSincronizacao(request.user.company_id, {
-    id: request.user.sub,
-    nome: request.user.name,
-  });
+  let r: Awaited<ReturnType<typeof pedirSincronizacao>>;
+  try {
+    r = await pedirSincronizacao(request.user.company_id, {
+      id: request.user.sub,
+      nome: request.user.name,
+    });
+  } catch (err) {
+    request.log.error({ err }, 'pedido de sincronização sem resposta do banco');
+    await reply.status(503).send({
+      error: 'Não deu para falar com o banco agora. O pedido de sincronização não foi registrado — tente de novo em instantes.',
+      code: 'BANCO_INDISPONIVEL',
+      statusCode: 503,
+    });
+    return;
+  }
   if (!r.ok) {
     await reply.status(503).send({
       error: 'A migração 049 ainda não rodou neste banco — o pedido de sincronização ainda não tem onde ficar.',

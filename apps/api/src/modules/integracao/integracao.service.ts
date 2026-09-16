@@ -161,12 +161,15 @@ async function nomeDoUsuario(company_id: string, user_id: string): Promise<strin
  *
  * `migracao: false` = a 049 ainda não rodou (não há onde guardar o pedido).
  * É a mesma pergunta que o `GET /partner/v1/status` faz para devolver
- * `sincronizar_agora` ao Control. Lança quando o banco não respondeu.
+ * `sincronizar_agora` ao Control. Lança quando o banco não respondeu —
+ * inclusive na sonda da coluna: um soluço de rede lido como "a 049 não rodou"
+ * fazia o botão responder MIGRACAO_PENDENTE com a 049 já rodada (revisão de
+ * 16/09/2026). Só a ausência de verdade vira `migracao: false`.
  */
 export async function lerSolicitacaoDeSync(
   company_id: string,
 ): Promise<{ migracao: boolean; solicitacao: SolicitacaoDeSync | null }> {
-  if (!(await detectar('companies', 'sync_solicitado_em'))) return { migracao: false, solicitacao: null };
+  if (!(await detectarOuFalhar('companies', 'sync_solicitado_em'))) return { migracao: false, solicitacao: null };
 
   const linha = await lerLinhaDaSolicitacao(company_id);
   if (!linha?.sync_solicitado_em) return { migracao: true, solicitacao: null };
@@ -253,7 +256,11 @@ export async function concluirSincronizacao(
   company_id: string,
   opts: { solicitado_em?: string | undefined } = {},
 ): Promise<ConclusaoDeSync> {
-  if (!(await detectar('companies', 'sync_solicitado_em'))) return { migracao: false, limpo: false, pendente: null };
+  // Soluço na sonda sobe (500) e o Control avisa de novo; lido como "sem a
+  // 049", o aviso seria engolido e o pedido ficaria de pé sem motivo.
+  if (!(await detectarOuFalhar('companies', 'sync_solicitado_em'))) {
+    return { migracao: false, limpo: false, pendente: null };
+  }
 
   const linha = await lerLinhaDaSolicitacao(company_id);
   const pendente = linha?.sync_solicitado_em ?? null;
