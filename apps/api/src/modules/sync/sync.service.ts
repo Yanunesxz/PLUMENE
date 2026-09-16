@@ -28,7 +28,15 @@ export async function processSyncQueue(
       // manda quando conferir (regra do Yan, 14/08/2026 — antes disto o sync
       // forçava submit e o pedido pulava direto para a fila do gerente). O da
       // loja não muda: a origem 'store' ignora o submit e cai na triagem.
-      await createOrder(company_id, rep_id, price_table_id, validation.data, origem);
+      const pedido = await createOrder(company_id, rep_id, price_table_id, validation.data, origem);
+      // Pedido que não nasceu (cliente que não existe na empresa, gravação que
+      // o banco recusou) volta como falha: o aparelho só apaga da fila o que
+      // não veio em `failed`, e contar como sincronizado fazia o pedido sumir
+      // do celular sem existir no servidor.
+      if (!pedido) {
+        failed.push({ local_id: offlineOrder.local_id, error: 'CREATE_FAILED' });
+        continue;
+      }
       synced++;
     } catch (err) {
       failed.push({

@@ -270,6 +270,62 @@ export interface OrigemPedido {
   created_by?: string;
 }
 
+/** Quantos "juntado em" seguir: o cadastro que ficou pode ter sido juntado de novo. */
+const SALTOS_DE_JUNCAO = 5;
+
+interface ClienteDoPedido {
+  id: string;
+  price_table_id: string | null;
+}
+
+/**
+ * O cliente do pedido na empresa — seguindo a exclusão com junção (050).
+ *
+ * O admin exclui um cadastro em dobro juntando-o em outro, mas o aparelho do
+ * representante continua com o cliente antigo no cache (e a loja cujo login foi
+ * herdado, com ele no token por até 1h). Sem isto, o pedido para o cliente
+ * excluído era recusado online e, pela fila offline, sumia. Aqui: cliente que
+ * não existe mais e tem cópia em deleted_customers com `juntado_em` vira o
+ * cadastro que ficou (em cadeia, com limite) — e o rastro fica na própria cópia
+ * e no log. Excluído sem junção, ou sem a 050, continua "não encontrado".
+ */
+async function clienteDoPedido(customer_id: string, company_id: string): Promise<ClienteDoPedido | null> {
+  const vistos = new Set<string>();
+  let alvo = customer_id;
+  for (let salto = 0; ; salto++) {
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id, price_table_id')
+      .eq('id', alvo)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (customer) {
+      const achado = customer as ClienteDoPedido;
+      if (achado.id !== customer_id) {
+        console.warn(
+          `[pedido] o cliente ${customer_id} foi excluído e juntado em ${achado.id}: o pedido entra no cadastro que ficou`,
+        );
+      }
+      return achado;
+    }
+    if (salto >= SALTOS_DE_JUNCAO || !(await detectar('deleted_customers', 'id'))) return null;
+
+    vistos.add(alvo);
+    const { data: copia, error } = await supabase
+      .from('deleted_customers')
+      .select('juntado_em')
+      .eq('company_id', company_id)
+      .eq('customer_id', alvo)
+      .not('juntado_em', 'is', null)
+      .order('deleted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const juntadoEm = error ? null : ((copia as { juntado_em: string | null } | null)?.juntado_em ?? null);
+    if (!juntadoEm || vistos.has(juntadoEm)) return null;
+    alvo = juntadoEm;
+  }
+}
+
 export async function createOrder(
   company_id: string,
   rep_id: string,
@@ -299,16 +355,15 @@ export async function createOrder(
   // vitrine antiga de visitante (link sem cliente atrelado, anterior à 035) —
   // ali quem pediu se identifica só por nome e WhatsApp. Vitrine com cliente
   // (o link novo) passa pela mesma checagem dos outros.
+  // O cliente que o pedido grava: o do corpo, ou o cadastro em que ele foi
+  // juntado quando o admin o excluiu (`clienteDoPedido`).
+  let customerIdDoPedido = body.customer_id ?? null;
   if (!daVitrine || body.customer_id) {
     if (!body.customer_id) return null;
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('id, price_table_id')
-      .eq('id', body.customer_id)
-      .eq('company_id', company_id)
-      .single();
+    const customer = await clienteDoPedido(body.customer_id, company_id);
 
     if (!customer) return null;
+    customerIdDoPedido = customer.id;
     // Cliente BLOQUEADO no Control não trava o representante (decisão 8 de
     // 16/09/2026): o pedido nasce normalmente e o financeiro é avisado na
     // hora de decidir — o bloqueio, o motivo e a pendência financeira ficam
@@ -320,7 +375,7 @@ export async function createOrder(
     // controller; o offline (fila de sync) mandava a tabela do REPRESENTANTE,
     // e um cliente de tabela 3 nasceu em pedido de tabela 1 (#14637, Simone,
     // 03/09/2026). Sem tabela no cadastro, vale a que o chamador mandou.
-    const tabelaDoCliente = (customer as { price_table_id: string | null }).price_table_id;
+    const tabelaDoCliente = customer.price_table_id;
     if (tabelaDoCliente) price_table_id = tabelaDoCliente;
   }
 
@@ -432,7 +487,7 @@ export async function createOrder(
         rep_id,
         // Vitrine COM cliente (link novo, 035) grava o cliente; a de visitante
         // (link antigo) segue sem — o contato fica nos campos guest_*.
-        customer_id: body.customer_id ?? null,
+        customer_id: customerIdDoPedido,
         status,
         total,
         notes: body.notes ?? null,
