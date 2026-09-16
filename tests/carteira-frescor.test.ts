@@ -6,6 +6,7 @@ import {
   reguaDaCarteira,
   NOME_DO_NIVEL,
   faixaEmPalavras,
+  dataDaUltimaCompra,
 } from '../apps/web/src/lib/carteira.js';
 import { REGUA_PADRAO } from '@csb/shared';
 
@@ -89,5 +90,29 @@ describe('cliente de varejo (migração 047)', () => {
     expect(situacaoDoCliente({ last_purchase_at: diasAtras(900) }).nivel).toBe('parado');
     expect(situacaoDoCliente({ last_purchase_at: diasAtras(900), varejo: false }).nivel).toBe('parado');
     expect(situacaoDoCliente({ last_purchase_at: diasAtras(10), varejo: null }).nivel).toBe('ativo');
+  });
+});
+
+describe('a data que aparece ao lado do selo', () => {
+  const fusoOriginal = process.env['TZ'];
+  afterEach(() => {
+    if (fusoOriginal === undefined) delete process.env['TZ'];
+    else process.env['TZ'] = fusoOriginal;
+  });
+
+  it('a compra de 09/06 aparece como 09/06 em Brasília — não como 08/06', () => {
+    // A coluna é DATE: o banco manda "2026-06-09". Lido como instante, isso é
+    // meia-noite em UTC, que em Brasília ainda é o dia 8 — o erro de antes.
+    process.env['TZ'] = 'America/Sao_Paulo';
+    expect(new Date('2026-06-09').toLocaleDateString('pt-BR')).toBe('08/06/2026');
+    expect(dataDaUltimaCompra('2026-06-09')).toBe('09/06/2026');
+    expect(dataDaUltimaCompra('2026-01-01')).toBe('01/01/2026');
+  });
+
+  it('sem data, ou com lixo, não inventa dia nenhum', () => {
+    expect(dataDaUltimaCompra(null)).toBeNull();
+    expect(dataDaUltimaCompra(undefined)).toBeNull();
+    expect(dataDaUltimaCompra('')).toBeNull();
+    expect(dataDaUltimaCompra('não é data')).toBeNull();
   });
 });

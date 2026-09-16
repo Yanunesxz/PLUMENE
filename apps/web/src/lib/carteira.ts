@@ -98,6 +98,22 @@ export function situacaoDaCompra(
 }
 
 /**
+ * "09/06/2026" a partir da data da última compra como o banco guarda ("2026-06-09").
+ *
+ * A coluna é DATE, sem hora. `new Date('2026-06-09')` lê isso como meia-noite
+ * em UTC, que em Brasília ainda é 08/06 — a lista de clientes mostrava TODA
+ * última compra um dia antes (16/09/2026). A data sem hora é escrita como está,
+ * sem passar por fuso; só um instante de verdade (com hora) usa o do aparelho.
+ */
+export function dataDaUltimaCompra(lastPurchaseAt: string | null | undefined): string | null {
+  if (!lastPurchaseAt) return null;
+  const soData = /^(\d{4})-(\d{2})-(\d{2})$/.exec(lastPurchaseAt.trim());
+  if (soData) return `${soData[3]}/${soData[2]}/${soData[1]}`;
+  const instante = new Date(lastPurchaseAt);
+  return Number.isNaN(instante.getTime()) ? null : instante.toLocaleDateString('pt-BR');
+}
+
+/**
  * A situação de UM cliente — o que selo, filtro, contagem e Minha Área usam.
  *
  * Marcado como varejo pela venda interna, a régua nem é consultada: é essa a
