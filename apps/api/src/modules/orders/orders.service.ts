@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import { detectar } from '../../lib/detectarColuna.js';
+import { detectar, detectarComCerteza } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
 import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.js';
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
@@ -122,6 +122,15 @@ export async function getOrderById(
   // As notas que o Control informou, com as peças de cada uma (048): é o
   // "como foi faturado" de verdade. Sem a 048, lista vazia.
   pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
+  // O pedido foi SOLICITADO ao Control (049)? O `*` já traz a coluna quando
+  // ela existe; aqui ela vira o bloco que a tela lê para ficar consultando
+  // até o número chegar. Sem a 049, o bloco não existe.
+  if (pedido.erp_requested_at) {
+    pedido.solicitacao_erp = {
+      solicitado_em: pedido.erp_requested_at,
+      solicitado_por: pedido.erp_requested_by ?? null,
+    };
+  }
   return pedido;
 }
 
@@ -294,15 +303,17 @@ export async function createOrder(
     if (!body.customer_id) return null;
     const { data: customer } = await supabase
       .from('customers')
-      .select('id, blocked, price_table_id')
+      .select('id, price_table_id')
       .eq('id', body.customer_id)
       .eq('company_id', company_id)
       .single();
 
     if (!customer) return null;
-    if ((customer as { blocked: boolean }).blocked) {
-      throw new Error('CUSTOMER_BLOCKED');
-    }
+    // Cliente BLOQUEADO no Control não trava o representante (decisão 8 de
+    // 16/09/2026): o pedido nasce normalmente e o financeiro é avisado na
+    // hora de decidir — o bloqueio, o motivo e a pendência financeira ficam
+    // no cadastro (customers.blocked, block_reason, pendencia_financeira).
+    // Até 16/09 este ponto recusava com CUSTOMER_BLOCKED.
 
     // A tabela do pedido é a do CADASTRO do cliente — aqui, no único lugar
     // por onde todo pedido passa. O caminho online já resolvia isso no
@@ -1082,6 +1093,150 @@ export async function ultimoNumeroErp(company_id: string): Promise<string | null
   return linha?.erp_order_id ?? null;
 }
 
+export type SolicitarErpResult =
+  | {
+      ok: true;
+      /** Quando foi solicitado (o de agora, ou o de antes se já estava). */
+      solicitado_em: string;
+      /** `true` = já estava solicitado; nada foi gravado nem registrado. */
+      ja_solicitado: boolean;
+    }
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'nao_aprovado'
+        | 'ja_faturado'
+        | 'ja_lancado'
+        | 'canal_manual'
+        | 'canal_indisponivel'
+        | 'sem_migracao'
+        | 'erro';
+      /** Em `ja_lancado`: o número que o pedido já tem. */
+      erp_order_id?: string;
+    };
+
+/** O que a solicitação lê do pedido. `*` de propósito: as colunas da 049 podem não existir. */
+interface PedidoParaSolicitar {
+  order_number?: number | null;
+  status: Order['status'];
+  invoiced?: boolean | null;
+  erp_order_id: string | null;
+  erp_requested_at?: string | null;
+}
+
+/**
+ * "Lançar no Control" com o canal de pedidos na API (049, decisão 2 de
+ * 16/09/2026).
+ *
+ * O lançamento continua sendo UM CLIQUE do financeiro — só que, com o canal
+ * na API, ele não digita número nenhum: o clique SOLICITA. O pedido ganha
+ * `erp_requested_at`/`erp_requested_by`, entra na fila que o Control puxa
+ * (GET /partner/v1/pedidos) e fica como está (approved, sem número) até o
+ * Control confirmar pelo POST /confirmar — aí vira sent_erp com o número. A
+ * tela fica consultando GET /orders/:id até isso acontecer.
+ *
+ * Regras, nesta ordem: existe → ainda sem número → não faturado → aprovado →
+ * canal na API → a 049 rodou → se já está solicitado, responde ok sem gravar
+ * (idempotente: o segundo clique, ou o clique depois do tempo esgotar, só
+ * volta a esperar) → grava só se ninguém mexeu no meio → evento
+ * 'solicitado_ao_erp'. Status nunca muda aqui.
+ */
+export async function solicitarLancamentoNoErp(
+  id: string,
+  company_id: string,
+  quem: { id: string; nome?: string | null },
+): Promise<SolicitarErpResult> {
+  const ler = async (): Promise<{ pedido: PedidoParaSolicitar | null; falhou: boolean }> => {
+    const { data, error } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (error) {
+      console.error(`[solicitar-erp] falha ao ler o pedido ${id}: ${error.message}`);
+      return { pedido: null, falhou: true };
+    }
+    return { pedido: (data as PedidoParaSolicitar | null) ?? null, falhou: false };
+  };
+
+  const responderPeloEstado = (o: PedidoParaSolicitar): SolicitarErpResult | null => {
+    if (o.erp_order_id) return { ok: false, reason: 'ja_lancado', erp_order_id: o.erp_order_id };
+    if (o.invoiced) return { ok: false, reason: 'ja_faturado' };
+    if (o.status !== 'approved') return { ok: false, reason: 'nao_aprovado' };
+    if (o.erp_requested_at) return { ok: true, solicitado_em: o.erp_requested_at, ja_solicitado: true };
+    return null;
+  };
+
+  const leitura = await ler();
+  if (leitura.falhou) return { ok: false, reason: 'erro' };
+  if (!leitura.pedido) return { ok: false, reason: 'not_found' };
+  const o = leitura.pedido;
+
+  // As três recusas de estado vêm ANTES do canal: um pedido já lançado ou já
+  // faturado não é caso de "canal", é caso de "não há o que solicitar".
+  if (o.erp_order_id) return { ok: false, reason: 'ja_lancado', erp_order_id: o.erp_order_id };
+  if (o.invoiced) return { ok: false, reason: 'ja_faturado' };
+  if (o.status !== 'approved') return { ok: false, reason: 'nao_aprovado' };
+
+  let canais: Canais;
+  try {
+    canais = await lerCanaisDaTela(company_id);
+  } catch {
+    return { ok: false, reason: 'canal_indisponivel' };
+  }
+  if (canais.pedido_erp !== 'api') return { ok: false, reason: 'canal_manual' };
+
+  // A 049 rodou? Sonda que não responde não pode virar "migração pendente"
+  // (a Larissa leria "ainda não funciona" por um soluço de rede): é o mesmo
+  // "tente de novo" do canal.
+  const coluna = await detectarComCerteza('orders', 'erp_requested_at');
+  if (coluna === 'nao_sei') return { ok: false, reason: 'canal_indisponivel' };
+  if (coluna === 'nao_existe') return { ok: false, reason: 'sem_migracao' };
+
+  if (o.erp_requested_at) return { ok: true, solicitado_em: o.erp_requested_at, ja_solicitado: true };
+
+  const agora = new Date().toISOString();
+  const { data: afetadas, error } = await supabase
+    .from('orders')
+    .update({ erp_requested_at: agora, erp_requested_by: quem.id, updated_at: agora })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    // Só se o pedido continua como foi lido: aprovado, sem número e ainda não
+    // solicitado. Dois cliques ao mesmo tempo gravam um só (e um só evento).
+    .eq('status', 'approved')
+    .is('erp_order_id', null)
+    .is('erp_requested_at', null)
+    .select('id');
+  if (error) {
+    console.error(`[solicitar-erp] falha ao solicitar o pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+
+  if (!Array.isArray(afetadas) || afetadas.length === 0) {
+    // Alguém mexeu entre a leitura e a gravação: responde pelo estado de agora.
+    const relido = await ler();
+    if (relido.falhou) return { ok: false, reason: 'erro' };
+    if (!relido.pedido) return { ok: false, reason: 'not_found' };
+    return responderPeloEstado(relido.pedido) ?? { ok: false, reason: 'erro' };
+  }
+
+  // O rastro (048/049). Nunca derruba a solicitação: ela já está gravada.
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: o.order_number ?? null,
+    tipo: 'solicitado_ao_erp',
+    origem: 'tela',
+    por: quem.id,
+    por_nome: quem.nome ?? null,
+    antes: null,
+    depois: { erp_order_id: null, status: 'approved' },
+  });
+  return { ok: true, solicitado_em: agora, ja_solicitado: false };
+}
+
 export type NotesResult =
   | { ok: true; order: Order }
   | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_foto_do_erp' };
@@ -1218,9 +1373,10 @@ export type FaturadoResult =
 /**
  * O botão manual de faturado (e o desfazer).
  *
- * - Com `canal_faturamento='api'` (048), o faturado de pedido que JÁ TEM número
- *   do Control vem do Control, pela API: o botão recusa, para não haver dois
- *   escritores do mesmo carimbo. Pedido sem número segue como sempre.
+ * - Com `canal_faturamento='api'` (048), o faturado vem do Control, pela API,
+ *   para TODO pedido — com ou sem número, de quem for (decisão 11 de
+ *   16/09/2026): o botão recusa, para não haver dois escritores do mesmo
+ *   carimbo. Com o canal manual segue como sempre.
  * - Recarimbo (já faturado) não grava nada: não move `invoiced_at`, não empurra
  *   a última compra e não avisa o representante de novo.
  * - Desfazer limpa também `invoiced_total` (027), como a API faz.
@@ -1248,19 +1404,18 @@ export async function setOrderInvoiced(
   const atual = await lerPedido();
   if (!atual) return { ok: false, reason: 'not_found' };
 
-  // O canal só é lido quando importa (pedido com número). Banco que não
-  // responde não carimba: um soluço não pode reabrir o botão com o canal na
-  // API. Mas também não vira 500 mudo — o desfecho é CANAL_INDISPONIVEL (503),
-  // e a tela mostra "tente de novo em instantes".
-  if (atual.erp_order_id) {
-    let canais: Canais;
-    try {
-      canais = await lerCanaisDaTela(company_id);
-    } catch {
-      return { ok: false, reason: 'canal_indisponivel' };
-    }
-    if (canais.faturamento === 'api') return { ok: false, reason: 'faturamento_pelo_control' };
+  // O canal vale para todo pedido. Banco que não responde não carimba: um
+  // soluço não pode reabrir o botão com o canal na API. Mas também não vira
+  // 500 mudo — o desfecho é CANAL_INDISPONIVEL (503), e a tela mostra "tente
+  // de novo em instantes". Sem a 048 (coluna ausente), `lerCanais` devolve os
+  // padrões sem consultar a empresa: o botão carimba como sempre carimbou.
+  let canais: Canais;
+  try {
+    canais = await lerCanaisDaTela(company_id);
+  } catch {
+    return { ok: false, reason: 'canal_indisponivel' };
   }
+  if (canais.faturamento === 'api') return { ok: false, reason: 'faturamento_pelo_control' };
 
   const temValor = Object.prototype.hasOwnProperty.call(atual, 'invoiced_total');
   const jaFaturado = atual.invoiced === true;
@@ -1428,12 +1583,17 @@ export async function updateOrderStatus(
   if (body.status === 'sent_erp') {
     // Com o canal de pedidos ligado na API (048), o número vem do Control pela
     // API de parceiro — a tela deixa de ser um segundo escritor do mesmo campo.
+    // Quem tentou DIGITAR um número ouve CANAL_API; quem chegou aqui sem número
+    // ouve que o caminho é SOLICITAR (PATCH /orders/:id/solicitar-erp), que
+    // não muda o status: o pedido vira sent_erp quando o Control confirmar.
     // Antes de validar o número: não adianta a Larissa acertar a digitação de
     // algo que a tela não pode mais gravar. Banco que não responde recusa o
     // lançamento com CANAL_INDISPONIVEL (503, "tente de novo") — nunca grava
     // no escuro, e nunca sem dizer o porquê.
     const canais = await lerCanaisDaTela(company_id);
-    if (canais.pedido_erp === 'api') throw new Error('CANAL_API');
+    if (canais.pedido_erp === 'api') {
+      throw new Error(body.erp_order_id?.trim() ? 'CANAL_API' : 'LANCAMENTO_PELO_CONTROL');
+    }
 
     const numero = normalizarNumeroErp(body.erp_order_id);
     if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');

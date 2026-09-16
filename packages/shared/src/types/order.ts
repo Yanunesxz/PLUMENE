@@ -148,6 +148,14 @@ export interface OrderWithItems extends Order {
    */
   solicitacao_erp?: SolicitacaoErp | null;
   /**
+   * Os canais da empresa que a tela do pedido precisa conhecer (migração 048),
+   * lidos pela API no GET /orders/:id: com `pedido_erp = 'api'` o "Lançar"
+   * SOLICITA ao Control em vez de pedir número; com `faturamento = 'api'` o
+   * botão manual de faturado some para todos. `null` = o banco não respondeu;
+   * ausente no cache offline. Nos dois casos a tela é a de sempre (manual).
+   */
+  canais?: { pedido_erp: string; faturamento: string } | null;
+  /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante
    * manda no WhatsApp quando o cliente pede. Ausente no cache offline.
@@ -267,7 +275,7 @@ export interface UpdateOrderStatusRequest {
   notes?: string;
   /**
    * Ao LANÇAR (sent_erp): o número que o Control deu ao pedido — duas letras
-   * e a numeração ("SX14627"). Obrigatório nesse passo; quem cunha é o ERP.
+   * e a numeração ("CS17379"). Obrigatório nesse passo; quem cunha é o ERP.
    */
   erp_order_id?: string;
 }

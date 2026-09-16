@@ -14,7 +14,21 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
-import { nomeDoComprador, origemParaExibir, decisaoDoPedido, seloDoPedido, compararReferencia, linkDoWhatsApp, podeLancarNoErp } from '../../lib/pedido.js';
+import {
+  nomeDoComprador,
+  origemParaExibir,
+  decisaoDoPedido,
+  seloDoPedido,
+  compararReferencia,
+  linkDoWhatsApp,
+  podeLancarNoErp,
+  lancaPeloControl,
+  faturaPeloControl,
+  serieDoControl,
+  exemploDeNumeroErp,
+  estadoDaEspera,
+  ESPERA_DO_CONTROL,
+} from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
@@ -22,7 +36,7 @@ import { SeletorTamanho, type PickedSize } from '../../components/comercial/Sele
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
-import { LancarNoErp } from '../../components/comercial/LancarNoErp.js';
+import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { precoDoTamanho, coresPorSku, semLinhasDeCor } from '@csb/shared';
@@ -54,6 +68,14 @@ interface PrecoNaTabela {
   price_larger: number | null;
 }
 
+/**
+ * O pedido como o GET /orders/:id devolve: o pedido inteiro mais os canais da
+ * empresa (048, `OrderWithItems.canais`), que dizem se "Lançar" digita o
+ * número ou solicita ao Control e se o botão de faturado existe. O cache
+ * offline não tem os canais.
+ */
+type PedidoNaTela = OrderWithItems;
+
 export function PaginaDetalhePedido() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -71,7 +93,12 @@ export function PaginaDetalhePedido() {
   // Quem mexe no Control de verdade: é quem confirma que já atualizou lá.
   const ehEscritorioDoErp = user?.role === 'financeiro' || user?.role === 'admin';
   // undefined = carregando, null = não encontrado
-  const [order, setOrder] = useState<OrderWithItems | null | undefined>(undefined);
+  const [order, setOrder] = useState<PedidoNaTela | null | undefined>(undefined);
+  // Por onde o número do Control e o faturado chegam nesta empresa (048). Sem
+  // os canais (cache offline, ou a API não leu), a tela é a de sempre: manual.
+  const canaisDaEmpresa = order?.canais ?? null;
+  const pelaApi = lancaPeloControl(canaisDaEmpresa);
+  const faturadoPeloControl = faturaPeloControl(canaisDaEmpresa);
 
   /**
    * Busca o pedido INTEIRO de novo depois de uma mudança.
@@ -90,7 +117,7 @@ export function PaginaDetalhePedido() {
     if (!id || !token) return;
     const esta = ++recargaMaisNova.current;
     try {
-      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      const r = await api.get<ApiResponse<PedidoNaTela>>(`/orders/${id}`, token);
       if (esta === recargaMaisNova.current) setOrder(r.data);
     } catch {
       /* sem rede: mantém o pedido que já está na tela */
@@ -103,7 +130,7 @@ export function PaginaDetalhePedido() {
    * não apaga o lançamento, o carimbo ou o aviso que vieram depois) e mescla
    * sobre o pedido MAIS NOVO, nunca sobre o da hora do toque.
    */
-  const mudarPedido = (mudanca: (atual: OrderWithItems) => OrderWithItems) => {
+  const mudarPedido = (mudanca: (atual: PedidoNaTela) => PedidoNaTela) => {
     recargaMaisNova.current++;
     setOrder((prev) => (prev ? mudanca(prev) : prev));
   };
@@ -157,9 +184,81 @@ export function PaginaDetalhePedido() {
   const [erroDoLancamento, setErroDoLancamento] = useState<string | null>(null);
   const [ultimoErp, setUltimoErp] = useState<string | null>(null);
   const [carregandoUltimo, setCarregandoUltimo] = useState(false);
+  // A série desta marca (CS / PL) para o exemplo e a sugestão — só ilustração;
+  // quem cunha o número é o Control.
+  const exemploDoNumero = exemploDeNumeroErp(serieDoControl(MARCA.nome, ultimoErp));
+
+  // ─── Solicitar ao Control (049): o canal na API ────────────────────────────
+  // Ninguém digita número: o clique solicita, e a tela consulta o pedido a
+  // cada 3 s, por até 3 min, até o Control devolver o número pela confirmação.
+  const [espera, setEspera] = useState<EsperaPeloControl>({ estado: 'parado' });
+  const inicioDaEspera = useRef(0);
+
+  const solicitarAoControl = async () => {
+    if (!id || !token || !order || espera.estado === 'solicitando') return;
+    setErroDoLancamento(null);
+    setEspera({ estado: 'solicitando' });
+    try {
+      const res = await api.patch<ApiResponse<{ solicitado_em: string; ja_solicitado: boolean }>>(
+        `/orders/${id}/solicitar-erp`,
+        {},
+        token,
+      );
+      mudarPedido((atual) => ({ ...atual, erp_requested_at: res.data.solicitado_em }));
+      inicioDaEspera.current = Date.now();
+      setEspera({ estado: 'aguardando', solicitadoEm: res.data.solicitado_em });
+    } catch (err) {
+      // Já tem número: o Control confirmou entre a abertura do diálogo e o
+      // clique. A recarga traz o número; o diálogo mostra o motivo.
+      if ((err as { code?: string }).code === 'ORDER_HAS_ERP_NUMBER') void recarregarPedido();
+      setErroDoLancamento(err instanceof Error ? err.message : 'Não foi possível solicitar ao Control.');
+      setEspera({ estado: 'parado', solicitadoEm: order.erp_requested_at ?? null });
+    }
+  };
+
+  // A consulta periódica. Só roda com o diálogo aberto e a espera em curso:
+  // fechar o diálogo para a consulta — o pedido continua solicitado no
+  // servidor e o número aparece na próxima abertura da tela.
+  useEffect(() => {
+    if (!lancando || espera.estado !== 'aguardando' || !id || !token) return;
+    let vivo = true;
+    const consultar = async () => {
+      try {
+        const r = await api.get<ApiResponse<PedidoNaTela>>(`/orders/${id}`, token);
+        if (!vivo) return;
+        const estado = estadoDaEspera(r.data, inicioDaEspera.current, Date.now());
+        if (estado === 'importado') {
+          // O pedido inteiro, como veio: status, número, foto do Control (046).
+          recargaMaisNova.current++;
+          setOrder(r.data);
+          void db.orders.update(id, { status: r.data.status, erp_order_id: r.data.erp_order_id });
+          setEspera({ estado: 'importado', numero: r.data.erp_order_id });
+        } else if (estado === 'esgotou') {
+          setEspera({ estado: 'esgotou' });
+        }
+      } catch {
+        // Sem rede nesta rodada: tenta na próxima — a menos que o tempo acabou.
+        if (vivo && Date.now() - inicioDaEspera.current >= ESPERA_DO_CONTROL.limite_ms) {
+          setEspera({ estado: 'esgotou' });
+        }
+      }
+    };
+    const timer = setInterval(() => void consultar(), ESPERA_DO_CONTROL.intervalo_ms);
+    return () => {
+      vivo = false;
+      clearInterval(timer);
+    };
+  }, [lancando, espera.estado, id, token]);
 
   const abrirLancamento = async () => {
     setLancando(true);
+    setErroDoLancamento(null);
+    // Canal na API: nada de último número nem sugestão — o diálogo só solicita.
+    // Se já estava solicitado, ele abre no "conferir agora".
+    if (pelaApi) {
+      setEspera({ estado: 'parado', solicitadoEm: order?.erp_requested_at ?? null });
+      return;
+    }
     if (!token) return;
     setCarregandoUltimo(true);
     try {
@@ -764,7 +863,7 @@ export function PaginaDetalhePedido() {
     };
     if (token) {
       api
-        .get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token)
+        .get<ApiResponse<PedidoNaTela>>(`/orders/${id}`, token)
         .then((r) => {
           if (aindaVale()) setOrder(r.data);
         })
@@ -1032,19 +1131,28 @@ export function PaginaDetalhePedido() {
                   </span>
                 )}
               </span>
-              {canInvoice && (!order.invoiced || podeDesmarcar) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={invoicing}
-                  onClick={() => {
-                    // A venda interna confirma antes: o carimbo dela não volta.
-                    if (!order.invoiced && ehVendaInterna) setConfirmandoFatura(true);
-                    else void toggleInvoiced();
-                  }}
-                >
-                  {order.invoiced ? 'Desmarcar' : 'Marcar faturado'}
-                </Button>
+              {/* Com o faturamento vindo do Control pela API (048/049), o botão
+                  manual some para TODOS — o carimbo chega sozinho, com a nota. */}
+              {faturadoPeloControl ? (
+                <span className="text-xs text-muted-foreground">
+                  {order.invoiced ? 'pelo Control' : 'o faturado chega pelo Control'}
+                </span>
+              ) : (
+                canInvoice &&
+                (!order.invoiced || podeDesmarcar) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={invoicing}
+                    onClick={() => {
+                      // A venda interna confirma antes: o carimbo dela não volta.
+                      if (!order.invoiced && ehVendaInterna) setConfirmandoFatura(true);
+                      else void toggleInvoiced();
+                    }}
+                  >
+                    {order.invoiced ? 'Desmarcar' : 'Marcar faturado'}
+                  </Button>
+                )
               )}
             </div>
           </div>
@@ -1095,17 +1203,20 @@ export function PaginaDetalhePedido() {
           {podeLancarNoErp(user?.role, order.status, order.invoiced) && (
               <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
                 <p className="mb-3 text-sm text-foreground">
-                  Pedido aceito. Depois de importar a planilha no Control, lance aqui com o número
-                  que o Control deu — ele sai da fila &quot;A lançar&quot; e fica aguardando a nota.
+                  {pelaApi
+                    ? order.erp_requested_at
+                      ? `Pedido solicitado ao Control em ${new Date(order.erp_requested_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}. O número aparece aqui quando o Control responder — dá para conferir agora.`
+                      : 'Pedido aceito. Lance no Control: o pedido entra na fila da integração e o Control devolve o número em instantes — sem digitar nada.'
+                    : 'Pedido aceito. Depois de importar a planilha no Control, lance aqui com o número que o Control deu — ele sai da fila "A lançar" e fica aguardando a nota.'}
                 </p>
                 <Button
                   size="lg"
                   className="w-full"
-                  disabled={decidindo !== null}
+                  disabled={decidindo !== null || (pelaApi && !isOnline)}
                   onClick={() => void abrirLancamento()}
                 >
                   <Check className="h-4 w-4" strokeWidth={2.5} />
-                  Lançar no ERP
+                  {pelaApi ? (order.erp_requested_at ? 'Conferir no Control' : 'Lançar no Control') : 'Lançar no ERP'}
                 </Button>
               </div>
             )}
@@ -1504,15 +1615,20 @@ export function PaginaDetalhePedido() {
 
       {lancando && order && (
         <LancarNoErp
+          modo={pelaApi ? 'solicitar' : 'lancar'}
           numeroDoPedido={order.order_number}
           ultimo={ultimoErp}
           carregandoUltimo={carregandoUltimo}
           ocupado={decidindo !== null}
           erro={erroDoLancamento}
+          exemplo={exemploDoNumero}
+          espera={espera}
+          onSolicitar={() => void solicitarAoControl()}
           onConfirmar={(n) => void lancarNoErp(n)}
           onCancelar={() => {
             setErroDoLancamento(null);
             setLancando(false);
+            setEspera({ estado: 'parado' });
           }}
         />
       )}
@@ -1526,6 +1642,7 @@ export function PaginaDetalhePedido() {
           carregandoUltimo={false}
           ocupado={salvandoNumero}
           erro={erroDaCorrecao}
+          exemplo={exemploDoNumero}
           onConfirmar={(n) => void corrigirNumero(n)}
           onCancelar={() => setCorrigindoNumero(false)}
         />

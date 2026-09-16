@@ -271,6 +271,290 @@ describe('lançar no ERP pela tela', () => {
   }, 60_000);
 });
 
+// ─── Solicitar ao Control (049) ──────────────────────────────────────────────
+
+describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
+  const SOLICITADO_EM = '2026-09-16T13:00:00.000Z';
+  const aprovado = (extra: Record<string, unknown> = {}) => ({
+    data: {
+      id: 'o1',
+      order_number: 5,
+      status: 'approved',
+      rep_id: REP,
+      invoiced: false,
+      erp_order_id: null,
+      erp_requested_at: null,
+      ...extra,
+    },
+    error: null,
+  });
+  const GRAVOU = { data: [{ id: 'o1' }], error: null };
+  const NINGUEM = { data: [], error: null };
+  const QUEM = { id: 'fin-1', nome: 'Financeiro Teste' };
+
+  it('grava erp_requested_at/by com o mesmo updated_at, só se o pedido continua aprovado, sem número e não solicitado — e deixa o evento', async () => {
+    const { solicitarLancamentoNoErp, fake } = await servicoDePedidos({
+      orders: [aprovado(), VAZIO, GRAVOU],
+      companies: CANAIS_API,
+    });
+
+    const r = await solicitarLancamentoNoErp('o1', EMPRESA, QUEM);
+
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.ja_solicitado).toBe(false);
+    const gravado = valores(fake, 'orders', 'update')!;
+    expect(typeof gravado['erp_requested_at']).toBe('string');
+    expect(gravado['erp_requested_by']).toBe('fin-1');
+    expect(gravado['updated_at']).toBe(gravado['erp_requested_at']);
+    expect(r.ok && r.solicitado_em).toBe(gravado['erp_requested_at']);
+    // Status NUNCA muda aqui: o pedido vira sent_erp quando o Control confirmar.
+    expect(Object.keys(gravado)).not.toContain('status');
+    expect(Object.keys(gravado)).not.toContain('erp_order_id');
+
+    const eqs = fake.filtrosDe('orders', 'eq').map((f) => f.args);
+    expect(eqs).toContainEqual(['company_id', EMPRESA]);
+    expect(eqs).toContainEqual(['status', 'approved']);
+    const iss = fake.filtrosDe('orders', 'is').map((f) => f.args);
+    expect(iss).toContainEqual(['erp_order_id', null]);
+    expect(iss).toContainEqual(['erp_requested_at', null]);
+
+    expect(valores(fake, 'order_erp_events', 'insert')).toMatchObject({
+      company_id: EMPRESA,
+      order_id: 'o1',
+      order_number: 5,
+      tipo: 'solicitado_ao_erp',
+      origem: 'tela',
+      por: 'fin-1',
+      por_nome: 'Financeiro Teste',
+      depois: { erp_order_id: null, status: 'approved' },
+    });
+  });
+
+  it('já solicitado: responde ok com o momento de antes, sem gravar e sem evento (idempotente)', async () => {
+    const { solicitarLancamentoNoErp, fake } = await servicoDePedidos({
+      orders: aprovado({ erp_requested_at: SOLICITADO_EM }),
+      companies: CANAIS_API,
+    });
+
+    expect(await solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: true,
+      solicitado_em: SOLICITADO_EM,
+      ja_solicitado: true,
+    });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+  });
+
+  it.each([
+    ['já tem número', { erp_order_id: NUMERO, status: 'sent_erp' }, { reason: 'ja_lancado', erp_order_id: NUMERO }],
+    ['já faturado', { invoiced: true }, { reason: 'ja_faturado' }],
+    ['ainda na fila', { status: 'pending_approval' }, { reason: 'nao_aprovado' }],
+    ['recusado', { status: 'rejected' }, { reason: 'nao_aprovado' }],
+  ])('pedido %s é recusado antes do canal e nada é gravado', async (_nome, extra, esperado) => {
+    const { solicitarLancamentoNoErp, fake } = await servicoDePedidos({
+      orders: aprovado(extra),
+      companies: CANAIS_API,
+    });
+
+    expect(await solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, ...esperado });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(fake.filtrosDe('companies')).toHaveLength(0);
+  });
+
+  it('pedido que não existe (ou de outra empresa) é not_found; falha de banco na leitura é erro, não 404', async () => {
+    const semPedido = await servicoDePedidos({ orders: VAZIO, companies: CANAIS_API });
+    expect(await semPedido.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'not_found' });
+
+    vi.resetModules();
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const caiu = await servicoDePedidos({
+      orders: { data: null, error: { message: 'fetch failed', code: '' } },
+      companies: CANAIS_API,
+    });
+    expect(await caiu.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'erro' });
+    expect(caiu.fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('com o canal manual é canal_manual: aí o caminho é digitar o número, como hoje', async () => {
+    // Sem linha em `companies`: valem os padrões (manual).
+    const { solicitarLancamentoNoErp, fake } = await servicoDePedidos({ orders: aprovado() });
+
+    expect(await solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'canal_manual' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('banco sem resposta sobre o canal é canal_indisponivel — nada gravado', async () => {
+    const { solicitarLancamentoNoErp, fake } = await servicoDePedidos({
+      orders: aprovado(),
+      companies: { data: null, error: { message: 'fetch failed', code: '' } },
+    });
+
+    expect(await solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'canal_indisponivel' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('sem a 049 (coluna ausente) é sem_migracao; sonda sem resposta é "tente de novo", nunca "migração pendente"', async () => {
+    const semColuna = await servicoDePedidos(
+      { orders: aprovado(), companies: CANAIS_API },
+      [...FORA_DO_ASSUNTO, 'orders.erp_requested_at'],
+    );
+    expect(await semColuna.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'sem_migracao' });
+    expect(semColuna.fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+
+    vi.resetModules();
+    const fake = criarSupabaseFake({ orders: aprovado(), companies: CANAIS_API } as never);
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    vi.doMock('../apps/api/src/lib/detectarColuna.js', () => ({
+      detectar: async () => true,
+      detectarOuFalhar: async () => true,
+      detectarComCerteza: async (t: string, c?: string) =>
+        t === 'orders' && c === 'erp_requested_at' ? 'nao_sei' : 'existe',
+      esquecerDeteccoes: () => {},
+    }));
+    const { solicitarLancamentoNoErp } = await import('../apps/api/src/modules/orders/orders.service.js');
+    expect(await solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'canal_indisponivel' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('corrida: ninguém afetado porque outro clique solicitou no meio → ok já solicitado; porque o Control confirmou → já lançado', async () => {
+    const outroClique = await servicoDePedidos({
+      orders: [aprovado(), VAZIO, NINGUEM, VAZIO, aprovado({ erp_requested_at: SOLICITADO_EM })],
+      companies: CANAIS_API,
+    });
+    expect(await outroClique.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: true,
+      solicitado_em: SOLICITADO_EM,
+      ja_solicitado: true,
+    });
+    // Este clique não gravou: não deixa evento.
+    expect(outroClique.fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+
+    vi.resetModules();
+    const confirmou = await servicoDePedidos({
+      orders: [aprovado(), VAZIO, NINGUEM, VAZIO, aprovado({ erp_order_id: NUMERO, status: 'sent_erp' })],
+      companies: CANAIS_API,
+    });
+    expect(await confirmou.solicitarLancamentoNoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: false,
+      reason: 'ja_lancado',
+      erp_order_id: NUMERO,
+    });
+  });
+
+  it('o rastro que falha não muda a resposta: a solicitação já está gravada', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { solicitarLancamentoNoErp } = await servicoDePedidos({
+      orders: [aprovado(), VAZIO, GRAVOU],
+      companies: CANAIS_API,
+      order_erp_events: { data: null, error: { message: 'insert recusado' } },
+    });
+
+    const r = await solicitarLancamentoNoErp('o1', EMPRESA, QUEM);
+
+    expect(r.ok).toBe(true);
+    expect(erro).toHaveBeenCalled();
+  });
+
+  it('a rota PATCH /orders/:id/solicitar-erp: financeiro solicita (200), gerente não (403)', async () => {
+    const { app, fake } = await subirApp({ orders: [aprovado(), VAZIO, GRAVOU], companies: CANAIS_API });
+    try {
+      const negado = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/solicitar-erp',
+        headers: { authorization: `Bearer ${TOKEN_GERENTE}` },
+      });
+      expect(negado.statusCode).toBe(403);
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/solicitar-erp',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const corpo = res.json() as { data: { solicitado_em: string; ja_solicitado: boolean } };
+      expect(typeof corpo.data.solicitado_em).toBe('string');
+      expect(corpo.data.ja_solicitado).toBe(false);
+      expect(valores(fake, 'orders', 'update')).toMatchObject({ erp_requested_by: 'fin-1' });
+      expect(valores(fake, 'order_erp_events', 'insert')).toMatchObject({ por_nome: 'Financeiro Teste' });
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it.each([
+    ['canal manual', {}, 409, 'CANAL_MANUAL'],
+    ['sem a 049', { ausentes: [...FORA_DO_ASSUNTO, 'orders.erp_requested_at'] }, 503, 'MIGRACAO_PENDENTE'],
+    ['já com número', { pedido: { erp_order_id: NUMERO, status: 'sent_erp' } }, 409, 'ORDER_HAS_ERP_NUMBER'],
+  ])('a rota traduz "%s" em %i %s', async (_nome, caso, status, code) => {
+    const c = caso as { ausentes?: string[]; pedido?: Record<string, unknown> };
+    const { app } = await subirApp(
+      { orders: aprovado(c.pedido ?? {}), ...(c.pedido || c.ausentes ? { companies: CANAIS_API } : {}) },
+      c.ausentes,
+    );
+    try {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/solicitar-erp',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+      });
+      expect(res.statusCode).toBe(status);
+      expect((res.json() as { code: string }).code).toBe(code);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it('GET /orders/:id devolve os canais da empresa e o bloco solicitacao_erp — é o que a tela consulta a cada 3 s', async () => {
+    const { app } = await subirApp({
+      orders: aprovado({ company_id: EMPRESA, erp_requested_at: SOLICITADO_EM, erp_requested_by: 'fin-1' }),
+      companies: CANAIS_API,
+    });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/orders/o1',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+      });
+      expect(res.statusCode).toBe(200);
+      const corpo = res.json() as { data: Record<string, unknown> };
+      expect(corpo.data).toMatchObject({
+        erp_order_id: null,
+        erp_requested_at: SOLICITADO_EM,
+        solicitacao_erp: { solicitado_em: SOLICITADO_EM, solicitado_por: 'fin-1' },
+        canais: { pedido_erp: 'api', faturamento: 'api' },
+      });
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it('lançar pela tela SEM número com o canal na API aponta para o solicitar (409 LANCAMENTO_PELO_CONTROL), sem gravar', async () => {
+    const { updateOrderStatus, fake } = await servicoDePedidos({ orders: aprovado(), companies: CANAIS_API });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '' }, 'financeiro'),
+    ).rejects.toThrow('LANCAMENTO_PELO_CONTROL');
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+
+    vi.resetModules();
+    const { app } = await subirApp({ orders: aprovado(), companies: CANAIS_API });
+    try {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/status',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+        payload: { status: 'sent_erp' },
+      });
+      expect(res.statusCode).toBe(409);
+      const corpo = res.json() as { code: string; error: string };
+      expect(corpo.code).toBe('LANCAMENTO_PELO_CONTROL');
+      expect(corpo.error).toMatch(/Lançar no Control/);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+});
+
 // ─── Corrigir o número ───────────────────────────────────────────────────────
 
 describe('corrigir o número do Control', () => {
@@ -351,20 +635,37 @@ describe('botão manual de faturado', () => {
     expect(fake.ultimaGravacao('customers', 'update')).toBeUndefined();
   });
 
-  it('com o faturamento na API, pedido SEM número segue como hoje', async () => {
+  it('com o faturamento na API, pedido SEM número também é recusado — o botão some para todos (decisão 11)', async () => {
     const { setOrderInvoiced, fake } = await servicoDePedidos({
-      orders: [
-        pedido({ erp_order_id: null }),
-        VAZIO,
-        pedido({ erp_order_id: null, invoiced: true, invoiced_at: '2026-08-13T15:00:00.000Z' }),
-      ],
+      orders: pedido({ erp_order_id: null }),
       companies: CANAIS_API,
     });
 
     const r = await setOrderInvoiced('o1', EMPRESA, true, { por: 'fin-1' });
 
-    expect(r.ok && r.mudou).toBe(true);
-    expect(valores(fake, 'orders', 'update')).toMatchObject({ invoiced: true });
+    expect(r).toEqual({ ok: false, reason: 'faturamento_pelo_control' });
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+  });
+
+  it('com o faturamento na API, a venda interna não carimba o próprio pedido, e ninguém desmarca', async () => {
+    const vendaInterna = await servicoDePedidos({ orders: pedido({ erp_order_id: null }), companies: CANAIS_API });
+    expect(await vendaInterna.setOrderInvoiced('o1', EMPRESA, true, { somenteDoRep: REP, por: REP })).toEqual({
+      ok: false,
+      reason: 'faturamento_pelo_control',
+    });
+    expect(vendaInterna.fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+
+    vi.resetModules();
+    const desmarcar = await servicoDePedidos({
+      orders: pedido({ invoiced: true, invoiced_at: '2026-08-01T12:00:00.000Z' }),
+      companies: CANAIS_API,
+    });
+    expect(await desmarcar.setOrderInvoiced('o1', EMPRESA, false, { por: 'fin-1' })).toEqual({
+      ok: false,
+      reason: 'faturamento_pelo_control',
+    });
+    expect(desmarcar.fake.ultimaGravacao('orders', 'update')).toBeUndefined();
   });
 
   it('sem a 048 o botão carimba pedido COM número e nem lê companies', async () => {

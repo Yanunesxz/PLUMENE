@@ -13,6 +13,7 @@ import {
   setNotesHandler,
   ultimoNumeroErpHandler,
   corrigirNumeroErpHandler,
+  solicitarErpHandler,
   erpSyncHandler,
   deleteOrderHandler,
   listDeletedOrdersHandler,
@@ -99,6 +100,14 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/orders/:id/numero-erp',
     { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
     corrigirNumeroErpHandler,
+  );
+  // "Lançar no Control" com o canal de pedidos na API (049): o financeiro
+  // SOLICITA e o número chega pela confirmação do Control. Mesmos papéis do
+  // lançamento à mão: quem lança (financeiro; admin como válvula).
+  fastify.patch(
+    '/orders/:id/solicitar-erp',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    solicitarErpHandler,
   );
   // "Atualizar no ERP" (046): a venda interna editou as peças de um pedido que
   // já está no Control e avisa a fábrica; quem mexe no Control confirma depois.

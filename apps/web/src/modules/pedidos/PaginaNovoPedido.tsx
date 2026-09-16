@@ -56,7 +56,9 @@ export function PaginaNovoPedido() {
   const [gradeEmEdicao, setGradeEmEdicao] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
+  // O bloqueado no Control continua na lista: o bloqueio não trava o
+  // representante (decisão 8 de 16/09/2026) — a tela avisa e o pedido segue.
+  const customers = useLiveQuery(() => db.customers.toArray(), []);
   const condicoes = useCondicoesDePagamento();
   // Booleano não é chave indexável no IndexedDB — lemos tudo e filtramos em memória.
   const allProducts = useLiveQuery(() => db.products.toArray(), []);
@@ -322,9 +324,7 @@ export function PaginaNovoPedido() {
       ? 'Selecione o cliente para enviar o pedido.'
       : items.length === 0
       ? 'Adicione ao menos um produto para enviar o pedido.'
-      : selectedCustomer?.blocked
-        ? 'Este cliente está bloqueado. Escolha outro para continuar.'
-        : null;
+      : null;
 
   /**
    * O botão não envia direto: abre a confirmação da tabela.
@@ -469,7 +469,11 @@ export function PaginaNovoPedido() {
               }))}
             />
             {selectedCustomer?.blocked ? (
-              <p className="text-xs text-danger">Este cliente está bloqueado.</p>
+              <p className="text-xs text-warn-soft-foreground">
+                Cliente bloqueado no Control
+                {selectedCustomer.block_reason ? ` (${selectedCustomer.block_reason})` : ''}. O pedido segue; o
+                financeiro é avisado na hora de decidir.
+              </p>
             ) : !customerId ? (
               <p className="text-xs text-muted-foreground">
                 Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.

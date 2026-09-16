@@ -701,7 +701,7 @@ export function PaginaClientes() {
               {/* Atalho para vender direto, sem passar pela ficha. A tabela e o
                   botão de trocar vivem na ficha: aqui já são três alvos de
                   toque, e um quarto no celular vira erro de dedo. */}
-              {!customer.blocked && user?.role !== 'relacionamento' && (
+              {user?.role !== 'relacionamento' && (
                 <button
                   type="button"
                   onClick={() => void navigate(`/orders/new?customer_id=${customer.id}`)}

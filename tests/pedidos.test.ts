@@ -82,17 +82,19 @@ describe('criação de pedido', () => {
     expect(itens[0]!.total).toBe(150);
   });
 
-  it('recusa pedido para cliente bloqueado', async () => {
+  it('cliente bloqueado no Control NÃO trava o pedido (decisão 8 de 16/09/2026) — segue para o preço', async () => {
     const { createOrder } = await carregarServico({
-      customers: { data: { id: 'c1', blocked: true }, error: null },
+      customers: { data: { id: 'c1', blocked: true, price_table_id: null }, error: null },
+      product_prices: { data: [], error: null },
     });
 
+    // Passou do cliente: o que barra aqui é o item sem preço, não o bloqueio.
     await expect(
       createOrder(EMPRESA, REP, TABELA, {
         customer_id: 'c1',
         items: [{ product_id: 'p1', quantity: 1, unit_price: 50 }],
       }),
-    ).rejects.toThrow('CUSTOMER_BLOCKED');
+    ).rejects.toThrow('PRICE_NOT_FOUND');
   });
 
   it('recusa item sem preço na tabela do representante', async () => {

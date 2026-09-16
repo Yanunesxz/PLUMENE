@@ -408,26 +408,26 @@ export function PaginaCliente() {
           )}
         </dl>
 
-        {!cliente.blocked && (
-          <div className="mt-4 flex flex-wrap gap-2">
-            {/* O relacionamento não vende — seleciona e encaminha. */}
-            {user?.role !== 'relacionamento' && (
-              <Button onClick={() => void navigate(`/orders/new?customer_id=${cliente.id}`)}>
-                <ShoppingCart className="h-4 w-4" strokeWidth={2.5} />
-                Novo pedido
-              </Button>
-            )}
-            {/* O fluxo da Bruna: ligou pro cliente parado, combinou a visita,
-                marca aqui — cai na Minha Área do representante dono da
-                carteira, que dá o OK. Só o escritório vê este botão. */}
-            {ehEscritorio && (
-              <Button variant="outline" onClick={() => setMarcando((v) => !v)}>
-                <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
-                {marcando ? 'Cancelar' : 'Marcar visita pro rep'}
-              </Button>
-            )}
-          </div>
-        )}
+        {/* Bloqueado no Control não trava a venda (decisão 8 de 16/09/2026):
+            o botão fica, o selo acima avisa. */}
+        <div className="mt-4 flex flex-wrap gap-2">
+          {/* O relacionamento não vende — seleciona e encaminha. */}
+          {user?.role !== 'relacionamento' && (
+            <Button onClick={() => void navigate(`/orders/new?customer_id=${cliente.id}`)}>
+              <ShoppingCart className="h-4 w-4" strokeWidth={2.5} />
+              Novo pedido
+            </Button>
+          )}
+          {/* O fluxo da Bruna: ligou pro cliente parado, combinou a visita,
+              marca aqui — cai na Minha Área do representante dono da
+              carteira, que dá o OK. Só o escritório vê este botão. */}
+          {ehEscritorio && (
+            <Button variant="outline" onClick={() => setMarcando((v) => !v)}>
+              <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
+              {marcando ? 'Cancelar' : 'Marcar visita pro rep'}
+            </Button>
+          )}
+        </div>
 
         {marcando && (
           <form
