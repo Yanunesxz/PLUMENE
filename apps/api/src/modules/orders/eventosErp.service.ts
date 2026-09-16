@@ -71,6 +71,11 @@ export type OrigemDoNumero = (typeof ORIGENS_DO_NUMERO)[number];
  */
 export const CAMPOS_DO_RASTRO = [
   'erp_order_id',
+  // A solicitação ao Control (049): quando e quem do financeiro pediu. O
+  // cancelamento apaga as duas colunas do pedido, e é o rastro que guarda a
+  // solicitação que deixou de existir.
+  'erp_requested_at',
+  'erp_requested_by',
   'status',
   'invoiced',
   'invoiced_at',

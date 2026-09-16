@@ -1123,6 +1123,7 @@ interface PedidoParaSolicitar {
   invoiced?: boolean | null;
   erp_order_id: string | null;
   erp_requested_at?: string | null;
+  erp_requested_by?: string | null;
 }
 
 /**
@@ -1246,7 +1247,7 @@ export async function solicitarLancamentoNoErp(
     por: quem.id,
     por_nome: quem.nome ?? null,
     antes: null,
-    depois: { erp_order_id: null, status: 'approved' },
+    depois: { erp_order_id: null, erp_requested_at: agora, erp_requested_by: quem.id, status: 'approved' },
   });
   return { ok: true, solicitado_em: agora, ja_solicitado: false };
 }
@@ -1280,7 +1281,12 @@ export type CancelarSolicitacaoResult =
  * AINDA está solicitado e sem número (o número pode chegar entre a leitura e a
  * gravação: ninguém afetado → relê → JA_IMPORTADO com o número) → evento
  * 'solicitacao_cancelada', que só existe no CHECK depois da 050 — sem a 050
- * o cancelamento acontece sem evento.
+ * o cancelamento acontece sem evento, e o console guarda o carimbo apagado.
+ *
+ * O app não sabe se o Control já puxou o pedido da fila (entre a leitura e a
+ * confirmação ele continua sem número). Cancelar não recusa a confirmação que
+ * vier depois: o POST /partner/v1/pedidos/:id/confirmar aceita o aprovado que
+ * já foi solicitado, e o número vence (revisão de 16/09/2026, à tarde).
  */
 export async function cancelarSolicitacaoAoErp(
   id: string,
@@ -1332,9 +1338,11 @@ export async function cancelarSolicitacaoAoErp(
   }
 
   // O rastro. 'solicitacao_cancelada' só é aceito pelo CHECK depois da 050, e
-  // a 050 é a que cria deleted_customers: é por ela que se sabe. Sem a 050 (ou
-  // sem resposta sobre ela), o cancelamento fica sem evento — ele já está
-  // gravado e o evento nunca derruba quem chamou.
+  // a 050 é a que cria deleted_customers: é por ela que se sabe. O evento leva
+  // a solicitação que foi apagada (quando e quem), que o pedido deixou de ter.
+  // Sem a 050 (ou sem resposta sobre ela), o cancelamento fica sem evento — ele
+  // já está gravado e o evento nunca derruba quem chamou — e o carimbo apagado
+  // fica ao menos no log (só ids e o momento).
   if (await detectar('deleted_customers', 'id')) {
     await registrarEventoErp({
       company_id,
@@ -1344,9 +1352,18 @@ export async function cancelarSolicitacaoAoErp(
       origem: 'tela',
       por: quem.id,
       por_nome: quem.nome ?? null,
-      antes: { erp_order_id: null, status: o.status },
-      depois: { erp_order_id: null, status: o.status },
+      antes: {
+        erp_order_id: null,
+        erp_requested_at: o.erp_requested_at,
+        erp_requested_by: o.erp_requested_by ?? null,
+        status: o.status,
+      },
+      depois: { erp_order_id: null, erp_requested_at: null, erp_requested_by: null, status: o.status },
     });
+  } else {
+    console.warn(
+      `[cancelar-solicitacao] pedido ${id}: solicitação de ${o.erp_requested_at} (por ${o.erp_requested_by ?? 'desconhecido'}) cancelada por ${quem.id}, sem evento (migração 050 ausente ou sem resposta do banco)`,
+    );
   }
   return { ok: true, solicitado_em: o.erp_requested_at, ja_cancelado: false };
 }

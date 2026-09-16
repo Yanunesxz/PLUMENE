@@ -329,7 +329,13 @@ describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
       origem: 'tela',
       por: 'fin-1',
       por_nome: 'Financeiro Teste',
-      depois: { erp_order_id: null, status: 'approved' },
+    });
+    // O rastro diz quando e quem solicitou: o cancelamento apaga isso do pedido.
+    expect(valores(fake, 'order_erp_events', 'insert')!['depois']).toEqual({
+      erp_order_id: null,
+      erp_requested_at: gravado['erp_requested_at'],
+      erp_requested_by: 'fin-1',
+      status: 'approved',
     });
   });
 
@@ -646,14 +652,27 @@ describe('cancelar a solicitação ao Control (PATCH /orders/:id/cancelar-solici
       origem: 'tela',
       por: 'fin-1',
       por_nome: 'Financeiro Teste',
-      antes: { erp_order_id: null, status: 'approved' },
-      depois: { erp_order_id: null, status: 'approved' },
+    });
+    // O rastro guarda a solicitação que o pedido deixou de ter: quando e quem.
+    const evento = valores(fake, 'order_erp_events', 'insert')!;
+    expect(evento['antes']).toEqual({
+      erp_order_id: null,
+      erp_requested_at: SOLICITADO_EM,
+      erp_requested_by: 'fin-1',
+      status: 'approved',
+    });
+    expect(evento['depois']).toEqual({
+      erp_order_id: null,
+      erp_requested_at: null,
+      erp_requested_by: null,
+      status: 'approved',
     });
     // Status nunca muda, e o canal nem é consultado.
     expect(fake.filtrosDe('companies')).toHaveLength(0);
   });
 
-  it('sem a 050 (deleted_customers ausente): o cancelamento acontece, sem evento', async () => {
+  it('sem a 050 (deleted_customers ausente): o cancelamento acontece, sem evento — e o carimbo apagado fica no log, só com ids', async () => {
+    const aviso = vi.spyOn(console, 'warn').mockImplementation(() => {});
     const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos(
       { orders: [solicitado(), VAZIO, GRAVOU] },
       [...FORA_DO_ASSUNTO, 'deleted_customers'],
@@ -666,6 +685,12 @@ describe('cancelar a solicitação ao Control (PATCH /orders/:id/cancelar-solici
     });
     expect(valores(fake, 'orders', 'update')).toMatchObject({ erp_requested_at: null, erp_requested_by: null });
     expect(fake.ultimaGravacao('order_erp_events')).toBeUndefined();
+    expect(aviso).toHaveBeenCalledTimes(1);
+    const linha = String(aviso.mock.calls[0]![0]);
+    expect(linha).toContain('o1');
+    expect(linha).toContain(SOLICITADO_EM);
+    expect(linha).toContain('fin-1');
+    expect(linha).not.toContain('Financeiro Teste');
   });
 
   it('o rastro que falha não muda a resposta: o cancelamento já está gravado', async () => {
