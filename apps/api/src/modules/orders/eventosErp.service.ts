@@ -26,7 +26,9 @@ import { detectar } from '../../lib/detectarColuna.js';
  * precisam ser as mesmas (tests/migracao-048.test.ts e tests/migracao-049.test.ts
  * conferem). Os três últimos só existem no banco depois da 049: gravar um deles
  * antes dela é recusado pelo CHECK e vira 'falhou' (fica no console, nunca
- * derruba quem chamou).
+ * derruba quem chamou). 'excluido_pelo_erp' continua na lista (é a do banco),
+ * mas a exclusão avisada pelo Control grava 'excluido' com origem 'api' —
+ * decisão 12, e o rastro não depende da 049 (revisão de 16/09/2026).
  */
 export const TIPOS_DE_EVENTO_ERP = [
   'numero_gravado',

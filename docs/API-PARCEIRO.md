@@ -680,15 +680,19 @@ Pedido com número do Control **não pode ser excluído pela tela do app** (nem
 pelo administrador): apagar de um lado só deixaria o outro com um pedido
 fantasma. O caminho é este: quando o seu ERP exclui o pedido, avisa aqui e o
 app exclui também — guardando uma cópia no histórico de excluídos, com o nome
-do parceiro como quem excluiu, e o rastro `excluido_pelo_erp` com o `motivo`
-(opcional, até 500 caracteres). Exige o canal de pedidos ligado para a API.
-Funciona com ou sem número do Control.
+do parceiro como quem excluiu, e o rastro `excluido` (origem `api`) com o
+`motivo` (opcional, até 500 caracteres). Exige o canal de pedidos ligado para a
+API. **Só vale para pedido que o Control tem:** com número do Control, ou
+solicitado ao Control pelo financeiro (está na fila, ou você o importou e
+excluiu antes de confirmar). Rascunho, pedido aguardando aceite e aprovado que
+ninguém mandou lançar não são excluídos por aqui (`409 ORDER_NOT_IN_CONTROL`).
 
 | Resposta | `code` | Significado |
 |---|---|---|
 | `200 {"ok":true,"excluido_em":"…"}` | — | Apagado agora |
 | `404` | `ORDER_NOT_FOUND` | Não existe pedido com esse `id` na sua empresa (ou já foi apagado — repetir é seguro) |
-| `409` | `ORDER_INVOICED` | Pedido **faturado** não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (`POST /faturamento` com `"faturado": false`) |
+| `409` | `ORDER_INVOICED` | Pedido **faturado** não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (`POST /faturamento` com `"faturado": false`). Também quando o faturamento chega no mesmo instante da exclusão: nada é apagado |
+| `409` | `ORDER_NOT_IN_CONTROL` | O pedido não tem número do Control e não foi solicitado: o Control nunca o recebeu, e o app não o exclui por aviso |
 | `409` | `CANAL_FECHADO` | Canal de pedidos não ligado para a API |
 | `500` | `SEM_COPIA` | A cópia do histórico não gravou — **o pedido não foi apagado**; tente de novo |
 | `500` | `INTERNAL_ERROR` | O banco recusou apagar — tente de novo |
@@ -1157,6 +1161,7 @@ Toda resposta de erro tem o formato `{ "error": "<mensagem>", "code":
 | `400` | `INVALID_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Número fora do formato (duas letras e até 10 dígitos) |
 | `404` | `ORDER_NOT_FOUND` | `POST /confirmar`, `POST /conciliar`, `POST /excluir` | Não há pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID) |
 | `409` | `ORDER_INVOICED` | `POST /excluir` | Pedido faturado não é excluído; desfaça o faturamento antes |
+| `409` | `ORDER_NOT_IN_CONTROL` | `POST /excluir` | Pedido sem número do Control e não solicitado: o Control nunca o recebeu |
 | `500` | `SEM_COPIA` | `POST /excluir` | A cópia do histórico não gravou; o pedido **não** foi apagado — tente de novo |
 | `400` | `MISSING_CONCLUIDA` | `POST /sincronizacao` | Falta `"concluida": true` |
 | `400` | `INVALID_SOLICITADO_EM` | `POST /sincronizacao` | `solicitado_em` sem fuso ou fora do formato |

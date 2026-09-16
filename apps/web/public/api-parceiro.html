@@ -1682,9 +1682,12 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             o outro com um pedido fantasma. Quando o seu ERP exclui o pedido,
             avisa aqui — corpo <code>{ "motivo": "cliente desistiu" }</code>
             (opcional) — e o aplicativo exclui também, guardando uma cópia no
-            histórico de excluídos com o nome do parceiro como quem excluiu.
-            Exige o canal de pedidos ligado para a API. Funciona com ou sem número
-            do Control.
+            histórico de excluídos com o nome do parceiro como quem excluiu e o
+            rastro <code>excluido</code> (origem <code>api</code>) com o motivo.
+            Exige o canal de pedidos ligado para a API. <b>Só vale para pedido que
+            o Control tem:</b> com número do Control, ou solicitado ao Control pelo
+            financeiro. Rascunho, pedido aguardando aceite e aprovado que ninguém
+            mandou lançar não são excluídos por aqui.
           </p>
           <div class="tw">
             <table>
@@ -1694,7 +1697,8 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
               <tbody>
                 <tr><td><span class="st ok">200</span> <code>{ ok, excluido_em }</code></td><td class="t-mut">—</td><td>Apagado agora.</td></tr>
                 <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>Não existe pedido com esse <code>id</code> na sua empresa, ou já foi apagado — repetir é seguro.</td></tr>
-                <tr><td><span class="st wr">409</span></td><td><code>ORDER_INVOICED</code></td><td>Pedido <b>faturado</b> não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (<code>POST /faturamento</code> com <code>"faturado": false</code>).</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ORDER_INVOICED</code></td><td>Pedido <b>faturado</b> não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (<code>POST /faturamento</code> com <code>"faturado": false</code>). Também quando o faturamento chega no mesmo instante: nada é apagado.</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>Sem número do Control e não solicitado: o Control nunca recebeu este pedido, e o aplicativo não o exclui por aviso.</td></tr>
                 <tr><td><span class="st wr">409</span></td><td><code>CANAL_FECHADO</code></td><td>Canal de pedidos não ligado para a API.</td></tr>
                 <tr><td><span class="st er">500</span></td><td><code>SEM_COPIA</code></td><td>A cópia do histórico não gravou — <b>o pedido não foi apagado</b>; tente de novo.</td></tr>
               </tbody>
@@ -3486,6 +3490,7 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Número fora do formato (duas letras e até 10 dígitos).</td></tr>
             <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>POST /confirmar, POST /conciliar, POST /excluir</td><td>Não há pedido com esse <code>id</code> na sua empresa.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_INVOICED</code></td><td>POST /excluir</td><td>Pedido faturado não é excluído; desfaça o faturamento antes.</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>POST /excluir</td><td>Pedido sem número do Control e não solicitado: o Control nunca o recebeu.</td></tr>
             <tr><td><span class="st er">500</span></td><td><code>SEM_COPIA</code></td><td>POST /excluir</td><td>A cópia do histórico não gravou; o pedido <b>não</b> foi apagado — tente de novo.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>MISSING_CONCLUIDA</code>, <code>INVALID_SOLICITADO_EM</code></td><td>POST /sincronizacao</td><td>Falta <code>"concluida": true</code>, ou <code>solicitado_em</code> sem fuso.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>POST /confirmar, POST /conciliar</td><td>Já tem outro número (<code>pedido_erp_atual</code>).</td></tr>

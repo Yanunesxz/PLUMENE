@@ -100,12 +100,14 @@ function motivoDoCorpo(corpo: unknown): string | null {
 /**
  * POST /partner/v1/pedidos/:id/excluir { motivo } — o Control excluiu o pedido
  * do lado dele e avisa; o app exclui aqui, com a cópia em deleted_orders e o
- * evento 'excluido_pelo_erp'. Funciona mesmo com número do Control (é o único
- * caminho que apaga um pedido com número: pela tela ninguém pode).
+ * evento 'excluido' (origem api). É o único caminho que apaga um pedido com
+ * número (pela tela ninguém pode) — e só apaga o que o Control tem: com número
+ * dele, ou solicitado ao Control pelo financeiro.
  *
  *   200 { ok, excluido_em }   apagado
  *   404 ORDER_NOT_FOUND       não existe nesta empresa (ou já foi apagado)
  *   409 ORDER_INVOICED        faturado: desfaça o faturamento antes
+ *   409 ORDER_NOT_IN_CONTROL  sem número do Control e não solicitado: o Control nunca o recebeu
  *   500 SEM_COPIA             a cópia da 040 não gravou — nada foi apagado
  *   500 INTERNAL_ERROR        o banco recusou apagar
  */
@@ -134,6 +136,14 @@ export async function partnerExcluirPedidoHandler(
       await responder(request, reply, 409, {
         error: 'Pedido faturado não é excluído — desfaça o faturamento (POST /faturamento com "faturado": false) antes',
         code: 'ORDER_INVOICED',
+        statusCode: 409,
+      });
+      return;
+    case 'fora_do_control':
+      await responder(request, reply, 409, {
+        error:
+          'Este pedido não está no Control (sem número do Control e não solicitado pelo financeiro) — o aplicativo não o exclui por aviso do Control',
+        code: 'ORDER_NOT_IN_CONTROL',
         statusCode: 409,
       });
       return;

@@ -105,7 +105,7 @@ As treze decisões abaixo fecham as perguntas 1, 7, 9, 10, 11, 13, 16 e 20 do §
 9. **E-mail do Control para representante** vai em `users.erp_email`; o login não muda.
 10. **Cores são internas:** nada muda (continuam na observação do item, `cor` sempre `00001`).
 11. **Com `canal_faturamento='api'` o botão manual de faturado some/é recusado para todos** (`409 FATURAMENTO_PELO_CONTROL`), não só para pedido com número.
-12. **Exclusão de pedido com número do Control é bloqueada para todos, inclusive admin.** Se o Control excluir, ele avisa por `POST /partner/v1/pedidos/:id/excluir { motivo }` e o app exclui (cópia em `deleted_orders` com `deleted_by_name` = nome do parceiro, evento `excluido_pelo_erp`, origem `api`).
+12. **Exclusão de pedido com número do Control é bloqueada para todos, inclusive admin.** Se o Control excluir, ele avisa por `POST /partner/v1/pedidos/:id/excluir { motivo }` e o app exclui (cópia em `deleted_orders` com `deleted_by_name` = nome do parceiro, evento `excluido`, origem `api` — o tipo `excluido_pelo_erp` só existe depois da 049 e o rastro se perderia num banco sem ela). Só vale para pedido que o Control tem: com número dele ou solicitado pelo financeiro (senão `409 ORDER_NOT_IN_CONTROL`).
 13. **Comissão é do gerente, não do Control;** representante do pedido = dono da carteira (nada muda).
 
 O que ainda depende do Yan, além dos passos de 0.5: rodar a **049** nos dois bancos **depois** da 048 (`_tools/SQL-PARA-RODAR-049.sql`, conferir com `node _tools/conferir-049.mjs [raiz da PLUMENE]`) — sem ela tudo degrada para o comportamento de hoje; e criar o aviso ao financeiro da decisão 8.

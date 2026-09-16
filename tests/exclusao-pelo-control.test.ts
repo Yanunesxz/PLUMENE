@@ -8,12 +8,16 @@ import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
  * Pela tela ninguém apaga pedido com número do Control (nem o admin). Quando o
  * Control exclui do lado dele, avisa aqui e o app apaga — com a cópia em
  * deleted_orders no MESMO formato do deleteOrder da tela, deleted_by_name = o
- * parceiro, e o evento 'excluido_pelo_erp' com o motivo.
+ * parceiro, e o evento 'excluido' (origem api) com o motivo.
  *
  * O que fica trancado:
- *   1. funciona com número do Control; a cópia vai antes do DELETE e é obrigatória
- *      com a 040 no ar (não gravou = não apaga); sem a 040, apaga como sempre;
+ *   1. funciona com número do Control (ou solicitado ao Control); a cópia vai
+ *      antes do DELETE e é obrigatória com a 040 no ar (não gravou = não apaga);
+ *      sem a 040, apaga como sempre; só o pedido é apagado (cascata);
  *   2. pedido faturado não é apagado; id inexistente (ou malformado) é not_found;
+ *      o que o Control nunca recebeu (rascunho, aprovado não solicitado) é
+ *      fora_do_control; o DELETE repete as condições e, se não apagar, a cópia
+ *      sai do histórico;
  *   3. sempre dentro da empresa da chave;
  *   4. a rota: canal de pedidos em 'api', 404/409/500 com os códigos, 200 { ok, excluido_em }.
  *
@@ -63,12 +67,14 @@ afterEach(() => {
 });
 
 describe('excluirPedidoPeloControl', () => {
-  it('com número do Control: copia (parceiro como quem apagou), apaga as peças e o pedido, e deixa o rastro', async () => {
+  /** O DELETE que apagou: devolve a linha (o `.select('id')` depois do delete). */
+  const APAGOU: RespostaTabela = { data: [{ id: 'o1' }], error: null };
+
+  it('com número do Control: copia (parceiro como quem apagou), apaga SÓ o pedido (a cascata leva as peças) e deixa o rastro', async () => {
     const { excluirPedidoPeloControl, fake } = await carregar({
       // cabeçalho → pedido inteiro (a cópia) → DELETE
-      orders: emSequencia({ data: PEDIDO, error: null }, { data: PEDIDO_INTEIRO, error: null }, OK),
+      orders: emSequencia({ data: PEDIDO, error: null }, { data: PEDIDO_INTEIRO, error: null }, APAGOU),
       deleted_orders: OK, // a tabela existe (sonda) e o insert gravou
-      order_items: OK,
       order_erp_events: OK,
     });
 
@@ -88,16 +94,17 @@ describe('excluirPedidoPeloControl', () => {
     expect((copia['snapshot'] as { items: unknown[]; customer: { name: string } }).items).toHaveLength(1);
     expect((copia['snapshot'] as { customer: { name: string } }).customer.name).toBe('LOJA TESTE');
 
-    // Ordem: cópia → peças → pedido → evento.
+    // Ordem: cópia → pedido → evento. As peças caem em cascata (ON DELETE CASCADE).
     const ordem = fake.gravacoes.map((g) => `${g.tabela}:${g.operacao}`);
-    expect(ordem).toEqual(['deleted_orders:insert', 'order_items:delete', 'orders:delete', 'order_erp_events:insert']);
+    expect(ordem).toEqual(['deleted_orders:insert', 'orders:delete', 'order_erp_events:insert']);
 
+    // O rastro da decisão 12: 'excluido' (existe desde a 048), origem api.
     const evento = fake.ultimaGravacao('order_erp_events', 'insert')?.valores as Record<string, unknown>;
     expect(evento).toMatchObject({
       company_id: EMPRESA,
       order_id: 'o1',
       order_number: 14632,
-      tipo: 'excluido_pelo_erp',
+      tipo: 'excluido',
       origem: 'api',
       parceiro: 'control-teste',
       motivo: 'pedido duplicado no Control',
@@ -108,12 +115,42 @@ describe('excluirPedidoPeloControl', () => {
     // Sempre dentro da empresa: na busca e no DELETE do pedido.
     const porEmpresa = fake.filtrosDe('orders', 'eq').filter((f) => f.args[0] === 'company_id' && f.args[1] === EMPRESA);
     expect(porEmpresa.length).toBeGreaterThanOrEqual(3);
-    expect(fake.filtrosDe('order_items', 'eq').map((f) => f.args)).toEqual([['order_id', 'o1']]);
+    // O DELETE repete as condições: não faturado e ainda com número do Control.
+    expect(fake.filtrosDe('orders', 'or').map((f) => f.args)).toEqual([['invoiced.is.null,invoiced.eq.false']]);
+    expect(fake.filtrosDe('orders', 'not').map((f) => f.args)).toEqual([['erp_order_id', 'is', null]]);
+    expect(fake.filtrosDe('order_items')).toHaveLength(0);
+  });
+
+  it.each<[string, Record<string, unknown>]>([
+    ['rascunho', { status: 'draft', erp_order_id: null, erp_requested_at: null }],
+    ['aguardando aceite', { status: 'pending_approval', erp_order_id: null, erp_requested_at: null }],
+    ['aprovado nunca solicitado', { status: 'approved', erp_order_id: null, erp_requested_at: null }],
+    ['aprovado num banco sem a 049', { status: 'approved', erp_order_id: null }],
+  ])('%s: o Control nunca recebeu — fora_do_control, nada copiado nem apagado', async (_nome, estado) => {
+    const { excluirPedidoPeloControl, fake } = await carregar({
+      orders: { data: { ...PEDIDO, ...estado }, error: null },
+      deleted_orders: OK,
+    });
+
+    expect(await excluirPedidoPeloControl(EMPRESA, 'o1', 'control-teste', null)).toEqual({ outcome: 'fora_do_control' });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('solicitado ao Control e ainda sem número: apaga (o Control pode ter importado e excluído antes de confirmar)', async () => {
+    const SOLICITADO = { ...PEDIDO, status: 'approved', erp_order_id: null, erp_requested_at: '2026-09-16T13:00:00Z' };
+    const { excluirPedidoPeloControl, fake } = await carregar({
+      orders: emSequencia({ data: SOLICITADO, error: null }, { data: PEDIDO_INTEIRO, error: null }, APAGOU),
+      deleted_orders: OK,
+      order_erp_events: OK,
+    });
+
+    expect(await excluirPedidoPeloControl(EMPRESA, 'o1', 'control-teste', null)).toMatchObject({ outcome: 'ok', pedido_erp: null });
+    expect(fake.filtrosDe('orders', 'not').map((f) => f.args)).toEqual([['erp_requested_at', 'is', null]]);
   });
 
   it('com a 040 no ar, cópia que não gravou segura o pedido (sem_copia): nada apagado', async () => {
     const { excluirPedidoPeloControl, fake } = await carregar({
-      orders: emSequencia({ data: PEDIDO, error: null }, { data: PEDIDO_INTEIRO, error: null }, OK),
+      orders: emSequencia({ data: PEDIDO, error: null }, { data: PEDIDO_INTEIRO, error: null }, APAGOU),
       deleted_orders: emSequencia(OK, { data: null, error: { message: 'disco cheio' } }),
     });
 
@@ -126,9 +163,8 @@ describe('excluirPedidoPeloControl', () => {
 
   it('sem a 040, apaga sem tentar copiar', async () => {
     const { excluirPedidoPeloControl, fake } = await carregar({
-      orders: emSequencia({ data: PEDIDO, error: null }, OK),
+      orders: emSequencia({ data: PEDIDO, error: null }, APAGOU),
       deleted_orders: SEM_TABELA,
-      order_items: OK,
       order_erp_events: OK,
     });
 
@@ -162,16 +198,41 @@ describe('excluirPedidoPeloControl', () => {
     });
   });
 
-  it('o DELETE do pedido que falha é falhou, e o evento não é registrado', async () => {
+  it('faturado entre a leitura e o DELETE: nada apagado, a cópia sai do histórico e a resposta é faturado', async () => {
     const { excluirPedidoPeloControl, fake } = await carregar({
-      orders: emSequencia({ data: PEDIDO, error: null }, { data: null, error: { message: 'bloqueado' } }),
-      deleted_orders: SEM_TABELA,
-      order_items: OK,
+      orders: emSequencia(
+        { data: PEDIDO, error: null },
+        { data: PEDIDO_INTEIRO, error: null },
+        { data: [], error: null }, // o DELETE não casou mais
+        { data: { ...PEDIDO, invoiced: true }, error: null }, // relido
+      ),
+      deleted_orders: OK,
+    });
+
+    const r = await excluirPedidoPeloControl(EMPRESA, 'o1', 'control-teste', null);
+
+    expect(r).toEqual({ outcome: 'faturado' });
+    const copiaTirada = fake.ultimaGravacao('deleted_orders', 'delete');
+    expect(copiaTirada).toBeDefined();
+    expect(fake.filtrosDe('deleted_orders', 'eq').map((f) => f.args)).toEqual(
+      expect.arrayContaining([
+        ['company_id', EMPRESA],
+        ['order_id', 'o1'],
+      ]),
+    );
+    expect(fake.gravacoes.some((g) => g.tabela === 'order_erp_events')).toBe(false);
+  });
+
+  it('o DELETE do pedido que falha é falhou, a cópia sai do histórico e o evento não é registrado', async () => {
+    const { excluirPedidoPeloControl, fake } = await carregar({
+      orders: emSequencia({ data: PEDIDO, error: null }, { data: PEDIDO_INTEIRO, error: null }, { data: null, error: { message: 'bloqueado' } }),
+      deleted_orders: OK,
     });
 
     const r = await excluirPedidoPeloControl(EMPRESA, 'o1', 'control-teste', null);
 
     expect(r).toEqual({ outcome: 'falhou', erro: 'falha ao apagar: bloqueado' });
+    expect(fake.ultimaGravacao('deleted_orders', 'delete')).toBeDefined();
     expect(fake.gravacoes.some((g) => g.tabela === 'order_erp_events')).toBe(false);
   });
 });
@@ -252,6 +313,7 @@ describe('POST /partner/v1/pedidos/:id/excluir — a rota', () => {
   it.each<[string, Record<string, unknown>, number, string]>([
     ['not_found', { outcome: 'not_found' }, 404, 'ORDER_NOT_FOUND'],
     ['faturado', { outcome: 'faturado' }, 409, 'ORDER_INVOICED'],
+    ['fora_do_control', { outcome: 'fora_do_control' }, 409, 'ORDER_NOT_IN_CONTROL'],
     ['sem_copia', { outcome: 'sem_copia' }, 500, 'SEM_COPIA'],
     ['falhou', { outcome: 'falhou', erro: 'caiu' }, 500, 'INTERNAL_ERROR'],
   ])('desfecho %s vira %i %s', async (_nome, resultado, status, code) => {

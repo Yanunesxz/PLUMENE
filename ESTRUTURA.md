@@ -198,7 +198,8 @@ apps/api/src/
 │   │                       exclusaoPeloControl.service.ts → o Control excluiu o pedido e
 │   │                       avisou (POST /partner/v1/pedidos/:id/excluir): cópia em
 │   │                       deleted_orders no formato do deleteOrder, evento
-│   │                       'excluido_pelo_erp'; pedido faturado é recusado
+│   │                       'excluido' (origem api); faturado é recusado, e o que o
+│   │                       Control nunca recebeu (sem número e não solicitado) também
 │   │                       orders.service.ts: solicitarLancamentoNoErp (049) — com
 │   │                       canal_pedido_erp='api' o "Lançar" SOLICITA (erp_requested_at)
 │   │                       e a tela espera a confirmação do Control; cliente bloqueado
