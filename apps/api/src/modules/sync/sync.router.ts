@@ -17,7 +17,10 @@ export async function syncRouter(fastify: FastifyInstance): Promise<void> {
     syncHandler,
   );
 
-  // ERP → Supabase (admin/manager apenas)
+  // ERP → Supabase (admin/manager apenas). Além de ERP_SYNC_ENABLED, cada rota
+  // exige o canal da empresa em 'firebird' (migração 048): /full precisa de
+  // canal_catalogo OU canal_cadastro, /stock de canal_catalogo; senão 409
+  // CANAL_FECHADO sem abrir o Firebird. /erp/status só lê e fica livre.
   fastify.post(
     '/erp/sync/full',
     { preHandler: [authenticate, requireRole(['admin', 'manager'])] },

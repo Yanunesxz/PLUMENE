@@ -1,7 +1,9 @@
 # _tools/erp-sync — o agente Python que fala com o Firebird do Control
 
-Atualizado em 15/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`
-(as linhas são as do arquivo neste commit). Se mexer no script, atualize aqui.
+Atualizado em 15/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`.
+**Atenção:** as âncoras de linha são de ANTES das travas da fase 0 (seção
+"Travas no código", abaixo), que acrescentaram linhas ao docstring, ao topo e
+antes do `main`. Localize por nome de função. Se mexer no script, atualize aqui.
 
 ## O que há nesta pasta
 
@@ -13,8 +15,7 @@ Atualizado em 15/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`
 | `skus_sem_foto.txt`, `skus_sem_preco.txt` | Saídas de rodadas antigas do `photos.py` e do `--mode prices-audit`. Só diagnóstico. |
 | `fbembed25_x64/` (não versionada) | As DLLs do Firebird. O script procura primeiro aqui e depois em `_tools/firebird-reader/fbembed25_x64` (`sync.py:38-42`) — **essa segunda pasta não existe no disco**; sem as DLLs ao lado do script, nada sobe. |
 
-O docstring do `sync.py:6-10` lista só quatro modos; está desatualizado. A
-lista real está no `argparse` em `sync.py:640-641` e é a tabela abaixo.
+O docstring do `sync.py` lista os nove modos do `argparse` e as travas.
 
 ## Como ele sobe
 
@@ -86,10 +87,12 @@ banco de produção do Control**. Passo a passo, com a linha:
    `'00001'` (`sync.py:564`), produto e tamanho da `erp_sku` `PRODUTO|TAMANHO`
    ou de `products.erp_id` + `variants.size` (`sync.py:486-493`). Commit em
    `sync.py:569`.
-6. **Confirma no Supabase** por PATCH direto (`sync.py:590-594`):
-   `status = sent_erp`, `erp_order_id = SXnnnnn`, `synced_at`. Não manda
-   `updated_at` — quem carimba é o gatilho da migração 013
-   (`apps/api/src/config/migrations/013_protecoes.sql:88-105`).
+6. **Confirma no Supabase** por PATCH direto (`gravar_numero_do_pedido`):
+   `status = sent_erp`, `erp_order_id = SXnnnnn`, `synced_at`, `updated_at`,
+   `erp_order_source = 'sync_py'` e `erp_order_set_at` (migração 048), filtrando
+   `company_id` e `erp_order_id IS NULL`. Se o pedido já tinha número (gravado
+   pela tela ou pela API no meio do caminho), nada é regravado e o log pede
+   conferência à mão: o número cunhado ficou no Control sem vínculo no app.
 7. **Cadastro que não casa vira `error_erp`** (`sync.py:597-600`): cliente sem
    `erp_id` (`sync.py:518-519`), sem `rep_erp_id` (`sync.py:520-521`), sem
    tabela com `erp_code` (`sync.py:523-525`), pedido sem itens ou item sem
@@ -149,6 +152,28 @@ existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-l
    Parceiro precisa ser desligada para aquela marca — nunca os dois ao mesmo
    tempo.
 
+## Travas no código — fase 0 (15/09/2026)
+
+A decisão acima deixou de depender só de ninguém rodar o modo:
+
+- **Todo modo que grava** (`full`, `stock`, `customers`, `prices`, `products`,
+  `reconcile`, `push-orders`) sai com **código 2**, antes de abrir o Firebird,
+  sem `ERP_SYNC_PY_LIBERADO=sim` no ambiente **da execução** (`conferir_travas`).
+  O valor é lido antes do `load_dotenv`: pôr a linha no `.env` não libera nada.
+  No cmd: `set ERP_SYNC_PY_LIBERADO=sim` e rodar na mesma janela.
+- **`push-orders`**, além disso, lê `companies.canal_pedido_erp` da `COMPANY_ID`
+  (GET `?select=canal_pedido_erp&id=eq.<COMPANY_ID>`, `ler_canal_pedido_erp`) e
+  só segue com `'sync_py'`. Coluna ausente (migração 048 não aplicada), empresa
+  sem linha ou erro de leitura: recusa. Hoje nenhuma empresa tem `'sync_py'`.
+- `COMPANY_ID` precisa ser um uuid, e todo PATCH (`supabase_patch_by_ids`)
+  filtra `company_id`.
+- `test` e `prices-audit` continuam livres.
+
+O leitor TypeScript da API tem a trava equivalente por canal:
+`canal_catalogo = 'firebird'` para tabelas, produtos, preços e estoque;
+`canal_cadastro = 'firebird'` para clientes (`erpSyncService.ts`, agendador e
+rotas `/erp/sync`, que respondem 409 `CANAL_FECHADO`).
+
 ## Outros vetos (mesma data)
 
 - **Não ligar `ERP_SYNC_ENABLED=true`** na API (`apps/api/src/config/env.ts:36`,
@@ -172,8 +197,9 @@ existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-l
 
 ## O que pode rodar hoje sem susto
 
-`--mode test`, `--mode prices-audit` (só leitura) e `--mode reconcile` (só o
-flag `active`). `--mode stock` e `--mode customers` gravam, mas não tocam em
-pedido nem em preço; ainda assim, rode primeiro numa cópia do banco e pause o
+`--mode test` e `--mode prices-audit` (só leitura, sem liberação). O
+`--mode reconcile` (só o flag `active`) exige `ERP_SYNC_PY_LIBERADO=sim`.
+`--mode stock` e `--mode customers` gravam (e exigem a mesma liberação), mas não
+tocam em pedido nem em preço; ainda assim, rode primeiro numa cópia do banco e pause o
 cron do CRM antes de uma carga grande de clientes (cada linha ganha
 `updated_at` novo e o CRM relê a base inteira na rodada seguinte).

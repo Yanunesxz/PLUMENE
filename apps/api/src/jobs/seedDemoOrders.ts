@@ -1,11 +1,20 @@
 import 'dotenv/config';
 import { supabase } from '../config/supabase.js';
+import { lerCanais } from '../lib/canais.js';
 
 // Dados de demonstração para apresentação:
-// 1) Remove pedidos vazios (sem itens) de toda a empresa.
+// 1) Remove pedidos vazios (sem itens) da empresa escolhida.
 // 2) Cria 3 pedidos por representante ativo, total entre R$14.000 e R$30.000,
 //    com pijamas e quantidades variados, precificados pela tabela de cada rep.
 //    Variação de status; os aprovados ficam faturados no mês atual.
+//
+// Uso: tsx src/jobs/seedDemoOrders.ts --empresa=<uuid>
+//
+// A empresa é OBRIGATÓRIA e explícita (fase 0 da integração com o Control).
+// Antes o script pegava "a empresa do primeiro admin" do banco do .env — que é
+// produção, com duas empresas no banco da Corpo Sensual — e apagava pedidos e
+// criava faturados de mentira nela. Também recusa NODE_ENV=production e empresa
+// cujo faturamento vem do Control (canal_faturamento='api').
 
 const MIN_TOTAL = 14000;
 const MAX_TOTAL = 30000;
@@ -67,16 +76,47 @@ function isoThisMonth() {
   return new Date(now.getFullYear(), now.getMonth(), day, 12, 0, 0).toISOString();
 }
 
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** `--empresa=<uuid>` ou `--empresa <uuid>`. */
+function empresaDosArgumentos(argv: string[]): string | null {
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i]!;
+    if (a.startsWith('--empresa=')) return a.slice('--empresa='.length).trim() || null;
+    if (a === '--empresa') return argv[i + 1]?.trim() || null;
+  }
+  return null;
+}
+
 async function run() {
-  const { data: ref } = await supabase
-    .from('users')
-    .select('company_id')
-    .in('role', ['admin', 'manager'])
-    .limit(1)
+  if (process.env['NODE_ENV'] === 'production') {
+    console.error('❌ Dados de demonstração não rodam com NODE_ENV=production.');
+    process.exit(1);
+  }
+
+  const company_id = empresaDosArgumentos(process.argv.slice(2));
+  if (!company_id || !UUID.test(company_id)) {
+    console.error('❌ Falta --empresa=<uuid> (a empresa onde os pedidos de demonstração entram).');
+    process.exit(1);
+  }
+
+  const { data: empresa, error: erroEmpresa } = await supabase
+    .from('companies')
+    .select('id')
+    .eq('id', company_id)
     .maybeSingle();
-  const company_id = (ref as { company_id: string } | null)?.company_id;
-  if (!company_id) {
-    console.error('❌ Empresa não encontrada.');
+  if (erroEmpresa) {
+    console.error(`❌ Falha ao conferir a empresa: ${erroEmpresa.message}`);
+    process.exit(1);
+  }
+  if (!empresa) {
+    console.error('❌ Empresa não encontrada neste banco.');
+    process.exit(1);
+  }
+
+  const canais = await lerCanais(company_id);
+  if (canais.faturamento === 'api') {
+    console.error('❌ O faturamento desta empresa vem do Control (canal_faturamento=api): nada de faturado de mentira.');
     process.exit(1);
   }
 
@@ -90,7 +130,7 @@ async function run() {
   const withItems = new Set((itemRows ?? []).map((r) => (r as { order_id: string }).order_id));
   const emptyIds = orderIds.filter((id) => !withItems.has(id));
   if (emptyIds.length) {
-    await supabase.from('orders').delete().in('id', emptyIds);
+    await supabase.from('orders').delete().in('id', emptyIds).eq('company_id', company_id);
   }
   console.log(`🧹 Pedidos vazios removidos: ${emptyIds.length}`);
 
@@ -169,6 +209,7 @@ async function run() {
           created_at: isoDaysAgo(randInt(2, 40)),
           invoiced: p.invoiced,
           invoiced_at: p.invoiced ? isoThisMonth() : null,
+          updated_at: new Date().toISOString(),
         })
         .select('id')
         .single();
@@ -182,7 +223,7 @@ async function run() {
         .from('order_items')
         .insert(items.map((i) => ({ order_id: orderId, variant_id: null, ...i })));
       if (itemsErr) {
-        await supabase.from('orders').delete().eq('id', orderId);
+        await supabase.from('orders').delete().eq('id', orderId).eq('company_id', company_id);
         console.error(`❌ ${rep.email} (itens): ${itemsErr.message}`);
         continue;
       }

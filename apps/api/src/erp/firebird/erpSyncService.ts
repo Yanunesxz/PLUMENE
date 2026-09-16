@@ -9,8 +9,20 @@
  *  2. Ler produtos + variantes (cor × tamanho) + estoque
  *  3. Ler clientes + bloqueios
  *  4. Calcular preços por variante × tabela
+ *
+ * TRAVA DE CANAL (migração 048, fase 0). Além do ERP_SYNC_ENABLED, cada parte só
+ * roda para empresa cujo canal é 'firebird':
+ *  - tabelas de preço, produtos, preços e estoque → `companies.canal_catalogo`;
+ *  - clientes → `companies.canal_cadastro`.
+ * Canal diferente (ou a 048 ainda não aplicada, que vale 'carga'): a parte é
+ * PULADA antes de abrir o Firebird e antes de tocar o Supabase, e o resultado
+ * sai com `pulado`. Um fluxo tem um escritor só — com o catálogo vindo de carga
+ * ou da API, este sync regravaria por cima. Falha ao ler o canal vira `error`
+ * no resultado, também sem ler nem gravar nada.
  */
 import { supabase } from '../../config/supabase.js';
+import { lerCanais, exigirCanal } from '../../lib/canais.js';
+import type { CanalRecusado, ValorDoCanal } from '../../lib/canais.js';
 import { withFirebird, query } from './connection.js';
 import {
   QUERY_PRICE_TABLES,
@@ -27,13 +39,57 @@ import type {
   ErpStock,
 } from './types.js';
 
-type SyncType = 'price_tables' | 'products' | 'stock' | 'customers' | 'prices';
+export type SyncType = 'price_tables' | 'products' | 'stock' | 'customers' | 'prices';
 
-interface SyncResult {
+/** Os dois canais que o Firebird pode alimentar. */
+export type CanalDoFirebird = 'catalogo' | 'cadastro';
+
+export interface SyncResult {
   type: SyncType;
   records: number;
   duration_ms: number;
   error?: string;
+  /** O canal da empresa não é 'firebird': nada foi lido do ERP nem gravado. */
+  pulado?: { canal: CanalDoFirebird; valor_atual: ValorDoCanal<CanalDoFirebird> };
+}
+
+// ─── Trava de canal ───────────────────────────────────────────────────────────
+
+/** Qual canal manda em cada parte do sync. */
+export const CANAL_DO_SYNC: Readonly<Record<SyncType, CanalDoFirebird>> = Object.freeze({
+  price_tables: 'catalogo',
+  products: 'catalogo',
+  prices: 'catalogo',
+  stock: 'catalogo',
+  customers: 'cadastro',
+});
+
+/**
+ * Os canais do Firebird fechados nesta empresa (lista vazia = os dois ligados).
+ * Lança como `lerCanais` quando o banco não respondeu.
+ */
+export async function canaisDoFirebirdFechados(
+  company_id: string,
+): Promise<CanalRecusado<CanalDoFirebird>[]> {
+  const canais = await lerCanais(company_id);
+  const fechados: CanalRecusado<CanalDoFirebird>[] = [];
+  if (canais.catalogo !== 'firebird') fechados.push({ canal: 'catalogo', valor_atual: canais.catalogo });
+  if (canais.cadastro !== 'firebird') fechados.push({ canal: 'cadastro', valor_atual: canais.cadastro });
+  return fechados;
+}
+
+/**
+ * `null` quando a parte pode rodar; senão o resultado "pulado", já registrado no
+ * log. Chamado ANTES de abrir o Firebird e antes de qualquer leitura do Supabase.
+ */
+async function pularSeCanalFechado(company_id: string, type: SyncType): Promise<SyncResult | null> {
+  const canal = CANAL_DO_SYNC[type];
+  const recusa = await exigirCanal(company_id, canal, 'firebird');
+  if (!recusa) return null;
+  console.warn(
+    `[ErpSync] ${type} pulado na empresa ${company_id}: canal_${canal} é '${recusa.valor_atual}', não 'firebird'`,
+  );
+  return { type, records: 0, duration_ms: 0, pulado: { canal, valor_atual: recusa.valor_atual } };
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -60,6 +116,9 @@ function now(): number {
 export async function syncPriceTables(company_id: string): Promise<SyncResult> {
   const t0 = now();
   try {
+    const pulado = await pularSeCanalFechado(company_id, 'price_tables');
+    if (pulado) return pulado;
+
     const erpRows = await withFirebird((db) =>
       query<ErpPriceTable>(db, QUERY_PRICE_TABLES),
     );
@@ -99,6 +158,9 @@ export async function syncPriceTables(company_id: string): Promise<SyncResult> {
 export async function syncProducts(company_id: string): Promise<SyncResult[]> {
   const t0 = now();
   try {
+    const pulado = await pularSeCanalFechado(company_id, 'products');
+    if (pulado) return [pulado];
+
     // Tipo da query produto + estoque agregado por tamanho (cores somadas)
     type ProductRow = {
       PRODUTO: string; TAMANHO: string; DESCRICAO: string; ATIVO: string;
@@ -192,6 +254,9 @@ export async function syncProducts(company_id: string): Promise<SyncResult[]> {
 export async function syncPrices(company_id: string): Promise<SyncResult> {
   const t0 = now();
   try {
+    const pulado = await pularSeCanalFechado(company_id, 'prices');
+    if (pulado) return pulado;
+
     const erpPrices = await withFirebird((db) =>
       query<ErpProductPrice>(db, QUERY_PRODUCT_PRICES),
     );
@@ -250,6 +315,9 @@ export async function syncPrices(company_id: string): Promise<SyncResult> {
 export async function syncCustomers(company_id: string): Promise<SyncResult> {
   const t0 = now();
   try {
+    const pulado = await pularSeCanalFechado(company_id, 'customers');
+    if (pulado) return pulado;
+
     const erpCustomers = await withFirebird((db) =>
       query<ErpCustomer>(db, QUERY_CUSTOMERS),
     );
@@ -277,7 +345,9 @@ export async function syncCustomers(company_id: string): Promise<SyncResult> {
       credit_limit: c.LIMITE_CREDITO ?? null,
       whatsapp: c.WHATSAPP1?.trim() ?? null,
       email: c.EMAIL?.trim() ?? null,
-      updated_at: c.DATA_UPDATE ? new Date(c.DATA_UPDATE).toISOString() : new Date().toISOString(),
+      // Sempre agora: o CRM lê `customers` por `updated_at` com folga de 15 min.
+      // A DATA_UPDATE do ERP (antiga) esconderia a gravação dele.
+      updated_at: new Date().toISOString(),
     }));
 
     await upsertBatch('customers', rows);
@@ -298,6 +368,9 @@ export async function syncCustomers(company_id: string): Promise<SyncResult> {
 export async function syncStock(company_id: string): Promise<SyncResult> {
   const t0 = now();
   try {
+    const pulado = await pularSeCanalFechado(company_id, 'stock');
+    if (pulado) return pulado;
+
     const erpStock = await withFirebird((db) =>
       query<ErpStock>(db, QUERY_STOCK_SNAPSHOT),
     );
@@ -344,7 +417,8 @@ export async function syncStock(company_id: string): Promise<SyncResult> {
 export async function runFullSync(company_id: string): Promise<SyncResult[]> {
   const results: SyncResult[] = [];
 
-  // Ordem importa: tabelas → produtos → preços → clientes
+  // Ordem importa: tabelas → produtos → preços → clientes. Cada parte confere o
+  // próprio canal: com só o cadastro no Firebird, as três primeiras saem puladas.
   results.push(await syncPriceTables(company_id));
 
   const productResults = await syncProducts(company_id);
