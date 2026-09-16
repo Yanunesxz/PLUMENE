@@ -36,8 +36,10 @@ import { LIMITE_POSTGREST } from '../apps/api/src/lib/paginacao.js';
  *      (`erp_requested_at`), com `solicitado_em` no pedido; sem a 049, a fila
  *      de antes. O cliente ganha `chave` (CNPJ só dígitos) e `novo_no_control`;
  *      "cliente sem código do ERP" deixa de ser pendência e "cliente sem CNPJ"
- *      entra no lugar. `alterado_apos_importacao` compara updated_at com
- *      erp_order_set_at. E o GET /status diz `sincronizar_agora`.
+ *      entra no lugar. `alterado_apos_importacao` compara o pedido de hoje
+ *      com a foto do que o Control conhece (046) — nunca updated_at, que a
+ *      trigger, o faturamento e a nota regravam. E o GET /status diz
+ *      `sincronizar_agora`.
  */
 
 const EMPRESA = 'empresa-1';
@@ -61,22 +63,20 @@ const COLUNA_AUSENTE: RespostaTabela = {
 const emSequencia = (...respostas: RespostaTabela[]) => respostas.flatMap((r) => [r, r]);
 
 /**
- * A fila de `orders` para a listagem: as SETE sondas de coluna
+ * A fila de `orders` para a listagem: as SEIS sondas de coluna
  * (order_number, invoiced, payment_condition_id, discount_percent,
- * price_table_id, erp_requested_at da 049, erp_order_set_at da 048) disparam
- * juntas antes de qualquer resposta, depois vêm as páginas. A sonda da 041 é
- * em `customers` e não entra nesta fila. Teste que só diz as cinco de antes
- * ganha as duas últimas como OK (as colunas existem).
+ * price_table_id, erp_requested_at da 049) disparam juntas antes de qualquer
+ * resposta, depois vêm as páginas. A sonda da 041 é em `customers` e não entra
+ * nesta fila. Teste que só diz as cinco de antes ganha a última como OK (a
+ * coluna existe).
  */
-const TOTAL_DE_SONDAS = 7;
+const TOTAL_DE_SONDAS = 6;
 function filaDaListagem(paginas: RespostaTabela[], sondas: RespostaTabela[] = []) {
   const todas = [...sondas, ...Array.from({ length: TOTAL_DE_SONDAS - sondas.length }, () => OK)];
   return [...todas, ...todas, ...emSequencia(...paginas)];
 }
 /** A sonda que diz "a 049 não rodou" (erp_requested_at ausente), com o resto OK. */
-const SEM_049 = [OK, OK, OK, OK, OK, COLUNA_AUSENTE, OK];
-/** A sonda que diz "a 048 não rodou" (erp_order_set_at ausente), com a 049 OK. */
-const SEM_ORIGEM_DO_NUMERO = [OK, OK, OK, OK, OK, OK, COLUNA_AUSENTE];
+const SEM_049 = [OK, OK, OK, OK, OK, COLUNA_AUSENTE];
 
 const CLIENTE = {
   erp_id: 'C0001',
@@ -337,7 +337,7 @@ describe('a fila é o que o financeiro SOLICITOU (049)', () => {
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem(
         [{ data: [pedido()], error: null }],
-        [OK, OK, OK, OK, OK, { data: null, error: { message: 'timeout' } }, OK],
+        [OK, OK, OK, OK, OK, { data: null, error: { message: 'timeout' } }],
       ),
       price_tables: { data: [], error: null },
     });
@@ -367,58 +367,107 @@ describe('a fila é o que o financeiro SOLICITOU (049)', () => {
   });
 });
 
-describe('alterado_apos_importacao — o app mexeu depois de o Control importar?', () => {
-  const IMPORTADO_EM = '2026-09-16T13:00:00+00:00';
+describe('alterado_apos_importacao — o app mexeu depois de o Control conhecer o pedido?', () => {
+  /** A peça do pedido com os ids que a comparação usa. */
+  const PECA = { ...ITEM, product_id: 'p1', variant_id: 'v1' };
+  /** A foto (046) do pedido como o Control o conhece: igual ao `pedido()` com PECA. */
+  const foto = (order_id: string, extra: Record<string, unknown> = {}) => ({
+    order_id,
+    itens: [{ product_id: 'p1', variant_id: 'v1', quantity: 3, unit_price: 50 }],
+    desconto: 10,
+    condicao: null,
+    observacao: null,
+    ...extra,
+  });
+  const importado = (id: string, numero: string, extra: Record<string, unknown> = {}) =>
+    pedido({ id, status: 'sent_erp', erp_order_id: numero, items: [PECA], ...extra });
 
-  it('true quando updated_at passou de erp_order_set_at; false quando é o mesmo instante', async () => {
+  it('compara com a foto do Control, não com updated_at: igual é false mesmo com updated_at bem depois', async () => {
+    // A trigger da 013 grava updated_at com a hora do banco, o faturamento e a
+    // nota regravam updated_at: nada disso é "o app mudou o pedido".
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem([
         {
           data: [
-            pedido({ status: 'sent_erp', erp_order_id: 'CS17379', erp_order_set_at: IMPORTADO_EM, updated_at: '2026-09-16T13:05:00+00:00' }),
-            pedido({ id: 'o2', status: 'sent_erp', erp_order_id: 'CS17380', erp_order_set_at: IMPORTADO_EM, updated_at: IMPORTADO_EM }),
-            // Fuso diferente, mesmo instante: não é alteração.
-            pedido({ id: 'o3', status: 'sent_erp', erp_order_id: 'CS17381', erp_order_set_at: IMPORTADO_EM, updated_at: '2026-09-16T10:00:00-03:00' }),
+            importado('o1', 'CS17379', { updated_at: '2026-09-16T23:59:00+00:00', erp_order_set_at: '2026-09-16T13:00:00+00:00' }),
+            importado('o2', 'CS17380'),
+            importado('o3', 'CS17381'),
+            importado('o4', 'CS17382', { notes: 'trocar a entrega para sexta' }),
+            importado('o5', 'CS17383'),
+            pedido({ id: 'o6', erp_requested_at: '2026-09-16T13:00:00Z', items: [PECA] }),
           ],
           error: null,
         },
       ]),
       price_tables: { data: [], error: null },
+      order_erp_sync: emSequencia(OK, {
+        data: [
+          foto('o1'),
+          foto('o2', { itens: [{ product_id: 'p1', variant_id: 'v1', quantity: 5, unit_price: 50 }] }),
+          foto('o3', { desconto: '5.00' }),
+          foto('o4'),
+          // o5 não tem foto: lançado antes da 046.
+        ],
+        error: null,
+      }),
     });
 
     const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
 
-    expect(lista.map((p) => p.alterado_apos_importacao)).toEqual([true, false, false]);
+    expect(lista.map((p) => [p.id, p.alterado_apos_importacao])).toEqual([
+      ['o1', false],
+      ['o2', true], // peça
+      ['o3', true], // desconto
+      ['o4', true], // observação
+      ['o5', null], // sem foto
+      ['o6', null], // sem número
+    ]);
+    // Só os pedidos com número, sempre pela empresa, e só o recorte da foto.
+    expect(fake.filtrosDe('order_erp_sync', 'in').map((f) => f.args)).toEqual([
+      ['order_id', ['o1', 'o2', 'o3', 'o4', 'o5']],
+    ]);
+    expect(fake.filtrosDe('order_erp_sync', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
+    const selectDaFoto = fake.filtrosDe('order_erp_sync', 'select').map((f) => String(f.args[0])).at(-1)!;
+    expect(selectDaFoto).toContain('snapshot->items');
+    expect(selectDaFoto).not.toMatch(/snapshot\s*(,|$)/);
+    // O pedido de hoje traz o que a comparação usa.
     const selectDaLista = fake
       .filtrosDe('orders', 'select')
       .map((f) => String(f.args[0]))
       .find((s) => s.includes('customer:customers'))!;
-    expect(selectDaLista.split('customer:customers')[0]).toContain('erp_order_set_at');
+    expect(selectDaLista).toContain('payment_condition_id');
+    expect(selectDaLista).toContain('order_items(product_id, variant_id, quantity');
+    expect(selectDaLista).not.toContain('erp_order_set_at');
   });
 
-  it('null na fila (sem número ainda) e null sem a coluna da 048 — e aí o select não a pede', async () => {
+  it('na fila não lê foto nenhuma (ninguém tem número); sem a 046, null', async () => {
     const naFila = await carregar({
-      orders: filaDaListagem([{ data: [pedido({ erp_requested_at: '2026-09-16T13:00:00Z', erp_order_set_at: null })], error: null }]),
+      orders: filaDaListagem([{ data: [pedido({ erp_requested_at: '2026-09-16T13:00:00Z' })], error: null }]),
       price_tables: { data: [], error: null },
     });
     const [p] = await naFila.getPartnerOrders(EMPRESA, {});
     expect(p!.alterado_apos_importacao).toBeNull();
+    expect(naFila.fake.filtrosDe('order_erp_sync')).toHaveLength(0);
 
     vi.resetModules();
-    const sem048 = await carregar({
-      orders: filaDaListagem(
-        [{ data: [pedido({ status: 'sent_erp', erp_order_id: 'CS17379', updated_at: '2026-09-16T13:05:00Z' })], error: null }],
-        SEM_ORIGEM_DO_NUMERO,
-      ),
+    const sem046 = await carregar({
+      orders: filaDaListagem([{ data: [importado('o1', 'CS17379')], error: null }]),
       price_tables: { data: [], error: null },
+      order_erp_sync: { data: null, error: { message: 'relation "order_erp_sync" does not exist', code: '42P01' } },
     });
-    const [q] = await sem048.getPartnerOrders(EMPRESA, { incluirImportados: true });
+    const [q] = await sem046.getPartnerOrders(EMPRESA, { incluirImportados: true });
     expect(q!.alterado_apos_importacao).toBeNull();
-    const selectDaLista = sem048.fake
-      .filtrosDe('orders', 'select')
-      .map((f) => String(f.args[0]))
-      .find((s) => s.includes('customer:customers'))!;
-    expect(selectDaLista).not.toContain('erp_order_set_at');
+    expect(sem046.fake.filtrosDe('order_erp_sync', 'in')).toHaveLength(0);
+  });
+
+  it('erro ao ler as fotos sobe — a reconciliação não sai dizendo "não mudou" pela metade', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([{ data: [importado('o1', 'CS17379')], error: null }]),
+      price_tables: { data: [], error: null },
+      order_erp_sync: emSequencia(OK, { data: null, error: { message: 'caiu' } }),
+    });
+
+    await expect(getPartnerOrders(EMPRESA, { incluirImportados: true })).rejects.toThrow(/caiu/);
   });
 });
 

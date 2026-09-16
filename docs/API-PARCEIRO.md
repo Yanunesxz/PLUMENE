@@ -375,12 +375,15 @@ exatamente a fila pendente. O resto não se importa:
   `POST /conciliar` (seção 3b).
 
 **Pedido editado depois da importação:** com `incluir=todos`, o campo
-`alterado_apos_importacao` diz se o app mexeu no pedido (peças, desconto,
-condição, observação) **depois** de o número do Control ter sido gravado. Use
-`?incluir=todos&desde=` na rodada de 5 minutos para pegar essas alterações e
-espelhá-las no ERP. Atenção: o próprio faturamento e as notas também tocam a
-data de alteração do pedido, então olhe o campo só em pedido com
-`faturado: false`.
+`alterado_apos_importacao` diz se o pedido de hoje é **diferente do que o
+Control conhece** — peças, desconto, condição de pagamento ou observação. A
+comparação é com a foto que o app guarda quando o número do Control é gravado
+(e de novo quando alguém confirma na tela que atualizou no Control); **não** é a
+data de alteração do pedido, que o faturamento, as notas e a própria
+confirmação também mexem. `true` continua `true` até alguém confirmar a
+atualização na tela do app. `null` = sem número, ou pedido lançado antes de o
+app guardar a foto (não dá para comparar). Use `?incluir=todos&desde=` na
+rodada de 5 minutos para pegar essas alterações e espelhá-las no ERP.
 
 **Não há paginação do seu lado:** a resposta traz todos os pedidos que casam com
 o filtro, em ordem de criação (`criado_em` e, no empate, `id`), e `total` é a
@@ -456,7 +459,7 @@ seguinte.
 | `observacoes` | texto ou null | Só o que o representante DIGITOU (a cor escolhida sai por item, em `itens[].observacao`) |
 | `pedido_erp` | texto ou null | Número no ERP, na forma normalizada (ex.: `CS17379`). Nulo na fila; preenchido pela sua confirmação ou conciliação |
 | `solicitado_em` | data ISO ou null | Quando o financeiro clicou em "Lançar no Control". Na fila vem sempre preenchido; `null` no passivo, no pedido lançado à mão e em instalação sem a migração 049 |
-| `alterado_apos_importacao` | booleano ou null | O app mexeu no pedido depois de o número do Control ser gravado? `null` sem número (na fila é sempre `null`) — ver "Pedido editado depois da importação" |
+| `alterado_apos_importacao` | booleano ou null | O pedido está diferente do que o Control conhece (peças, desconto, condição, observação)? `null` sem número (na fila é sempre `null`) ou sem a foto do lançamento — ver "Pedido editado depois da importação" |
 | `cliente.codigo_erp` | texto ou null | **Código do cliente no seu ERP** (campo CLIENTE). `null` quando o cliente nasceu no app e o Control ainda não devolveu o código |
 | `cliente.chave` | texto ou null | **A chave única do cliente entre os sistemas: o CNPJ/CPF só com dígitos.** É por ela que o seu ERP casa o cadastro. `null` quando o cadastro não tem documento (aí vira a pendência `cliente sem CNPJ`) |
 | `cliente.novo_no_control` | booleano | `true` = o app não tem o código deste cliente no Control. **Crie o cadastro no ERP** (casando pela `chave`) e devolva o código pelo `POST /clientes` — não é pendência, o pedido é importável |

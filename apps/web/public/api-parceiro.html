@@ -1296,12 +1296,17 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <p>
               <b>Pedido editado depois da importação:</b> com
               <code>incluir=todos</code>, <code>alterado_apos_importacao</code>
-              diz se o aplicativo mexeu no pedido (peças, desconto, condição,
-              observação) <b>depois</b> de o número do Control ter sido gravado.
-              Use <code>?incluir=todos&amp;desde=</code> na rodada de 5 minutos
-              para espelhar essas alterações no ERP — e olhe o campo só em pedido
-              com <code>faturado: false</code>, porque o faturamento também toca a
-              data de alteração.
+              diz se o pedido de hoje está <b>diferente do que o Control
+              conhece</b> — peças, desconto, condição de pagamento ou observação.
+              A comparação é com a foto que o aplicativo guarda quando o número
+              do Control é gravado (e de novo quando alguém confirma na tela que
+              atualizou no Control); <b>não</b> é a data de alteração do pedido,
+              que o faturamento, as notas e a própria confirmação também mexem.
+              <code>true</code> continua <code>true</code> até a confirmação na
+              tela; <code>null</code> = sem número, ou pedido lançado antes de o
+              aplicativo guardar a foto. Use
+              <code>?incluir=todos&amp;desde=</code> na rodada de 5 minutos para
+              espelhar essas alterações no ERP.
             </p>
           </div>
 

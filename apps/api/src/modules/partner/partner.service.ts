@@ -12,16 +12,17 @@
 import { supabase } from '../../config/supabase.js';
 import {
   coresPorSku,
+  divergenciaComOErp,
   semLinhasDeCor,
   normalizarNumeroErp,
   numeroErpValido,
   ORDER_STATUS_FLOW,
 } from '@csb/shared';
-import type { OrderStatus } from '@csb/shared';
+import type { ItemDaFoto, OrderStatus, PedidoParaComparar } from '@csb/shared';
 import { registrarNoErp } from '../orders/erpSync.service.js';
 import { gravarOrigemDoNumero, registrarEventoErp } from '../orders/eventosErp.service.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
-import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
+import { buscarTudoOuFalhar, emLotes } from '../../lib/paginacao.js';
 
 /** Código de cor usado pelo ERP quando o pedido é por tamanho (cores sortidas). */
 const COR_SORTIDA = '00001';
@@ -53,10 +54,16 @@ export interface PartnerOrder {
    */
   solicitado_em: string | null;
   /**
-   * O app mudou este pedido DEPOIS de o Control o importar? É
-   * `updated_at > erp_order_set_at` (048): peças, desconto, condição ou
-   * observação alterados depois da confirmação. `null` quando o pedido ainda
-   * não tem número, ou quando o banco não tem a coluna de origem do número.
+   * O app mudou este pedido DEPOIS de o Control o conhecer? É a comparação do
+   * pedido de hoje com a foto do que o Control conhece (046, order_erp_sync):
+   * peças, desconto, condição de pagamento ou observação diferentes. NÃO é
+   * `updated_at > erp_order_set_at`: a trigger da 013 grava `updated_at` com a
+   * hora do banco (sempre um pouco depois do carimbo da confirmação), e o
+   * faturamento e as notas regravam `updated_at` sem mudar nada que o Control
+   * tenha — todo pedido importado sairia `true` (revisão de 16/09/2026).
+   * Fica `true` até alguém confirmar na tela que atualizou no Control (foto
+   * nova). `null` quando o pedido ainda não tem número, quando não há foto dele
+   * (lançado antes da 046) ou quando o banco não tem a 046.
    * Serve à reconciliação (`incluir=todos`): na fila, é sempre null.
    */
   alterado_apos_importacao: boolean | null;
@@ -133,9 +140,9 @@ interface OrderRow {
   erp_order_id: string | null;
   /** Quando o financeiro solicitou o lançamento (049). Ausente em banco sem a coluna. */
   erp_requested_at?: string | null;
-  /** Quando o número do Control foi gravado (048). Ausente em banco sem a coluna. */
-  erp_order_set_at?: string | null;
   discount_percent?: number | null;
+  /** A condição do pedido (028) — entra na comparação com a foto do Control. */
+  payment_condition_id?: string | null;
   invoiced?: boolean | null;
   invoiced_at?: string | null;
   invoiced_total?: number | null;
@@ -167,6 +174,8 @@ interface OrderRow {
     inscricao_estadual?: string | null;
   } | null;
   items: Array<{
+    product_id?: string | null;
+    variant_id?: string | null;
     quantity: number;
     unit_price: number;
     total: number;
@@ -188,8 +197,6 @@ interface ColunasOpcionais {
    * coluna, a fila é só o solicitado; sem ela, a fila de antes.
    */
   solicitado: boolean;
-  /** orders.erp_order_set_at (048): quando o número do Control foi gravado. */
-  origemDoNumero: boolean;
   /** customers.cep e as demais colunas do cadastro real (041). */
   cadastroReal: boolean;
 }
@@ -204,14 +211,13 @@ function buildOrderSelect(c: ColunasOpcionais): string {
     created_at, updated_at, erp_order_id, price_table_erp_code, price_column,
     ${c.priceTable ? 'price_table_id, ' : ''}
     ${c.solicitado ? 'erp_requested_at, ' : ''}
-    ${c.origemDoNumero ? 'erp_order_set_at, ' : ''}
     ${c.invoiced ? 'invoiced, invoiced_at, invoiced_total, ' : ''}
     ${c.discount ? 'discount_percent, ' : ''}
-    ${c.condition ? 'payment_condition:payment_conditions(code, description), ' : ''}
+    ${c.condition ? 'payment_condition_id, payment_condition:payment_conditions(code, description), ' : ''}
     customer:customers(erp_id, cnpj, name, trade_name, rep_erp_id, price_table_id, whatsapp, email${
       c.cadastroReal ? `, ${COLUNAS_DO_CADASTRO_REAL}` : ''
     }),
-    items:order_items(quantity, unit_price, total,
+    items:order_items(product_id, variant_id, quantity, unit_price, total,
       variant:product_variants(erp_sku, size),
       product:products(erp_id, sku))
   `;
@@ -237,18 +243,16 @@ function buildOrderSelect(c: ColunasOpcionais): string {
 async function detectarColunas(): Promise<ColunasOpcionais> {
   // A ordem das sondas de `orders` é a que os testes do dublê seguem; a de
   // `customers` vai por último e não mexe na fila de `orders`.
-  const [orderNumber, invoiced, condition, discount, priceTable, solicitado, origemDoNumero, cadastroReal] =
-    await Promise.all([
-      detectar('orders', 'order_number'),
-      detectarOuFalhar('orders', 'invoiced'),
-      detectar('orders', 'payment_condition_id'),
-      detectar('orders', 'discount_percent'),
-      detectar('orders', 'price_table_id'),
-      detectarOuFalhar('orders', 'erp_requested_at'),
-      detectar('orders', 'erp_order_set_at'),
-      detectar('customers', 'cep'),
-    ]);
-  return { orderNumber, invoiced, condition, discount, priceTable, solicitado, origemDoNumero, cadastroReal };
+  const [orderNumber, invoiced, condition, discount, priceTable, solicitado, cadastroReal] = await Promise.all([
+    detectar('orders', 'order_number'),
+    detectarOuFalhar('orders', 'invoiced'),
+    detectar('orders', 'payment_condition_id'),
+    detectar('orders', 'discount_percent'),
+    detectar('orders', 'price_table_id'),
+    detectarOuFalhar('orders', 'erp_requested_at'),
+    detectar('customers', 'cep'),
+  ]);
+  return { orderNumber, invoiced, condition, discount, priceTable, solicitado, cadastroReal };
 }
 
 type MapaDeTabelas = Map<string, { erp_code: string | null; price_column: number }>;
@@ -292,18 +296,80 @@ function chaveDoCliente(cnpj: unknown): string | null {
   return digitos ? digitos : null;
 }
 
+/** O que o Control conhece de cada pedido (a foto da 046), por id do pedido. */
+type FotosDoControl = Map<string, PedidoParaComparar>;
+
 /**
- * O app mudou o pedido depois de o Control o importar? Só quando as duas
- * datas existem; qualquer uma ilegível vale `null` (não se acusa nada).
+ * O app mudou o pedido depois de o Control o conhecer? A comparação é a mesma
+ * do aviso "Atualizar no ERP" da tela (`divergenciaComOErp`): peças, desconto,
+ * condição e observação do pedido de hoje contra a foto. Sem número, sem foto
+ * ou sem a 046: `null` (não se acusa nada).
  */
-function alteradoAposImportacao(row: OrderRow): boolean | null {
-  const importadoEm = row.erp_order_set_at ? Date.parse(row.erp_order_set_at) : Number.NaN;
-  const atualizadoEm = row.updated_at ? Date.parse(row.updated_at) : Number.NaN;
-  if (Number.isNaN(importadoEm) || Number.isNaN(atualizadoEm)) return null;
-  return atualizadoEm > importadoEm;
+function alteradoAposImportacao(row: OrderRow, fotos: FotosDoControl | null): boolean | null {
+  if (!row.erp_order_id || !fotos) return null;
+  const foto = fotos.get(row.id);
+  if (!foto) return null;
+  const hoje: PedidoParaComparar = {
+    items: (row.items ?? []).map((i) => ({
+      product_id: i.product_id ?? '',
+      variant_id: i.variant_id ?? null,
+      quantity: Number(i.quantity ?? 0),
+      unit_price: Number(i.unit_price ?? 0),
+    })) as ItemDaFoto[],
+    discount_percent: row.discount_percent ?? null,
+    payment_condition_id: row.payment_condition_id ?? null,
+    notes: row.notes,
+  };
+  return divergenciaComOErp(foto, hoje).mudou;
 }
 
-function mapOrder(row: OrderRow, tableMap: MapaDeTabelas): PartnerOrder {
+/** O recorte da foto (046) que a comparação usa — nunca o snapshot inteiro. */
+interface LinhaDaFoto {
+  order_id: string;
+  itens: ItemDaFoto[] | null;
+  desconto: number | string | null;
+  condicao: string | null;
+  observacao: string | null;
+}
+
+/**
+ * As fotos do que o Control conhece (046) dos pedidos que já têm número.
+ * `null` quando o banco não tem a 046 (aí `alterado_apos_importacao` sai null).
+ * Erro em qualquer lote sobe (500): a reconciliação não pode sair com metade
+ * dos pedidos dizendo "não mudou".
+ */
+async function fotosDoControl(company_id: string, rows: OrderRow[]): Promise<FotosDoControl | null> {
+  const ids = rows.filter((r) => r.erp_order_id).map((r) => r.id);
+  if (ids.length === 0) return new Map();
+  if (!(await detectar('order_erp_sync', 'order_id'))) return null;
+
+  const fotos: FotosDoControl = new Map();
+  for (const lote of emLotes(ids)) {
+    const linhas = await buscarTudoOuFalhar<LinhaDaFoto>((de, ate) =>
+      supabase
+        .from('order_erp_sync')
+        .select(
+          'order_id, itens:snapshot->items, desconto:snapshot->discount_percent, ' +
+            'condicao:snapshot->>payment_condition_id, observacao:snapshot->>notes',
+        )
+        .eq('company_id', company_id)
+        .in('order_id', lote)
+        .order('order_id')
+        .range(de, ate),
+    );
+    for (const l of linhas) {
+      fotos.set(l.order_id, {
+        items: Array.isArray(l.itens) ? l.itens : [],
+        discount_percent: l.desconto == null ? null : Number(l.desconto),
+        payment_condition_id: l.condicao ?? null,
+        notes: l.observacao ?? null,
+      });
+    }
+  }
+  return fotos;
+}
+
+function mapOrder(row: OrderRow, tableMap: MapaDeTabelas, fotos: FotosDoControl | null): PartnerOrder {
   const pendencias: string[] = [];
   const customer = row.customer;
 
@@ -367,7 +433,7 @@ function mapOrder(row: OrderRow, tableMap: MapaDeTabelas): PartnerOrder {
     observacoes: semLinhasDeCor(row.notes, skusDoPedido) || null,
     pedido_erp: row.erp_order_id,
     solicitado_em: row.erp_requested_at ?? null,
-    alterado_apos_importacao: alteradoAposImportacao(row),
+    alterado_apos_importacao: alteradoAposImportacao(row, fotos),
     cliente: {
       codigo_erp: customer?.erp_id ?? null,
       cnpj: customer?.cnpj ?? null,
@@ -481,7 +547,9 @@ export async function getPartnerOrders(
   });
 
   const tableMap = await getPriceTableMap(company_id);
-  return linhas.map((row) => mapOrder(row, tableMap));
+  // Na fila nenhum pedido tem número: só a reconciliação lê as fotos.
+  const fotos = await fotosDoControl(company_id, linhas);
+  return linhas.map((row) => mapOrder(row, tableMap, fotos));
 }
 
 export type ConfirmResult =
