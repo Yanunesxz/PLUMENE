@@ -190,8 +190,18 @@ apps/api/src/
 │   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048;
 │   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 049 (a da 048 + 3)
 │   │                       notasDoPedido.service.ts → notas fiscais e peças faturadas (048):
-│   │                       lerNotasDoPedido (GET /orders/:id → `notas`), detectarNotas e
-│   │                       cancelarNotasAtivas (desfazer o faturado pela tela)
+│   │                       lerNotasDoPedido (GET /orders/:id → `notas`, com a ativa e o
+│   │                       histórico), detectarNotas, cancelarNotasAtivas (desfazer o
+│   │                       faturado pela tela) e lerSubstituicoesDoPedido (049: "a 1234
+│   │                       foi substituída pela 1260")
+│   │                       exclusaoPeloControl.service.ts → o Control excluiu o pedido e
+│   │                       avisou (POST /partner/v1/pedidos/:id/excluir): cópia em
+│   │                       deleted_orders no formato do deleteOrder, evento
+│   │                       'excluido_pelo_erp'; pedido faturado é recusado
+│   │                       orders.service.ts: solicitarLancamentoNoErp (049) — com
+│   │                       canal_pedido_erp='api' o "Lançar" SOLICITA (erp_requested_at)
+│   │                       e a tela espera a confirmação do Control; cliente bloqueado
+│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026)
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
@@ -199,26 +209,56 @@ apps/api/src/
 │   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
 │   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
 │   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
-│   │                       → 401 PARTNER_UNAUTHORIZED). NOVE rotas (partner.router.ts):
-│   │                         GET  /partner/v1/status                 (+ `canais` da empresa)
-│   │                         GET  /partner/v1/pedidos                (a fila que o ERP PUXA)
+│   │                       → 401 PARTNER_UNAUTHORIZED). DEZENOVE rotas (partner.router.ts):
+│   │                         GET  /partner/v1/status                 (+ `canais`, sincronizar_agora, solicitado_em)
+│   │                         GET  /partner/v1/pedidos                (a fila: aprovado + SOLICITADO ao Control)
 │   │                         GET  /partner/v1/pedidos/excluidos      (excluídos com número; livre)
 │   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
 │   │                         POST /partner/v1/pedidos/:id/conciliar  (sent_erp sem número)
+│   │                         POST /partner/v1/pedidos/:id/excluir    (o Control excluiu; partner.cadastros.controller)
 │   │                         GET  /partner/v1/conciliacao            (só contagens; livre)
-│   │                         POST /partner/v1/faturamento            (partner.faturamento.service)
-│   │                         POST /partner/v1/clientes               (partner.sync.service)
-│   │                         POST /partner/v1/representantes         (partner.sync.service)
-│   │                       Canal por empresa (048, lib/canais.ts): pedidos/confirmar/conciliar
+│   │                         POST /partner/v1/faturamento            (partner.faturamento.service; UMA nota por pedido)
+│   │                         POST /partner/v1/clientes               (partner.sync.service; casa por CNPJ, depois código)
+│   │                         POST /partner/v1/representantes         (partner.sync.service; email → users.erp_email)
+│   │                         GET  /partner/v1/clientes?desde=        (o Control PUXA o que mudou no app)
+│   │                         GET  /partner/v1/representantes?desde=  (idem; partner.cadastros.controller)
+│   │                         POST /partner/v1/tabelas-preco          (partner.catalogo.service)
+│   │                         POST /partner/v1/condicoes-pagamento    (idem)
+│   │                         POST /partner/v1/produtos               (idem; produtos e tamanhos)
+│   │                         POST /partner/v1/precos                 (idem; sobrescreve o preço por tabela)
+│   │                         POST /partner/v1/estoque                (idem)
+│   │                         POST /partner/v1/retrato                (partner.retrato.service; 1x/dia)
+│   │                         POST /partner/v1/sincronizacao          (partner.sincronizacao.controller; livre)
+│   │                       Canal por empresa (048, lib/canais.ts): pedidos/confirmar/conciliar/excluir
 │   │                       exigem canal_pedido_erp='api'; faturamento, canal_faturamento='api';
-│   │                       clientes/representantes, canal_cadastro='api'. Senão 409 CANAL_FECHADO.
+│   │                       clientes/representantes (POST e GET), canal_cadastro='api'; as cinco do
+│   │                       catálogo, canal_catalogo='api'; retrato, canal_retrato='api'. Senão
+│   │                       409 CANAL_FECHADO. status/conciliacao/excluidos/sincronizacao são livres.
 │   │                       É o CANAL OFICIAL com o Control (decisão de 15/09/2026 — ver
 │   │                       _tools/erp-sync/README.md). O contrato vive em docs/API-PARCEIRO.md
 │   │                       e apps/web/public/api-parceiro.html — a MESMA especificação.
+│   │                       partner.porta.ts → a porta de TODO handler: autenticar, recusouPorCanal,
+│   │                       lerLote (INVALID_BODY / BATCH_TOO_LARGE), responder, anotarLote, lerDesde
 │   │                       partner.log.ts → registrarChamada: cada chamada em erp_sync_log (048);
 │   │                       nunca derruba a resposta; `detalhe` sem dado de cliente.
 │   │                       partner.chamada.ts → o resumo que o handler anota em request.partnerLog
 │   │                       e o hook onResponse do router grava (401/503 com company_id nulo)
+│   │                       partner.controller.ts / partner.service.ts → status, fila, confirmar,
+│   │                       conciliar, conciliação (+ aprovados_solicitados_ao_control), excluídos
+│   │                       partner.cadastros.controller.ts → GET clientes/representantes ?desde= e
+│   │                       a exclusão avisada pelo Control
+│   │                       partner.catalogo.{controller,service}.ts → decisão 6: o Control manda
+│   │                       tabelas, condições, produtos/tamanhos, preços e estoque e sobrescreve;
+│   │                       name/description do CRM NUNCA regravados (descrição vai em erp_description)
+│   │                       partner.retrato.{controller,service}.ts → retrato do cliente (última
+│   │                       compra só para frente, total, vencido, pendência, títulos vencidos)
+│   │                       partner.sincronizacao.controller.ts → o Control avisa que rodou a passada
+│   │                       pedida pelo botão da tela (limpa companies.sync_solicitado_em)
+│   ├── integracao/       → A TELA DA INTEGRAÇÃO (decisão 7): GET /erp/integracao/status (canais,
+│   │                       pedido de sync, última chamada por rota, contagens da fila; financeiro/
+│   │                       gerente/admin) e PATCH /erp/integracao/sincronizar (o botão "Pedir
+│   │                       sincronização agora", financeiro/admin; grava companies.sync_solicitado_em).
+│   │                       lerSolicitacaoDeSync é o que o GET /partner/v1/status usa.
 │   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
 │   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
@@ -270,7 +310,10 @@ apps/web/
     │   ├── pedidos/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
     │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
-    │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
+    │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp; com
+    │   │                                 canal api o "Lançar" SOLICITA ao Control e espera o número)
+    │   ├── integracao/PaginaIntegracao → estado da integração com o Control e o botão
+    │   │                                 "Pedir sincronização agora" [financeiro/gerente/admin]
     │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]
     │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
@@ -391,7 +434,7 @@ _tools/
 | Adicionar **rota na API** | `apps/api/src/modules/<área>/*.router.ts` |
 | Mudar um **tipo de dado** | `packages/shared/src/types/` |
 | Mudar o **banco** (colunas) | nova migration em `apps/api/src/config/migrations/` |
-| Mexer na **API de Parceiro** (o que o Control puxa/confirma) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html` |
+| Mexer na **API de Parceiro** (o que o Control puxa/confirma/manda) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html`. Rota nova entra também em `ROTAS_DO_PARCEIRO` (`modules/integracao/integracao.service.ts`) para a tela dar o título |
 | Mexer no **sync do ERP** (Firebird → Supabase) | `_tools/erp-sync/sync.py` — leia `_tools/erp-sync/README.md` antes |
 | Rodar o **push-orders** (app → Firebird) | NÃO. Vetado em produção — `_tools/erp-sync/README.md`, seção "DECISÃO" |
 | Mexer no **offline** | `apps/web/src/offline/` |
