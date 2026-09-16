@@ -27,6 +27,37 @@ export function tabelasEscolhiveis<T extends { active?: boolean | null | undefin
   return tabelas.filter(tabelaEstaAtiva);
 }
 
+/**
+ * A tabela `id` é do conjunto e foi desligada no Control? `false` quando não
+ * há id ou a tabela não é do conjunto (não dá para dizer nada dela).
+ */
+export function tabelaInativaNoConjunto(
+  tabelas: readonly { id: string; active?: boolean | null | undefined }[],
+  id: string | null | undefined,
+): boolean {
+  if (!id) return false;
+  const tabela = tabelas.find((t) => t.id === id);
+  return tabela ? !tabelaEstaAtiva(tabela) : false;
+}
+
+/**
+ * Dá para TROCAR a tabela do cliente que está em `atual`?
+ *
+ * Com duas ou mais ativas, sempre (é a escolha de sempre). Com uma ativa só, a
+ * escolha normalmente não existe — mas o cliente que ficou numa tabela
+ * desligada no Control precisa poder passar para a ativa (revisão de
+ * 16/09/2026): quem tinha duas tabelas e perdeu uma não pode ficar preso nela.
+ * Mostrar a ativa não conta nada de novo: ele já vê as duas.
+ */
+export function podeTrocarTabelaDoCliente(
+  tabelas: readonly { id: string; active?: boolean | null | undefined }[],
+  atual: string | null | undefined,
+): boolean {
+  const ativas = tabelasEscolhiveis(tabelas);
+  if (ativas.length >= 2) return true;
+  return tabelaInativaNoConjunto(tabelas, atual) && ativas.some((t) => t.id !== atual);
+}
+
 /** O nome para exibir: o da tabela, com a marca quando o Control a desligou. */
 export function rotuloDaTabela(tabela: {
   name: string;

@@ -23,7 +23,7 @@ import { observacaoDeCores, juntarObservacao } from '@csb/shared';
 import { compararReferencia } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
-import { minimoDaCondicao, precoDoTamanho } from '@csb/shared';
+import { minimoDaCondicao, precoDoTamanho, tabelaInativaNoConjunto } from '@csb/shared';
 
 export function PaginaNovoPedido() {
   const navigate = useNavigate();
@@ -82,7 +82,7 @@ export function PaginaNovoPedido() {
   // `nomeDe` já devolve a tabela desligada no Control com a marca "(inativa no
   // Control)": o cliente que está nela continua comprando por ela, e a
   // confirmação precisa dizer isso em vez de fingir que é uma tabela vigente.
-  const { nomeDe, precisaEscolher } = useMinhasTabelas();
+  const { nomeDe, precisaEscolher, todas: todasAsTabelas } = useMinhasTabelas();
 
   /** A tabela que precifica ESTE pedido: a do cliente, caindo para a do rep. */
   const tabelaDoPedido = ehLoja
@@ -203,11 +203,14 @@ export function PaginaNovoPedido() {
    */
   const confirmacaoDaTabela = (() => {
     if (ehLoja || !customerId) return null;
+    const doCliente = selectedCustomer?.price_table_id ?? null;
     // Com UMA tabela só não há o que conferir: é a dele, e o pedido sai nela.
     // Yan (16/09/2026): "essa msg só aparece pra quem tem mais de uma tabela;
-    // se a pessoa tem só uma, só ela que vai enviar".
-    if (!precisaEscolher) return null;
-    const doCliente = selectedCustomer?.price_table_id ?? null;
+    // se a pessoa tem só uma, só ela que vai enviar". A exceção é o cliente
+    // numa tabela DESLIGADA no Control (revisão de 16/09/2026): quem tinha duas
+    // e perdeu uma continua vendendo nela, e esta confirmação é o único lugar
+    // do pedido onde a marca "(inativa no Control)" aparece.
+    if (!precisaEscolher && !tabelaInativaNoConjunto(todasAsTabelas, doCliente)) return null;
 
     if (!doCliente) {
       const minha = nomeDe(user?.price_table_id);
@@ -226,7 +229,9 @@ export function PaginaNovoPedido() {
 
     return {
       titulo: `Este cliente está cadastrado na ${nome}. Está correta?`,
-      detalhe: 'É esta tabela que define o preço do pedido. Se estiver errada, corrija o cadastro do cliente antes de enviar.',
+      detalhe: tabelaInativaNoConjunto(todasAsTabelas, doCliente)
+        ? 'Esta tabela foi desligada no Control, mas o cliente continua nela e é ela que define o preço do pedido. Para mudar, troque a tabela na ficha do cliente antes de enviar.'
+        : 'É esta tabela que define o preço do pedido. Se estiver errada, corrija o cadastro do cliente antes de enviar.',
       tabela: nome,
       rotuloConfirmar: undefined,
     };

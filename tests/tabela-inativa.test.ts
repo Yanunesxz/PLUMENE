@@ -5,8 +5,10 @@ import type { FastifyReply, FastifyRequest } from 'fastify';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
 import {
   MARCA_DE_TABELA_INATIVA,
+  podeTrocarTabelaDoCliente,
   rotuloDaTabela,
   tabelaEstaAtiva,
+  tabelaInativaNoConjunto,
   tabelasEscolhiveis,
 } from '@csb/shared';
 
@@ -154,6 +156,49 @@ describe('funções puras da tabela inativa (@csb/shared)', () => {
     expect(rotuloDaTabela(COM_049[1]!)).toBe('TABELA 02 - TESTE (inativa no Control)');
     expect(rotuloDaTabela(COM_049[0]!)).toBe('TABELA 01 - TESTE');
     expect(rotuloDaTabela(SEM_049[1]!)).toBe('TABELA 02 - TESTE');
+  });
+
+  it('tabelaInativaNoConjunto: só a desligada do conjunto — sem id, de fora ou sem a 049, não', () => {
+    expect(tabelaInativaNoConjunto(COM_049, 't2')).toBe(true);
+    expect(tabelaInativaNoConjunto(COM_049, 't1')).toBe(false);
+    expect(tabelaInativaNoConjunto(COM_049, 'de-outra-regiao')).toBe(false);
+    expect(tabelaInativaNoConjunto(COM_049, null)).toBe(false);
+    expect(tabelaInativaNoConjunto(SEM_049, 't2')).toBe(false);
+  });
+
+  it('podeTrocarTabelaDoCliente: duas ativas sempre; uma ativa só tira o cliente da desligada (revisão de 16/09)', () => {
+    // Rep com t1 ativa e t2 desligada: o cliente em t2 pode passar para t1…
+    const umaAtivaUmaDesligada = [COM_049[0]!, COM_049[1]!];
+    expect(podeTrocarTabelaDoCliente(umaAtivaUmaDesligada, 't2')).toBe(true);
+    // …o cliente em t1 (ativa) não tem para onde ir…
+    expect(podeTrocarTabelaDoCliente(umaAtivaUmaDesligada, 't1')).toBe(false);
+    // …nem o sem tabela, nem o de tabela de fora do conjunto (seguem as regras de antes).
+    expect(podeTrocarTabelaDoCliente(umaAtivaUmaDesligada, null)).toBe(false);
+    expect(podeTrocarTabelaDoCliente(umaAtivaUmaDesligada, 'de-outra-regiao')).toBe(false);
+    // Só a desligada, nenhuma ativa: não há para onde trocar.
+    expect(podeTrocarTabelaDoCliente([COM_049[1]!], 't2')).toBe(false);
+    // Duas ou mais ativas: como sempre foi.
+    expect(podeTrocarTabelaDoCliente(COM_049, 't1')).toBe(true);
+    expect(podeTrocarTabelaDoCliente(SEM_049, null)).toBe(true);
+    // Uma tabela só, sem a 049: nada muda (sem escolha).
+    expect(podeTrocarTabelaDoCliente([SEM_049[0]!], 't1')).toBe(false);
+  });
+});
+
+describe('a tela usa as regras da tabela desligada', () => {
+  const ler = (arquivo: string) => readFileSync(path.resolve(__dirname, '..', arquivo), 'utf8');
+
+  it('o novo pedido confirma a tabela desligada do cliente mesmo para quem tem uma ativa só', () => {
+    const tela = ler('apps/web/src/modules/pedidos/PaginaNovoPedido.tsx');
+    expect(tela).toMatch(/!precisaEscolher && !tabelaInativaNoConjunto\(todasAsTabelas, doCliente\)/);
+  });
+
+  it('a ficha do cliente mostra "Trocar" por podeTrocarTabelaDoCliente, e o diálogo aceita uma ativa', () => {
+    expect(ler('apps/web/src/modules/clientes/PaginaCliente.tsx')).toMatch(
+      /podeTrocarTabelaDoCliente\(todasAsTabelas, cliente\.price_table_id\)/,
+    );
+    expect(ler('apps/web/src/modules/clientes/TrocarTabelaDoCliente.tsx')).toMatch(/\baceitaUma\b/);
+    expect(ler('apps/web/src/components/comercial/SeletorDeTabela.tsx')).toMatch(/aceitaUma \? 1 : 2/);
   });
 });
 

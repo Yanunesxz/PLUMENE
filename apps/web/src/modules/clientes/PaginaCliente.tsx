@@ -27,7 +27,7 @@ import { linhasDoDono } from '../../lib/donoDoCliente.js';
 import { seloDoPedido } from '../../lib/pedido.js';
 import { situacaoDoCliente, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
-import { formatarDocumento, formatarCep, apenasDigitos } from '@csb/shared';
+import { formatarDocumento, formatarCep, apenasDigitos, podeTrocarTabelaDoCliente } from '@csb/shared';
 import type { ApiResponse, CustomerDetail } from '@csb/shared';
 
 /**
@@ -43,7 +43,7 @@ export function PaginaCliente() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { token, user } = useAuthStore();
-  const { tabelas, nomeDe } = useMinhasTabelas();
+  const { tabelas, todas: todasAsTabelas, nomeDe } = useMinhasTabelas();
 
   const [cliente, setCliente] = useState<CustomerDetail | null>(null);
   const [erro, setErro] = useState('');
@@ -593,8 +593,10 @@ export function PaginaCliente() {
             </p>
           )}
         </div>
-        {/* O financeiro não troca tabela de cliente — cadastro é leitura pra ele. */}
-        {tabelas.length >= 2 && user?.role !== 'financeiro' && (
+        {/* O financeiro não troca tabela de cliente — cadastro é leitura pra ele.
+            Com uma ativa só, o botão aparece para tirar o cliente de uma tabela
+            desligada no Control (podeTrocarTabelaDoCliente). */}
+        {podeTrocarTabelaDoCliente(todasAsTabelas, cliente.price_table_id) && user?.role !== 'financeiro' && (
           <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
             Trocar
           </Button>
