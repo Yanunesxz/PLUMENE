@@ -1,7 +1,12 @@
 import { useMemo, useState } from 'react';
 import { ChevronDown, ChevronUp, Scissors } from 'lucide-react';
 import { formatBRL } from '../../lib/utils.js';
-import { compararComOOriginal, type ItemDaFoto, type PedidoOriginal as Foto } from '@csb/shared';
+import {
+  lerFaturamentoDoPedido,
+  type ItemDaFoto,
+  type NotaDoPedido,
+  type PedidoOriginal as Foto,
+} from '@csb/shared';
 
 interface Props {
   /** A cópia guardada pela migração 044. */
@@ -13,6 +18,13 @@ interface Props {
   /** O valor que a nota fechou, quando o Control informou (027). */
   invoicedTotal?: number | null | undefined;
   faturado: boolean;
+  /**
+   * As notas que o Control mandou, com os itens de cada uma (048). Quando há
+   * itens em nota ativa, a coluna "Faturado" é o que as notas levaram. Nota
+   * cancelada ou SUBSTITUÍDA (049 — outra nota subiu por cima dela) fica de
+   * fora da conta: `lerFaturamentoDoPedido` só olha `notasAtivas`.
+   */
+  notas?: NotaDoPedido[] | null | undefined;
 }
 
 /**
@@ -25,35 +37,43 @@ interface Props {
  *
  * O bloco só aparece quando há o que comparar. Um pedido que saiu inteiro não
  * ganha um aviso dizendo que está inteiro — exceto depois da nota, onde a
- * confirmação de que nada foi cortado é justamente a informação.
+ * confirmação de que nada foi cortado é justamente a informação. E essa
+ * confirmação só sai quando o Control disse alguma coisa (itens da nota ou o
+ * valor dela): o corte acontece DENTRO do Control, e sem o detalhe o app não
+ * sabe o que saiu. Pelo mesmo motivo, nota que levou parte das peças sem o
+ * valor fechado é FATURAMENTO EM PARTES, não corte. A conta inteira mora em
+ * `lerFaturamentoDoPedido` (shared).
  */
-export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTotal, faturado }: Props) {
+export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTotal, faturado, notas }: Props) {
   const [aberto, setAberto] = useState(false);
 
-  const d = useMemo(
-    () => compararComOOriginal(original.snapshot.items ?? [], itensAtuais),
-    [original, itensAtuais],
+  const leitura = useMemo(
+    () =>
+      lerFaturamentoDoPedido({
+        original: original.snapshot.items ?? [],
+        itensAtuais,
+        totalAtual,
+        invoicedTotal,
+        faturado,
+        notas,
+      }),
+    [original, itensAtuais, totalAtual, invoicedTotal, faturado, notas],
   );
 
+  if (!leitura.mostrar) return null;
+
+  const d = leitura.diferenca;
   const totalOriginal = original.total ?? null;
-  const valorDeHoje = invoicedTotal ?? totalAtual ?? null;
-
-  // Três coisas que o total mistura e a manchete tem de separar:
-  //   corte    → peças que saíram (ou entraram), a preço ORIGINAL: d.valorQueSaiu
-  //   preço    → a reprecificação das peças que ficaram: d.valorReprecificado
-  //   nota     → o que o Control faturou abaixo do pedido de HOJE
-  // Derivar "encolheu" do total fazia um pedido que só ganhou peça aparecer
-  // como "saíram −2 peças" quando a tabela tinha baixado de preço.
   const encolheu = d.pecasAntes > d.pecasDepois;
-  const reprecificou = Math.abs(d.valorReprecificado) >= 0.01;
-  const diferencaDaNota =
-    faturado && invoicedTotal != null && totalAtual != null
-      ? Number((totalAtual - invoicedTotal).toFixed(2))
-      : null;
-  const notaDiferente = diferencaDaNota != null && Math.abs(diferencaDaNota) >= 0.01;
+  const diferencaDaNota = leitura.diferencaDaNota;
 
-  // Nada mudou, o preço é o mesmo e a nota bateu: não há comparação a fazer.
-  if (!d.mudou && !reprecificou && !notaDiferente && !faturado) return null;
+  // A última frase: o que a nota levou, o que ainda pode mudar, ou a
+  // admissão honesta de que o Control ainda não disse o que faturou.
+  const fecho = !faturado
+    ? 'O pedido ainda pode mudar até a nota.'
+    : leitura.semDetalheDoControl
+      ? 'O detalhe do faturamento ainda não chegou do Control.'
+      : 'É o que a nota levou.';
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -80,27 +100,21 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
         <div className="grid grid-cols-2 gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">Original</p>
-            <p className="tnum mt-0.5 text-sm font-semibold text-foreground">
-              {d.pecasAntes} peças
-            </p>
+            <p className="tnum mt-0.5 text-sm font-semibold text-foreground">{d.pecasAntes} peças</p>
             {totalOriginal != null && (
               <p className="tnum text-xs text-muted-foreground">{formatBRL(totalOriginal)}</p>
             )}
           </div>
           <div>
-            <p className="text-xs uppercase tracking-wide text-muted-foreground">
-              {faturado ? 'Faturado' : 'Hoje'}
-            </p>
-            <p className="tnum mt-0.5 text-sm font-semibold text-foreground">
-              {d.pecasDepois} peças
-            </p>
-            {valorDeHoje != null && (
-              <p className="tnum text-xs text-muted-foreground">{formatBRL(valorDeHoje)}</p>
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">{leitura.rotuloDaDireita}</p>
+            <p className="tnum mt-0.5 text-sm font-semibold text-foreground">{d.pecasDepois} peças</p>
+            {leitura.valorDaDireita != null && (
+              <p className="tnum text-xs text-muted-foreground">{formatBRL(leitura.valorDaDireita)}</p>
             )}
           </div>
         </div>
 
-        {d.mudou || reprecificou || notaDiferente ? (
+        {leitura.situacao === 'mudou' && (
           <p
             className={`mt-3 rounded-lg px-3 py-2 text-xs ${
               encolheu || (diferencaDaNota ?? 0) > 0
@@ -130,23 +144,39 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
                 .{' '}
               </>
             )}
-            {reprecificou && (
+            {leitura.reprecificou && (
               <>
                 O preço das peças mudou {formatBRL(Math.abs(d.valorReprecificado))}{' '}
                 {d.valorReprecificado > 0 ? 'para cima' : 'para baixo'} desde o original.{' '}
               </>
             )}
-            {diferencaDaNota != null && Math.abs(diferencaDaNota) >= 0.01 && (
+            {leitura.notaDiferente && diferencaDaNota != null && (
               <>
                 A nota fechou {formatBRL(Math.abs(diferencaDaNota))}{' '}
                 {diferencaDaNota > 0 ? 'abaixo' : 'acima'} do pedido.{' '}
               </>
             )}
-            {faturado ? 'É o que a nota levou.' : 'O pedido ainda pode mudar até a nota.'}
+            {fecho}
           </p>
-        ) : (
+        )}
+
+        {leitura.situacao === 'parcial' && (
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Faturado em partes: as notas que chegaram levaram {leitura.pecasFaturadas} das {d.pecasAntes} peças
+            do pedido. O restante pode vir em outra nota — por enquanto não dá para dizer o que foi cortado.
+          </p>
+        )}
+
+        {leitura.situacao === 'igual' && (
           <p className="mt-3 rounded-lg bg-positive-soft px-3 py-2 text-xs text-positive-soft-foreground">
             Faturado igual ao pedido original — nenhuma peça foi cortada.
+          </p>
+        )}
+
+        {leitura.situacao === 'sem_detalhe' && (
+          <p className="mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Pedido faturado. O detalhe do faturamento (as peças e o valor da nota) ainda não chegou do
+            Control — por enquanto não dá para dizer se alguma peça foi cortada.
           </p>
         )}
 
@@ -164,9 +194,7 @@ export function PedidoOriginal({ original, itensAtuais, totalAtual, invoicedTota
                 <div className="shrink-0 text-right">
                   <p className="tnum text-sm text-foreground">
                     {l.antes} <span className="text-muted-foreground">→</span>{' '}
-                    <span className={l.depois < l.antes ? 'text-danger' : 'text-positive'}>
-                      {l.depois}
-                    </span>
+                    <span className={l.depois < l.antes ? 'text-danger' : 'text-positive'}>{l.depois}</span>
                   </p>
                   <p className="tnum text-xs text-muted-foreground">
                     {l.valor > 0 ? `− ${formatBRL(l.valor)}` : `+ ${formatBRL(-l.valor)}`}

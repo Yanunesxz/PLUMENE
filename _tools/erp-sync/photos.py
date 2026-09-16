@@ -17,8 +17,19 @@ Este script é ONE-TIME (roda numa máquina com acesso à rede):
 Uso:
   python photos.py                      # sobe tudo da pasta padrão (CS Inverno)
   python photos.py --dir "<pasta>"      # outra pasta (ex.: Plumene)
-  python photos.py --dry-run            # só mapeia código→produto, não sobe nada
+  python photos.py --dry-run            # só mapeia código→produto, não sobe nada (livre)
   python photos.py --limit 5            # testa com poucas fotos
+
+TRAVAS (fase 0 da integração com o Control) — este script GRAVA no catálogo
+(cria o bucket e escreve products.image_url), então vale a mesma regra do
+sync.py:
+  - sem ERP_SYNC_PY_LIBERADO=sim no ambiente DA EXECUÇÃO (nunca o .env), recusa
+    com código 2;
+  - e só roda com companies.canal_catalogo = 'firebird' na empresa COMPANY_ID
+    (migração 048). Com o catálogo vindo do Control pela API, regravar a foto
+    por aqui seria um segundo escritor no mesmo fluxo. Sem a coluna, ou sem
+    conseguir ler, recusa.
+  - --dry-run continua livre: ele só mapeia arquivo → produto.
 
 Variáveis de ambiente (.env — mesmas do sync.py):
   SUPABASE_URL          = https://xxxx.supabase.co
@@ -42,6 +53,11 @@ logging.basicConfig(
 log = logging.getLogger("erp-photos")
 
 SCRIPT_DIR = Path(__file__).parent
+
+# Lido ANTES do load_dotenv de propósito: a liberação de quem grava tem de vir
+# do terminal de quem roda, não de uma linha esquecida num .env.
+LIBERACAO_ENV = "ERP_SYNC_PY_LIBERADO"
+LIBERADO = os.environ.get(LIBERACAO_ENV, "").strip().lower() == "sim"
 
 try:
     from dotenv import load_dotenv
@@ -93,6 +109,51 @@ def now_iso():
 def norm_code(code: str) -> str:
     """Normaliza p/ casar apesar de zero-padding (0015 ↔ 15)."""
     return code.lstrip("0") or "0"
+
+
+# ─── travas ───────────────────────────────────────────────────────────────────
+def ler_canal_catalogo() -> tuple[str | None, str]:
+    """(canal, motivo) de companies.canal_catalogo da COMPANY_ID.
+
+    Uma leitura GET ?select=canal_catalogo&id=eq.<COMPANY_ID>. canal None = não
+    deu para saber (coluna ausente, empresa sem linha, erro de rede), e quem
+    chama recusa.
+    """
+    url = f"{SUPABASE_URL}/rest/v1/companies?select=canal_catalogo&id=eq.{COMPANY_ID}"
+    try:
+        r = httpx.get(url, headers=JSON_HEADERS, timeout=30)
+    except Exception as e:  # rede, DNS, timeout
+        return None, f"falha ao ler o canal ({type(e).__name__})"
+    if r.status_code != 200:
+        texto = r.text[:300]
+        if "42703" in texto or "PGRST204" in texto or "does not exist" in texto:
+            return None, "a coluna companies.canal_catalogo não existe (migração 048 não aplicada)"
+        return None, f"falha ao ler o canal [{r.status_code}]"
+    try:
+        linhas = r.json()
+    except ValueError:
+        return None, "resposta ilegível ao ler o canal"
+    if not isinstance(linhas, list) or not linhas:
+        return None, "empresa COMPANY_ID não encontrada em companies"
+    return linhas[0].get("canal_catalogo"), "ok"
+
+
+def conferir_travas() -> None:
+    """Sai com código 2 antes de tocar no bucket ou no catálogo."""
+    if not LIBERADO:
+        log.error(
+            f"este script grava no catálogo e está travado: rode com {LIBERACAO_ENV}=sim no ambiente "
+            "desta execução (o .env não conta). Veja o README antes."
+        )
+        sys.exit(2)
+    canal, motivo = ler_canal_catalogo()
+    if canal != "firebird":
+        detalhe = f"canal_catalogo='{canal}'" if canal is not None else motivo
+        log.error(
+            f"recusado: {detalhe}. As fotos só entram por aqui com canal_catalogo='firebird' nesta "
+            "empresa; com 'api' o catálogo vem do Control e regravar image_url seria um segundo escritor."
+        )
+        sys.exit(2)
 
 
 # ─── Supabase ─────────────────────────────────────────────────────────────────
@@ -178,6 +239,10 @@ def main():
     if not args.dry_run and (not SUPABASE_URL or not SUPABASE_KEY or not COMPANY_ID):
         log.error("SUPABASE_URL, SUPABASE_SERVICE_KEY e COMPANY_ID são obrigatórios (exceto --dry-run)")
         sys.exit(1)
+
+    # Trava antes de qualquer escrita (o --dry-run não escreve nada e passa).
+    if not args.dry_run:
+        conferir_travas()
 
     folder = Path(args.dir)
     if not folder.is_dir():

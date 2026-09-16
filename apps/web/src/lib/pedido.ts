@@ -2,6 +2,7 @@ import type { AuthRole, Order, OrderSource, OrderStatus, StatusDoCliente } from 
 import {
   ORDER_STATUS_LABELS,
   STATUS_DO_CLIENTE_LABELS,
+  lerNumeroErp,
   statusDoCliente,
   usaStatusInterno,
 } from '@csb/shared';
@@ -86,7 +87,12 @@ export interface SeloDoPedido {
  * o mesmo pedido apareceria de um jeito na lista e de outro no detalhe.
  */
 export function seloDoPedido(
-  pedido: Pick<Order, 'status'> & { invoiced?: boolean | null; delivered?: boolean | null },
+  pedido: Pick<Order, 'status'> & {
+    invoiced?: boolean | null;
+    delivered?: boolean | null;
+    erp_requested_at?: string | null;
+    erp_order_id?: string | null;
+  },
   papel: AuthRole | undefined,
 ): SeloDoPedido {
   // O financeiro fala a língua da MESA dele, não a do fluxo interno: o que
@@ -96,6 +102,11 @@ export function seloDoPedido(
     if (pedido.status === 'draft') return { texto: 'Rascunho', variante: 'gray' };
     if (pedido.invoiced) return { texto: 'Faturado', variante: 'green' };
     if (pedido.status === 'pending_approval') return { texto: 'Aguardando aceite', variante: 'yellow' };
+    // Aceito e já SOLICITADO ao Control (049): não é mais "a lançar" — o
+    // clique foi dado; falta o Control devolver o número.
+    if (pedido.status === 'approved' && pedido.erp_requested_at && !pedido.erp_order_id) {
+      return { texto: 'Solicitado ao Control', variante: 'yellow' };
+    }
     // Aceito mas fora do Control: falta o LANÇAMENTO (a planilha).
     if (pedido.status === 'approved') return { texto: 'A lançar', variante: 'brand' };
     // Lançado: agora é esperar a nota sair para carimbar.
@@ -182,6 +193,114 @@ export function podeLancarNoErp(
   invoiced: boolean | null | undefined,
 ): boolean {
   return status === 'approved' && !invoiced && (papel === 'financeiro' || papel === 'admin');
+}
+
+// ─── A integração com o Control (048/049) ────────────────────────────────────
+
+/**
+ * Os canais da empresa que o GET /orders/:id devolve junto com o pedido
+ * (migração 048): por onde o número do Control chega e por onde o faturado
+ * chega. `null` = a API não conseguiu ler; ausente = pedido do cache offline.
+ * Nos dois casos a tela se comporta como sempre (manual).
+ */
+export interface CanaisDoPedido {
+  pedido_erp: string;
+  faturamento: string;
+}
+
+/**
+ * O número do pedido vem do Control pela API? Aí "Lançar" não pede número:
+ * SOLICITA, e a tela espera o Control responder (decisão 2 de 16/09/2026).
+ */
+export function lancaPeloControl(canais: CanaisDoPedido | null | undefined): boolean {
+  return canais?.pedido_erp === 'api';
+}
+
+/**
+ * O faturado vem do Control pela API? Aí o botão manual de faturado some
+ * para TODOS — financeiro, admin e venda interna (decisão 11 de 16/09/2026).
+ */
+export function faturaPeloControl(canais: CanaisDoPedido | null | undefined): boolean {
+  return canais?.faturamento === 'api';
+}
+
+/**
+ * A SÉRIE do número do Control desta marca: CS na Corpo Sensual, PL na
+ * PLUMENE. É só para exemplo e sugestão na tela — quem cunha o número é o
+ * Control. Marca que a tela não conhece usa a série do último número lançado
+ * na empresa; sem nenhum dos dois, vazio.
+ */
+export function serieDoControl(marca: string | null | undefined, ultimo?: string | null): string {
+  const nome = (marca ?? '').trim().toUpperCase();
+  if (nome === 'CORPO SENSUAL') return 'CS';
+  if (nome === 'PLUMENE') return 'PL';
+  return lerNumeroErp(ultimo)?.prefixo ?? '';
+}
+
+/** O exemplo que a tela mostra ao lado do campo ("CS17379"). */
+export function exemploDeNumeroErp(serie: string): string {
+  return `${serie || 'CS'}17379`;
+}
+
+/**
+ * A espera pelo Control depois de solicitar: a tela consulta o pedido de 3 em
+ * 3 s, por até 3 min (decisão 2 de 16/09/2026).
+ */
+export const ESPERA_DO_CONTROL = {
+  intervalo_ms: 3_000,
+  limite_ms: 3 * 60_000,
+} as const;
+
+export type EstadoDaEspera = 'aguardando' | 'importado' | 'esgotou';
+
+/**
+ * Onde a espera está, a partir do pedido recém-consultado e do relógio.
+ * Número chegou = importado (mesmo que o tempo já tenha passado); sem número
+ * e dentro do prazo = aguardando; sem número e fora = esgotou.
+ */
+export function estadoDaEspera(
+  pedido: Pick<Order, 'erp_order_id'>,
+  inicioMs: number,
+  agoraMs: number,
+): EstadoDaEspera {
+  if (pedido.erp_order_id) return 'importado';
+  return agoraMs - inicioMs >= ESPERA_DO_CONTROL.limite_ms ? 'esgotou' : 'aguardando';
+}
+
+/**
+ * Quem vê "Cancelar solicitação" (decisão do Yan, 16/09/2026 à tarde): quem
+ * solicita — financeiro e admin —, num pedido SOLICITADO ao Control e ainda
+ * sem número. Com o número, o Control já importou e não há o que cancelar.
+ * A mesma regra do PATCH /orders/:id/cancelar-solicitacao; quem protege de
+ * verdade é a API.
+ */
+export function podeCancelarSolicitacao(
+  papel: AuthRole | undefined,
+  pedido: Pick<Order, 'erp_order_id'> & { erp_requested_at?: string | null },
+): boolean {
+  return (papel === 'financeiro' || papel === 'admin') && Boolean(pedido.erp_requested_at) && !pedido.erp_order_id;
+}
+
+/**
+ * A pergunta antes de cancelar (16/09/2026). O app não tem como saber se o
+ * Control já puxou o pedido da fila: entre a importação e a confirmação o
+ * pedido continua sem número. Por isso a frase não afirma que ele não
+ * importou — e, se importou, o número dele ainda chega e vale (revisão de
+ * 16/09/2026 à tarde: o POST /confirmar aceita o pedido de solicitação
+ * cancelada).
+ */
+export const PERGUNTA_CANCELAR_SOLICITACAO =
+  'Se o Control ainda não importou, cancelar tira o pedido da fila do Control. Se ele já importou, o número ainda chega e vale.';
+
+/** As frases combinadas com o Yan (16/09/2026) para cada desfecho da espera. */
+export function mensagemDaEspera(estado: EstadoDaEspera, numeroNoControl: string | null | undefined): string {
+  if (estado === 'importado') {
+    return `Parabéns, pedido importado! O número no Control é ${numeroNoControl ?? ''}`.trimEnd() + '.';
+  }
+  if (estado === 'esgotou') {
+    return 'O Control ainda não respondeu. O pedido fica na fila e o número aparece aqui quando chegar.';
+  }
+  return 'Aguardando o Control importar o pedido…';
 }
 
 /**

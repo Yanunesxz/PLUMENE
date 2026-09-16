@@ -94,6 +94,10 @@ export function TrocarTabelaDoCliente({
             valor={escolhida}
             onEscolher={setEscolhida}
             contexto="cliente"
+            // Quem abre este diálogo já passou por podeTrocarTabelaDoCliente:
+            // com uma ativa só, é o cliente preso numa tabela desligada no
+            // Control, e a ativa precisa aparecer para ele sair dela.
+            aceitaUma
           />
 
           <div className="mt-4 flex justify-end">

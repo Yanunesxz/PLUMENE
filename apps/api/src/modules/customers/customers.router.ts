@@ -8,6 +8,8 @@ import {
   marcarInatividadeHandler,
   marcarVarejoHandler,
   atrelarCodigoErpHandler,
+  vinculosDoClienteHandler,
+  excluirClienteHandler,
 } from './customers.controller.js';
 
 export async function customersRouter(fastify: FastifyInstance): Promise<void> {
@@ -50,4 +52,10 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
     { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
     atrelarCodigoErpHandler,
   );
+  // Excluir cliente (decisão do Yan, 16/09/2026): SÓ o admin. Cliente com
+  // pedido, login, convite, vitrine ou tarefa sai juntado em outro cadastro, e
+  // a cópia fica em deleted_customers (migração 050).
+  const soAdmin = { preHandler: [authenticate, requireRole(['admin'])] };
+  fastify.get('/customers/:id/vinculos', soAdmin, vinculosDoClienteHandler);
+  fastify.post('/customers/:id/excluir', soAdmin, excluirClienteHandler);
 }

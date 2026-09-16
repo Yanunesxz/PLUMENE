@@ -8,6 +8,7 @@ import {
   marcarVarejo,
   atrelarCodigoErp,
 } from './customers.service.js';
+import { excluirCliente, lerVinculosParaExcluir } from './customers.exclusao.service.js';
 import { z } from 'zod';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
@@ -16,6 +17,8 @@ import {
   createCustomerSchema,
   trocarTabelaDoClienteSchema,
   atrelarCodigoErpSchema,
+  excluirClienteSchema,
+  idDeClienteSchema,
 } from './customers.schema.js';
 
 const inatividadeSchema = z.object({
@@ -27,9 +30,11 @@ const varejoSchema = z.object({ varejo: z.boolean() });
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
-  const { search, include_blocked } = request.query as {
+  const { search, include_blocked, cnpj } = request.query as {
     search?: string;
     include_blocked?: string;
+    /** Só os clientes com este documento (dígitos ou máscara). */
+    cnpj?: string;
   };
 
   const customers = await getCustomers(
@@ -39,6 +44,7 @@ export async function listCustomers(request: FastifyRequest, reply: FastifyReply
     search,
     include_blocked !== 'false',
     erp_rep_id,
+    typeof cnpj === 'string' ? cnpj : null,
   );
   await reply.send({ data: customers });
 }
@@ -342,4 +348,116 @@ export async function atrelarCodigoErpHandler(
   };
   const resp = respostas[r.motivo];
   await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
+}
+
+// ─── Excluir cliente (só admin) ──────────────────────────────────────────────
+
+async function clienteNaoEncontrado(reply: FastifyReply): Promise<void> {
+  await reply.status(404).send({ error: 'Cliente não encontrado', code: 'NOT_FOUND', statusCode: 404 });
+}
+
+/**
+ * GET /customers/:id/vinculos — o que o diálogo de exclusão mostra antes de o
+ * admin confirmar: quantos pedidos, logins, convites, vitrines e tarefas.
+ */
+export async function vinculosDoClienteHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id } = request.user;
+  const { id } = request.params as { id: string };
+  if (!idDeClienteSchema.safeParse(id).success) {
+    await clienteNaoEncontrado(reply);
+    return;
+  }
+
+  const r = await lerVinculosParaExcluir(company_id, id);
+  if (r.ok) {
+    await reply.send({ data: r.vinculos });
+    return;
+  }
+  if (r.motivo === 'cliente_nao_encontrado') {
+    await clienteNaoEncontrado(reply);
+    return;
+  }
+  await reply.status(500).send({
+    error: 'Não foi possível contar os vínculos do cliente. Tente de novo.',
+    code: 'LEITURA_FALHOU',
+    statusCode: 500,
+  });
+}
+
+/**
+ * POST /customers/:id/excluir — só admin (a rota barra os outros papéis).
+ *
+ * Cliente com pedido, login de loja, convite, vitrine ou tarefa só sai juntado
+ * em outro cadastro da empresa (`juntar_em`). A cópia vai para
+ * deleted_customers antes; sem a migração 050, nada acontece.
+ */
+export async function excluirClienteHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, name } = request.user;
+  const { id } = request.params as { id: string };
+  if (!idDeClienteSchema.safeParse(id).success) {
+    await clienteNaoEncontrado(reply);
+    return;
+  }
+  const body = await parseBody(excluirClienteSchema, request.body ?? {}, reply);
+  if (!body) return;
+
+  const r = await excluirCliente(company_id, id, body, { id: sub, nome: name });
+  if (r.ok) {
+    await reply.send({ data: r.resultado });
+    return;
+  }
+
+  switch (r.motivo) {
+    case 'migracao_pendente':
+      await reply.status(409).send({
+        error: 'Excluir cliente precisa da migração 050 aplicada no banco. Nada foi alterado.',
+        code: 'MIGRACAO_PENDENTE',
+        statusCode: 409,
+      });
+      return;
+    case 'banco_indisponivel':
+      await reply.status(503).send({
+        error: 'O banco não respondeu. Nada foi alterado — tente de novo em instantes.',
+        code: 'BANCO_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    case 'cliente_nao_encontrado':
+      await clienteNaoEncontrado(reply);
+      return;
+    case 'juntar_em_invalido':
+      await reply.status(400).send({
+        error: 'O cadastro que fica precisa ser outro cliente desta empresa.',
+        code: 'JUNTAR_EM_INVALIDO',
+        statusCode: 400,
+      });
+      return;
+    case 'com_vinculos':
+      await reply.status(409).send({
+        error:
+          'Este cliente tem pedidos, login, convites, vitrines ou tarefas. Escolha o cadastro que fica com eles.',
+        code: 'CLIENTE_COM_VINCULOS',
+        statusCode: 409,
+        contagens: r.contagens,
+      });
+      return;
+    case 'erro':
+      await reply.status(500).send({
+        error: `Não foi possível excluir o cliente. Nada foi alterado. (${r.detalhe})`,
+        code: 'EXCLUSAO_FALHOU',
+        statusCode: 500,
+        desfeito: true,
+      });
+      return;
+    case 'falhou_no_meio':
+      await reply.status(500).send({
+        error: r.desfeito
+          ? `Não foi possível excluir o cliente. O que já tinha mudado foi desfeito. (${r.detalhe})`
+          : `A exclusão falhou no meio e nem tudo pôde ser desfeito — avise o suporte. (${r.detalhe})`,
+        code: 'EXCLUSAO_FALHOU',
+        statusCode: 500,
+        desfeito: r.desfeito,
+      });
+      return;
+  }
 }

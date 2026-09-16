@@ -13,11 +13,14 @@ import {
   setNotesHandler,
   ultimoNumeroErpHandler,
   corrigirNumeroErpHandler,
+  solicitarErpHandler,
+  cancelarSolicitacaoHandler,
   erpSyncHandler,
   deleteOrderHandler,
   listDeletedOrdersHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
+  canaisDosPedidosHandler,
 } from './orders.controller.js';
 
 export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
@@ -77,6 +80,9 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     { preHandler: [authenticate, requireRole(['admin'])] },
     listDeletedOrdersHandler,
   );
+  // Os canais que mudam a tela de pedidos (048) — a lista esconde o "Marcar
+  // faturado" do cartão quando o faturamento vem do Control. Sem dado de pedido.
+  fastify.get('/orders/canais', daFabricaOuLoja, canaisDosPedidosHandler);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
@@ -99,6 +105,21 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/orders/:id/numero-erp',
     { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
     corrigirNumeroErpHandler,
+  );
+  // "Lançar no Control" com o canal de pedidos na API (049): o financeiro
+  // SOLICITA e o número chega pela confirmação do Control. Mesmos papéis do
+  // lançamento à mão: quem lança (financeiro; admin como válvula).
+  fastify.patch(
+    '/orders/:id/solicitar-erp',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    solicitarErpHandler,
+  );
+  // "Cancelar solicitação" (050): o Control ainda não importou e o financeiro
+  // tira o pedido da fila. Os mesmos papéis de quem solicita.
+  fastify.patch(
+    '/orders/:id/cancelar-solicitacao',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    cancelarSolicitacaoHandler,
   );
   // "Atualizar no ERP" (046): a venda interna editou as peças de um pedido que
   // já está no Control e avisa a fábrica; quem mexe no Control confirma depois.

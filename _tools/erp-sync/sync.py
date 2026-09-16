@@ -4,10 +4,25 @@ ERP Sync — Firebird 2.5 → Supabase
 Corpo Sensual B2B
 
 Uso:
-  python sync.py --mode full            # tudo
-  python sync.py --mode stock           # só estoque
-  python sync.py --mode customers       # só clientes
-  python sync.py --mode prices          # só preços
+  python sync.py --mode test            # só conta no Firebird (livre)
+  python sync.py --mode prices-audit    # auditoria de preços, só leitura (livre)
+  python sync.py --mode full            # tudo                     (grava)
+  python sync.py --mode stock           # só estoque               (grava)
+  python sync.py --mode customers       # só clientes              (grava)
+  python sync.py --mode prices          # só preços                (grava)
+  python sync.py --mode products        # produtos e variantes     (grava)
+  python sync.py --mode reconcile       # flag active dos produtos (grava)
+  python sync.py --mode push-orders     # PEDIDO no Firebird do Control (grava nos dois lados)
+
+TRAVAS (fase 0 da integração com o Control):
+  - Todo modo que GRAVA recusa rodar (sai com código 2, sem abrir o Firebird)
+    sem ERP_SYNC_PY_LIBERADO=sim no ambiente DA EXECUÇÃO. Vale só o ambiente do
+    terminal (ex.: `set ERP_SYNC_PY_LIBERADO=sim` no cmd), nunca o .env: a
+    liberação é um ato de quem roda, não uma configuração esquecida no disco.
+  - push-orders, além disso, só roda com companies.canal_pedido_erp = 'sync_py'
+    na empresa COMPANY_ID (migração 048). Sem a coluna, ou sem conseguir ler,
+    recusa. Com o canal em 'manual' ou 'api', o número vem da tela ou da API.
+  - test e prices-audit continuam livres.
 
 Variáveis de ambiente (.env):
   FIREBIRD_DB_PATH    = C:\\caminho\\para\\DBCORPO-002.FDB
@@ -19,7 +34,7 @@ Variáveis de ambiente (.env):
 Dependências:
   pip install fdb python-dotenv httpx
 """
-import os, sys, json, time, logging, argparse
+import os, re, sys, json, time, logging, argparse
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -43,6 +58,11 @@ FBEMBED_DIR = next((p for p in _fbembed_candidates if p.exists()), _fbembed_cand
 
 # Adiciona DLLs ao PATH antes de importar fdb
 os.environ["PATH"] = str(FBEMBED_DIR) + ";" + os.environ.get("PATH", "")
+
+# Lido ANTES do load_dotenv de propósito: a liberação dos modos que gravam tem
+# de vir do terminal de quem roda, não de uma linha esquecida num .env.
+LIBERACAO_ENV = "ERP_SYNC_PY_LIBERADO"
+LIBERADO = os.environ.get(LIBERACAO_ENV, "").strip().lower() == "sim"
 
 try:
     from dotenv import load_dotenv
@@ -143,11 +163,12 @@ def supabase_select(table: str, columns: str = "*", filters: dict | None = None)
     return r.json()
 
 def supabase_patch_by_ids(table: str, ids: list, body: dict) -> int:
-    """PATCH em lote dos registros cujo id está na lista (em chunks)."""
+    """PATCH em lote dos registros cujo id está na lista (em chunks), sempre
+    dentro da empresa COMPANY_ID."""
     total = 0
     for i in range(0, len(ids), CHUNK_SIZE):
         chunk = ids[i:i+CHUNK_SIZE]
-        url = f"{SUPABASE_URL}/rest/v1/{table}?id=in.({','.join(chunk)})"
+        url = f"{SUPABASE_URL}/rest/v1/{table}?id=in.({','.join(chunk)})&company_id=eq.{COMPANY_ID}"
         r = httpx.patch(url, headers={**HEADERS, "Prefer": "return=minimal"}, json=body, timeout=30)
         if r.status_code not in (200, 204):
             raise RuntimeError(f"Supabase patch {table} falhou [{r.status_code}]: {r.text[:300]}")
@@ -569,6 +590,33 @@ def _insert_order_into_erp(con, order: dict, table_map: dict) -> str:
     con.commit()
     return pedido_num
 
+def gravar_numero_do_pedido(order_id: str, pedido_num: str) -> bool:
+    """Grava o número do Control no pedido, com a origem 'sync_py' (migração 048).
+
+    Só grava se o pedido ainda não tem número (`erp_order_id=is.null`): quem
+    gravou antes (tela ou API) não é atropelado. Devolve False quando nenhuma
+    linha mudou; aí o número ficou no Control sem vínculo no app e precisa de
+    conferência à mão. A coluna erp_order_source existe: o push-orders só roda
+    com canal_pedido_erp, que nasce na mesma migração.
+    """
+    agora = now_iso()
+    url = (
+        f"{SUPABASE_URL}/rest/v1/orders?id=eq.{order_id}"
+        f"&company_id=eq.{COMPANY_ID}&erp_order_id=is.null&select=id"
+    )
+    body = {
+        "status": "sent_erp",
+        "erp_order_id": pedido_num,
+        "synced_at": agora,
+        "updated_at": agora,
+        "erp_order_source": "sync_py",
+        "erp_order_set_at": agora,
+    }
+    r = httpx.patch(url, headers={**HEADERS, "Prefer": "return=representation"}, json=body, timeout=30)
+    if r.status_code not in (200, 204):
+        raise RuntimeError(f"Supabase patch orders falhou [{r.status_code}]: {r.text[:300]}")
+    return r.status_code == 200 and len(r.json()) > 0
+
 def push_orders(con) -> int:
     """Envia pedidos aprovados do Supabase para o ERP. Retorna qtde enviada."""
     orders = fetch_pending_orders()
@@ -587,17 +635,18 @@ def push_orders(con) -> int:
         oid = order["id"]
         try:
             pedido_num = _insert_order_into_erp(con, order, table_map)
-            supabase_patch_by_ids("orders", [oid], {
-                "status": "sent_erp",
-                "erp_order_id": pedido_num,
-                "synced_at": now_iso(),
-            })
+            if not gravar_numero_do_pedido(oid, pedido_num):
+                log.error(
+                    f"  Pedido {oid[:8]} entrou no ERP como {pedido_num}, mas já tinha número no app "
+                    "(gravado por outro caminho) — nada regravado; conferir à mão"
+                )
+                continue
             log.info(f"  Pedido {oid[:8]} → ERP {pedido_num} OK")
             sent += 1
         except OrderMappingError as e:
             con.rollback()
             log.error(f"  Pedido {oid[:8]} com erro de cadastro (não será re-tentado): {e}")
-            supabase_patch_by_ids("orders", [oid], {"status": "error_erp", "synced_at": now_iso()})
+            supabase_patch_by_ids("orders", [oid], {"status": "error_erp", "synced_at": now_iso(), "updated_at": now_iso()})
         except Exception as e:
             con.rollback()
             log.error(f"  Pedido {oid[:8]} falhou (vai re-tentar na próxima rodada): {e}")
@@ -634,6 +683,58 @@ def sync_stock(cur) -> int:
     log.info(f"  Estoque: {result['records']} variantes atualizadas")
     return result["records"]
 
+# ─── Travas ───────────────────────────────────────────────────────────────────
+# Modos que GRAVAM (no Supabase e, no push-orders, também no Firebird do Control).
+# test e prices-audit só leem e ficam fora.
+MODOS_QUE_GRAVAM = {"full", "stock", "customers", "prices", "products", "reconcile", "push-orders"}
+
+UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$")
+
+def ler_canal_pedido_erp() -> tuple[str | None, str]:
+    """(canal, motivo) de companies.canal_pedido_erp da COMPANY_ID.
+
+    Uma leitura GET ?select=canal_pedido_erp&id=eq.<COMPANY_ID>. canal None =
+    não deu para saber (coluna ausente, empresa sem linha, erro de rede), e
+    quem chama recusa.
+    """
+    url = f"{SUPABASE_URL}/rest/v1/companies?select=canal_pedido_erp&id=eq.{COMPANY_ID}"
+    try:
+        r = httpx.get(url, headers=HEADERS, timeout=30)
+    except Exception as e:  # rede, DNS, timeout
+        return None, f"falha ao ler o canal ({type(e).__name__})"
+    if r.status_code != 200:
+        texto = r.text[:300]
+        if "42703" in texto or "PGRST204" in texto or "does not exist" in texto:
+            return None, "a coluna companies.canal_pedido_erp não existe (migração 048 não aplicada)"
+        return None, f"falha ao ler o canal [{r.status_code}]"
+    try:
+        linhas = r.json()
+    except ValueError:
+        return None, "resposta ilegível ao ler o canal"
+    if not isinstance(linhas, list) or not linhas:
+        return None, "empresa COMPANY_ID não encontrada em companies"
+    return linhas[0].get("canal_pedido_erp"), "ok"
+
+def conferir_travas(mode: str) -> None:
+    """Sai com código 2 (antes de abrir o Firebird) quando o modo não pode rodar."""
+    if mode not in MODOS_QUE_GRAVAM:
+        return
+    if not LIBERADO:
+        log.error(
+            f"--mode {mode} grava e está travado: rode com {LIBERACAO_ENV}=sim no ambiente "
+            "desta execução (o .env não conta). Veja o README antes."
+        )
+        sys.exit(2)
+    if mode == "push-orders":
+        canal, motivo = ler_canal_pedido_erp()
+        if canal != "sync_py":
+            detalhe = f"canal_pedido_erp='{canal}'" if canal is not None else motivo
+            log.error(
+                f"--mode push-orders recusado: {detalhe}. Só roda com canal_pedido_erp='sync_py' "
+                "nesta empresa; com 'manual' ou 'api' o número vem da tela ou da API."
+            )
+            sys.exit(2)
+
 # ─── Main ─────────────────────────────────────────────────────────────────────
 def main():
     parser = argparse.ArgumentParser(description="ERP Sync — Firebird → Supabase")
@@ -644,6 +745,11 @@ def main():
     if not COMPANY_ID:
         log.error("COMPANY_ID não definido")
         sys.exit(1)
+    if not UUID_RE.match(COMPANY_ID):
+        log.error("COMPANY_ID não é um uuid")
+        sys.exit(1)
+
+    conferir_travas(args.mode)
 
     log.info(f"Iniciando sync modo={args.mode} | Empresa: {COMPANY_ID}")
     log.info(f"Banco: {DB_PATH}")

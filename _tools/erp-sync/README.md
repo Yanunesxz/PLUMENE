@@ -1,20 +1,54 @@
-# _tools/erp-sync — o agente Python que fala com o Firebird do Control
+# _tools/erp-sync — o agente Python que falava com o Firebird do Control
 
-Atualizado em 15/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`
-(as linhas são as do arquivo neste commit). Se mexer no script, atualize aqui.
+Atualizado em 16/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`.
+**Atenção:** as âncoras de linha são de ANTES das travas da fase 0 (seção
+"Travas no código", abaixo), que acrescentaram linhas ao docstring, ao topo e
+antes do `main`. Localize por nome de função. Se mexer no script, atualize aqui.
+
+## DECISÃO — 16/09/2026: o Firebird está APOSENTADO. Tudo vem pela API.
+
+Decisão do Yan (decisão 6 das respostas de 16/09, registradas em
+`docs/BRIEF-ERP-FABIO.md`, §0.6): **o Control manda TUDO pela API de Parceiro
+e sobrescreve** — tabelas de preço (código, descrição, coluna, ativo),
+condições de pagamento (código, descrição, ativo, valor mínimo), produtos e
+tamanhos, preço por tabela (sobrescreve o do PDF), estoque das duas marcas,
+clientes e representantes, o retrato do cliente (última compra, total
+comprado, vencido, pendência financeira) e o faturamento com a nota. As rotas
+estão em `apps/api/src/modules/partner/` e o contrato em `docs/API-PARCEIRO.md`
+(seções 5 a 7) e `apps/web/public/api-parceiro.html`.
+
+O que isso significa para esta pasta:
+
+- **Nenhum modo deste script deve rodar contra produção**, nem o leitor
+  TypeScript do Firebird (`apps/api/src/erp/firebird/`, `ERP_SYNC_ENABLED`),
+  nem o `photos.py` no que escreve no catálogo. Não é "até decidir": a decisão
+  foi tomada — o caminho é a API. As travas da fase 0 (abaixo) continuam no
+  código e são a garantia de que um `--mode` digitado por engano não sobe.
+- **`push-orders` está morto de vez.** O modelo é o publicado: o financeiro
+  clica "Lançar no Control", o pedido entra na fila solicitada, o programa do
+  Fábio puxa `GET /partner/v1/pedidos` a cada 1 minuto, grava no Control, e
+  devolve o número por `POST /partner/v1/pedidos/:id/confirmar`. O número é
+  cunhado pelo Control, na série da marca (`CS` na Corpo Sensual, `PL` na
+  PLUMENE) — a série de representante que este script configurava em
+  `ERP_ORDER_PREFIX` não existe mais.
+- **As tabelas de preço deixam de vir do PDF:** o preço que vale é o que o
+  Control manda por `POST /partner/v1/precos`. A pergunta 9 do brief está
+  respondida.
+- **O código não é apagado** (é a prova de como a leitura direta funcionava),
+  mas o resto deste README passa a ser **histórico**: descreve o que o script
+  faz, para ninguém precisar abri-lo, não o que deve ser feito.
 
 ## O que há nesta pasta
 
 | Arquivo | O que é |
 |---|---|
 | `sync.py` | O agente. Lê o Firebird 2.5 do Control e grava no Supabase — e, num modo só, faz o caminho inverso (ver **push-orders**). |
-| `photos.py` | Ingestão única de fotos: pasta de rede MARKETING → Supabase Storage → `products.image_url` (`photos.py:3-16`). Não toca no Firebird. |
+| `photos.py` | Ingestão única de fotos: pasta de rede MARKETING → Supabase Storage → `products.image_url` (`photos.py:3-16`). Não toca no Firebird, mas **escreve no catálogo** — por isso pede as mesmas travas do `sync.py`: `ERP_SYNC_PY_LIBERADO=sim` no ambiente da execução e `companies.canal_catalogo='firebird'` na `COMPANY_ID` (ver `conferir_travas`). `--dry-run` continua livre. |
 | `.env.example` | As variáveis que o agente lê. Copie para `.env` ao lado do script. |
 | `skus_sem_foto.txt`, `skus_sem_preco.txt` | Saídas de rodadas antigas do `photos.py` e do `--mode prices-audit`. Só diagnóstico. |
 | `fbembed25_x64/` (não versionada) | As DLLs do Firebird. O script procura primeiro aqui e depois em `_tools/firebird-reader/fbembed25_x64` (`sync.py:38-42`) — **essa segunda pasta não existe no disco**; sem as DLLs ao lado do script, nada sobe. |
 
-O docstring do `sync.py:6-10` lista só quatro modos; está desatualizado. A
-lista real está no `argparse` em `sync.py:640-641` e é a tabela abaixo.
+O docstring do `sync.py` lista os nove modos do `argparse` e as travas.
 
 ## Como ele sobe
 
@@ -36,10 +70,10 @@ lista real está no `argparse` em `sync.py:640-641` e é a tabela abaixo.
 |---|---|---|---|
 | `full` | `sync.py:657-661` | `price_tables`, `products` + `product_variants`, `product_prices`, `customers` | Roda, nesta ordem: `sync_price_tables` (`sync.py:168-189`), depois o mesmo que `products`, `prices` e `customers`. **Não** inclui `stock` nem `push-orders`. |
 | `stock` | `sync_stock`, `sync.py:607-635` | `product_variants.stock_quantity/stock_committed` | Casa pela `erp_sku` (`PRODUTO\|TAMANHO`, `sync.py:623`). |
-| `customers` | `sync_customers`, `sync.py:391-431` | `customers` (upsert por `company_id,erp_id`, `sync.py:429`) | Manda `block_reason: None` (`sync.py:422`), então apaga o motivo de bloqueio digitado no app. |
+| `customers` | `sync_customers`, `sync.py:391-431` | `customers` (upsert por `company_id,erp_id`, `sync.py:429`) | Manda `block_reason: None` (`sync.py:422`), então apaga o motivo de bloqueio digitado no app. **Defeituoso — ver "O que pode rodar hoje sem susto"**; o canal oficial de cadastro é `POST /partner/v1/clientes`. |
 | `prices` | `sync_prices`, `sync.py:277-321` | `product_prices` (upsert por `product_id,price_table_id`, `sync.py:319`) | **Defeituoso — ver "vetos"**. |
 | `products` | `sync_products`, `sync.py:192-274` | `products` (upsert por `company_id,sku`) + `product_variants` (por `company_id,erp_sku`), desativa ref desligada no ERP (`sync.py:255-262`) | Grava `description: None` (`sync.py:227`): apaga descrição editada no app. `image_url` é preservada de propósito (`sync.py:220-221`). |
-| `reconcile` | `reconcile_active`, `sync.py:324-344` | só `products.active` | PATCH pontual, não reescreve nada mais. |
+| `reconcile` | `reconcile_active`, `sync.py:324-344` | só `products.active` | PATCH pontual, não reescreve nada mais — mas liga e desliga produto pelo que o Firebird pensa, contra o catálogo dos PDFs (ver o fim deste README). |
 | `prices-audit` | `audit_prices`, `sync.py:348-387` | **nada** | Só lê: conta produtos com preço em PRECO1, só em PRECO2..6, ou sem preço. |
 | `test` | `sync.py:676-681` | **nada** | Conta produtos e clientes ativos no Firebird. |
 | `push-orders` | `push_orders`, `sync.py:572-604` | **PEDIDO e ITENS_PEDIDO no Firebird do Fábio** + `orders` no Supabase | A única escrita no ERP (`sync.py:434-435`). Detalhado abaixo. **Vetado em produção.** |
@@ -70,10 +104,12 @@ banco de produção do Control**. Passo a passo, com a linha:
    (`sync.py:457-458`). Isso é **DDL no banco de produção do Fábio**, feito
    por um script nosso, sem ninguém do lado de lá saber.
 3. **Cunha o número** (`sync.py:534-538`): `SELECT GEN_ID(GEN_PEDIDO_UNIVERSAL, 1)`
-   dentro do Firebird e monta `SX` + sequência (`ERP_ORDER_PREFIX`,
-   `sync.py:80`). O `GEN_PEDIDO_UNIVERSAL` é a sequência **única compartilhada
-   por todas as séries** do Control (CS/SX/PL entrelaçam o mesmo contador,
-   `sync.py:77-79`, `.env.example:19-23`). `GEN_ID` não é transacional no
+   dentro do Firebird e monta o prefixo de `ERP_ORDER_PREFIX` + sequência
+   (`sync.py:80`; o prefixo configurado era o de uma série de representante
+   que não existe mais — a série é a da marca). O `GEN_PEDIDO_UNIVERSAL` é a
+   sequência **única compartilhada por todas as séries** do Control (as séries
+   entrelaçam o mesmo contador, `sync.py:77-79`, `.env.example:19-23`).
+   `GEN_ID` não é transacional no
    Firebird: qualquer falha depois da linha 534 (o `rollback` em
    `sync.py:598` e `602`) **queima um número** da numeração do Fábio.
 4. **Insere `PEDIDO`** (`sync.py:543-556`): `STATUS = 'A'`,
@@ -86,10 +122,12 @@ banco de produção do Control**. Passo a passo, com a linha:
    `'00001'` (`sync.py:564`), produto e tamanho da `erp_sku` `PRODUTO|TAMANHO`
    ou de `products.erp_id` + `variants.size` (`sync.py:486-493`). Commit em
    `sync.py:569`.
-6. **Confirma no Supabase** por PATCH direto (`sync.py:590-594`):
-   `status = sent_erp`, `erp_order_id = SXnnnnn`, `synced_at`. Não manda
-   `updated_at` — quem carimba é o gatilho da migração 013
-   (`apps/api/src/config/migrations/013_protecoes.sql:88-105`).
+6. **Confirma no Supabase** por PATCH direto (`gravar_numero_do_pedido`):
+   `status = sent_erp`, `erp_order_id = <prefixo>nnnnn`, `synced_at`, `updated_at`,
+   `erp_order_source = 'sync_py'` e `erp_order_set_at` (migração 048), filtrando
+   `company_id` e `erp_order_id IS NULL`. Se o pedido já tinha número (gravado
+   pela tela ou pela API no meio do caminho), nada é regravado e o log pede
+   conferência à mão: o número cunhado ficou no Control sem vínculo no app.
 7. **Cadastro que não casa vira `error_erp`** (`sync.py:597-600`): cliente sem
    `erp_id` (`sync.py:518-519`), sem `rep_erp_id` (`sync.py:520-521`), sem
    tabela com `erp_code` (`sync.py:523-525`), pedido sem itens ou item sem
@@ -117,9 +155,10 @@ armada e desconectada — não é processo rodando.
 O que foi prometido ao Fábio, nos dois documentos que são a mesma
 especificação:
 
-- `docs/API-PARCEIRO.md:16` — *"O aplicativo nunca escreve no banco do ERP"*.
-- `apps/web/public/api-parceiro.html:611` — *"nada é escrito no seu ERP por
-  fora — você continua no controle do que entra"*.
+- `docs/API-PARCEIRO.md`, primeiro parágrafo — *"O aplicativo nunca escreve no
+  banco do ERP"*.
+- `apps/web/public/api-parceiro.html`, texto de abertura — *"nada é escrito no
+  seu ERP por fora — você continua no controle do que entra"*.
 - `apps/api/src/modules/partner/partner.router.ts:6-8` — duas mãos: pedidos
   **saem** (o parceiro busca e confirma) e cadastros **entram** por POST.
 
@@ -127,27 +166,54 @@ O `push-orders` faz o contrário: escreve `PEDIDO`, `ITENS_PEDIDO` e, se
 precisar, o próprio generator no Firebird de produção. Enquanto o script
 existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-lo.
 
-## DECISÃO — 15/09/2026
+## DECISÃO — 15/09/2026 (mantida; a de 16/09, acima, fecha o que faltava)
 
 1. **O canal oficial é a API de Parceiro.** O programa do Fábio **PUXA** os
    pedidos em `GET /partner/v1/pedidos`, grava no Control e devolve o número
    em `POST /partner/v1/pedidos/:id/confirmar`. O número do Control é cunhado
    **pelo Control**; o app nunca cunha número e nunca escreve no Firebird.
    A frase "nada é escrito no seu ERP" continua sendo o contrato.
+   Desde a fase 0 isso está **gravado por empresa**, em `companies.canal_*`
+   (migração 048, lido por `apps/api/src/lib/canais.ts`): `canal_pedido_erp`
+   diz quem grava o número do pedido (`manual` = a tela, `api` = a API de
+   Parceiro, `sync_py` = este script), `canal_faturamento` quem carimba o
+   faturado e `canal_cadastro` / `canal_catalogo` de onde vêm clientes e
+   catálogo. Os padrões são o comportamento de hoje; virar um canal é um
+   `UPDATE` por empresa, feito à mão pelo Yan.
 2. **`--mode push-orders` NÃO deve ser executado em produção**, em nenhuma das
-   duas marcas, até decisão explícita do Yan com o Fábio. As perguntas que
-   destravam isso estão no §6 do brief (`docs/BRIEF-ERP-FABIO.md`):
-   - **Pergunta 1** — o Fábio fica com o modelo publicado (ele puxa e confirma)
-     ou prefere que o app insira direto no Firebird? Um dos dois morre.
-   - **Pergunta 5** — alguém já rodou `push-orders` em produção? Existe
-     `PEDIDO` com `IDPEDIDO_EXTERNO` preenchido? O `GEN_PEDIDO_UNIVERSAL` já
-     existia no Control ou foi o nosso script que criou?
+   duas marcas. Em 16/09/2026 a decisão ficou definitiva (ver o topo): o
+   modelo é o publicado — o Control puxa e confirma. A pergunta 1 do §6 do
+   brief está respondida; a pergunta 5 (alguém já rodou `push-orders`? existe
+   `PEDIDO` com `IDPEDIDO_EXTERNO`? o `GEN_PEDIDO_UNIVERSAL` já existia?)
+   continua valendo como conferência histórica com o Fábio.
 3. **O código não é apagado.** É decisão registrada, não remoção: ele é a
    prova de como a inserção direta funcionaria, caso a resposta da pergunta 1
    vá por esse caminho. Se um dia for ligado, precisa antes: paginar a fila,
    filtrar faturado, parar de gravar `error_erp` por fora do fluxo, e a API de
    Parceiro precisa ser desligada para aquela marca — nunca os dois ao mesmo
    tempo.
+
+## Travas no código — fase 0 (15/09/2026)
+
+A decisão acima deixou de depender só de ninguém rodar o modo:
+
+- **Todo modo que grava** (`full`, `stock`, `customers`, `prices`, `products`,
+  `reconcile`, `push-orders`) sai com **código 2**, antes de abrir o Firebird,
+  sem `ERP_SYNC_PY_LIBERADO=sim` no ambiente **da execução** (`conferir_travas`).
+  O valor é lido antes do `load_dotenv`: pôr a linha no `.env` não libera nada.
+  No cmd: `set ERP_SYNC_PY_LIBERADO=sim` e rodar na mesma janela.
+- **`push-orders`**, além disso, lê `companies.canal_pedido_erp` da `COMPANY_ID`
+  (GET `?select=canal_pedido_erp&id=eq.<COMPANY_ID>`, `ler_canal_pedido_erp`) e
+  só segue com `'sync_py'`. Coluna ausente (migração 048 não aplicada), empresa
+  sem linha ou erro de leitura: recusa. Hoje nenhuma empresa tem `'sync_py'`.
+- `COMPANY_ID` precisa ser um uuid, e todo PATCH (`supabase_patch_by_ids`)
+  filtra `company_id`.
+- `test` e `prices-audit` continuam livres.
+
+O leitor TypeScript da API tem a trava equivalente por canal:
+`canal_catalogo = 'firebird'` para tabelas, produtos, preços e estoque;
+`canal_cadastro = 'firebird'` para clientes (`erpSyncService.ts`, agendador e
+rotas `/erp/sync`, que respondem 409 `CANAL_FECHADO`).
 
 ## Outros vetos (mesma data)
 
@@ -164,16 +230,43 @@ existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-l
   (`sync.py:319`) estoura no Postgres ("ON CONFLICT DO UPDATE command cannot
   affect row a second time"). O `full` também derruba a descrição dos produtos
   (`sync.py:227`).
-- **As tabelas de preço em produção vêm dos PDFs de 2027**
+- **As tabelas de preço em produção vieram dos PDFs de 2027**
   (`_tools/tabelas-2027/carregar.mjs`), com `erp_code` vazio **de propósito**
-  para o sync não sobrescrevê-las. Preencher `erp_code` reabre as tabelas ao
-  Firebird. Quem manda no preço — o PDF ou o Control — é a pergunta 9 do §6,
-  não uma coluna esquecida.
+  para o sync não sobrescrevê-las. Desde 16/09/2026 quem manda no preço é o
+  Control, por `POST /partner/v1/tabelas-preco` (que preenche o `erp_code`) e
+  `POST /partner/v1/precos` (que sobrescreve o preço) — pela API, nunca pelo
+  Firebird. A pergunta 9 do §6 está respondida.
 
 ## O que pode rodar hoje sem susto
 
-`--mode test`, `--mode prices-audit` (só leitura) e `--mode reconcile` (só o
-flag `active`). `--mode stock` e `--mode customers` gravam, mas não tocam em
-pedido nem em preço; ainda assim, rode primeiro numa cópia do banco e pause o
-cron do CRM antes de uma carga grande de clientes (cada linha ganha
-`updated_at` novo e o CRM relê a base inteira na rodada seguinte).
+**Só `--mode test` e `--mode prices-audit`** — os dois só leem e não pedem
+liberação. Todo o resto grava, exige `ERP_SYNC_PY_LIBERADO=sim` na janela do
+terminal e **continua com os defeitos abaixo**: a trava só impede o acidente,
+não conserta o modo. Desde 16/09/2026 nenhum deles é para ser liberado: o dado
+que cada um gravava chega pela API (`customers` → `POST /clientes`; `products`
+e `stock` → `POST /produtos` e `POST /estoque`; `prices` e `full` →
+`POST /tabelas-preco` e `POST /precos`; `reconcile` → o `ativo` de
+`POST /produtos`). A lista fica como registro (medições de 15/09/2026):
+
+- **`customers`** casa só por `erp_id` exato no upsert
+  (`on_conflict=company_id,erp_id`): `2225` e `02225` viram dois cadastros, e os
+  clientes que estão sem código (1254 na CS, 468 na PL) seriam **criados de
+  novo**. Além disso zera `price_table_id` enquanto nenhuma tabela tem
+  `erp_code` (até 559 clientes da CS), grava `block_reason` nulo (apaga o motivo
+  de bloqueio digitado no app) e usa `DATA_UPDATE` sem fuso como `updated_at`.
+  A rota `POST /partner/v1/clientes` faz o mesmo trabalho sem nenhum desses
+  defeitos — é ela o canal oficial de cadastro.
+- **`reconcile`** compara o `active` de todo produto com `erp_id` contra o
+  Firebird: desativaria os produtos que só existem nos PDFs de 2027 e reativaria
+  até 124 refs que o catálogo tirou de linha na CS.
+- **`stock`** manda linha parcial num upsert sem `on_conflict` (provável erro
+  23502) e lê só 1.000 variantes de 1.634 na CS — parte do estoque ficaria de
+  fora. Nunca foi executado.
+- **`prices` e `full`** estão vetados pelo upsert de preço duplicado (acima);
+  o `full` ainda derruba a descrição dos produtos.
+- **`push-orders`** está vetado pela DECISÃO acima e exige `canal_pedido_erp =
+  'sync_py'`, que hoje nenhuma empresa tem.
+
+Se um dia um desses modos for mesmo necessário: rode primeiro numa cópia do
+banco e pause o cron do CRM antes de uma carga grande de clientes (cada linha
+ganha `updated_at` novo e o CRM relê a base inteira na rodada seguinte).

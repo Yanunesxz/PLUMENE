@@ -7,8 +7,10 @@
 --   046 → o botão "Atualizar no ERP" (a Larissa confirma que atualizou o Control)
 --   047 → o botão "Cliente varejo" (a Simone e a Nicoli marcam o cliente de balcão)
 --
--- Conferido em 15/09/2026 por consulta direta: as duas FALTAM nos dois bancos.
--- Sem elas os dois botões simplesmente não aparecem; o resto do app segue igual.
+-- JÁ APLICADO NOS DOIS BANCOS (15/09/2026). Medido às 09:5x de 15/09 com
+-- `node _tools/conferir-046-047.mjs` (GET de verdade, nas duas raízes): 046 e
+-- 047 visíveis na Corpo Sensual e na PLUMENE. Não precisa colar de novo — se
+-- colar, não faz mal (é idempotente). Fica aqui como registro do que rodou.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─────────────────────────────────────────────────────────────────────────────

@@ -66,6 +66,93 @@ site ── CRM (CSP 360) ──┬── app Corpo Sensual ──┬── ERP 
 - O comando do §8 sobre `partner/v1` devolve dois comentários, não vazio.
 - No CRM: `mapearStatus` faz `invoiced === true` vencer qualquer status (até `rejected`); o catch do insert de clientes não descarta pedidos (caem em "A vincular"); `deleted_orders` é filtrada por `deleted_at` (a falta de trigger é irrelevante ali); peças são reescritas se `orcamento` OU pedido sem itens.
 
+### 0.5 Fase 0 implementada (branch `mudanca/app-control-fase-0`)
+
+O que a auditoria apontou virou código, na worktree `SetorxWeb-control`, ainda **fora do `main`**. Resumo do que mudou — o contrato vivo é `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html` (a mesma especificação nos dois), que já descrevem **nove** rotas; o §2.2 deste brief fala de seis e está defasado.
+
+**O que mudou no app**
+
+- **Canal por empresa** (`companies.canal_*`, migração 048, `apps/api/src/lib/canais.ts`): cada fluxo tem um escritor só. A API de parceiro responde `409 CANAL_FECHADO` nas rotas que gravam enquanto o canal daquela empresa não for `'api'`; `GET /partner/v1/status` devolve `canais`. Padrões = o comportamento de hoje (manual/carga), então **sem a 048 a API fica fechada**.
+- **Três rotas novas**, todas só de leitura menos a primeira: `POST /partner/v1/pedidos/:id/conciliar` (dá número ao passivo `sent_erp` sem número), `GET /partner/v1/conciliacao` (só contagens) e `GET /partner/v1/pedidos/excluidos`.
+- **Faturamento idempotente**: campo ausente não apaga, `null` limpa, momento sem fuso é ignorado, só `approved`/`sent_erp` fatura, contador `inalterados`, e os campos novos `nota` e `itens` (tabelas `order_invoices` e `order_invoice_items`, 048) — com aviso e sem perder o resto quando a 048 ainda não rodou. Resolve o 0.2.1.
+- **Cadastros que não apagam o que não veio** em `POST /clientes` e `/representantes`, com `sem_mudanca`, miolo do código, colunas da 041 gravadas, `legal_name` e o e-mail do Control que **não** troca o login. Resolve o 0.3 (`/clientes` apaga, `/representantes`) e o 0.2.4.
+- **Fila sem pedido faturado**, corrida do `confirmOrderImport` fechada (`.is('erp_order_id', null)`), tabela do pedido (`orders.price_table_id`) no `GET /pedidos` e lista inteira com `buscarTudoOuFalhar`. Resolve o resto do 0.3.
+- **Rastro**: toda chamada do parceiro em `erp_sync_log` e todo acontecimento do pedido com o Control em `order_erp_events` (048), sem dado de cliente.
+- **Tela**: pedido com número do Control não pode ser excluído (`409 ORDER_HAS_ERP_NUMBER`); com `canal_pedido_erp='api'`, lançar no ERP pela tela responde `409 CANAL_API` (corrigir o número continua); com `canal_faturamento='api'`, o botão manual de faturado responde `409 FATURAMENTO_PELO_CONTROL`; edição de peças sem foto do original responde `503 ORIGINAL_NAO_GUARDADO`.
+- **Firebird e scripts travados**: o sync TS só roda para empresa com `canal_catalogo='firebird'` / `canal_cadastro='firebird'`; o `sync.py` recusa todo modo que grava sem `ERP_SYNC_PY_LIBERADO=sim` na janela do terminal, e o `push-orders` exige ainda `canal_pedido_erp='sync_py'`; `faturar-retroativo.mjs` exige `--empresa=<uuid>` e só grava com `--aplicar`; `seedDemoOrders` exige empresa explícita.
+
+**O que depende do Yan (nesta ordem)**
+
+1. **Reservar o número 048 por mensagem** entre as sessões antes do merge (regra do CLAUDE.md).
+2. **Só na Corpo Sensual:** rodar a consulta de repetidos do cabeçalho de `_tools/SQL-PARA-RODAR-013-042-NA-CS.sql` (deve vir vazia) e colar o arquivo — é a 013 inteira + o índice único da 042, que ainda faltam lá.
+3. **Nos dois bancos:** rodar as duas consultas do cabeçalho de `_tools/SQL-PARA-RODAR-048.sql` (`price_column` fora de 1–6 e `erp_code` repetido; as duas devem vir vazias), colar o arquivo e conferir com `node _tools/conferir-048.mjs` e `node _tools/conferir-048.mjs <raiz da PLUMENE>`.
+4. **Ler e aprovar o texto publicado** (`docs/API-PARCEIRO.md` e `apps/web/public/api-parceiro.html`): ele vai ao ar no Vercel quando a branch entrar no `main`.
+5. **Conferir no Railway e no Vercel** qual serviço é de qual marca antes de publicar a tabela de URLs (Corpo Sensual `setorxweb-production`, PLUMENE `csbapi-production`) e configurar `PARTNER_API_KEYS` com **uma chave por marca**.
+6. **Virar canal é um `UPDATE companies SET canal_… = 'api'`** por empresa, no SQL Editor, combinado com o Fábio. Enquanto não virar, a API responde `409 CANAL_FECHADO` e nada muda para quem usa o app hoje.
+
+### 0.6 Respostas do Yan em 16/09/2026
+
+As treze decisões abaixo fecham as perguntas 1, 7, 9, 10, 11, 13, 16 e 20 do §6 e viraram código na mesma branch (`mudanca/app-control-fase-0`, migração 049). O contrato vivo continua sendo `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html`, agora com **dezenove** rotas. Onde este brief disser outra coisa, vale isto:
+
+1. **Um Control por marca; uma chave e uma URL por marca.** A série do número é a da marca: `CS` (Corpo Sensual) e `PL` (PLUMENE). A série de representante que o script e a doc antiga exemplificavam **não existe mais**; a máscara continua duas letras + dígitos.
+2. **O lançamento continua sendo um clique do financeiro.** Com `canal_pedido_erp='api'`, "Lançar no Control" não digita número e não responde 409: **solicita** (`orders.erp_requested_at/by`, evento `solicitado_ao_erp`) e a tela consulta o pedido a cada 3 s por até 3 min; quando o número chega pela confirmação, mostra "Parabéns, pedido importado! O número no Control é CS…"; se estourar, "O Control ainda não respondeu. O pedido fica na fila e o número aparece aqui quando chegar". Com canal manual, tudo como hoje.
+3. **A fila da API** (`GET /partner/v1/pedidos`) é `approved AND erp_order_id IS NULL AND não faturado AND erp_requested_at IS NOT NULL` (sem a 049, a fila de antes). Campo novo `solicitado_em`; com `incluir=todos`, `alterado_apos_importacao` = o pedido de hoje difere da foto do que o Control conhece (046: peças, desconto, condição, observação). A conta literal `updated_at > erp_order_set_at` foi trocada na revisão de 16/09: a trigger da 013, o faturamento e as notas regravam `updated_at` e todo pedido importado sairia `true`.
+4. **O CNPJ é a chave única do cliente entre os sistemas.** No pedido, `cliente.chave` (só dígitos) e `cliente.novo_no_control` quando não há código. "Cliente sem código do ERP" **deixou de ser pendência** — o Control cria o cadastro e devolve o código por `POST /clientes`, casando por CNPJ; a pendência passa a ser "cliente sem CNPJ". Em `POST /clientes` o casamento é primeiro por `cnpj_digits`, depois pelo miolo do código; cliente sem código recebe o que vier.
+5. **Um pedido tem uma nota só.** Nota cancelada/devolvida não é avisada: o Control sobe outra por cima. Nota nova (número diferente) **substitui** a anterior (`cancelada_em`, `substituida_por`, evento `nota_substituida`); a tela usa só a nota ativa.
+6. **O Control manda tudo pela API e sobrescreve:** tabelas de preço (código, descrição, coluna 1-6, ativo), condições de pagamento (código, descrição, ativo, valor mínimo), produtos e tamanhos, preço por tabela (sobrescreve o do PDF), estoque das duas marcas, retrato do cliente e pendência financeira. **O Firebird está aposentado** (as travas ficam) — `_tools/erp-sync/README.md`.
+7. **Sincronização bidirecional:** o Control **puxa** o que mudou no app por `GET /clientes`, `GET /representantes` e `GET /pedidos?incluir=todos`, todos com `?desde=`. Intervalos recomendados na doc: fila a cada 1 min; cadastros e alterações a cada 5 min; faturamento ao carimbar ou a cada 5 min; catálogo/preço/estoque a cada 30 min; retrato 1x por dia; e quando `GET /status` devolver `sincronizar_agora: true`, tudo já — o botão "Pedir sincronização agora" da tela de Integração do app (`companies.sync_solicitado_em`), que o Control limpa com `POST /sincronizacao`.
+8. **Bloqueio do Control não trava o representante.** O pedido segue; o financeiro é avisado (o aviso da tela é do Yan). O app guarda `block_reason`, `pendencia_financeira` e `titulos_vencidos` que vierem.
+9. **E-mail do Control para representante** vai em `users.erp_email`; o login não muda.
+10. **Cores são internas:** nada muda (continuam na observação do item, `cor` sempre `00001`).
+11. **Com `canal_faturamento='api'` o botão manual de faturado some/é recusado para todos** (`409 FATURAMENTO_PELO_CONTROL`), não só para pedido com número.
+12. **Exclusão de pedido com número do Control é bloqueada para todos, inclusive admin.** Se o Control excluir, ele avisa por `POST /partner/v1/pedidos/:id/excluir { motivo }` e o app exclui (cópia em `deleted_orders` com `deleted_by_name` = nome do parceiro, evento `excluido`, origem `api` — o tipo `excluido_pelo_erp` só existe depois da 049 e o rastro se perderia num banco sem ela). Só vale para pedido que o Control tem: com número dele ou solicitado pelo financeiro (senão `409 ORDER_NOT_IN_CONTROL`).
+13. **Comissão é do gerente, não do Control;** representante do pedido = dono da carteira (nada muda).
+
+O que ainda depende do Yan, além dos passos de 0.5: rodar a **049** nos dois bancos **depois** da 048 (`_tools/SQL-PARA-RODAR-049.sql`, conferir com `node _tools/conferir-049.mjs [raiz da PLUMENE]`) — sem ela tudo degrada para o comportamento de hoje; e criar o aviso ao financeiro da decisão 8.
+
+### 0.7 Fechamento de 16/09 (à tarde)
+
+Entrou na mesma branch (`mudanca/app-control-fase-0`), com a migração **050**:
+
+- **Excluir cliente (só admin)**: `POST /customers/:id/excluir { juntar_em?, motivo? }`. Cliente com pedido, login de loja, convite, vitrine ou tarefa só sai **juntado** em outro cadastro da mesma empresa, que herda tudo; a cópia vai antes para `deleted_customers`. Login de loja nunca é apagado: o que fica herda o de acesso mais recente, os outros são desligados. Falha no meio desfaz o que já tinha mudado.
+- **Dono na ficha do cliente**: "Representante: NOME (código …)" pelo código do Control e "Cadastrado por" quando quem cadastrou no app é outro.
+- **Tabela de preço inativa no Control** (`price_tables.active = false`) some de toda escolha; cliente e pedido que já estão nela continuam, marcados "(inativa no Control)".
+- **Pedido mínimo da condição** (`payment_conditions.valor_minimo`): a tela avisa quando o total fica abaixo; ninguém bloqueia.
+- **Cancelar solicitação** (financeiro/admin): `PATCH /orders/:id/cancelar-solicitacao` tira da fila do Control o pedido solicitado que ainda não tem número. Status não muda; evento `solicitacao_cancelada` só com a 050 (o evento guarda quando e por quem o pedido tinha sido solicitado). **O app não sabe se o Control já puxou o pedido** — entre o `GET /pedidos` e o `POST /confirmar` ele continua sem número —, então a pergunta da tela é "Se o Control ainda não importou, cancelar tira o pedido da fila…" e **o número vence o cancelamento**: o `POST /confirmar` aceita o aprovado sem `solicitado_em` que já foi solicitado (rastro `solicitado_ao_erp` ou `solicitacao_cancelada`) e grava `numero_gravado` com o motivo "confirmado pelo Control depois de a solicitação ser cancelada no app". Pedido nunca solicitado continua `409 ORDER_NOT_REQUESTED`. O `POST /pedidos/{id}/excluir` de um pedido cancelado e não confirmado responde `409 ORDER_NOT_IN_CONTROL` e o app mantém o pedido — para o Control, nada a fazer.
+- **"Sincronizar agora" expira em 15 minutos**: depois disso o `GET /partner/v1/status` devolve `sincronizar_agora: false` (o `solicitado_em` continua saindo) e a tela mostra "pedido expirado".
+
+**Mudanças no contrato do Fábio nesta rodada: duas.** A expiração do "sincronizar agora" e o cancelamento da solicitação — um pedido pode **sair da fila depois de entregue**. Para o programa do Fábio: se já importou, confirme normalmente (é aceito); antes de importar, confira pelo `id` se o pedido já está no Control (o financeiro pode cancelar e pedir de novo, e o mesmo `id` volta à fila). Está em `docs/API-PARCEIRO.md` ("Pedido que sai da fila depois de entregue") e no `api-parceiro.html`.
+
+**O que depende do Yan:** a 048 e a 049 já estão nos dois bancos, e a 013 na Corpo Sensual (o índice da 042 na Corpo Sensual se confere à parte, como em 0.5). Falta colar `_tools/SQL-PARA-RODAR-050.sql` nos **DOIS bancos**, **depois** da 049 (o bloco 0 recusa se a 049 não rodou), e conferir com `node _tools/conferir-050.mjs [raiz da PLUMENE]`. Depois da 050, **não rerodar a 048 nem a 049** (recolocariam a lista antiga no CHECK de tipo). Sem a 050: excluir cliente responde `409 MIGRACAO_PENDENTE` sem mexer em nada, e o cancelamento de solicitação acontece sem evento.
+
+#### Para a sessão do CRM
+
+**`deleted_customers` (050)** — uma linha por cliente excluído pelo app. Quem preenche: **só o app**, no "Excluir cliente" do admin (nunca o Control, nunca carga). É a tabela que o CRM deve ler para apagar ou juntar o cliente do lado dele: o cliente some de `customers` sem nenhum outro sinal.
+
+| Coluna | Significado |
+|---|---|
+| `id` | a linha da cópia |
+| `company_id` | a empresa (FK `companies`, CASCADE) |
+| `customer_id` | o `customers.id` que saiu — o mesmo que o CRM guardou como origem. Sem FK: a linha não existe mais |
+| `erp_id` | o código do Control do cliente que saiu (`null` se não tinha) |
+| `cnpj_digits` | o documento só com dígitos |
+| `juntado_em` | o `customers.id` do cadastro que **ficou** com tudo; `null` = excluído sem juntar (cliente sem nenhum vínculo). Sem FK |
+| `snapshot` | a linha inteira de `customers` como estava antes do DELETE (JSONB) |
+| `pedidos_movidos` | quantos pedidos passaram para `juntado_em` |
+| `deleted_at` | quando saiu — é por ela que o CRM lê o que é novo |
+| `deleted_by` / `deleted_by_name` | o admin que excluiu (id pode ficar nulo se o login sumir; o nome fica) |
+| `motivo` | o que o admin escreveu. Se contiver `EXCLUSÃO NÃO CONCLUÍDA`, a exclusão falhou no meio e o desfazer não voltou tudo. **A conferência de antes de agir vale para toda linha, com ou sem essa marca** (ver "Como ler") |
+| `created_at` / `updated_at` | carimbos da linha (sem trigger da 013; o app grava `updated_at` quando anota a cópia) |
+
+Como ler: filtrar por `deleted_at` (paginando — o PostgREST corta em 1.000 em silêncio), **com atraso**: só as linhas com `deleted_at` de alguns minutos atrás (5 min basta). A cópia é gravada **antes** de a exclusão terminar (antes de mover os pedidos e do DELETE) com `deleted_at` = aquele instante; se um passo falha, o app desfaz tudo e apaga a linha — e, se a resposta do INSERT se perder, pode sobrar uma linha de uma exclusão que nunca aconteceu, sem marca nenhuma. Por isso, **antes de agir em qualquer linha, sempre**: (1) conferir que `customer_id` **não existe mais** em `customers`; se existe, não fazer nada (a exclusão não aconteceu ou está em andamento) e reler na próxima rodada; (2) com `juntado_em`, conferir que `juntado_em` **existe** em `customers`; se não existe (o que ficou também foi excluído), seguir a linha dele em `deleted_customers`. Só então: com `juntado_em`, juntar no CRM o cliente de `customer_id` no de `juntado_em`; sem ele, apagar ou inativar. Os pedidos **já mudaram de dono no app** (`orders.customer_id` = `juntado_em`, com `updated_at`), então a rodada normal por `updated_at` traz os pedidos com o cliente novo; o cadastro que ficou também ganha `updated_at`. Cliente excluído que ainda existe no Control pode voltar pelo `POST /partner/v1/clientes` (hoje nada impede).
+
+**Colunas da 048/049 que o CRM pode passar a ler** (nenhuma é obrigatória; nenhuma renomeia o que já é lido):
+
+- **`users.erp_email`** (049, TEXT): o e-mail do representante **no Control**, gravado pelo `POST /partner/v1/representantes`. `users.email` continua sendo o login do app e não muda por causa do Control.
+- **`customers.pendencia_financeira`** (NUMERIC 12,2, R$ em aberto; `null` = o Control não informou), **`pendencia_financeira_em`** (quando o valor chegou), **`titulos_vencidos`** (INTEGER) e **`retrato_referencia_em`** (TIMESTAMPTZ, de quando é o retrato: `last_purchase_at`, `total_purchased`, `overdue_amount`). Gravados pelo Control no `POST /partner/v1/retrato` (e pendência/títulos também no `POST /clientes`), com `updated_at`. Retrato mais velho que o guardado é recusado. Bloqueio e pendência **não travam** o representante.
+- **`order_invoices`** (048, uma linha por nota: `numero`, `serie`, `chave`, `emitida_em`, `valor`, `cancelada_em`, e da 049 `substituida_por`/`substituida_em`) e **`order_invoice_items`** (`invoice_id`, `order_id`, `produto` = o SKU, `tamanho`, `variant_id` que pode ser nulo, `quantidade`, `preco_unitario`). Gravadas pelo `POST /partner/v1/faturamento`. **Nota ativa = `cancelada_em IS NULL`**; um pedido tem uma nota ativa, e a nova substitui a anterior. São as peças FATURADAS (o corte da 044 aparece aqui). Mudança só na nota também carimba `orders.updated_at`.
+- **`orders.erp_requested_at`** / **`erp_requested_by`** (049): quando e quem do financeiro solicitou o lançamento ao Control (canal `api`). `null` = não solicitado, lançado à mão ou **solicitação cancelada**. Não é status: `orders.status` não ganhou valor novo, e o `mapearStatus` do CRM não muda.
+
 ---
 
 ## 1. ESTADO ATUAL
@@ -255,7 +342,7 @@ Nenhum registro de qual chave chamou o quê, quando, quantos pedidos levou. O gr
 - **"Não há teste do módulo partner."** Falso. `tests/faturamento-do-parceiro.test.ts` e `tests/parceiro-cadastros.test.ts` existem (os testes moram em `tests/` na raiz, não junto do código). O que **não** tem teste é `GET /pedidos`, `confirmOrderImport` e a autenticação por chave.
 - **"A doc promete 409 e o código devolve 500."** Falso, e é pior: o 409 documentado (`API-PARCEIRO.md:180`) é o caso do **mesmo pedido** já confirmado com outro número — esse o código trata. O caso "número já usado por **outro** pedido" **não está documentado em lugar nenhum**. Não é alinhar doc e código: falta **decidir o contrato**.
 - **"Não há código aproveitável além da interface do adapter."** Falso: existe integração Firebird de **leitura** inteira e funcional (~800 linhas, §1.3). Falta só a mão de volta.
-- **"O push-orders inventa o número do lado do app."** Falso: o `GEN_ID` roda **dentro do Firebird**, sobre o generator do próprio ERP (`GEN_PEDIDO_UNIVERSAL`), e a série `SX` já é usada na fábrica (`_tools/erp-sync/.env.example:19-21`). O problema não é número inventado — é **quem cunha**.
+- **"O push-orders inventa o número do lado do app."** Falso: o `GEN_ID` roda **dentro do Firebird**, sobre o generator do próprio ERP (`GEN_PEDIDO_UNIVERSAL`), e a série `SX` já era usada na fábrica (`_tools/erp-sync/.env.example:19-21`; histórico — a série SX foi descontinuada em 16/09/2026, decisão 1: só `CS` e `PL`). O problema não é número inventado — é **quem cunha**.
 - **"O app não tem trigger de `updated_at`."** Falso: a 013 cria trigger em 6 tabelas (§2.4). O que falta é `order_items` e `deleted_orders`.
 - **"São 4 pendências"** → são **5**. **"`discount_percent` tem 6 casas"** → é `NUMERIC(5,2)`. **"O faturamento tem 5 motivos de ignorado"** → são **6** (falta `falha ao gravar`, que é o que o torna realmente tolerante).
 - **"Todos os scripts de `_tools` têm empresa fixa."** Falso para `conferir-pendencias.mjs`, `conferir-fila-e-tabelas.mjs` e `backup.mjs` — eles não filtram `company_id` e por isso servem para os dois bancos.
@@ -273,7 +360,7 @@ Nenhum registro de qual chave chamou o quê, quando, quantos pedidos levou. O gr
 ### 4.4 Caminhos concorrentes e efeitos colaterais
 
 - **Três escritores de `erp_order_id`, dois de `invoiced`** (§3, item 1).
-- **A confirmação da API sequestra a sugestão da tela.** `ultimoNumeroErp` escolhe o último número por `synced_at desc` (`orders.service.ts:959-969`) e a confirmação da API grava `synced_at`. Efeitos: (a) número fora do formato faz `proximoNumeroErp` devolver string vazia e **a sugestão some**; (b) se o ERP usar `SX` e a Larissa `CS`, as séries se misturam no mesmo campo e a sugestão sai da série errada (`LancarNoErp.tsx:48,94`). *Detalhe: `corrigirNumeroErp` **não** atualiza `synced_at` (`orders.service.ts:944-948`) — corrigir não traz o pedido para o topo da sugestão.*
+- **A confirmação da API sequestra a sugestão da tela.** `ultimoNumeroErp` escolhe o último número por `synced_at desc` (`orders.service.ts:959-969`) e a confirmação da API grava `synced_at`. Efeitos: (a) número fora do formato faz `proximoNumeroErp` devolver string vazia e **a sugestão some**; (b) se o ERP usar `SX` (histórico — série descontinuada em 16/09/2026) e a Larissa `CS`, as séries se misturam no mesmo campo e a sugestão sai da série errada (`LancarNoErp.tsx:48,94`). *Detalhe: `corrigirNumeroErp` **não** atualiza `synced_at` (`orders.service.ts:944-948`) — corrigir não traz o pedido para o topo da sugestão.*
 - **O faturamento pela API não avisa o representante.** `avisarFaturadoAoRep` é chamado em **um** lugar: `orders.controller.ts:313`, o handler da tela. No dia em que o ERP ligar, o rep deixa de receber a notificação que recebe hoje — regressão silenciosa.
 - **`_tools/faturar-retroativo.mjs` fura a foto da 044:** grava direto no Supabase (`:137-141`) sem passar por `setOrderInvoiced`, então não chama `guardarOriginal` nem dispara aviso.
 - **Venda interna edita peças em qualquer status.** `orders.service.ts:676-680` roda **antes** do teto geral (`681`): rep com `venda_interna`, no próprio pedido, mexe até o carimbo do faturamento — **inclusive já em `sent_erp`**. E pedido de venda interna nasce `approved` (`031_venda_interna.sql:7-9`) e cai na fila do parceiro como qualquer outro.
@@ -323,7 +410,7 @@ Nenhum registro de qual chave chamou o quê, quando, quantos pedidos levou. O gr
 6. Você aceita que o app leia o Firebird direto por TCP 3050 com usuário somente-leitura, ou a decisão é que o app nunca toca no seu banco — nem para ler? Existe hoje uma máquina na fábrica com acesso ao Firebird que a gente controla (onde um agente rodaria)?
 
 **Numeração**
-7. Qual é a série e a máscara do número que você vai devolver? A produção usa `CS17505`; toda a nossa documentação exemplifica com `SX16680`; o script usa `SX`. São séries por marca (CS = Corpo Sensual, PL = Plumene, SX = pedido de representante)? Qual série a integração usa para cada marca?
+7. Qual é a série e a máscara do número que você vai devolver? A produção usa `CS17505`; toda a nossa documentação exemplifica com `SX16680`; o script usa `SX`. São séries por marca (CS = Corpo Sensual, PL = Plumene, SX = pedido de representante)? Qual série a integração usa para cada marca? *(Respondida em 16/09/2026, decisão 1: `CS` na Corpo Sensual e `PL` na PLUMENE; a série SX foi descontinuada — as menções a ela neste brief são histórico.)*
 8. A numeração é por série ou existe um contador universal compartilhado (o `GEN_PEDIDO_UNIVERSAL`)?
 
 **Cadastros (é aqui que está o gargalo, não no pedido)**
@@ -395,7 +482,7 @@ Confira o estado no banco antes de acreditar em qualquer arquivo (passo 1 do §7
 - **`apps/api/src/modules/partner/partner.service.ts`** (app) — O coracao do lado do app: a fila (status=approved e erp_order_id nulo), o payload campo a campo, as cinco pendencias que decidem importavel true/false, e o confirmOrderImport que grava o numero sem validar formato, sem checar duplicidade e sem olhar o status atual.
 - **`apps/api/src/modules/partner/partner.faturamento.service.ts`** (app) — A segunda metade do ciclo e o UNICO lugar do repositorio que escreve invoiced_total - sem esta rota, todo pedido faturado conta no painel pelo valor do pedido, nao pelo valor da nota.
 - **`apps/api/src/modules/orders/orders.service.ts`** (app) — O caminho que roda de verdade hoje: updateOrderStatus exigindo o numero digitado pela Larissa, o bloqueio do gerente, o ERP_NUMBER_IN_USE, a correcao do numero antes da nota, o portao podeMexerNoPedido e o faturamento manual - e o contraste com tudo que a API de parceiro nao valida.
-- **`packages/shared/src/pedidos/numeroErp.ts`** (app) — O numero do Control em 55 linhas: formato duas letras + digitos, a normalizacao que transforma 'sx-14627' em 'SX14627', a sugestao do proximo e o aviso de sequencia - decide a conversa sobre serie CS/SX/PL com o Fabio.
+- **`packages/shared/src/pedidos/numeroErp.ts`** (app) — O numero do Control em 55 linhas: formato duas letras + digitos, a normalizacao que transforma 'cs-17379' em 'CS17379', a sugestao do proximo e o aviso de sequencia - decidiu a conversa sobre serie com o Fabio (CS/PL; a SX foi descontinuada em 16/09/2026).
 - **`_tools/erp-sync/sync.py`** (app) — O caminho PARALELO e a primeira decisao do chat: o modo push-orders insere PEDIDO e ITENS_PEDIDO direto no Firebird, cunha o numero pelo GEN_PEDIDO_UNIVERSAL e grava sent_erp no Supabase, consumindo exatamente a mesma fila que a API de parceiro entrega ao ERP.
 - **`apps/api/src/config/migrations/042_numero_do_control_unico.sql`** (app) — A unica trava real contra numero do Control repetido, e o comentario dela nomeia o problema por escrito ('a API de Parceiro grava erp_order_id por fora, sem checagem nenhuma') - e ainda precisa ser colada nos dois bancos.
 - **`C:/Users/Yan/Desktop/Projeto-CS-SP/central/produto/spec-integracao-erp.md`** (crm) — Sao 67 linhas com a regra de ouro que nao pode ser quebrada: o ERP do Fabio e o unico dono do numero, o CRM nao cria pedido e nao cunha numero, e a API de parceiro para o CRM e projeto futuro.
@@ -435,7 +522,7 @@ Confira o estado no banco antes de acreditar em qualquer arquivo (passo 1 do §7
 - **`apps/api/src/config/migrations/013_protecoes.sql`** (app) — Tem duas coisas que quase ninguem sabe que existem: a trigger que carimba updated_at em orders/customers e a tabela order_status_history, que grava a hora exata de cada mudanca e nunca foi lida por codigo nenhum.
 - **`apps/api/src/erp/firebird/erpSyncService.ts`** (app) — O sync TypeScript de leitura (produtos, precos, clientes, estoque) com o defeito latente do upsert sem onConflict - consulte antes de cogitar ligar ERP_SYNC_ENABLED.
 - **`apps/api/src/jobs/erpSyncScheduler.ts`** (app) — Prova que da para rodar job periodico no processo do Railway (e o unico setInterval do servidor), caso a integracao precise de um robo que puxe ou vigie a fila.
-- **`_tools/erp-sync/.env.example`** (app) — Responde metade das perguntas sobre numeracao antes de perguntar ao Fabio: a serie SX 'ja usada na fabrica' e o GEN_PEDIDO_UNIVERSAL como sequencia unica compartilhada por todas as series.
+- **`_tools/erp-sync/.env.example`** (app) — Responde metade das perguntas sobre numeracao antes de perguntar ao Fabio: a serie SX 'ja usada na fabrica' (historico: descontinuada em 16/09/2026) e o GEN_PEDIDO_UNIVERSAL como sequencia unica compartilhada por todas as series.
 - **`apps/web/src/modules/pedidos/PaginaPedidos.tsx`** (app) — As filas do financeiro ('A lancar' = approved sem faturar) sao literalmente a mesma fila que a API entrega ao ERP - e onde se ve o conflito entre o robo e a mao da Larissa.
 - **`C:/Users/Yan/Desktop/Projeto-CS-SP/src/data/supabase/sincronizacao.ts`** (crm) — Mostra que o resumo da tela le cru o JSON gravado em sincronizacoes.resultado, entao renomear um contador da Edge Function faz a tela mostrar zero sem quebrar nada visivel.
 - **`C:/Users/Yan/Desktop/Projeto-CS-SP/src/modules/pedidos/PedidosPage.tsx`** (crm) — A fila 'A vincular' e os cartoes que mostram o codigo_erp (que pode ser a chave provisoria APP-<numero>) - e onde o efeito da integracao aparece para o time do CRM.

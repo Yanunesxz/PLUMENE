@@ -4,10 +4,11 @@ import type {
   CustomerListItem,
   CreateCustomerRequest,
   CustomerDetail,
+  DonoDoCliente,
   PedidoDoCliente,
 } from '@csb/shared';
 import type { AuthRole } from '@csb/shared';
-import { documento, formatarDocumento, linhaDeEndereco, apenasDigitos } from '@csb/shared';
+import { documento, formatarDocumento, linhaDeEndereco, apenasDigitos, codigoMiolo } from '@csb/shared';
 
 // O PostgREST devolve no máximo 1000 linhas por requisição. Gerente/admin podem
 // ter milhares de clientes, então paginamos em blocos até pegar todos.
@@ -63,10 +64,18 @@ export async function getCustomers(
   search?: string,
   include_blocked = true,
   erp_rep_id?: string | null,
+  cnpj?: string | null,
 ): Promise<CustomerListItem[]> {
   // Sanitiza o termo de busca: vírgula/parênteses/barra têm significado no
   // filtro `.or()` do PostgREST e quebrariam a query se digitados.
   const term = search ? search.replace(/[,()\\]/g, ' ').trim() : '';
+
+  // O mesmo documento (o diálogo de excluir cliente procura o cadastro em
+  // dobro). Pedido sem dígito nenhum não vira "a carteira inteira": não casa
+  // com ninguém.
+  const doc = cnpj != null ? apenasDigitos(cnpj) : null;
+  if (doc === '') return [];
+  const temDigitos = doc ? await detectarCadastroReal() : false;
 
   const colunas = await colunasDaLista();
   const all: CustomerListItem[] = [];
@@ -89,6 +98,9 @@ export async function getCustomers(
     }
     if (!include_blocked) query = query.eq('blocked', false);
     if (term) query = query.or(`name.ilike.%${term}%,cnpj.ilike.%${term}%`);
+    // Com a 041, `cnpj_digits` enxerga máscara e dígitos como o mesmo
+    // documento; sem ela, as duas grafias que as cargas gravaram.
+    if (doc) query = temDigitos ? query.eq('cnpj_digits', doc) : query.in('cnpj', [doc, formatarDocumento(doc)]);
 
     const { data, error } = await query;
     if (error || !data) break;
@@ -313,11 +325,65 @@ const MAX_PEDIDOS_DA_FICHA = 50;
 const DETALHE_COLUNAS =
   'id, name, trade_name, cnpj, whatsapp, email, address, credit_limit, blocked, block_reason, price_table_id';
 
+/**
+ * De quem é o cliente, pelos dois caminhos da carteira: o login que cadastrou
+ * (`rep_id`) e o representante do código do Control (`rep_erp_id`).
+ *
+ * O código casa pelo MIOLO ("#779", "779" e "00779" são o mesmo
+ * representante) — comparar a grafia deixava o dono sem nome sempre que a
+ * carga do ERP e o cadastro do login escreveram diferente. Só representante
+ * da MESMA empresa; havendo dois logins com o código, vale o ativo.
+ *
+ * Falha de leitura aqui não derruba a ficha: o nome só não aparece.
+ */
+async function donoDoCliente(
+  company_id: string,
+  rep_id: string | null,
+  rep_erp_id: string | null,
+): Promise<DonoDoCliente> {
+  let rep_nome: string | null = null;
+  if (rep_id) {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name')
+      .eq('id', rep_id)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    rep_nome = (data as { name: string } | null)?.name ?? null;
+  }
+
+  let rep_pelo_codigo_id: string | null = null;
+  let rep_pelo_codigo_nome: string | null = null;
+  const miolo = codigoMiolo(rep_erp_id);
+  if (miolo) {
+    const { data, error } = await supabase
+      .from('users')
+      .select('id, name, erp_rep_id, active')
+      .eq('company_id', company_id)
+      .eq('role', 'rep')
+      .not('erp_rep_id', 'is', null)
+      .order('name');
+    const reps = (!error && Array.isArray(data) ? data : []) as Array<{
+      id: string;
+      name: string;
+      erp_rep_id: string | null;
+      active: boolean | null;
+    }>;
+    const doCodigo = reps.filter((u) => codigoMiolo(u.erp_rep_id) === miolo);
+    const escolhido = doCodigo.find((u) => u.active !== false) ?? doCodigo[0];
+    rep_pelo_codigo_id = escolhido?.id ?? null;
+    rep_pelo_codigo_nome = escolhido?.name ?? null;
+  }
+
+  return { rep_id, rep_nome, rep_erp_id, rep_pelo_codigo_id, rep_pelo_codigo_nome };
+}
+
 /** A ficha soma o que as migrações 036/039 trouxerem — sem elas, vem como antes. */
 async function colunasDoDetalhe(): Promise<string> {
   // erp_id: a ficha mostra o número do Control (ou "sem código") — é o que o
   // financeiro atrela. cadastro real: os campos da 041, quando existem.
-  let colunas = `${DETALHE_COLUNAS}, erp_id`;
+  // rep_id e rep_erp_id: viram o `dono` e saem da resposta como colunas soltas.
+  let colunas = `${DETALHE_COLUNAS}, erp_id, rep_id, rep_erp_id`;
   if (await detectarCadastroReal()) colunas += `, ${COLUNAS_DO_CADASTRO_REAL}`;
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
   if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
@@ -337,17 +403,18 @@ export async function obterCliente(
   customer_id: string,
   escopo: EscopoDaCarteira,
 ): Promise<CustomerDetail | null> {
-  const lido = await clienteDaCarteira<Omit<CustomerDetail, 'pedidos'> & { varejo_marcado_por?: string | null }>(
-    company_id,
-    customer_id,
-    escopo,
-    await colunasDoDetalhe(),
-  );
+  const lido = await clienteDaCarteira<
+    Omit<CustomerDetail, 'pedidos'> & {
+      varejo_marcado_por?: string | null;
+      rep_id?: string | null;
+      rep_erp_id?: string | null;
+    }
+  >(company_id, customer_id, escopo, await colunasDoDetalhe());
   if (!lido) return null;
 
   // Quem marcou o varejo, pelo nome: a ficha diz "marcado pela Simone" — sem
   // isso o gerente vê o cliente fora da régua e não sabe a quem perguntar.
-  const { varejo_marcado_por, ...cliente } = lido;
+  const { varejo_marcado_por, rep_id, rep_erp_id, ...cliente } = lido;
   if (varejo_marcado_por) {
     const { data: quem } = await supabase
       .from('users')
@@ -375,7 +442,9 @@ export async function obterCliente(
     created_at: p.created_at,
   }));
 
-  return { ...cliente, pedidos };
+  const dono = await donoDoCliente(company_id, rep_id ?? null, rep_erp_id ?? null);
+
+  return { ...cliente, dono, pedidos };
 }
 
 export type MarcaDeInatividade =
@@ -399,13 +468,17 @@ export async function marcarInatividade(
   const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
   if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
 
+  // `updated_at` junto: é por ele que o CRM (e quem mais sincroniza) descobre
+  // que o cadastro mudou desde a última leitura.
+  const agora = new Date().toISOString();
   const { error } = await supabase
     .from('customers')
     .update({
       inactivity_reason: body.motivo.trim(),
       inactivity_note: body.observacao?.trim() || null,
       inactivity_updated_by: quem,
-      inactivity_updated_at: new Date().toISOString(),
+      inactivity_updated_at: agora,
+      updated_at: agora,
     })
     .eq('id', customer_id)
     .eq('company_id', company_id);
@@ -439,7 +512,7 @@ export async function marcarVarejo(
   const marcado_em = new Date().toISOString();
   const { error } = await supabase
     .from('customers')
-    .update({ varejo, varejo_marcado_por: quem, varejo_marcado_em: marcado_em })
+    .update({ varejo, varejo_marcado_por: quem, varejo_marcado_em: marcado_em, updated_at: marcado_em })
     .eq('id', customer_id)
     .eq('company_id', company_id);
 
@@ -464,12 +537,16 @@ export async function atualizarTabelaDoCliente(
   price_table_id: string,
   escopo: EscopoDaCarteira,
 ): Promise<TrocaDeTabela> {
-  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  const cliente = await clienteDaCarteira<CustomerListItem>(company_id, customer_id, escopo, CUSTOMER_COLUMNS);
   if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  // Já é esta a tabela: nada a gravar — nem o `updated_at`, que faria o CRM
+  // reler um cadastro que não mudou.
+  if (cliente.price_table_id === price_table_id) return { ok: true, cliente };
 
   const { data, error } = await supabase
     .from('customers')
-    .update({ price_table_id })
+    .update({ price_table_id, updated_at: new Date().toISOString() })
     .eq('id', customer_id)
     .eq('company_id', company_id)
     .select(CUSTOMER_COLUMNS)

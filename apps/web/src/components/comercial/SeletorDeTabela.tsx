@@ -1,5 +1,5 @@
 import { AlertTriangle } from 'lucide-react';
-import type { PriceTable } from '@csb/shared';
+import { tabelasEscolhiveis, type PriceTable } from '@csb/shared';
 
 interface Props {
   tabelas: PriceTable[];
@@ -7,6 +7,13 @@ interface Props {
   onEscolher: (id: string) => void;
   /** O que esta escolha vai precificar. Muda só a frase do aviso. */
   contexto: 'cliente' | 'link';
+  /**
+   * Mostra a escolha mesmo com UMA ativa. Só para a troca de tabela do cliente
+   * que está numa tabela desligada no Control (`podeTrocarTabelaDoCliente`):
+   * ali quem escolhe já vê as duas tabelas, e sem isto não teria como tirar o
+   * cliente da desligada.
+   */
+  aceitaUma?: boolean;
 }
 
 /**
@@ -21,9 +28,13 @@ interface Props {
  * Nada vem marcado de propósito. Vir com a principal já selecionada é
  * exatamente o erro caro: cadastro no piloto automático e o cliente da região 3
  * nascendo na tabela 2, sem ninguém perceber até a fatura.
+ *
+ * Tabela desligada no Control nunca vira opção, mesmo que alguém passe a lista
+ * inteira: o filtro mora aqui também, não só em quem chama.
  */
-export function SeletorDeTabela({ tabelas, valor, onEscolher, contexto }: Props) {
-  if (tabelas.length < 2) return null;
+export function SeletorDeTabela({ tabelas: recebidas, valor, onEscolher, contexto, aceitaUma = false }: Props) {
+  const tabelas = tabelasEscolhiveis(recebidas);
+  if (tabelas.length < (aceitaUma ? 1 : 2)) return null;
 
   return (
     <fieldset className="rounded-xl border border-warn/30 bg-warn-soft p-4">

@@ -24,7 +24,7 @@ SetorxWeb/
 | `package.json` | Scripts raiz (`dev:web`, `dev:api`, `seed`) e workspaces |
 | `pnpm-workspace.yaml` | Define os pacotes do monorepo |
 | `tsconfig.base.json` | Config TypeScript compartilhada |
-| `Dockerfile` + `railway.toml` | Build/deploy da **API** no Railway |
+| `Dockerfile` + `railway.toml` | Build/deploy da **API** no Railway. Uma instalação por marca: Corpo Sensual em `setorxweb-production.up.railway.app`, PLUMENE em `csbapi-production.up.railway.app` — as duas URLs (e a regra de uma chave de parceiro por marca) estão em `docs/API-PARCEIRO.md` |
 | `.claude/launch.json` | Servidor de preview (porta 5173) |
 | `vitest.config.ts` | Configuração dos testes (`pnpm test`) |
 | `README.md` | Visão geral |
@@ -40,17 +40,38 @@ packages/shared/src/
 ├── index.ts              → barrel: re-exporta tudo
 ├── types/                → interfaces de dados (o "formato" de cada coisa)
 │   ├── api.ts            → ApiResponse (envelope { data })
+│   ├── control.ts        → SolicitacaoErp (o pedido solicitado ao Control, esperando o número) e
+│   │                       NotaSubstituida (a nota nova por cima da anterior) — migração 049
 │   ├── user.ts           → User, AuthPayload, Login*, RepListItem, Create/UpdateRepRequest
-│   ├── customer.ts       → Customer, CustomerWithPriceTable, PriceTable, CreateCustomerRequest
+│   ├── customer.ts       → Customer, CustomerWithPriceTable, PriceTable, CreateCustomerRequest,
+│   │                       DonoDoCliente (o `dono` da ficha) e os tipos do "Excluir cliente"
+│   │                       (VinculosDoCliente, VinculosParaExcluir, ExcluirClienteRequest, ClienteExcluido)
 │   ├── product.ts        → Product, ProductVariant (tamanho), ProductWithPrice, CatalogProduct
 │   └── order.ts          → Order, OrderItem, OrderWithItems, CreateOrderRequest, tipos de sync
 ├── constants/            → uniões + rótulos PT
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
+├── pedidos/              → regras do pedido que a API e a tela precisam contar IGUAL
+│   ├── numeroErp.ts      → o número do Control ("CS17379"; série da marca, CS/PL): normaliza,
+│   │                       valida, sugere o próximo
+│   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido)
+│   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
+│   ├── valorMinimo.ts    → o pedido mínimo da condição (049, payment_conditions.valor_minimo):
+│   │                       avisoDeValorMinimo — só AVISA, nem a tela nem o servidor bloqueiam
+│   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
+│                           (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
+├── cadastro/
+│   └── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
+│                           GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
+│                           tests/codigo-miolo.test.ts confere a paridade
 └── pricing/
     ├── faixaDeTamanho.ts → EG/XG/48-54 custam mais: qual tamanho é "faixa maior"
     │                       e qual preço cobrar. Usado pela API (grava o pedido)
     │                       E pelo app (mostra a tela) — precisa ser o MESMO.
+    ├── tabelaAtiva.ts    → tabela desligada no Control (049, price_tables.active): some de toda
+    │                       ESCOLHA, mas quem já está nela continua; rotuloDaTabela marca
+    │                       "(inativa no Control)"; podeTrocarTabelaDoCliente deixa trocar
+    │                       com uma ativa só quando o cliente está numa desligada
     └── priceTier.ts      → (LEGADO/abandonado) regra de preço por total do pedido
 ```
 
@@ -119,7 +140,36 @@ apps/api/src/
 │       ├── 044_pedido_original.sql → order_originals (a cópia do pedido antes do primeiro corte de peça; o "veio assim, foi faturado assado")
 │       ├── (045 NÃO EXISTE — número pulado. Foi reservado por mensagem entre sessões; não assuma que está livre)
 │       ├── 046_pedido_atualizado_no_erp.sql → order_erp_sync (o que o Control CONHECE do pedido; o botão "Atualizar no ERP" quando a venda interna edita depois de lançado)
-│       └── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│       ├── 047_cliente_varejo.sql → customers.varejo/varejo_marcado_por/varejo_marcado_em (a venda interna tira o cliente de balcão da cobrança de contato; controle interno, não vai ao ERP)
+│       ├── 048_integracao_control_fase_0.sql → base da integração com o Control: erp_sync_log registra as
+│       │                           chamadas do parceiro; companies.canal_* (canal oficial de cada fluxo, por
+│       │                           empresa; padrão = hoje); orders.erp_order_source/set_at/set_by; order_erp_events
+│       │                           (rastro do pedido, sem FK: sobrevive à exclusão); public.codigo_miolo() + trava
+│       │                           price_tables.price_column 1-6 + erp_code único pelo miolo; users.updated_at;
+│       │                           order_invoices e order_invoice_items (notas e itens faturados). SQL para os dois
+│       │                           bancos em _tools/SQL-PARA-RODAR-048.sql. NÃO rerodar depois da 049 (o bloco D
+│       │                           recolocaria a lista antiga no CHECK de tipo)
+│       ├── 049_integracao_control_respostas.sql → as respostas do Control (decisões de 16/09/2026): orders.erp_requested_at/by
+│       │                           (pedido SOLICITADO ao Control com canal 'api'; índice parcial da fila) + users.erp_email
+│       │                           + order_invoices.substituida_por/em (nota nova por cima da anterior) +
+│       │                           companies.sync_solicitado_em/por ("Sincronizar agora") + customers.erp_updated_at/
+│       │                           retrato_referencia_em/pendencia_financeira/pendencia_financeira_em/titulos_vencidos +
+│       │                           price_tables.erp_description/erp_updated_at/active + payment_conditions.erp_description/
+│       │                           erp_updated_at/valor_minimo + products.erp_updated_at + product_variants.stock_updated_at
+│       │                           + product_prices.erp_updated_at/preco_original/desconto_percentual + CHECK de
+│       │                           order_erp_events.tipo com solicitado_ao_erp/nota_substituida/excluido_pelo_erp. Exige a
+│       │                           048 (para com mensagem se ela faltar). SQL para os dois bancos em
+│       │                           _tools/SQL-PARA-RODAR-049.sql. NÃO rerodar depois da 050 (o bloco H recolocaria a
+│       │                           lista antiga no CHECK de tipo)
+│       └── 050_cliente_excluido_e_solicitacao.sql → decisões de 16/09/2026 à tarde: deleted_customers (id, company_id FK
+│                                   CASCADE, customer_id sem FK, erp_id, cnpj_digits, juntado_em sem FK = o cadastro que
+│                                   ficou, snapshot = a linha inteira do cliente, pedidos_movidos, deleted_at, deleted_by FK
+│                                   SET NULL, deleted_by_name, motivo, created_at, updated_at; índice (company_id,
+│                                   deleted_at DESC); RLS) — a cópia antes do DELETE do "Excluir cliente", e a tabela que o
+│                                   CRM pode ler para saber de cliente excluído/juntado + CHECK de order_erp_events.tipo
+│                                   com solicitacao_cancelada. Exige a 049 (para com mensagem se ela faltar). SQL para os
+│                                   dois bancos em _tools/SQL-PARA-RODAR-050.sql. Depois dela, NÃO rerodar a 048 nem a
+│                                   049. É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -133,6 +183,9 @@ apps/api/src/
 │   │                       exist"); erro de rede não memoriza. Use ISTO, nunca cache próprio.
 │   │                       detectarOuFalhar: igual, mas LANÇA quando o banco não respondeu
 │   │                       — para coluna que é FILTRO (o invoiced da fila do parceiro)
+│   ├── canais.ts         → lerCanais(company_id) / exigirCanal / corpoCanalFechado: o canal oficial
+│   │                       de cada fluxo com o Control (companies.canal_*, 048). Sem a 048 = padrões
+│   │                       de hoje (manual/carga); banco sem resposta LANÇA; memória de 30 s
 │   ├── paginacao.ts      → buscarTudo / buscarTudoOuFalhar / buscarPorIds / emLotes: o
 │   │                       PostgREST corta em 1.000 linhas EM SILÊNCIO; listagem que pode
 │   │                       passar disso pagina aqui. buscarTudo ENGOLE erro de página (serve
@@ -146,40 +199,144 @@ apps/api/src/
 │   ├── access/           → convite da loja, vitrine temporária e a área da loja
 │   │                       (invites, showcase, loja.service = GET /minha-area)
 │   ├── auth/             → login, refresh (auth.service tem findUserByEmail, buildAuthPayload)
-│   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep)
-│   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos)
+│   ├── catalog/          → GET /products (com variantes + preço pela tabela do rep). As listas de
+│   │                       escolha de tabela só trazem as ativas (detectar price_tables.active, 049);
+│   │                       priceTableBelongsToCompany continua aceitando a inativa já em uso
+│   ├── customers/        → GET/POST /customers (rep vê só os dele; gerente vê todos). ?cnpj= filtra
+│   │                       pelo documento (cnpj_digits). GET /customers/:id devolve `dono` (quem
+│   │                       cadastrou por rep_id + o rep do código do Control pelo miolo).
+│   │                       customers.exclusao.service.ts → "Excluir cliente" (SÓ admin, 050):
+│   │                       GET /customers/:id/vinculos (as contagens do diálogo) e POST
+│   │                       /customers/:id/excluir { juntar_em?, motivo? } — cópia em
+│   │                       deleted_customers ANTES; pedidos, convites, vitrines e tarefas vão para
+│   │                       juntar_em; login de loja herdado ou desligado (nunca apagado), e o
+│   │                       convite pendente do que fica com login é revogado; sem juntar_em,
+│   │                       reconta os vínculos logo antes do DELETE; falha no meio desfaz o
+│   │                       que já moveu. Sem a 050: 409 MIGRACAO_PENDENTE
 │   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
-│   │                       (rep nos próprios; gerente em tudo até virar nota)
+│   │                       (rep nos próprios; gerente em tudo até virar nota).
+│   │                       eventosErp.service.ts → registrarEventoErp (order_erp_events) e
+│   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048;
+│   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 050 (a da 048 + 3 da 049
+│   │                       + solicitacao_cancelada)
+│   │                       notasDoPedido.service.ts → notas fiscais e peças faturadas (048):
+│   │                       lerNotasDoPedido (GET /orders/:id → `notas`, com a ativa e o
+│   │                       histórico), detectarNotas, cancelarNotasAtivas (desfazer o
+│   │                       faturado pela tela) e lerSubstituicoesDoPedido (049: "a 1234
+│   │                       foi substituída pela 1260")
+│   │                       exclusaoPeloControl.service.ts → o Control excluiu o pedido e
+│   │                       avisou (POST /partner/v1/pedidos/:id/excluir): cópia em
+│   │                       deleted_orders no formato do deleteOrder, evento
+│   │                       'excluido' (origem api); faturado é recusado, e o que o
+│   │                       Control nunca recebeu (sem número e não solicitado) também
+│   │                       orders.service.ts: solicitarLancamentoNoErp (049) — com
+│   │                       canal_pedido_erp='api' o "Lançar" SOLICITA (erp_requested_at)
+│   │                       e a tela espera a confirmação do Control; cliente bloqueado
+│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026). createOrder segue
+│   │                       deleted_customers.juntado_em (050) quando o cliente foi excluído
+│   │                       e juntado; o /sync devolve em failed o pedido que não nasceu.
+│   │                       cancelarSolicitacaoAoErp → PATCH /orders/:id/cancelar-solicitacao
+│   │                       (financeiro/admin): tira da fila do Control o solicitado sem número
+│   │                       (UPDATE condicional; número que chega no meio = 409 JA_IMPORTADO);
+│   │                       evento solicitacao_cancelada só com a 050; sem a 049, 409.
+│   │                       O POST /partner/v1/pedidos/:id/confirmar aceita o pedido de
+│   │                       solicitação cancelada (o Control pode tê-lo puxado): o número vence
+│   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
+│   │                       valor_minimo (detectar), que a tela usa só para AVISAR
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra)
-│   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin)
+│   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin). As listas
+│   │                       /price-tables e /price-tables/minhas trazem só as ATIVAS no Control;
+│   │                       ?incluir_inativas=1 traz também as desligadas (com active=false), para a
+│   │                       tela reconhecer a tabela que cliente ou pedido já usa.
+│   │                       resolverTabelaEscolhida recusa escolha NOVA de tabela inativa
 │   ├── sync/             → POST /sync (fila offline) + controle de sync do ERP
 │   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
 │   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
 │   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
-│   │                       → 401 PARTNER_UNAUTHORIZED). SEIS rotas (partner.router.ts):
-│   │                         GET  /partner/v1/status
-│   │                         GET  /partner/v1/pedidos                (a fila que o ERP PUXA)
+│   │                       → 401 PARTNER_UNAUTHORIZED). DEZENOVE rotas (partner.router.ts):
+│   │                         GET  /partner/v1/status                 (+ `canais`, sincronizar_agora — expira em 15 min —, solicitado_em)
+│   │                         GET  /partner/v1/pedidos                (a fila: aprovado + SOLICITADO ao Control)
+│   │                         GET  /partner/v1/pedidos/excluidos      (excluídos com número; livre)
 │   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
-│   │                         POST /partner/v1/faturamento            (partner.faturamento.service)
-│   │                         POST /partner/v1/clientes               (partner.sync.service)
-│   │                         POST /partner/v1/representantes         (partner.sync.service)
+│   │                         POST /partner/v1/pedidos/:id/conciliar  (sent_erp sem número)
+│   │                         POST /partner/v1/pedidos/:id/excluir    (o Control excluiu; partner.cadastros.controller)
+│   │                         GET  /partner/v1/conciliacao            (só contagens; livre)
+│   │                         POST /partner/v1/faturamento            (partner.faturamento.service; UMA nota por pedido)
+│   │                         POST /partner/v1/clientes               (partner.sync.service; casa por CNPJ, depois código)
+│   │                         POST /partner/v1/representantes         (partner.sync.service; email → users.erp_email)
+│   │                         GET  /partner/v1/clientes?desde=        (o Control PUXA o que mudou no app)
+│   │                         GET  /partner/v1/representantes?desde=  (idem; partner.cadastros.controller)
+│   │                         POST /partner/v1/tabelas-preco          (partner.catalogo.service)
+│   │                         POST /partner/v1/condicoes-pagamento    (idem)
+│   │                         POST /partner/v1/produtos               (idem; produtos e tamanhos)
+│   │                         POST /partner/v1/precos                 (idem; sobrescreve o preço por tabela)
+│   │                         POST /partner/v1/estoque                (idem)
+│   │                         POST /partner/v1/retrato                (partner.retrato.service; 1x/dia)
+│   │                         POST /partner/v1/sincronizacao          (partner.sincronizacao.controller; livre)
+│   │                       Canal por empresa (048, lib/canais.ts): pedidos/confirmar/conciliar/excluir
+│   │                       exigem canal_pedido_erp='api'; faturamento, canal_faturamento='api';
+│   │                       clientes/representantes (POST e GET), canal_cadastro='api'; as cinco do
+│   │                       catálogo, canal_catalogo='api'; retrato, canal_retrato='api'. Senão
+│   │                       409 CANAL_FECHADO. status/conciliacao/excluidos/sincronizacao são livres.
 │   │                       É o CANAL OFICIAL com o Control (decisão de 15/09/2026 — ver
 │   │                       _tools/erp-sync/README.md). O contrato vive em docs/API-PARCEIRO.md
 │   │                       e apps/web/public/api-parceiro.html — a MESMA especificação.
+│   │                       partner.porta.ts → a porta de TODO handler: autenticar, recusouPorCanal,
+│   │                       lerLote (INVALID_BODY / BATCH_TOO_LARGE), responder, anotarLote, lerDesde
+│   │                       partner.log.ts → registrarChamada: cada chamada em erp_sync_log (048);
+│   │                       nunca derruba a resposta; `detalhe` sem dado de cliente.
+│   │                       partner.chamada.ts → o resumo que o handler anota em request.partnerLog
+│   │                       e o hook onResponse do router grava (401/503 com company_id nulo)
+│   │                       partner.controller.ts / partner.service.ts → status, fila, confirmar,
+│   │                       conciliar, conciliação (+ aprovados_solicitados_ao_control), excluídos
+│   │                       partner.cadastros.controller.ts → GET clientes/representantes ?desde= e
+│   │                       a exclusão avisada pelo Control
+│   │                       partner.catalogo.{controller,service}.ts → decisão 6: o Control manda
+│   │                       tabelas, condições, produtos/tamanhos, preços e estoque e sobrescreve;
+│   │                       name/description do CRM NUNCA regravados (descrição vai em erp_description)
+│   │                       partner.retrato.{controller,service}.ts → retrato do cliente (última
+│   │                       compra só para frente, total, vencido, pendência, títulos vencidos)
+│   │                       partner.eco.ts → o anti-eco do GET /clientes?desde=: a última mão foi do
+│   │                       Control (erp_updated_at com folga para a trigger da 013)? Carimbo só
+│   │                       quando já estava em dia — mudança do app não puxada nunca some do GET
+│   │                       partner.sincronizacao.controller.ts → o Control avisa que rodou a passada
+│   │                       pedida pelo botão da tela (limpa companies.sync_solicitado_em)
+│   ├── integracao/       → A TELA DA INTEGRAÇÃO (decisão 7): GET /erp/integracao/status (canais,
+│   │                       pedido de sync, última chamada por rota, contagens da fila; financeiro/
+│   │                       gerente/admin) e PATCH /erp/integracao/sincronizar (o botão "Pedir
+│   │                       sincronização agora", financeiro/admin; grava companies.sync_solicitado_em).
+│   │                       lerSolicitacaoDeSync é o que o GET /partner/v1/status usa; ela diz
+│   │                       também se o pedido EXPIROU. expiracaoDoSync.ts →
+│   │                       EXPIRACAO_DO_PEDIDO_DE_SYNC_MS (15 min, o único lugar da regra):
+│   │                       expirado, o /status do parceiro dá sincronizar_agora=false (o
+│   │                       solicitado_em continua saindo), o GET da tela devolve sincronizacao:
+│   │                       { solicitado_em, expirado } e pedir de novo grava um carimbo novo.
 │   ├── company/          → POST /companies/onboard (chave da plataforma) + régua da carteira
 │   ├── tarefas/          → /tarefas — o que o escritório pede ao rep (migração 037)
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
 │   └── ia/               → relatório da carteira sob demanda (Anthropic ou OpenAI, por env)
 │
-├── erp/                  → integração com o ERP (Firebird)
-│   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto)
-│   └── firebird/         → connection, queries, types, erpSyncService
+├── erp/                  → integração com o ERP (Firebird) — APOSENTADA em 16/09/2026: o Control
+│                           manda tudo pela API de Parceiro (modules/partner). Fica como prova de
+│                           como a leitura direta funcionava; as travas por canal continuam.
+│   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto). sendOrder
+│   │                       LANÇA (EnvioAoErpDesligadoError): o número vem do Control
+│   └── firebird/         → connection, queries, types, erpSyncService. Além de
+│                           ERP_SYNC_ENABLED, cada parte exige o canal da empresa:
+│                           catálogo/preço/estoque só com canal_catalogo='firebird',
+│                           clientes só com canal_cadastro='firebird' (senão pula; as
+│                           rotas /erp/sync respondem 409 CANAL_FECHADO)
 │
 └── jobs/
     ├── seed.ts           → popula dados de teste (pnpm seed)
-    └── erpSyncScheduler.ts → agenda o sync periódico
+    ├── liberacaoDoAmbiente.ts → copia process.env ANTES do dotenv: o "sim" de quem roda
+    │                            não pode vir do .env (que aponta para produção)
+    ├── seedDemoOrders.ts → pedidos de demonstração: exige --empresa=<uuid> e
+    │                       SEED_DEMO_LIBERADO=sim no ambiente, recusa produção, e o
+    │                       DELETE de pedido vazio nunca pega pedido com número do Control
+    └── erpSyncScheduler.ts → agenda o sync periódico (só empresas com canal 'firebird')
 ```
 
 **Padrão de cada módulo (siga sempre este trio):**
@@ -209,8 +366,18 @@ apps/web/
     │   ├── pedidos/
     │   │   ├── PaginaPedidos           → lista de pedidos (busca + filtro status)
     │   │   ├── PaginaNovoPedido        → montar pedido (cliente + itens por tamanho)
-    │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp)
-    │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar)
+    │   │   └── PaginaDetalhePedido     → detalhe (itens, decidir, faturar, WhatsApp; com
+    │   │                                 canal api o "Lançar" SOLICITA ao Control e espera o número;
+    │   │                                 "Cancelar solicitação" enquanto o número não chega
+    │   │                                 [financeiro/admin])
+    │   ├── integracao/PaginaIntegracao → estado da integração com o Control e o botão
+    │   │                                 "Pedir sincronização agora" [financeiro/gerente/admin];
+    │   │                                 "pedido expirado" depois de 15 min sem o Control responder
+    │   ├── clientes/PaginaClientes     → clientes (lista + cadastrar; mostra o aviso da exclusão)
+    │   ├── clientes/PaginaCliente      → a ficha: "Representante: NOME (código …)" e "Cadastrado
+    │   │                                 por" perto do CNPJ; botão "Excluir cliente" [só admin]
+    │   ├── clientes/ExcluirCliente     → o diálogo da exclusão: contagens, o cadastro que fica
+    │   │                                 (mesmo documento, ou busca por nome/CNPJ) e confirmação
     │   ├── representantes/PaginaRepresentantes → reps (CRUD, meta) [gerente/admin]
     │   ├── painel/PaginaPainel         → Painel do gerente [gerente/admin]
     │   ├── minha-area/PaginaMinhaArea  → "Minha área" do rep (triagem, faturado, sync)
@@ -225,6 +392,9 @@ apps/web/
     │   │                    BotaoTema (claro/escuro/automático)
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
     │   └── comercial/     → CartaoProduto, SeletorTamanho, CartaoDecisao (aprovar/recusar),
+    │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela
+    │                        (nunca oferece tabela inativa), AvisoDeValorMinimo (o pedido mínimo
+    │                        da condição; só avisa), PedidoOriginal (o original x o faturado, peça por peça),
     │                        grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)
@@ -237,11 +407,16 @@ apps/web/
     │   └── authCache.ts  → login offline (hash da senha guardado local)
     │
     ├── services/api.ts   → cliente HTTP (fetch + Bearer token) — fala com a API
-    ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido
+    ├── hooks/            → useOnlineStatus, useSyncOnReconnect, useDecidirPedido, useMinhasTabelas
+    │                       (`tabelas` = só as ativas, para escolher; `todas` = com as inativas, para
+    │                       reconhecer a tabela em uso; `nomeDe` marca "(inativa no Control)")
     ├── lib/
     │   ├── utils.ts      → cn (classes) + formatBRL (R$)
     │   ├── pedido.ts     → nome do comprador, origem, cor do status e
-    │   │                   `decisaoDoPedido` (que decisão cada papel pode tomar)
+    │   │                   `decisaoDoPedido` (que decisão cada papel pode tomar);
+    │   │                   podeCancelarSolicitacao e a frase da confirmação
+    │   ├── donoDoCliente.ts → as linhas "Representante" / "Cadastrado por" da ficha
+    │   ├── exclusaoDeCliente.ts → as contas e frases do diálogo "Excluir cliente"
     │   ├── exportOrders.ts → gera a planilha do Control (32 linhas por arquivo,
     │   │                   o excedente vai num .zip) e entrega por download ou
     │   │                   pela folha de compartilhamento do iPhone
@@ -269,9 +444,10 @@ _tools/
 │   ├── extrair.py      → lê os 3 PDFs oficiais → tabelas-2027.json (as 2 faixas)
 │   ├── carregar.mjs    → substitui as tabelas de preço pelas do PDF
 │   └── carregar-faixa-maior.mjs → preenche price_larger (exige a migração 026)
-├── erp-sync/
-│   ├── README.md  → LEIA ANTES DE RODAR: o que cada modo faz, linha por linha, e a
-│   │                DECISÃO de 15/09/2026 sobre o push-orders
+├── erp-sync/     → APOSENTADO em 16/09/2026: o Control manda tudo pela API de Parceiro.
+│   │                Nenhum modo roda contra produção; o código fica como registro.
+│   ├── README.md  → LEIA ANTES DE RODAR: a DECISÃO de 16/09/2026 (Firebird aposentado), a de
+│   │                15/09/2026 sobre o push-orders e o que cada modo fazia, linha por linha
 │   ├── sync.py    → Firebird → Supabase. Modos: full, products, prices, customers,
 │   │                stock, reconcile (liga/desliga ativo), prices-audit (diagnóstico), test
 │   │                e push-orders — o ÚNICO que escreve NO FIREBIRD do Fábio (insere
@@ -279,8 +455,21 @@ _tools/
 │   │                se faltar). Contradiz o contrato "nada é escrito no seu ERP".
 │   │                VETADO em produção até o Yan decidir com o Fábio. prices/full também
 │   │                estão vetados (upsert de preço duplicado) — ver o README.
-│   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
+│   │                Trava no código (fase 0): os modos que gravam recusam sem a env
+│   │                ERP_SYNC_PY_LIBERADO=sim NA JANELA do terminal (no .env não vale); o
+│   │                push-orders exige ainda companies.canal_pedido_erp='sync_py'.
+│   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url.
+│   │                Também grava no catálogo: mesmas travas do sync.py
+│   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-050.sql         → a 050 para colar nos DOIS bancos, DEPOIS da 049 (termina com o NOTIFY).
+│                                    Conferir depois com node _tools/conferir-050.mjs [raiz da PLUMENE]
+├── SQL-PARA-RODAR-049.sql         → a 049 para colar nos DOIS bancos, DEPOIS da 048 (termina com o NOTIFY).
+│                                    Conferir depois com node _tools/conferir-049.mjs [raiz da PLUMENE]
+├── SQL-PARA-RODAR-048.sql         → a 048 para colar nos DOIS bancos (termina com o NOTIFY). Conferir
+│                                    depois com node _tools/conferir-048.mjs [raiz da PLUMENE]
+├── SQL-PARA-RODAR-013-042-NA-CS.sql → SÓ NA CORPO SENSUAL: a 013 inteira + o índice único da 042.
+│                                    Rodar antes a consulta de repetidos que está no cabeçalho
 ├── SQL-PARA-RODAR-046-047.sql     → 046 e 047 num arquivo só — JÁ APLICADO nos dois bancos (15/09)
 ├── SQL-PARA-RODAR-046.sql         → a 046 sozinha (substituída pelo 046-047). Medido em 15/09 09:5x com
 │                                    node _tools/conferir-046-047.mjs: 046 e 047 visíveis nos DOIS bancos
@@ -289,10 +478,14 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048, conferir-049 e conferir-050 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
-                 → cargas e consertos pontuais direto no Supabase (fora do app)
+                 → cargas e consertos pontuais direto no Supabase (fora do app).
+                   faturar-retroativo.mjs exige --empresa=<uuid>, é ensaio por padrão
+                   (--aplicar grava) e recusa empresa com canal_faturamento='api'.
+                   apps/api/src/jobs/seedDemoOrders.ts também exige --empresa=<uuid>
+                   e SEED_DEMO_LIBERADO=sim no ambiente da execução.
 ```
 
 > `_tools/firebird-reader/` **não existe no disco** (este mapa a listava). O `sync.py:38-42`
@@ -313,8 +506,8 @@ _tools/
 | Adicionar **rota na API** | `apps/api/src/modules/<área>/*.router.ts` |
 | Mudar um **tipo de dado** | `packages/shared/src/types/` |
 | Mudar o **banco** (colunas) | nova migration em `apps/api/src/config/migrations/` |
-| Mexer na **API de Parceiro** (o que o Control puxa/confirma) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html` |
-| Mexer no **sync do ERP** (Firebird → Supabase) | `_tools/erp-sync/sync.py` — leia `_tools/erp-sync/README.md` antes |
-| Rodar o **push-orders** (app → Firebird) | NÃO. Vetado em produção — `_tools/erp-sync/README.md`, seção "DECISÃO" |
+| Mexer na **API de Parceiro** (o que o Control puxa/confirma/manda) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html`. Rota nova entra também em `ROTAS_DO_PARCEIRO` (`modules/integracao/integracao.service.ts`) para a tela dar o título |
+| Mexer no **sync do ERP** (Firebird → Supabase) | NÃO. Aposentado em 16/09/2026: o dado chega pela API de Parceiro (`modules/partner/partner.catalogo.service.ts`, `partner.sync.service.ts`, `partner.retrato.service.ts`) — `_tools/erp-sync/README.md` explica |
+| Rodar o **push-orders** (app → Firebird) | NÃO. Morto — o Control puxa a fila e confirma o número; `_tools/erp-sync/README.md`, seção "DECISÃO" |
 | Mexer no **offline** | `apps/web/src/offline/` |
 ```

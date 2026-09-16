@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing } from 'lucide-react';
+import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing, Cable } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -51,6 +51,8 @@ const managerItems: NavItem[] = [
   // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
   // não se aplica a ele. O gerente só vê se o admin ligar a dele.
   { to: '/importar', label: 'Importar produtos', short: 'Importar', icon: UploadCloud, permissao: 'importar_produtos' },
+  // O estado da integração com o Control (o gerente olha; quem pede é o financeiro/admin).
+  { to: '/integracao', label: 'Integração', short: 'Control', icon: Cable },
 ];
 
 // Controle de logins não tem tecla: é do admin e ponto.
@@ -69,6 +71,9 @@ const financeiroItems: NavItem[] = [
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/customers', label: 'Clientes', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
+  // É a mesa dele que espera o número do Control: aqui ele vê se o Control
+  // está chegando e pede uma passada agora.
+  { to: '/integracao', label: 'Integração', short: 'Control', icon: Cable },
 ];
 
 // O relacionamento (Bruna) seleciona o cliente e encaminha pro rep — e

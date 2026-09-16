@@ -1,10 +1,13 @@
 import { supabase } from '../../config/supabase.js';
-import { detectar } from '../../lib/detectarColuna.js';
+import { detectar, detectarComCerteza } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
+import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.js';
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
+import { gravarOrigemDoNumero, registrarEventoErp } from './eventosErp.service.js';
+import { lerCanais, type Canais } from '../../lib/canais.js';
 import type {
   Order,
   OrderWithItems,
@@ -21,6 +24,27 @@ import {
   numeroErpValido,
 } from '@csb/shared';
 import type { AuthRole, OrderSource } from '@csb/shared';
+
+/**
+ * O canal da empresa para uma ação da TELA, com desfecho próprio quando o
+ * banco não responde.
+ *
+ * `lerCanais` lança de propósito (soluço de rede não pode abrir nem fechar
+ * canal). Só que "lançar" atravessa dois botões que antes nem consultavam
+ * `companies` — lançar no ERP e faturar pedido com número —, e uma exceção
+ * solta ali vira 500 sem código: a Larissa lê "Erro interno do servidor" e não
+ * sabe se o número foi gravado. Aqui a falha vira CANAL_INDISPONIVEL, que o
+ * controller traduz em 503 com a frase "tente de novo".
+ */
+async function lerCanaisDaTela(company_id: string): Promise<Canais> {
+  try {
+    return await lerCanais(company_id);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[canais] sem resposta do banco sobre os canais da empresa ${company_id}: ${msg}`);
+    throw new Error('CANAL_INDISPONIVEL');
+  }
+}
 
 export async function getOrders(
   company_id: string,
@@ -95,6 +119,18 @@ export async function getOrderById(
   // que a fábrica está com a versão velha depois de a venda interna editar.
   const sincronia = await lerSincronia(pedido.id, company_id);
   if (sincronia) pedido.erp_sync = sincronia;
+  // As notas que o Control informou, com as peças de cada uma (048): é o
+  // "como foi faturado" de verdade. Sem a 048, lista vazia.
+  pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
+  // O pedido foi SOLICITADO ao Control (049)? O `*` já traz a coluna quando
+  // ela existe; aqui ela vira o bloco que a tela lê para ficar consultando
+  // até o número chegar. Sem a 049, o bloco não existe.
+  if (pedido.erp_requested_at) {
+    pedido.solicitacao_erp = {
+      solicitado_em: pedido.erp_requested_at,
+      solicitado_por: pedido.erp_requested_by ?? null,
+    };
+  }
   return pedido;
 }
 
@@ -234,6 +270,62 @@ export interface OrigemPedido {
   created_by?: string;
 }
 
+/** Quantos "juntado em" seguir: o cadastro que ficou pode ter sido juntado de novo. */
+const SALTOS_DE_JUNCAO = 5;
+
+interface ClienteDoPedido {
+  id: string;
+  price_table_id: string | null;
+}
+
+/**
+ * O cliente do pedido na empresa — seguindo a exclusão com junção (050).
+ *
+ * O admin exclui um cadastro em dobro juntando-o em outro, mas o aparelho do
+ * representante continua com o cliente antigo no cache (e a loja cujo login foi
+ * herdado, com ele no token por até 1h). Sem isto, o pedido para o cliente
+ * excluído era recusado online e, pela fila offline, sumia. Aqui: cliente que
+ * não existe mais e tem cópia em deleted_customers com `juntado_em` vira o
+ * cadastro que ficou (em cadeia, com limite) — e o rastro fica na própria cópia
+ * e no log. Excluído sem junção, ou sem a 050, continua "não encontrado".
+ */
+async function clienteDoPedido(customer_id: string, company_id: string): Promise<ClienteDoPedido | null> {
+  const vistos = new Set<string>();
+  let alvo = customer_id;
+  for (let salto = 0; ; salto++) {
+    const { data: customer } = await supabase
+      .from('customers')
+      .select('id, price_table_id')
+      .eq('id', alvo)
+      .eq('company_id', company_id)
+      .maybeSingle();
+    if (customer) {
+      const achado = customer as ClienteDoPedido;
+      if (achado.id !== customer_id) {
+        console.warn(
+          `[pedido] o cliente ${customer_id} foi excluído e juntado em ${achado.id}: o pedido entra no cadastro que ficou`,
+        );
+      }
+      return achado;
+    }
+    if (salto >= SALTOS_DE_JUNCAO || !(await detectar('deleted_customers', 'id'))) return null;
+
+    vistos.add(alvo);
+    const { data: copia, error } = await supabase
+      .from('deleted_customers')
+      .select('juntado_em')
+      .eq('company_id', company_id)
+      .eq('customer_id', alvo)
+      .not('juntado_em', 'is', null)
+      .order('deleted_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    const juntadoEm = error ? null : ((copia as { juntado_em: string | null } | null)?.juntado_em ?? null);
+    if (!juntadoEm || vistos.has(juntadoEm)) return null;
+    alvo = juntadoEm;
+  }
+}
+
 export async function createOrder(
   company_id: string,
   rep_id: string,
@@ -263,26 +355,27 @@ export async function createOrder(
   // vitrine antiga de visitante (link sem cliente atrelado, anterior à 035) —
   // ali quem pediu se identifica só por nome e WhatsApp. Vitrine com cliente
   // (o link novo) passa pela mesma checagem dos outros.
+  // O cliente que o pedido grava: o do corpo, ou o cadastro em que ele foi
+  // juntado quando o admin o excluiu (`clienteDoPedido`).
+  let customerIdDoPedido = body.customer_id ?? null;
   if (!daVitrine || body.customer_id) {
     if (!body.customer_id) return null;
-    const { data: customer } = await supabase
-      .from('customers')
-      .select('id, blocked, price_table_id')
-      .eq('id', body.customer_id)
-      .eq('company_id', company_id)
-      .single();
+    const customer = await clienteDoPedido(body.customer_id, company_id);
 
     if (!customer) return null;
-    if ((customer as { blocked: boolean }).blocked) {
-      throw new Error('CUSTOMER_BLOCKED');
-    }
+    customerIdDoPedido = customer.id;
+    // Cliente BLOQUEADO no Control não trava o representante (decisão 8 de
+    // 16/09/2026): o pedido nasce normalmente e o financeiro é avisado na
+    // hora de decidir — o bloqueio, o motivo e a pendência financeira ficam
+    // no cadastro (customers.blocked, block_reason, pendencia_financeira).
+    // Até 16/09 este ponto recusava com CUSTOMER_BLOCKED.
 
     // A tabela do pedido é a do CADASTRO do cliente — aqui, no único lugar
     // por onde todo pedido passa. O caminho online já resolvia isso no
     // controller; o offline (fila de sync) mandava a tabela do REPRESENTANTE,
     // e um cliente de tabela 3 nasceu em pedido de tabela 1 (#14637, Simone,
     // 03/09/2026). Sem tabela no cadastro, vale a que o chamador mandou.
-    const tabelaDoCliente = (customer as { price_table_id: string | null }).price_table_id;
+    const tabelaDoCliente = customer.price_table_id;
     if (tabelaDoCliente) price_table_id = tabelaDoCliente;
   }
 
@@ -394,7 +487,7 @@ export async function createOrder(
         rep_id,
         // Vitrine COM cliente (link novo, 035) grava o cliente; a de visitante
         // (link antigo) segue sem — o contato fica nos campos guest_*.
-        customer_id: body.customer_id ?? null,
+        customer_id: customerIdDoPedido,
         status,
         total,
         notes: body.notes ?? null,
@@ -452,7 +545,7 @@ export async function createOrder(
 
 export type DeleteOrderResult =
   | { ok: true }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'sem_copia' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'tem_numero_erp' | 'sem_copia' };
 
 // ─── Pedidos excluídos (migração 040) ────────────────────────────────────────
 //
@@ -528,15 +621,20 @@ export async function deleteOrder(
 ): Promise<DeleteOrderResult> {
   const { data: order } = await supabase
     .from('orders')
-    .select('id, rep_id, invoiced')
+    .select('id, rep_id, invoiced, erp_order_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
 
   if (!order) return { ok: false, reason: 'not_found' };
-  const o = order as { rep_id: string; invoiced: boolean | null };
+  const o = order as { rep_id: string; invoiced: boolean | null; erp_order_id?: string | null };
   if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
   if (o.invoiced) return { ok: false, reason: 'invoiced' };
+  // Pedido com número do Control já existe LÁ (integração, fase 0). Apagar aqui
+  // deixaria o Control com um pedido que o app não conhece mais — e o
+  // faturamento dele chegaria procurando um número sem dono. Vale para todos,
+  // admin incluído: o caminho é o financeiro corrigir, não o pedido sumir.
+  if (o.erp_order_id) return { ok: false, reason: 'tem_numero_erp' };
 
   // Com a tabela no ar, a cópia é obrigatória: se ela não gravou, o pedido não
   // é apagado — é exatamente o "sumiu sem rastro" que a 040 existe para evitar.
@@ -721,7 +819,17 @@ export interface ItemEditado {
 
 export type EditarPecasResult =
   | { ok: true; order: OrderWithItems }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'price_not_found' | 'save_failed' | 'sem_foto_do_erp' };
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'forbidden'
+        | 'tarde_demais'
+        | 'price_not_found'
+        | 'save_failed'
+        | 'sem_foto_do_erp'
+        | 'original_nao_guardado';
+    };
 
 /**
  * Troca as peças de um pedido que ainda não foi para a fábrica.
@@ -761,8 +869,14 @@ export async function setOrderItems(
 
   // ANTES de trocar qualquer peça: a foto do que o representante fechou (044).
   // Só a primeira vale, e rascunho não entra — quem está montando o pedido não
-  // está cortando nada. É acessório: falhar aqui não impede a edição.
-  await guardarOriginal(o, 'edicao', user_id);
+  // está cortando nada.
+  //
+  // Se a foto FALHA (a tabela existe e o banco recusou), a edição não passa:
+  // cortar sem ela apagaria o original para sempre — a próxima foto já sairia
+  // com o corte dentro, e o "veio assim, foi faturado assado" perderia a
+  // primeira metade. Tabela ausente (044 não rodou) ou foto já tirada seguem.
+  const original = await guardarOriginal(o, 'edicao', user_id);
+  if (original === 'falhou') return { ok: false, reason: 'original_nao_guardado' };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
@@ -943,20 +1057,40 @@ export async function corrigirNumeroErp(
   id: string,
   company_id: string,
   numeroDigitado: string,
+  /** Quem corrigiu — vai para a origem do número e para o rastro (048). */
+  quem: { id?: string | null; nome?: string | null } = {},
 ): Promise<CorrigirNumeroErpResult> {
   const numero = normalizarNumeroErp(numeroDigitado);
   if (!numero || !numeroErpValido(numero)) return { ok: false, motivo: 'formato' };
 
-  const { data: pedido } = await supabase
+  // `*` de propósito: `order_number` (009/012) é opcional em todo o resto do
+  // código, e pedi-la pelo nome faria um banco sem ela responder 42703 — que,
+  // lido só pelo `data`, viraria "pedido não encontrado" para um pedido que
+  // existe. E o erro é lido: falha de banco não pode virar 404.
+  const { data: pedido, error: erroLeitura } = await supabase
     .from('orders')
-    .select('id, status, invoiced, erp_order_id')
+    .select('*')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
+  if (erroLeitura) {
+    console.error(`[numero] falha ao ler o pedido ${id} para corrigir o número: ${erroLeitura.message}`);
+    return { ok: false, motivo: 'erro' };
+  }
   if (!pedido) return { ok: false, motivo: 'not_found' };
-  const o = pedido as { status: Order['status']; invoiced: boolean | null; erp_order_id: string | null };
+  const o = pedido as {
+    order_number?: number | null;
+    status: Order['status'];
+    invoiced: boolean | null;
+    erp_order_id: string | null;
+  };
   if (o.status !== 'sent_erp' || !o.erp_order_id) return { ok: false, motivo: 'nao_lancado' };
   if (o.invoiced) return { ok: false, motivo: 'ja_faturado' };
+
+  // O mesmo número de novo (duplo toque): nada a gravar. Regravar trocaria a
+  // origem e o "quando" do número sem mudança nenhuma. Grafia diferente do que
+  // está gravado segue e grava — é a normalização chegando.
+  if (o.erp_order_id === numero) return { ok: true, erp_order_id: numero };
 
   const { data: dono } = await supabase
     .from('orders')
@@ -967,9 +1101,15 @@ export async function corrigirNumeroErp(
     .limit(1);
   if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
 
+  // A correção é um dos quatro escritores do número: fica dito no pedido (048).
+  const patch = await gravarOrigemDoNumero(
+    { erp_order_id: numero, updated_at: new Date().toISOString() },
+    'correcao',
+    quem.id ?? null,
+  );
   const { error } = await supabase
     .from('orders')
-    .update({ erp_order_id: numero, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', id)
     .eq('company_id', company_id);
   if (error) {
@@ -977,6 +1117,18 @@ export async function corrigirNumeroErp(
   }
   // A foto do que o Control conhece passa a apontar o número certo (046).
   await atualizarNumeroNaFoto(id, company_id, numero);
+  // E o rastro: de qual número para qual, e quem. Nunca derruba a correção.
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: o.order_number ?? null,
+    tipo: 'numero_corrigido',
+    origem: 'tela',
+    por: quem.id ?? null,
+    por_nome: quem.nome ?? null,
+    antes: { erp_order_id: o.erp_order_id },
+    depois: { erp_order_id: numero },
+  });
   return { ok: true, erp_order_id: numero };
 }
 
@@ -994,6 +1146,281 @@ export async function ultimoNumeroErp(company_id: string): Promise<string | null
     .limit(1);
   const linha = (data ?? [])[0] as { erp_order_id: string | null } | undefined;
   return linha?.erp_order_id ?? null;
+}
+
+export type SolicitarErpResult =
+  | {
+      ok: true;
+      /** Quando foi solicitado (o de agora, ou o de antes se já estava). */
+      solicitado_em: string;
+      /** `true` = já estava solicitado; nada foi gravado nem registrado. */
+      ja_solicitado: boolean;
+    }
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'nao_aprovado'
+        | 'ja_faturado'
+        | 'ja_lancado'
+        | 'canal_manual'
+        | 'canal_indisponivel'
+        | 'sem_migracao'
+        | 'erro';
+      /** Em `ja_lancado`: o número que o pedido já tem. */
+      erp_order_id?: string;
+    };
+
+/** O que a solicitação lê do pedido. `*` de propósito: as colunas da 049 podem não existir. */
+interface PedidoParaSolicitar {
+  order_number?: number | null;
+  status: Order['status'];
+  invoiced?: boolean | null;
+  erp_order_id: string | null;
+  erp_requested_at?: string | null;
+  erp_requested_by?: string | null;
+}
+
+/**
+ * Lê o pedido dentro da empresa para solicitar ou cancelar a solicitação.
+ * `falhou` separa "o banco não respondeu" (500) de "não existe" (404).
+ */
+async function lerPedidoParaSolicitar(
+  id: string,
+  company_id: string,
+  rotulo: string,
+): Promise<{ pedido: PedidoParaSolicitar | null; falhou: boolean }> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (error) {
+    console.error(`[${rotulo}] falha ao ler o pedido ${id}: ${error.message}`);
+    return { pedido: null, falhou: true };
+  }
+  return { pedido: (data as PedidoParaSolicitar | null) ?? null, falhou: false };
+}
+
+/**
+ * "Lançar no Control" com o canal de pedidos na API (049, decisão 2 de
+ * 16/09/2026).
+ *
+ * O lançamento continua sendo UM CLIQUE do financeiro — só que, com o canal
+ * na API, ele não digita número nenhum: o clique SOLICITA. O pedido ganha
+ * `erp_requested_at`/`erp_requested_by`, entra na fila que o Control puxa
+ * (GET /partner/v1/pedidos) e fica como está (approved, sem número) até o
+ * Control confirmar pelo POST /confirmar — aí vira sent_erp com o número. A
+ * tela fica consultando GET /orders/:id até isso acontecer.
+ *
+ * Regras, nesta ordem: existe → ainda sem número → não faturado → aprovado →
+ * canal na API → a 049 rodou → se já está solicitado, responde ok sem gravar
+ * (idempotente: o segundo clique, ou o clique depois do tempo esgotar, só
+ * volta a esperar) → grava só se ninguém mexeu no meio → evento
+ * 'solicitado_ao_erp'. Status nunca muda aqui.
+ */
+export async function solicitarLancamentoNoErp(
+  id: string,
+  company_id: string,
+  quem: { id: string; nome?: string | null },
+): Promise<SolicitarErpResult> {
+  const ler = () => lerPedidoParaSolicitar(id, company_id, 'solicitar-erp');
+
+  const responderPeloEstado = (o: PedidoParaSolicitar): SolicitarErpResult | null => {
+    if (o.erp_order_id) return { ok: false, reason: 'ja_lancado', erp_order_id: o.erp_order_id };
+    if (o.invoiced) return { ok: false, reason: 'ja_faturado' };
+    if (o.status !== 'approved') return { ok: false, reason: 'nao_aprovado' };
+    if (o.erp_requested_at) return { ok: true, solicitado_em: o.erp_requested_at, ja_solicitado: true };
+    return null;
+  };
+
+  const leitura = await ler();
+  if (leitura.falhou) return { ok: false, reason: 'erro' };
+  if (!leitura.pedido) return { ok: false, reason: 'not_found' };
+  const o = leitura.pedido;
+
+  // As três recusas de estado vêm ANTES do canal: um pedido já lançado ou já
+  // faturado não é caso de "canal", é caso de "não há o que solicitar".
+  if (o.erp_order_id) return { ok: false, reason: 'ja_lancado', erp_order_id: o.erp_order_id };
+  if (o.invoiced) return { ok: false, reason: 'ja_faturado' };
+  if (o.status !== 'approved') return { ok: false, reason: 'nao_aprovado' };
+
+  let canais: Canais;
+  try {
+    canais = await lerCanaisDaTela(company_id);
+  } catch {
+    return { ok: false, reason: 'canal_indisponivel' };
+  }
+  if (canais.pedido_erp !== 'api') return { ok: false, reason: 'canal_manual' };
+
+  // A 049 rodou? Sonda que não responde não pode virar "migração pendente"
+  // (a Larissa leria "ainda não funciona" por um soluço de rede): é o mesmo
+  // "tente de novo" do canal.
+  const coluna = await detectarComCerteza('orders', 'erp_requested_at');
+  if (coluna === 'nao_sei') return { ok: false, reason: 'canal_indisponivel' };
+  if (coluna === 'nao_existe') return { ok: false, reason: 'sem_migracao' };
+
+  if (o.erp_requested_at) return { ok: true, solicitado_em: o.erp_requested_at, ja_solicitado: true };
+
+  const agora = new Date().toISOString();
+  const { data: afetadas, error } = await supabase
+    .from('orders')
+    .update({ erp_requested_at: agora, erp_requested_by: quem.id, updated_at: agora })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    // Só se o pedido continua como foi lido: aprovado, sem número, NÃO
+    // faturado e ainda não solicitado. Dois cliques ao mesmo tempo gravam um só
+    // (e um só evento); um carimbo manual que caia entre a leitura e o UPDATE
+    // não deixa pedido faturado marcado como "Solicitado ao Control" — o
+    // relido responde ja_faturado.
+    .eq('status', 'approved')
+    .is('erp_order_id', null)
+    .or('invoiced.is.null,invoiced.eq.false')
+    .is('erp_requested_at', null)
+    .select('id');
+  if (error) {
+    console.error(`[solicitar-erp] falha ao solicitar o pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+
+  if (!Array.isArray(afetadas) || afetadas.length === 0) {
+    // Alguém mexeu entre a leitura e a gravação: responde pelo estado de agora.
+    const relido = await ler();
+    if (relido.falhou) return { ok: false, reason: 'erro' };
+    if (!relido.pedido) return { ok: false, reason: 'not_found' };
+    return responderPeloEstado(relido.pedido) ?? { ok: false, reason: 'erro' };
+  }
+
+  // O rastro (048/049). Nunca derruba a solicitação: ela já está gravada.
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: o.order_number ?? null,
+    tipo: 'solicitado_ao_erp',
+    origem: 'tela',
+    por: quem.id,
+    por_nome: quem.nome ?? null,
+    antes: null,
+    depois: { erp_order_id: null, erp_requested_at: agora, erp_requested_by: quem.id, status: 'approved' },
+  });
+  return { ok: true, solicitado_em: agora, ja_solicitado: false };
+}
+
+export type CancelarSolicitacaoResult =
+  | {
+      ok: true;
+      /** O carimbo que foi tirado (ou `null` quando outro clique já tinha tirado). */
+      solicitado_em: string | null;
+      /** `true` = outro clique cancelou no meio; nada foi gravado aqui nem registrado. */
+      ja_cancelado: boolean;
+    }
+  | {
+      ok: false;
+      reason: 'not_found' | 'nao_solicitado' | 'ja_importado' | 'sem_migracao' | 'indisponivel' | 'erro';
+      /** Em `ja_importado`: o número que o Control deu. */
+      erp_order_id?: string;
+    };
+
+/**
+ * "Cancelar solicitação" (decisão do Yan, 16/09/2026 à tarde): o financeiro
+ * clicou "Lançar no Control" e o Control ainda não importou — cancelar tira o
+ * pedido da fila que o Control puxa (GET /partner/v1/pedidos só entrega
+ * aprovado COM `erp_requested_at`). O pedido volta a ser um aprovado "a
+ * lançar", como antes do clique. Status nunca muda aqui.
+ *
+ * Regras, nesta ordem: a 049 rodou (sem ela não existe solicitação: 409
+ * MIGRACAO_PENDENTE; sonda sem resposta é "tente de novo") → o pedido existe
+ * na empresa → ainda sem número do Control (com número, JA_IMPORTADO: aí não
+ * há o que cancelar, o Control já importou) → está solicitado → UPDATE só se
+ * AINDA está solicitado e sem número (o número pode chegar entre a leitura e a
+ * gravação: ninguém afetado → relê → JA_IMPORTADO com o número) → evento
+ * 'solicitacao_cancelada', que só existe no CHECK depois da 050 — sem a 050
+ * o cancelamento acontece sem evento, e o console guarda o carimbo apagado.
+ *
+ * O app não sabe se o Control já puxou o pedido da fila (entre a leitura e a
+ * confirmação ele continua sem número). Cancelar não recusa a confirmação que
+ * vier depois: o POST /partner/v1/pedidos/:id/confirmar aceita o aprovado que
+ * já foi solicitado, e o número vence (revisão de 16/09/2026, à tarde).
+ */
+export async function cancelarSolicitacaoAoErp(
+  id: string,
+  company_id: string,
+  quem: { id: string; nome?: string | null },
+): Promise<CancelarSolicitacaoResult> {
+  const coluna = await detectarComCerteza('orders', 'erp_requested_at');
+  if (coluna === 'nao_sei') return { ok: false, reason: 'indisponivel' };
+  if (coluna === 'nao_existe') return { ok: false, reason: 'sem_migracao' };
+
+  const ler = () => lerPedidoParaSolicitar(id, company_id, 'cancelar-solicitacao');
+
+  const leitura = await ler();
+  if (leitura.falhou) return { ok: false, reason: 'erro' };
+  if (!leitura.pedido) return { ok: false, reason: 'not_found' };
+  const o = leitura.pedido;
+
+  if (o.erp_order_id) return { ok: false, reason: 'ja_importado', erp_order_id: o.erp_order_id };
+  if (!o.erp_requested_at) return { ok: false, reason: 'nao_solicitado' };
+
+  const agora = new Date().toISOString();
+  const { data: afetadas, error } = await supabase
+    .from('orders')
+    .update({ erp_requested_at: null, erp_requested_by: null, updated_at: agora })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    // Só se o Control AINDA não deu o número e o pedido AINDA está solicitado:
+    // a confirmação que cai no meio vence, e o pedido não perde a solicitação
+    // de um número que já existe.
+    .is('erp_order_id', null)
+    .not('erp_requested_at', 'is', null)
+    .select('id');
+  if (error) {
+    console.error(`[cancelar-solicitacao] falha ao cancelar a solicitação do pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+
+  if (!Array.isArray(afetadas) || afetadas.length === 0) {
+    // Alguém mexeu entre a leitura e a gravação: responde pelo estado de agora.
+    const relido = await ler();
+    if (relido.falhou) return { ok: false, reason: 'erro' };
+    if (!relido.pedido) return { ok: false, reason: 'not_found' };
+    if (relido.pedido.erp_order_id) {
+      return { ok: false, reason: 'ja_importado', erp_order_id: relido.pedido.erp_order_id };
+    }
+    // Outro clique já tirou da fila: o que a pessoa queria já aconteceu.
+    if (!relido.pedido.erp_requested_at) return { ok: true, solicitado_em: null, ja_cancelado: true };
+    return { ok: false, reason: 'erro' };
+  }
+
+  // O rastro. 'solicitacao_cancelada' só é aceito pelo CHECK depois da 050, e
+  // a 050 é a que cria deleted_customers: é por ela que se sabe. O evento leva
+  // a solicitação que foi apagada (quando e quem), que o pedido deixou de ter.
+  // Sem a 050 (ou sem resposta sobre ela), o cancelamento fica sem evento — ele
+  // já está gravado e o evento nunca derruba quem chamou — e o carimbo apagado
+  // fica ao menos no log (só ids e o momento).
+  if (await detectar('deleted_customers', 'id')) {
+    await registrarEventoErp({
+      company_id,
+      order_id: id,
+      order_number: o.order_number ?? null,
+      tipo: 'solicitacao_cancelada',
+      origem: 'tela',
+      por: quem.id,
+      por_nome: quem.nome ?? null,
+      antes: {
+        erp_order_id: null,
+        erp_requested_at: o.erp_requested_at,
+        erp_requested_by: o.erp_requested_by ?? null,
+        status: o.status,
+      },
+      depois: { erp_order_id: null, erp_requested_at: null, erp_requested_by: null, status: o.status },
+    });
+  } else {
+    console.warn(
+      `[cancelar-solicitacao] pedido ${id}: solicitação de ${o.erp_requested_at} (por ${o.erp_requested_by ?? 'desconhecido'}) cancelada por ${quem.id}, sem evento (migração 050 ausente ou sem resposta do banco)`,
+    );
+  }
+  return { ok: true, solicitado_em: o.erp_requested_at, ja_cancelado: false };
 }
 
 export type NotesResult =
@@ -1061,6 +1488,31 @@ async function detectarUltimaCompra(): Promise<boolean> {
   return detectar('customers', 'last_purchase_at');
 }
 
+/** A data do calendário (AAAA-MM-DD) de um momento, no fuso da fábrica. */
+const DIA_EM_SAO_PAULO = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * O DIA da compra, em America/Sao_Paulo.
+ *
+ * `slice(0, 10)` de um ISO em UTC errava a noite: faturado às 22h de 13/08 em
+ * São Paulo é 01h de 14/08 em UTC, e o selo da carteira ganhava um dia que não
+ * houve. Data pura (AAAA-MM-DD) já é o dia e vale como veio. `null` quando não
+ * dá para ler.
+ */
+export function diaDaCompra(quando: string | null | undefined): string | null {
+  if (!quando) return null;
+  const texto = quando.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+  const ms = Date.parse(texto);
+  if (Number.isNaN(ms)) return null;
+  return DIA_EM_SAO_PAULO.format(new Date(ms));
+}
+
 /**
  * O carimbo do faturamento empurra a última compra do cliente para FRENTE — é
  * o que mantém o selo da carteira vivo para quem vende pelo app.
@@ -1068,25 +1520,53 @@ async function detectarUltimaCompra(): Promise<boolean> {
  * Só para frente, nunca para trás: desfazer um faturamento não apaga a compra
  * que existiu, e um carimbo retroativo não rejuvenesce o retrato. Falha aqui
  * não derruba o faturamento — o selo é acessório do carimbo, não o contrário.
+ *
+ * Quem chama só chama na TRANSIÇÃO para faturado: um recarimbo não é compra
+ * nova. `company_id`, quando vem, entra no filtro (toda gravação é da empresa).
  */
 export async function registrarCompraDoCliente(
   customer_id: string | null | undefined,
   quando: string | null | undefined,
+  company_id?: string | null,
 ): Promise<void> {
-  if (!customer_id || !quando) return;
-  if (!(await detectarUltimaCompra())) return;
-  const dia = quando.slice(0, 10);
+  if (!customer_id) return;
+  const dia = diaDaCompra(quando);
+  if (!dia) return;
   try {
-    await supabase
+    if (!(await detectarUltimaCompra())) return;
+    let consulta = supabase
       .from('customers')
       .update({ last_purchase_at: dia, updated_at: new Date().toISOString() })
-      .eq('id', customer_id)
-      .or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
-  } catch {
+      .eq('id', customer_id);
+    if (company_id) consulta = consulta.eq('company_id', company_id);
+    const { error } = await consulta.or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
+    if (error) console.error(`[faturado] falha ao empurrar a última compra do cliente ${customer_id}: ${error.message}`);
+  } catch (e) {
     /* acessório — nunca derruba o carimbo */
+    console.error(`[faturado] falha ao empurrar a última compra do cliente ${customer_id}: ${String(e)}`);
   }
 }
 
+export type FaturadoResult =
+  | {
+      ok: true;
+      order: Order;
+      /** `false` = o pedido já estava assim; nada foi gravado nem avisado. */
+      mudou: boolean;
+    }
+  | { ok: false; reason: 'not_found' | 'faturamento_pelo_control' | 'canal_indisponivel' | 'erro' };
+
+/**
+ * O botão manual de faturado (e o desfazer).
+ *
+ * - Com `canal_faturamento='api'` (048), o faturado vem do Control, pela API,
+ *   para TODO pedido — com ou sem número, de quem for (decisão 11 de
+ *   16/09/2026): o botão recusa, para não haver dois escritores do mesmo
+ *   carimbo. Com o canal manual segue como sempre.
+ * - Recarimbo (já faturado) não grava nada: não move `invoiced_at`, não empurra
+ *   a última compra e não avisa o representante de novo.
+ * - Desfazer limpa também `invoiced_total` (027), como a API faz.
+ */
 export async function setOrderInvoiced(
   id: string,
   company_id: string,
@@ -1094,39 +1574,114 @@ export async function setOrderInvoiced(
   opcoes: {
     /** Venda interna: o rep só carimba o PRÓPRIO pedido. Nulo = sem restrição. */
     somenteDoRep?: string | null;
+    /** Quem apertou o botão — para o rastro (048). */
+    por?: string | null;
+    por_nome?: string | null;
   } = {},
-): Promise<Order | null> {
+): Promise<FaturadoResult> {
+  // `*` de propósito: traz `invoiced_total` só quando a 027 existe — e é a
+  // presença da chave que diz se o desfazer tem um valor para limpar.
+  const lerPedido = async (): Promise<(Order & Record<string, unknown>) | null> => {
+    let leitura = supabase.from('orders').select('*').eq('id', id).eq('company_id', company_id);
+    if (opcoes.somenteDoRep) leitura = leitura.eq('rep_id', opcoes.somenteDoRep);
+    const resposta = await leitura.maybeSingle();
+    return (resposta.data as (Order & Record<string, unknown>) | null) ?? null;
+  };
+  const atual = await lerPedido();
+  if (!atual) return { ok: false, reason: 'not_found' };
+
+  // O canal vale para todo pedido. Banco que não responde não carimba: um
+  // soluço não pode reabrir o botão com o canal na API. Mas também não vira
+  // 500 mudo — o desfecho é CANAL_INDISPONIVEL (503), e a tela mostra "tente
+  // de novo em instantes". Sem a 048 (coluna ausente), `lerCanais` devolve os
+  // padrões sem consultar a empresa: o botão carimba como sempre carimbou.
+  let canais: Canais;
+  try {
+    canais = await lerCanaisDaTela(company_id);
+  } catch {
+    return { ok: false, reason: 'canal_indisponivel' };
+  }
+  if (canais.faturamento === 'api') return { ok: false, reason: 'faturamento_pelo_control' };
+
+  const temValor = Object.prototype.hasOwnProperty.call(atual, 'invoiced_total');
+  const jaFaturado = atual.invoiced === true;
+
+  if (invoiced && jaFaturado) return { ok: true, order: atual, mudou: false };
+  if (!invoiced && !jaFaturado && !atual.invoiced_at && (!temValor || atual.invoiced_total == null)) {
+    return { ok: true, order: atual, mudou: false };
+  }
+
   // O carimbo fecha o pedido para sempre. Se ninguém tinha cortado peça, esta
   // é a hora da foto (044): daí em diante todo pedido faturado tem o original
   // registrado, e o "veio assim, foi faturado assado" sempre tem as duas metades.
-  if (invoiced) {
-    const { data: antes } = await supabase
-      .from('orders')
-      .select('id, company_id, status')
-      .eq('id', id)
-      .eq('company_id', company_id)
-      .maybeSingle();
-    if (antes) await guardarOriginal(antes as Pick<Order, 'id' | 'company_id' | 'status'>, 'faturamento');
-  }
+  if (invoiced) await guardarOriginal(atual, 'faturamento', opcoes.por ?? null);
 
-  let query = supabase
-    .from('orders')
-    .update({
-      invoiced,
-      invoiced_at: invoiced ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('company_id', company_id);
+  const agora = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    invoiced,
+    invoiced_at: invoiced ? agora : null,
+    updated_at: agora,
+  };
+  if (!invoiced && temValor) patch['invoiced_total'] = null;
 
+  let query = supabase.from('orders').update(patch).eq('id', id).eq('company_id', company_id);
   if (opcoes.somenteDoRep) query = query.eq('rep_id', opcoes.somenteDoRep);
+  // Dois toques ao mesmo tempo: só o primeiro carimba (e só ele avisa o rep).
+  if (invoiced) query = query.or('invoiced.is.null,invoiced.eq.false');
 
   const { data, error } = await query.select().maybeSingle();
+  if (error) {
+    console.error(`[faturado] falha ao gravar o faturado do pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+  if (!data) {
+    // O outro toque chegou antes: o pedido já está como pedido.
+    const agoraLido = await lerPedido();
+    return agoraLido ? { ok: true, order: agoraLido, mudou: false } : { ok: false, reason: 'not_found' };
+  }
 
-  if (error || !data) return null;
   const order = data as Order;
-  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? undefined);
-  return order;
+  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? agora, company_id);
+
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: order.order_number ?? atual.order_number ?? null,
+    tipo: invoiced ? 'faturado' : 'faturamento_desfeito',
+    origem: 'tela',
+    por: opcoes.por ?? null,
+    por_nome: opcoes.por_nome ?? null,
+    antes: {
+      invoiced: atual.invoiced ?? false,
+      invoiced_at: atual.invoiced_at ?? null,
+      ...(temValor ? { invoiced_total: atual.invoiced_total ?? null } : {}),
+    },
+    depois: {
+      invoiced,
+      invoiced_at: invoiced ? (order.invoiced_at ?? agora) : null,
+      ...(temValor ? { invoiced_total: invoiced ? (atual.invoiced_total ?? null) : null } : {}),
+    },
+  });
+
+  // Desfazer à mão cancela as notas ativas (048), como o `faturado: false` da
+  // API. Acessório: o desfazer já está gravado e não volta atrás.
+  if (!invoiced) {
+    const canceladas = await cancelarNotasAtivas(id, company_id, agora);
+    for (const nota of canceladas ?? []) {
+      await registrarEventoErp({
+        company_id,
+        order_id: id,
+        order_number: order.order_number ?? atual.order_number ?? null,
+        tipo: 'nota_cancelada',
+        origem: 'tela',
+        por: opcoes.por ?? null,
+        por_nome: opcoes.por_nome ?? null,
+        antes: { numero: nota.numero, serie: nota.serie, cancelada_em: null },
+        depois: { numero: nota.numero, serie: nota.serie, cancelada_em: agora },
+      });
+    }
+  }
+  return { ok: true, order, mudou: true };
 }
 
 export async function updateOrderStatus(
@@ -1136,17 +1691,19 @@ export async function updateOrderStatus(
   body: UpdateOrderStatusRequest,
   role?: AuthRole,
   vendaInterna = false,
+  /** Nome de quem decidiu — vai para o rastro do lançamento (048). */
+  por_nome: string | null = null,
 ): Promise<Order | null> {
   const { data: current, error: currentError } = await supabase
     .from('orders')
-    .select('status, rep_id')
+    .select('status, rep_id, erp_order_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .single();
 
   if (currentError || !current) return null;
 
-  const row = current as { status: Order['status']; rep_id: string };
+  const row = current as { status: Order['status']; rep_id: string; erp_order_id?: string | null };
 
   // Representante só mexe no status dos próprios pedidos (ex.: enviar para aprovação).
   if (role === 'rep' && row.rep_id !== approverId) {
@@ -1210,6 +1767,20 @@ export async function updateOrderStatus(
   // vez que ela for lançar tem que carregar e seguir o padrão da fábrica"). O
   // app nunca inventa esse número; e um número do Control é de UM pedido só.
   if (body.status === 'sent_erp') {
+    // Com o canal de pedidos ligado na API (048), o número vem do Control pela
+    // API de parceiro — a tela deixa de ser um segundo escritor do mesmo campo.
+    // Quem tentou DIGITAR um número ouve CANAL_API; quem chegou aqui sem número
+    // ouve que o caminho é SOLICITAR (PATCH /orders/:id/solicitar-erp), que
+    // não muda o status: o pedido vira sent_erp quando o Control confirmar.
+    // Antes de validar o número: não adianta a Larissa acertar a digitação de
+    // algo que a tela não pode mais gravar. Banco que não responde recusa o
+    // lançamento com CANAL_INDISPONIVEL (503, "tente de novo") — nunca grava
+    // no escuro, e nunca sem dizer o porquê.
+    const canais = await lerCanaisDaTela(company_id);
+    if (canais.pedido_erp === 'api') {
+      throw new Error(body.erp_order_id?.trim() ? 'CANAL_API' : 'LANCAMENTO_PELO_CONTROL');
+    }
+
     const numero = normalizarNumeroErp(body.erp_order_id);
     if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
     const { data: dono } = await supabase
@@ -1222,6 +1793,8 @@ export async function updateOrderStatus(
     if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
     update.erp_order_id = numero;
     update.synced_at = new Date().toISOString();
+    // De onde veio o número: do lançamento na tela, por quem (048).
+    await gravarOrigemDoNumero(update, 'lancamento', approverId);
   }
 
   if (body.notes) {
@@ -1249,6 +1822,18 @@ export async function updateOrderStatus(
   // venda interna editar as peças mais tarde. Acessório: não derruba o lançamento.
   if (body.status === 'sent_erp') {
     await registrarNoErp(id, company_id, approverId);
+    // O rastro do número (048). Nunca derruba o lançamento.
+    await registrarEventoErp({
+      company_id,
+      order_id: id,
+      order_number: (data as Order).order_number ?? null,
+      tipo: 'numero_gravado',
+      origem: 'tela',
+      por: approverId,
+      por_nome,
+      antes: { erp_order_id: row.erp_order_id ?? null, status: row.status },
+      depois: { erp_order_id: update.erp_order_id ?? null, status: 'sent_erp' },
+    });
   }
 
   // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido

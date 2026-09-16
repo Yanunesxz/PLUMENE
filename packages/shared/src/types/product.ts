@@ -28,6 +28,8 @@ export interface Product {
   color_hex: string | null;
   active: boolean;
   updated_at: string;
+  /** Quando o Control mandou este produto pela última vez (migração 049). */
+  erp_updated_at?: string | null;
 }
 
 // ─── Variante = (produto × tamanho) ──────────────────────────────────────────
@@ -49,6 +51,8 @@ export interface ProductVariant {
   stock_committed: number;
   active: boolean;
   updated_at: string;
+  /** Quando o Control mandou o estoque deste tamanho (migração 049). */
+  stock_updated_at?: string | null;
 }
 
 // ─── Preço de variante por tabela ─────────────────────────────────────────────
@@ -66,6 +70,14 @@ export interface ProductPrice {
    */
   price_larger: number | null;
   updated_at: string;
+  /**
+   * Preço vindo do Control (migração 049): quando ele mandou, o preço de
+   * tabela original e o desconto que ele aplicou, quando `price` já chega com
+   * desconto. Nulos no preço carregado do PDF.
+   */
+  erp_updated_at?: string | null;
+  preco_original?: number | null;
+  desconto_percentual?: number | null;
 }
 
 // ─── Variante como o catálogo entrega ────────────────────────────────────────

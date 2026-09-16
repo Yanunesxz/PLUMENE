@@ -23,22 +23,51 @@ export async function detectarColunaDaCondicao(): Promise<boolean> {
 }
 
 /**
+ * `payment_conditions.valor_minimo` vem da migração 049. Pedir a coluna antes
+ * do SQL faria o PostgREST recusar a lista inteira — e sem lista o seletor de
+ * condição some do pedido. Sem ela, a resposta é a de hoje, sem o campo.
+ */
+export async function detectarValorMinimo(): Promise<boolean> {
+  return detectar('payment_conditions', 'valor_minimo');
+}
+
+/**
+ * O NUMERIC do Postgres em número. Nulo, vazio ou ilegível = sem mínimo
+ * (`null`) — nunca um zero inventado, que a tela leria como "mínimo de R$ 0".
+ */
+export function normalizarValorMinimo(valor: unknown): number | null {
+  if (valor == null || valor === '') return null;
+  const numero = Number(valor);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+/**
  * As condições ativas da empresa, em ordem de código — a ordem do Control, que
  * é a que a fábrica reconhece. São ~146: cabem inteiras numa resposta, e o
  * seletor filtra no aparelho (funciona offline com o cache do Dexie).
+ *
+ * Com a 049, cada uma traz `valor_minimo`: a tela AVISA quando o total do
+ * pedido fica abaixo dele. Só avisa — nem a tela nem o servidor bloqueiam
+ * (`condicaoValida` não olha o mínimo, de propósito).
  */
 export async function getCondicoesDePagamento(company_id: string): Promise<PaymentCondition[]> {
   if (!(await detectarCondicoes())) return [];
+  const comMinimo = await detectarValorMinimo();
+  const colunas = comMinimo
+    ? 'id, code, description, active, valor_minimo'
+    : 'id, code, description, active';
 
   const { data, error } = await supabase
     .from('payment_conditions')
-    .select('id, code, description, active')
+    .select(colunas)
     .eq('company_id', company_id)
     .eq('active', true)
     .order('code', { ascending: true });
 
   if (error || !data) return [];
-  return data as PaymentCondition[];
+  const condicoes = data as unknown as PaymentCondition[];
+  if (!comMinimo) return condicoes;
+  return condicoes.map((c) => ({ ...c, valor_minimo: normalizarValorMinimo(c.valor_minimo) }));
 }
 
 /**

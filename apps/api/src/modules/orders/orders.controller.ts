@@ -11,11 +11,14 @@ import {
   setOrderNotes,
   ultimoNumeroErp,
   corrigirNumeroErp,
+  solicitarLancamentoNoErp,
+  cancelarSolicitacaoAoErp,
   deleteOrder,
   listDeletedOrders,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
 import { pedirAtualizacao, confirmarAtualizacao } from './erpSync.service.js';
+import { lerCanais } from '../../lib/canais.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
 import { getPedidoPublico } from './publicOrder.service.js';
 import { tokenDoPedido } from './publicToken.js';
@@ -86,13 +89,46 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
     .eq('id', order.rep_id)
     .maybeSingle();
 
+  // Os canais da empresa (048) vão junto: é por eles que a tela sabe se
+  // "Lançar" pede o número (manual) ou solicita ao Control (api), e se o botão
+  // de faturado existe. Lembrado por 30 s no `lerCanais` — a tela que fica
+  // consultando o pedido a cada 3 s não custa uma leitura de empresa por vez.
+  // Sem resposta do banco, `null`: a tela se comporta como hoje (manual).
+  let canais: { pedido_erp: string; faturamento: string } | null = null;
+  try {
+    const lidos = await lerCanais(company_id);
+    canais = { pedido_erp: lidos.pedido_erp, faturamento: lidos.faturamento };
+  } catch (e) {
+    request.log.error({ err: e }, 'pedido lido, mas o banco não respondeu sobre os canais da empresa');
+  }
+
   await reply.send({
     data: {
       ...order,
       public_link: `${env.APP_PUBLIC_URL}/pedido/${tokenDoPedido(order.id)}`,
       rep_info: (rep as { name: string; erp_rep_id: string | null } | null) ?? null,
+      canais,
     },
   });
+}
+
+/**
+ * GET /orders/canais — só os dois canais que mudam a tela de pedidos (lançar
+ * e faturar), sem pedido nenhum. É o que a LISTA pergunta para esconder o
+ * "Marcar faturado" do cartão da venda interna quando o faturamento vem do
+ * Control (decisão 11); o detalhe já recebe os mesmos canais no GET
+ * /orders/:id. Sem resposta do banco, `null`: a tela fica como hoje, e o
+ * servidor recusa o carimbo de qualquer jeito.
+ */
+export async function canaisDosPedidosHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  let canais: { pedido_erp: string; faturamento: string } | null = null;
+  try {
+    const lidos = await lerCanais(request.user.company_id);
+    canais = { pedido_erp: lidos.pedido_erp, faturamento: lidos.faturamento };
+  } catch (e) {
+    request.log.error({ err: e }, 'o banco não respondeu sobre os canais da empresa (lista de pedidos)');
+  }
+  await reply.send({ data: canais });
 }
 
 /** GET /public/pedido/:token — a página pública do pedido (link do e-mail). Sem login. */
@@ -232,10 +268,6 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
       });
       return;
     }
-    if (err instanceof Error && err.message === 'CUSTOMER_BLOCKED') {
-      await reply.status(403).send({ error: 'Cliente bloqueado', code: 'CUSTOMER_BLOCKED', statusCode: 403 });
-      return;
-    }
     if (err instanceof Error && err.message === 'PRICE_NOT_FOUND') {
       await reply.status(422).send({
         error: 'Há itens sem preço na tabela do representante',
@@ -260,6 +292,14 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
     }
     if (result.reason === 'invoiced') {
       await reply.status(409).send({ error: 'Pedido faturado não pode ser excluído', code: 'ORDER_INVOICED', statusCode: 409 });
+      return;
+    }
+    if (result.reason === 'tem_numero_erp') {
+      await reply.status(409).send({
+        error: 'Este pedido já está no Control e não pode ser excluído. Peça a correção ao financeiro.',
+        code: 'ORDER_HAS_ERP_NUMBER',
+        statusCode: 409,
+      });
       return;
     }
     if (result.reason === 'sem_copia') {
@@ -288,7 +328,7 @@ export async function listDeletedOrdersHandler(request: FastifyRequest, reply: F
 }
 
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, role, sub, venda_interna } = request.user;
+  const { company_id, role, sub, venda_interna, name } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(setInvoicedSchema, request.body, reply);
   if (!body) return;
@@ -304,18 +344,47 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
     return;
   }
 
-  const order = await setOrderInvoiced(id, company_id, body.invoiced, {
+  const r = await setOrderInvoiced(id, company_id, body.invoiced, {
     somenteDoRep: role === 'rep' ? sub : null,
+    por: sub,
+    por_nome: name ?? null,
   });
-  if (!order) {
+  if (!r.ok) {
+    if (r.reason === 'faturamento_pelo_control') {
+      await reply.status(409).send({
+        error: 'O faturamento deste pedido vem do Control pela integração — o botão manual está desligado nesta empresa.',
+        code: 'FATURAMENTO_PELO_CONTROL',
+        statusCode: 409,
+      });
+      return;
+    }
+    // O banco não disse se o faturamento desta empresa vem do Control. Nada
+    // foi gravado, e a mensagem diz isso — 500 sem código deixaria a dúvida.
+    if (r.reason === 'canal_indisponivel') {
+      await reply.status(503).send({
+        error: 'Não deu para conferir o canal desta empresa. Nada foi alterado — tente de novo em instantes.',
+        code: 'CANAL_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    }
+    if (r.reason === 'erro') {
+      await reply.status(500).send({
+        error: 'Não foi possível gravar o faturamento — tente de novo',
+        code: 'UPDATE_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
   }
 
-  // A notícia que o rep mais espera — só no CARIMBO, nunca no desfazer.
-  if (body.invoiced) avisarFaturadoAoRep(company_id, order, sub);
+  // A notícia que o rep mais espera — só no CARIMBO de verdade: nunca no
+  // desfazer, e nunca no recarimbo de um pedido que já estava faturado.
+  if (body.invoiced && r.mudou) avisarFaturadoAoRep(company_id, r.order, sub);
 
-  await reply.send({ data: order });
+  await reply.send({ data: r.order });
 }
 
 export async function setDiscountHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -518,6 +587,13 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
         statusCode: 503,
       });
       return;
+    case 'original_nao_guardado':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a cópia do pedido original antes de mexer nas peças. Nada foi alterado — tente de novo em instantes.',
+        code: 'ORIGINAL_NAO_GUARDADO',
+        statusCode: 503,
+      });
+      return;
     default:
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
   }
@@ -528,12 +604,12 @@ export async function corrigirNumeroErpHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const { company_id } = request.user;
+  const { company_id, sub, name } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(corrigirNumeroErpSchema, request.body, reply);
   if (!body) return;
 
-  const r = await corrigirNumeroErp(id, company_id, body.erp_order_id);
+  const r = await corrigirNumeroErp(id, company_id, body.erp_order_id, { id: sub, nome: name ?? null });
   if (r.ok) {
     await reply.send({ data: { erp_order_id: r.erp_order_id } });
     return;
@@ -556,6 +632,117 @@ export async function ultimoNumeroErpHandler(request: FastifyRequest, reply: Fas
   await reply.send({ data: { ultimo: await ultimoNumeroErp(company_id) } });
 }
 
+/**
+ * PATCH /orders/:id/solicitar-erp — "Lançar no Control" com o canal na API (049).
+ *
+ * Não muda status e não recebe número: só marca o pedido como solicitado e o
+ * põe na fila que o Control puxa. A tela fica consultando GET /orders/:id
+ * até `erp_order_id` chegar pela confirmação do Control.
+ */
+export async function solicitarErpHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, name } = request.user;
+  const { id } = request.params as { id: string };
+
+  const r = await solicitarLancamentoNoErp(id, company_id, { id: sub, nome: name ?? null });
+  if (r.ok) {
+    await reply.send({ data: { solicitado_em: r.solicitado_em, ja_solicitado: r.ja_solicitado } });
+    return;
+  }
+  const respostas = {
+    not_found: { status: 404, code: 'NOT_FOUND', error: 'Pedido não encontrado' },
+    nao_aprovado: {
+      status: 409,
+      code: 'ORDER_NOT_APPROVED',
+      error: 'Só pedido aprovado vai para o Control — este ainda não foi aceito (ou já saiu da mesa)',
+    },
+    ja_faturado: {
+      status: 409,
+      code: 'JA_FATURADO',
+      error: 'O pedido já foi faturado — não há o que lançar no Control',
+    },
+    ja_lancado: {
+      status: 409,
+      code: 'ORDER_HAS_ERP_NUMBER',
+      error: 'Este pedido já tem número no Control',
+    },
+    canal_manual: {
+      status: 409,
+      code: 'CANAL_MANUAL',
+      error: 'Nesta empresa o lançamento é manual: lance com o número que o Control deu ao pedido',
+    },
+    canal_indisponivel: {
+      status: 503,
+      code: 'CANAL_INDISPONIVEL',
+      error: 'Não deu para conferir o canal desta empresa. Nada foi alterado — tente de novo em instantes.',
+    },
+    sem_migracao: {
+      status: 503,
+      code: 'MIGRACAO_PENDENTE',
+      error: 'A migração 049 ainda não rodou neste banco — solicitar ao Control ainda não funciona aqui',
+    },
+    erro: { status: 500, code: 'UPDATE_FAILED', error: 'Não foi possível solicitar o lançamento — tente de novo' },
+  } as const;
+  const resp = respostas[r.reason];
+  await reply.status(resp.status).send({
+    error: resp.error,
+    code: resp.code,
+    statusCode: resp.status,
+    ...(r.reason === 'ja_lancado' && r.erp_order_id ? { erp_order_id: r.erp_order_id } : {}),
+  });
+}
+
+/**
+ * PATCH /orders/:id/cancelar-solicitacao — "Cancelar solicitação" (050).
+ *
+ * Tira da fila do Control um pedido solicitado que ainda não tem número. Não
+ * muda status: o pedido volta a ser um aprovado "a lançar". Se o número chegou
+ * no meio, 409 JA_IMPORTADO com o número — a tela recarrega e mostra.
+ */
+export async function cancelarSolicitacaoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, name } = request.user;
+  const { id } = request.params as { id: string };
+
+  const r = await cancelarSolicitacaoAoErp(id, company_id, { id: sub, nome: name ?? null });
+  if (r.ok) {
+    await reply.send({ data: { solicitado_em: r.solicitado_em, ja_cancelado: r.ja_cancelado } });
+    return;
+  }
+  const respostas = {
+    not_found: { status: 404, code: 'NOT_FOUND', error: 'Pedido não encontrado' },
+    nao_solicitado: {
+      status: 409,
+      code: 'NAO_SOLICITADO',
+      error: 'Este pedido não está solicitado ao Control — não há solicitação para cancelar',
+    },
+    ja_importado: {
+      status: 409,
+      code: 'JA_IMPORTADO',
+      error: 'O Control já importou este pedido e deu o número — não dá mais para cancelar a solicitação',
+    },
+    sem_migracao: {
+      status: 409,
+      code: 'MIGRACAO_PENDENTE',
+      error: 'A migração 049 ainda não rodou neste banco — não existe solicitação ao Control para cancelar',
+    },
+    indisponivel: {
+      status: 503,
+      code: 'BANCO_INDISPONIVEL',
+      error: 'Não deu para falar com o banco agora. Nada foi alterado — tente de novo em instantes.',
+    },
+    erro: { status: 500, code: 'UPDATE_FAILED', error: 'Não foi possível cancelar a solicitação — tente de novo' },
+  } as const;
+  const resp = respostas[r.reason];
+  await reply.status(resp.status).send({
+    error:
+      r.reason === 'ja_importado' && r.erp_order_id
+        ? `O Control já importou este pedido com o número ${r.erp_order_id} — não dá mais para cancelar a solicitação`
+        : resp.error,
+    code: resp.code,
+    statusCode: resp.status,
+    ...(r.reason === 'ja_importado' && r.erp_order_id ? { erp_order_id: r.erp_order_id } : {}),
+  });
+}
+
 export async function updateStatusHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: approverId, role } = request.user;
   const { id } = request.params as { id: string };
@@ -570,6 +757,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       { status: body.status, notes: body.notes ?? '', ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}) },
       role,
       request.user.venda_interna === true,
+      request.user.name ?? null,
     );
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
@@ -599,9 +787,39 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       });
       return;
     }
+    // O banco não respondeu sobre o canal desta empresa: nada foi lançado, e o
+    // 503 diz isso. Sem este ramo a exceção virava 500 sem código e o diálogo
+    // do lançamento deixava a dúvida de o número ter sido gravado ou não.
+    if (err instanceof Error && err.message === 'CANAL_INDISPONIVEL') {
+      await reply.status(503).send({
+        error: 'Não deu para conferir o canal desta empresa. Nada foi alterado — tente de novo em instantes.',
+        code: 'CANAL_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    }
+    if (err instanceof Error && err.message === 'CANAL_API') {
+      await reply.status(409).send({
+        error: 'Lançar no ERP pela tela está desligado nesta empresa: o número agora vem do Control pela API.',
+        code: 'CANAL_API',
+        statusCode: 409,
+      });
+      return;
+    }
+    // Canal na API e ninguém digitou número: o caminho é SOLICITAR ao Control
+    // (PATCH /orders/:id/solicitar-erp), que não muda o status. É a tela
+    // antiga, ainda em cache no aparelho, chegando na empresa já virada.
+    if (err instanceof Error && err.message === 'LANCAMENTO_PELO_CONTROL') {
+      await reply.status(409).send({
+        error: 'Nesta empresa o pedido é solicitado ao Control — use "Lançar no Control", sem digitar número. Atualize o app se o botão não aparecer.',
+        code: 'LANCAMENTO_PELO_CONTROL',
+        statusCode: 409,
+      });
+      return;
+    }
     if (err instanceof Error && err.message === 'ERP_NUMBER_REQUIRED') {
       await reply.status(422).send({
-        error: 'Informe o número que o Control deu ao pedido (duas letras e a numeração, ex.: SX14627)',
+        error: 'Informe o número que o Control deu ao pedido (duas letras e a numeração, ex.: CS17379)',
         code: 'ERP_NUMBER_REQUIRED',
         statusCode: 422,
       });

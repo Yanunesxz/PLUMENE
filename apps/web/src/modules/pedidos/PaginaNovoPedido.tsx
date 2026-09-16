@@ -13,6 +13,7 @@ import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
+import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { useCondicoesDePagamento } from '../../hooks/useCondicoesDePagamento.js';
 import { Textarea } from '../../components/interface/Textarea.js';
@@ -22,7 +23,7 @@ import { observacaoDeCores, juntarObservacao } from '@csb/shared';
 import { compararReferencia } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import type { CreateOrderRequest, ApiResponse, OrderWithItems, ProductWithPrice } from '@csb/shared';
-import { precoDoTamanho } from '@csb/shared';
+import { minimoDaCondicao, precoDoTamanho, tabelaInativaNoConjunto } from '@csb/shared';
 
 export function PaginaNovoPedido() {
   const navigate = useNavigate();
@@ -56,13 +57,20 @@ export function PaginaNovoPedido() {
   const [gradeEmEdicao, setGradeEmEdicao] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  const customers = useLiveQuery(() => db.customers.filter((c) => !c.blocked).toArray(), []);
+  // O bloqueado no Control continua na lista: o bloqueio não trava o
+  // representante (decisão 8 de 16/09/2026) — a tela avisa e o pedido segue.
+  const customers = useLiveQuery(() => db.customers.toArray(), []);
   const condicoes = useCondicoesDePagamento();
   // Booleano não é chave indexável no IndexedDB — lemos tudo e filtramos em memória.
   const allProducts = useLiveQuery(() => db.products.toArray(), []);
   const activeProducts = useMemo(() => (allProducts ?? []).filter((p) => p.active), [allProducts]);
 
   const selectedCustomer = customers?.find((c) => c.id === customerId);
+  // A condição escolhida inteira: o pedido mínimo dela (049) vira aviso perto
+  // do total. Sem a condição no cache (primeiro acesso offline) ou sem a 049
+  // no servidor, não há mínimo a conferir e nada aparece.
+  const condicaoEscolhida = condicaoId ? condicoes.find((c) => c.id === condicaoId) : undefined;
+  const minimoEscolhido = minimoDaCondicao(condicaoEscolhida?.valor_minimo);
 
   useEffect(() => {
     if (preselectedCustomerId) setCustomerId(preselectedCustomerId);
@@ -71,7 +79,10 @@ export function PaginaNovoPedido() {
   // ─── A tabela vem do cadastro do cliente ───────────────────────────────────
   // Ninguém escolhe aqui: quem manda no preço é o cadastro. O que a tela faz é
   // não deixar o representante ver um preço e o servidor cobrar outro.
-  const { nomeDe } = useMinhasTabelas();
+  // `nomeDe` já devolve a tabela desligada no Control com a marca "(inativa no
+  // Control)": o cliente que está nela continua comprando por ela, e a
+  // confirmação precisa dizer isso em vez de fingir que é uma tabela vigente.
+  const { nomeDe, precisaEscolher, todas: todasAsTabelas } = useMinhasTabelas();
 
   /** A tabela que precifica ESTE pedido: a do cliente, caindo para a do rep. */
   const tabelaDoPedido = ehLoja
@@ -193,6 +204,13 @@ export function PaginaNovoPedido() {
   const confirmacaoDaTabela = (() => {
     if (ehLoja || !customerId) return null;
     const doCliente = selectedCustomer?.price_table_id ?? null;
+    // Com UMA tabela só não há o que conferir: é a dele, e o pedido sai nela.
+    // Yan (16/09/2026): "essa msg só aparece pra quem tem mais de uma tabela;
+    // se a pessoa tem só uma, só ela que vai enviar". A exceção é o cliente
+    // numa tabela DESLIGADA no Control (revisão de 16/09/2026): quem tinha duas
+    // e perdeu uma continua vendendo nela, e esta confirmação é o único lugar
+    // do pedido onde a marca "(inativa no Control)" aparece.
+    if (!precisaEscolher && !tabelaInativaNoConjunto(todasAsTabelas, doCliente)) return null;
 
     if (!doCliente) {
       const minha = nomeDe(user?.price_table_id);
@@ -211,7 +229,9 @@ export function PaginaNovoPedido() {
 
     return {
       titulo: `Este cliente está cadastrado na ${nome}. Está correta?`,
-      detalhe: 'É esta tabela que define o preço do pedido. Se estiver errada, corrija o cadastro do cliente antes de enviar.',
+      detalhe: tabelaInativaNoConjunto(todasAsTabelas, doCliente)
+        ? 'Esta tabela foi desligada no Control, mas o cliente continua nela e é ela que define o preço do pedido. Para mudar, troque a tabela na ficha do cliente antes de enviar.'
+        : 'É esta tabela que define o preço do pedido. Se estiver errada, corrija o cadastro do cliente antes de enviar.',
       tabela: nome,
       rotuloConfirmar: undefined,
     };
@@ -318,9 +338,7 @@ export function PaginaNovoPedido() {
       ? 'Selecione o cliente para enviar o pedido.'
       : items.length === 0
       ? 'Adicione ao menos um produto para enviar o pedido.'
-      : selectedCustomer?.blocked
-        ? 'Este cliente está bloqueado. Escolha outro para continuar.'
-        : null;
+      : null;
 
   /**
    * O botão não envia direto: abre a confirmação da tabela.
@@ -465,7 +483,11 @@ export function PaginaNovoPedido() {
               }))}
             />
             {selectedCustomer?.blocked ? (
-              <p className="text-xs text-danger">Este cliente está bloqueado.</p>
+              <p className="text-xs text-warn-soft-foreground">
+                Cliente bloqueado no Control
+                {selectedCustomer.block_reason ? ` (${selectedCustomer.block_reason})` : ''}. O pedido segue; o
+                financeiro é avisado na hora de decidir.
+              </p>
             ) : !customerId ? (
               <p className="text-xs text-muted-foreground">
                 Comece escolhendo o cliente — o pedido é sempre vinculado a um cliente.
@@ -486,16 +508,24 @@ export function PaginaNovoPedido() {
               placeholder="Buscar condição (ex.: 30/60/90)…"
               searchPlaceholder="Digite os prazos ou o código…"
               emptyText="Nenhuma condição encontrada"
-              options={condicoes.map((c) => ({
-                value: c.id,
-                label: c.description,
-                sublabel: `Código ${c.code}`,
-              }))}
+              options={condicoes.map((c) => {
+                const minimo = minimoDaCondicao(c.valor_minimo);
+                return {
+                  value: c.id,
+                  label: c.description,
+                  sublabel:
+                    minimo != null
+                      ? `Código ${c.code} · mínimo ${formatBRL(minimo)}`
+                      : `Código ${c.code}`,
+                };
+              })}
             />
             <p className="text-xs text-muted-foreground">
               {condicaoId
                 ? 'Vai no pedido, no e-mail e na planilha da fábrica.'
                 : 'Opcional. Sem escolha, a fábrica define no lançamento.'}
+              {minimoEscolhido != null &&
+                ` Pedido mínimo desta condição: ${formatBRL(minimoEscolhido)}.`}
             </p>
           </div>
         )}
@@ -830,6 +860,12 @@ export function PaginaNovoPedido() {
             </span>
             <span className="text-xl font-bold text-foreground">{formatBRL(total)}</span>
           </div>
+          {/* O aviso do pedido mínimo mora junto do total e do botão: é aqui
+              que o representante olha antes de salvar. Não entra no
+              `missingReason` de propósito — aquele trava o envio, este só avisa. */}
+          {items.length > 0 && (
+            <AvisoDeValorMinimo condicao={condicaoEscolhida} total={total} className="mb-3" />
+          )}
           {missingReason && (
             <div className="mb-3 flex items-start gap-2 rounded-lg border border-warn/30 bg-warn-soft px-3 py-2 text-xs font-medium text-warn-soft-foreground">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" strokeWidth={2.5} />

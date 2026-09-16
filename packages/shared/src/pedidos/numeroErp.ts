@@ -1,5 +1,6 @@
 /**
- * O número do pedido NO CONTROL — duas letras e a numeração ("SX14627").
+ * O número do pedido NO CONTROL — duas letras e a numeração ("CS17379" na
+ * Corpo Sensual, "PL02672" na PLUMENE; a série SX não existe mais).
  *
  * Quem cunha esse número é o ERP do Fábio, nunca o app. Quando a Larissa lança
  * o pedido (importa a planilha no Control), ela digita aqui o número que o
@@ -11,7 +12,7 @@
 
 const FORMATO = /^([A-Z]{2})(\d{1,10})$/;
 
-/** "sx 14627" → "SX14627". Não valida — só limpa. */
+/** "cs 17379" → "CS17379". Não valida — só limpa. */
 export function normalizarNumeroErp(v: string | null | undefined): string {
   return (v ?? '').toUpperCase().replace(/[\s.\-/]/g, '');
 }
@@ -33,7 +34,7 @@ export function lerNumeroErp(v: string | null | undefined): NumeroErp | null {
 
 /**
  * O próximo da sequência: mesmo prefixo, número + 1, com os zeros à esquerda
- * que o último tinha ("SX00099" → "SX00100"). Sem último, não há o que sugerir.
+ * que o último tinha ("CS00099" → "CS00100"). Sem último, não há o que sugerir.
  */
 export function proximoNumeroErp(ultimo: string | null | undefined): string {
   const lido = lerNumeroErp(ultimo);

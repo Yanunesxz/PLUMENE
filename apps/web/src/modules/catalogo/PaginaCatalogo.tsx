@@ -14,7 +14,7 @@ import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
-import { precoDoTamanho } from '@csb/shared';
+import { precoDoTamanho, rotuloDaTabela } from '@csb/shared';
 
 const ALL = '__all__';
 
@@ -104,7 +104,16 @@ export function PaginaCatalogo() {
   // todas. Com uma tabela só o seletor não aparece — e isso é a regra, não
   // economia de tela: ele não pode descobrir que existem outras.
   const defaultTableId = user?.price_table_id ?? '';
-  const { tabelas: tables } = useMinhasTabelas();
+  const { tabelas: ativas, todas } = useMinhasTabelas();
+  // Tabela desligada no Control sai do seletor — MENOS a do próprio usuário: é
+  // nela que o catálogo dele abre, e sem a opção o seletor mostraria o nome de
+  // outra tabela em cima dos preços da dele. Aparece marcada, para ninguém
+  // achar que é vigente.
+  const tables = useMemo(() => {
+    if (!defaultTableId || ativas.some((t) => t.id === defaultTableId)) return ativas;
+    const propria = todas.find((t) => t.id === defaultTableId);
+    return propria ? [propria, ...ativas] : ativas;
+  }, [ativas, todas, defaultTableId]);
   const [viewTableId, setViewTableId] = useState<string>(defaultTableId);
   // Quem não tem tabela própria (admin, gerente) começava com o estado VAZIO
   // enquanto o <select> mostrava a primeira opção: o navegador exibe "TABELA 01"
@@ -276,7 +285,7 @@ export function PaginaCatalogo() {
           >
             {tables.map((t) => (
               <option key={t.id} value={t.id}>
-                Preços: {t.name}
+                Preços: {rotuloDaTabela(t)}
                 {t.id === defaultTableId ? ' (sua tabela)' : ''}
               </option>
             ))}

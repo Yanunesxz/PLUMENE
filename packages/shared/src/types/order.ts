@@ -2,6 +2,7 @@ import type { OrderStatus } from '../constants/orderStatus.js';
 import type { OrderSource } from './access.js';
 import type { PedidoOriginal } from '../pedidos/pedidoOriginal.js';
 import type { SincroniaComOErp } from '../pedidos/sincroniaErp.js';
+import type { SolicitacaoErp } from './control.js';
 
 export interface OrderItem {
   id: string;
@@ -73,10 +74,49 @@ export interface Order {
   local_id: string | null;
   synced_at: string | null;
   erp_order_id: string | null;
+  /**
+   * Pedido SOLICITADO ao Control (migração 049): quando o financeiro apertou
+   * "Lançar no ERP" com o canal em 'api', e quem. Nulo = não solicitado, ou
+   * lançado à mão. Solicitado e com `erp_order_id` nulo = esperando o Control.
+   */
+  erp_requested_at?: string | null;
+  erp_requested_by?: string | null;
   created_by: string;
   approved_by: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/**
+ * Uma peça que a nota fiscal levou, como o Control informou (migração 048).
+ * `produto` e `tamanho` são os mesmos códigos que o GET /partner/v1/pedidos
+ * manda; `variant_id` é a variante do catálogo que o app achou para eles
+ * (null quando não achou — o item continua guardado).
+ */
+export interface ItemDaNota {
+  produto: string;
+  tamanho: string;
+  variant_id: string | null;
+  quantidade: number;
+  preco_unitario: number | null;
+}
+
+/** Uma nota fiscal do pedido (migração 048). Série vazia = o Control não mandou. */
+export interface NotaDoPedido {
+  numero: string;
+  serie: string;
+  emitida_em: string | null;
+  valor: number | null;
+  /** Preenchida quando a nota foi cancelada: os itens dela deixam de contar. */
+  cancelada_em: string | null;
+  /**
+   * Nota substituída (migração 049): a nota nova que subiu por cima desta
+   * (id em order_invoices) e quando. Ausentes antes da 049; nulos na nota
+   * ativa. A tela usa só a nota ativa — ver `NotaSubstituida` para o rastro.
+   */
+  substituida_por?: string | null;
+  substituida_em?: string | null;
+  itens: ItemDaNota[];
 }
 
 export interface OrderWithItems extends Order {
@@ -93,6 +133,28 @@ export interface OrderWithItems extends Order {
    * fábrica está com a versão velha e alguém tem de atualizar lá.
    */
   erp_sync?: SincroniaComOErp | null;
+  /**
+   * As notas fiscais que o Control informou para este pedido (migração 048),
+   * com os itens que cada uma faturou de verdade. Nota cancelada continua na
+   * lista, com `cancelada_em`. Lista vazia = nenhuma nota chegou ainda, ou a
+   * 048 ainda não rodou. Ausente no cache offline.
+   */
+  notas?: NotaDoPedido[];
+  /**
+   * O pedido foi solicitado ao Control (migração 049). Presente só com o canal
+   * em 'api' e depois do clique do financeiro; é o que a tela usa para ficar
+   * consultando até `erp_order_id` chegar. Nulo = nunca solicitado. Ausente no
+   * cache offline e antes da 049.
+   */
+  solicitacao_erp?: SolicitacaoErp | null;
+  /**
+   * Os canais da empresa que a tela do pedido precisa conhecer (migração 048),
+   * lidos pela API no GET /orders/:id: com `pedido_erp = 'api'` o "Lançar"
+   * SOLICITA ao Control em vez de pedir número; com `faturamento = 'api'` o
+   * botão manual de faturado some para todos. `null` = o banco não respondeu;
+   * ausente no cache offline. Nos dois casos a tela é a de sempre (manual).
+   */
+  canais?: { pedido_erp: string; faturamento: string } | null;
   /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante
@@ -213,7 +275,7 @@ export interface UpdateOrderStatusRequest {
   notes?: string;
   /**
    * Ao LANÇAR (sent_erp): o número que o Control deu ao pedido — duas letras
-   * e a numeração ("SX14627"). Obrigatório nesse passo; quem cunha é o ERP.
+   * e a numeração ("CS17379"). Obrigatório nesse passo; quem cunha é o ERP.
    */
   erp_order_id?: string;
 }

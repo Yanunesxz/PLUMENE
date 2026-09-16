@@ -14,11 +14,20 @@
  *
  * Uso:
  *   listar candidatos (sem faturar) de um representante:
- *     node faturar-retroativo.mjs --rep 04518 --listar
+ *     node faturar-retroativo.mjs --empresa=<uuid> --rep 04518 --listar
  *   carimbar pedidos numa data:
- *     node faturar-retroativo.mjs --rep 04518 --data 2026-08-29 --pedidos 14550,14551 [--aplicar]
+ *     node faturar-retroativo.mjs --empresa=<uuid> --rep 04518 --data 2026-08-29 --pedidos 14550,14551 [--aplicar]
  *
- * Sem --aplicar é ensaio: mostra o que faria e não escreve nada.
+ * Sem --aplicar é ENSAIO: só conta o que faria e não escreve nada.
+ *
+ * Travas (fase 0 da integração com o Control):
+ *   - `--empresa=<uuid>` é obrigatório e toda leitura e gravação filtra por ela
+ *     (o banco da Corpo Sensual tem duas empresas; antes a empresa era fixa).
+ *   - Recusa rodar quando `companies.canal_faturamento` da empresa é 'api': aí o
+ *     faturado vem do Control pela API e um carimbo à mão seria um segundo
+ *     escritor. Sem a migração 048 (coluna ausente) vale 'manual', como hoje.
+ *   - Não imprime nome de representante, de cliente nem valor: só código,
+ *     número do pedido, data e contagens.
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
@@ -26,9 +35,32 @@ import { readFileSync } from 'node:fs';
 import path from 'node:path';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
-const EMPRESA = '4a9fccd7-6241-4b8e-9c0b-b18aca364fba'; // Corpo Sensual
 const require = createRequire(pathToFileURL(path.join(RAIZ, 'apps/api/.env')));
 const { createClient } = require('@supabase/supabase-js');
+
+/** `--nome=valor` ou `--nome valor`. */
+const arg = (nome) => {
+  const comIgual = process.argv.find((a) => a.startsWith(`--${nome}=`));
+  if (comIgual) return comIgual.slice(nome.length + 3).trim() || null;
+  const i = process.argv.indexOf(`--${nome}`);
+  return i >= 0 ? (process.argv[i + 1] ?? null) : null;
+};
+const APLICAR = process.argv.includes('--aplicar');
+const LISTAR = process.argv.includes('--listar');
+const EMPRESA = arg('empresa');
+const codigoRep = arg('rep');
+const data = arg('data');
+const pedidosArg = arg('pedidos');
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+if (!EMPRESA || !UUID.test(EMPRESA)) {
+  console.error('Falta --empresa=<uuid> (a empresa dos pedidos; o banco pode ter mais de uma).');
+  process.exit(1);
+}
+if (!codigoRep) {
+  console.error('Falta --rep CODIGO (ex.: --rep 04518)');
+  process.exit(1);
+}
 
 const env = {};
 for (const l of readFileSync(path.join(RAIZ, 'apps/api/.env'), 'utf8').split(/\r?\n/)) {
@@ -39,57 +71,75 @@ const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const arg = (nome) => {
-  const i = process.argv.indexOf(`--${nome}`);
-  return i >= 0 ? process.argv[i + 1] : null;
-};
-const APLICAR = process.argv.includes('--aplicar');
-const LISTAR = process.argv.includes('--listar');
-const codigoRep = arg('rep');
-const data = arg('data');
-const pedidosArg = arg('pedidos');
+const miolo = (v) => String(v ?? '').replace(/\D/g, '').replace(/^0+/, '');
+const dia = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
+const agoraIso = () => new Date().toISOString();
 
-if (!codigoRep) {
-  console.error('Falta --rep CODIGO (ex.: --rep 04518)');
+// ─── A empresa e o canal do faturamento ──────────────────────────────────────
+const { data: empresa, error: erroEmpresa } = await db
+  .from('companies')
+  .select('id')
+  .eq('id', EMPRESA)
+  .maybeSingle();
+if (erroEmpresa) {
+  console.error(`❌ Falha ao conferir a empresa: ${erroEmpresa.message}`);
+  process.exit(1);
+}
+if (!empresa) {
+  console.error('❌ Empresa não encontrada neste banco.');
   process.exit(1);
 }
 
-const miolo = (v) => String(v ?? '').replace(/\D/g, '').replace(/^0+/, '');
-const brl = (v) => `R$ ${Number(v ?? 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const dia = (iso) => (iso ? new Date(iso).toLocaleDateString('pt-BR') : '—');
+const { data: canal, error: erroCanal } = await db
+  .from('companies')
+  .select('canal_faturamento')
+  .eq('id', EMPRESA)
+  .maybeSingle();
+if (erroCanal) {
+  const semColuna = erroCanal.code === '42703' || erroCanal.code === 'PGRST204'
+    || /does not exist|schema cache/i.test(erroCanal.message ?? '');
+  if (!semColuna) {
+    // Não deu para saber o canal: na dúvida, não carimba.
+    console.error(`❌ Falha ao ler o canal do faturamento: ${erroCanal.message}`);
+    process.exit(1);
+  }
+  // Sem a 048: canal 'manual', o comportamento de hoje.
+} else if (canal?.canal_faturamento === 'api') {
+  console.error(
+    '❌ O faturamento desta empresa vem do Control pela API (canal_faturamento=api). ' +
+      'Carimbo retroativo à mão está recusado — o pedido fica faturado quando o Control mandar a nota.',
+  );
+  process.exit(1);
+}
 
 // ─── O representante ─────────────────────────────────────────────────────────
-const { data: reps } = await db
+const { data: reps, error: erroReps } = await db
   .from('users')
-  .select('id, name, erp_rep_id, venda_interna')
+  .select('id, erp_rep_id, venda_interna')
   .eq('company_id', EMPRESA)
   .eq('role', 'rep');
-const rep = (reps ?? []).find((u) => miolo(u.erp_rep_id) === miolo(codigoRep));
-if (!rep) {
-  console.error(`❌ Nenhum representante com código ${codigoRep}.`);
+if (erroReps) {
+  console.error(`❌ Falha ao ler os representantes: ${erroReps.message}`);
   process.exit(1);
 }
-console.log(`Representante: ${rep.name} (${rep.erp_rep_id})${rep.venda_interna ? ' · venda interna' : ''}\n`);
+const rep = (reps ?? []).find((u) => miolo(u.erp_rep_id) === miolo(codigoRep));
+if (!rep) {
+  console.error(`❌ Nenhum representante com código ${codigoRep} nesta empresa.`);
+  process.exit(1);
+}
+console.log(`Representante: código ${rep.erp_rep_id}${rep.venda_interna ? ' · venda interna' : ''}\n`);
 
 // ─── Os pedidos dele ─────────────────────────────────────────────────────────
-const { data: pedidos } = await db
+const { data: pedidos, error: erroPedidos } = await db
   .from('orders')
-  .select('id, order_number, status, total, invoiced, invoiced_at, created_at, customer_id')
+  .select('id, order_number, status, invoiced, invoiced_at, created_at, customer_id')
   .eq('company_id', EMPRESA)
   .eq('rep_id', rep.id)
   .order('order_number', { ascending: true });
-
-const clientes = new Map();
-for (let de = 0; ; de += 1000) {
-  const { data } = await db
-    .from('customers')
-    .select('id, name, last_purchase_at')
-    .eq('company_id', EMPRESA)
-    .range(de, de + 999);
-  for (const c of data ?? []) clientes.set(c.id, c);
-  if (!data || data.length < 1000) break;
+if (erroPedidos) {
+  console.error(`❌ Falha ao ler os pedidos: ${erroPedidos.message}`);
+  process.exit(1);
 }
-const nomeDo = (id) => clientes.get(id)?.name ?? '—';
 
 if (LISTAR) {
   const agora = new Date();
@@ -99,13 +149,10 @@ if (LISTAR) {
   );
   console.log(`SEM CARIMBO e de antes deste mês (${candidatos.length}):\n`);
   for (const o of candidatos) {
-    console.log(
-      `  #${o.order_number ?? o.id.slice(0, 8)} | ${dia(o.created_at)} | ${brl(o.total)} | ${o.status} | ${nomeDo(o.customer_id)}`,
-    );
+    console.log(`  #${o.order_number ?? o.id.slice(0, 8)} | ${dia(o.created_at)} | ${o.status}`);
   }
   const jaFaturados = (pedidos ?? []).filter((o) => o.invoiced).length;
   console.log(`\nTotal de pedidos dele: ${pedidos?.length ?? 0} · já faturados: ${jaFaturados}`);
-  console.log(`Soma dos candidatos: ${brl(candidatos.reduce((s, o) => s + Number(o.total ?? 0), 0))}`);
   process.exit(0);
 }
 
@@ -118,39 +165,70 @@ if (!pedidosArg) {
   console.error('Falta --pedidos 14550,14551 (números do pedido, separados por vírgula)');
   process.exit(1);
 }
-// Meio-dia: fuso não empurra o carimbo para o dia (nem o mês) vizinho.
+// Meio-dia UTC (9h em Brasília): fuso não empurra o carimbo para o dia (nem o
+// mês) vizinho, e o dia da compra é o próprio `--data`.
 const quando = new Date(`${data}T12:00:00.000Z`).toISOString();
+const diaDaCompra = data;
 const numeros = pedidosArg.split(',').map((n) => Number(String(n).replace(/\D/g, ''))).filter(Boolean);
 
 console.log(`Data do faturamento: ${dia(quando)}  (${numeros.length} pedido(s) pedidos)\n`);
 
 let ok = 0;
+let clientesAvancados = 0;
 const problemas = [];
+const clientesDaRodada = new Set();
 for (const numero of numeros) {
   const o = (pedidos ?? []).find((p) => p.order_number === numero);
-  if (!o) { problemas.push(`#${numero}: não é pedido de ${rep.name}`); continue; }
+  if (!o) { problemas.push(`#${numero}: não é pedido deste representante`); continue; }
   if (o.invoiced) { problemas.push(`#${numero}: JÁ faturado em ${dia(o.invoiced_at)} — não mexi`); continue; }
 
-  console.log(`  #${numero} | ${brl(o.total)} | ${nomeDo(o.customer_id)} → faturado em ${dia(quando)}`);
-  if (!APLICAR) { ok++; continue; }
+  if (!APLICAR) {
+    ok++;
+    if (o.customer_id) clientesDaRodada.add(o.customer_id);
+    continue;
+  }
 
-  const { error } = await db
+  // `invoiced=false` no filtro: se alguém faturou no meio do caminho, não regrava.
+  const { data: gravados, error } = await db
     .from('orders')
-    .update({ invoiced: true, invoiced_at: quando, updated_at: new Date().toISOString() })
+    .update({ invoiced: true, invoiced_at: quando, updated_at: agoraIso() })
     .eq('id', o.id)
-    .eq('company_id', EMPRESA);
+    .eq('company_id', EMPRESA)
+    .eq('invoiced', false)
+    .select('id');
   if (error) { problemas.push(`#${numero}: falha ao gravar (${error.message})`); continue; }
+  if (!gravados || gravados.length === 0) {
+    problemas.push(`#${numero}: faturado por outro caminho durante a rodada — não mexi`);
+    continue;
+  }
   ok++;
 
-  // A carteira acompanha: última compra só anda para frente.
-  const cli = clientes.get(o.customer_id);
-  const diaDaCompra = quando.slice(0, 10);
-  if (cli && (!cli.last_purchase_at || cli.last_purchase_at < diaDaCompra)) {
-    await db.from('customers').update({ last_purchase_at: diaDaCompra }).eq('id', cli.id);
+  // A carteira acompanha: última compra só anda para frente (o filtro fica no
+  // próprio update, então duas rodadas não recuam a data).
+  if (o.customer_id) {
+    const { data: avancados, error: erroCliente } = await db
+      .from('customers')
+      .update({ last_purchase_at: diaDaCompra, updated_at: agoraIso() })
+      .eq('id', o.customer_id)
+      .eq('company_id', EMPRESA)
+      .or(`last_purchase_at.is.null,last_purchase_at.lt.${diaDaCompra}`)
+      .select('id');
+    if (erroCliente) {
+      problemas.push(`#${numero}: pedido carimbado, mas a última compra do cliente não gravou (${erroCliente.message})`);
+    } else if (avancados && avancados.length > 0) {
+      clientesAvancados++;
+    }
   }
 }
 
-console.log(`\n${APLICAR ? 'FEITO' : 'ENSAIO (nada gravado — rode com --aplicar)'}: ${ok} pedido(s).`);
+if (APLICAR) {
+  console.log(`\nFEITO: ${ok} pedido(s) carimbado(s); última compra avançada em ${clientesAvancados} cliente(s).`);
+} else {
+  console.log(
+    `\nENSAIO (nada gravado — rode com --aplicar): ${ok} pedido(s) seriam carimbados, ` +
+      `de ${clientesDaRodada.size} cliente(s).`,
+  );
+}
 if (problemas.length) {
   console.log('\nAtenção:');
   for (const p of problemas) console.log('  - ' + p);

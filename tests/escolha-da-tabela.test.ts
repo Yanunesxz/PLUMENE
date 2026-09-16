@@ -152,7 +152,22 @@ describe('trocar a tabela de um cliente', () => {
     const r = await atualizarTabelaDoCliente(EMPRESA, 'c1', 't3', { rep_id: REP });
 
     expect(r.ok).toBe(true);
-    expect(fake.ultimaGravacao('customers', 'update')!.valores).toEqual({ price_table_id: 't3' });
+    // `updated_at` junto: é por ele que o CRM descobre que o cadastro mudou.
+    expect(fake.ultimaGravacao('customers', 'update')!.valores).toEqual({
+      price_table_id: 't3',
+      updated_at: expect.any(String),
+    });
+  });
+
+  it('a mesma tabela de novo não grava nada — nem o updated_at', async () => {
+    const { atualizarTabelaDoCliente, fake } = await carregarClientes({
+      customers: { data: { id: 'c1', name: 'Cliente Teste', price_table_id: 't3' }, error: null },
+    });
+
+    const r = await atualizarTabelaDoCliente(EMPRESA, 'c1', 't3', { rep_id: REP });
+
+    expect(r.ok).toBe(true);
+    expect(fake.ultimaGravacao('customers', 'update')).toBeUndefined();
   });
 
   it('procura o cliente nas DUAS metades da carteira — app e ERP', async () => {

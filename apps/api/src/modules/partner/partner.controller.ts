@@ -1,6 +1,11 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import { requirePartner } from './partner.auth.js';
-import { getPartnerOrders, confirmOrderImport } from './partner.service.js';
+import {
+  getPartnerOrders,
+  confirmOrderImport,
+  conciliarPedidoErp,
+  contarConciliacao,
+  listarExcluidosComNumero,
+} from './partner.service.js';
 import {
   receberClientes,
   receberRepresentantes,
@@ -8,23 +13,62 @@ import {
   type RepresentanteParceiro,
 } from './partner.sync.service.js';
 import { receberFaturamento, type FaturamentoParceiro } from './partner.faturamento.service.js';
+import { anotarChamada } from './partner.chamada.js';
+import { lerCanais, type Canais } from '../../lib/canais.js';
+import { lerSolicitacaoDeSync } from '../integracao/integracao.service.js';
+import {
+  MAX_POR_LOTE,
+  anotarLote,
+  autenticar,
+  extrairLista,
+  momentoComFuso,
+  recusouPorCanal,
+  responder,
+  CORPO_NAO_ENCONTRADO,
+  CORPO_ERRO_INTERNO,
+} from './partner.porta.js';
 
-/**
- * Máximo por requisição. Mantém o corpo bem abaixo do limite de 1 MB do Fastify;
- * o parceiro divide em lotes (a spec recomenda 500). Passar disso é 400, não um
- * 413 críptico no meio do envio.
- */
-const MAX_POR_LOTE = 1000;
+/** O `pedido_erp` do corpo, aparado; '' quando não veio em texto. */
+function pedidoErpDoCorpo(corpo: unknown): string {
+  // Corpo nulo, lista, ou `pedido_erp` numérico: nada disso pode virar
+  // TypeError (que o app.ts carimbaria como 500 INTERNAL_ERROR).
+  const bruto =
+    corpo && typeof corpo === 'object' && !Array.isArray(corpo)
+      ? (corpo as { pedido_erp?: unknown }).pedido_erp
+      : undefined;
+  return typeof bruto === 'string' ? bruto.trim() : '';
+}
 
-/** Aceita `{ clientes: [...] }`, `{ dados: [...] }` ou a lista pura no corpo. */
-function extrairLista<T>(body: unknown, chave: string): T[] | null {
-  if (Array.isArray(body)) return body as T[];
-  if (body && typeof body === 'object') {
-    const obj = body as Record<string, unknown>;
-    const lista = obj[chave] ?? obj['dados'];
-    if (Array.isArray(lista)) return lista as T[];
-  }
-  return null;
+const CORPO_SEM_PEDIDO_ERP = {
+  error: 'Informe "pedido_erp" — o número do pedido gerado no seu ERP',
+  code: 'MISSING_PEDIDO_ERP',
+  statusCode: 400,
+};
+
+const CORPO_PEDIDO_ERP_INVALIDO = {
+  error: 'pedido_erp fora do formato: duas letras e ate 10 digitos (ex.: CS17379)',
+  code: 'INVALID_PEDIDO_ERP',
+  statusCode: 400,
+};
+
+function corpoNumeroEmUso(pedido_em_uso: { id: string; numero: number | null } | null) {
+  return {
+    error: pedido_em_uso
+      ? `Número do Control já usado pelo pedido ${pedido_em_uso.numero ?? pedido_em_uso.id}`
+      : 'Número do Control já usado por outro pedido',
+    code: 'ERP_NUMBER_IN_USE',
+    statusCode: 409,
+    pedido_em_uso,
+  };
+}
+
+function corpoJaConfirmado(pedido_erp_atual: string) {
+  return {
+    error: `Pedido já confirmado com outro número: ${pedido_erp_atual}`,
+    code: 'ORDER_ALREADY_CONFIRMED',
+    statusCode: 409,
+    pedido_erp_atual,
+  };
 }
 
 /** GET /partner/v1/status — teste de conexão e de chave */
@@ -32,13 +76,71 @@ export async function partnerStatusHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+
+  // O /status é a rota de DIAGNÓSTICO: é ela que o parceiro chama para saber se
+  // a chave e a conexão estão boas. Um soluço do banco não pode transformá-la
+  // em 500 — aí ele perde justamente o instrumento de distinguir "minha chave
+  // está errada" de "o app está com problema". Então aqui o canal degrada:
+  // `canais: null` significa "não deu para ler agora". As rotas que GRAVAM
+  // continuam lançando (canal fechado por falta de resposta).
+  let canais: Omit<Canais, 'migracao'> | null = null;
+  try {
+    const lidos = await lerCanais(partner.company_id);
+    canais = {
+      pedido_erp: lidos.pedido_erp,
+      faturamento: lidos.faturamento,
+      cadastro: lidos.cadastro,
+      retrato: lidos.retrato,
+      catalogo: lidos.catalogo,
+    };
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[parceiro] /status sem resposta do banco sobre os canais: ${msg}`);
+    anotarChamada(request, { detalhe: { canais: 'nao_lidos' } });
+  }
+
+  // "Sincronizar agora" (049): alguém no app apertou o botão da tela de
+  // integração e o Control ainda não avisou que rodou (POST /sincronizacao).
+  // Mesma degradação dos canais: sem resposta do banco vale `false` (o Control
+  // segue o horário normal dele) e fica anotado. É sempre booleano, para o
+  // robô do parceiro não ter de interpretar um terceiro valor; `solicitado_em`
+  // é o que ele devolve no aviso de concluída.
+  //
+  // O pedido EXPIRA em 15 minutos (expiracaoDoSync.ts; a leitura já diz se
+  // expirou, a mesma que a tela usa): mais velho que isso, `sincronizar_agora`
+  // é false — o Control que voltar depois de horas parado não roda uma rodada
+  // que ninguém espera mais — e o `solicitado_em` continua saindo, para
+  // diagnóstico.
+  let sincronizar_agora = false;
+  let solicitado_em: string | null = null;
+  let expirado = false;
+  try {
+    const lida = await lerSolicitacaoDeSync(partner.company_id);
+    solicitado_em = lida.solicitacao?.solicitado_em ?? null;
+    expirado = Boolean(lida.solicitacao && lida.expirado);
+    sincronizar_agora = Boolean(lida.solicitacao) && !expirado;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`[parceiro] /status sem resposta do banco sobre o "sincronizar agora": ${msg}`);
+    anotarChamada(request, { detalhe: { sincronizar_agora: 'nao_lido' } });
+  }
+  if (sincronizar_agora) anotarChamada(request, { detalhe: { sincronizar_agora: true } });
+  else if (expirado) anotarChamada(request, { detalhe: { sincronizar_agora: 'expirado' } });
 
   await reply.send({
     ok: true,
     parceiro: partner.name,
     servidor_hora: new Date().toISOString(),
+    // Quais mãos estão ligadas para a API nesta empresa (os cinco canais).
+    // Aditivo. `null` = o banco não respondeu agora; tente de novo.
+    canais,
+    // `true` = rode a rodada inteira agora (fila, cadastros, faturamento,
+    // catálogo, retrato), sem esperar o próximo horário — e depois avise com
+    // POST /partner/v1/sincronizacao { concluida: true, solicitado_em }.
+    sincronizar_agora,
+    solicitado_em,
   });
 }
 
@@ -47,12 +149,13 @@ export async function partnerOrdersHandler(
   request: FastifyRequest<{ Querystring: { desde?: string; incluir?: string } }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'pedido_erp')) return;
 
-  const { desde, incluir } = request.query;
+  const { desde, incluir } = request.query ?? {};
   if (desde && Number.isNaN(Date.parse(desde))) {
-    await reply.status(400).send({
+    await responder(request, reply, 400, {
       error: 'Parâmetro "desde" deve ser uma data ISO (ex.: 2026-07-15T00:00:00Z)',
       code: 'INVALID_DESDE',
       statusCode: 400,
@@ -60,11 +163,16 @@ export async function partnerOrdersHandler(
     return;
   }
 
-  const pedidos = await getPartnerOrders(partner.company_id, {
-    desde,
-    incluirImportados: incluir === 'todos',
-  });
+  const incluirImportados = incluir === 'todos';
+  const pedidos = await getPartnerOrders(partner.company_id, { desde, incluirImportados });
 
+  anotarChamada(request, {
+    detalhe: {
+      incluir: incluirImportados ? 'todos' : 'fila',
+      pedidos: pedidos.length,
+      importaveis: pedidos.filter((p) => p.importavel).length,
+    },
+  });
   await reply.send({
     total: pedidos.length,
     servidor_hora: new Date().toISOString(),
@@ -82,78 +190,166 @@ export async function partnerConfirmOrderHandler(
   request: FastifyRequest<{ Params: { id: string }; Body: { pedido_erp?: unknown } }>,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'pedido_erp')) return;
 
-  // Corpo nulo, lista, ou `pedido_erp` numérico: nada disso pode virar
-  // TypeError (que o app.ts carimbaria como 500 INTERNAL_ERROR).
-  const corpo = request.body;
-  const bruto = corpo && typeof corpo === 'object' ? (corpo as { pedido_erp?: unknown }).pedido_erp : undefined;
-  const pedido_erp = typeof bruto === 'string' ? bruto.trim() : '';
+  const pedido_erp = pedidoErpDoCorpo(request.body);
   if (!pedido_erp) {
-    await reply.status(400).send({
-      error: 'Informe "pedido_erp" — o número do pedido gerado no seu ERP',
-      code: 'MISSING_PEDIDO_ERP',
-      statusCode: 400,
-    });
+    await responder(request, reply, 400, CORPO_SEM_PEDIDO_ERP);
     return;
   }
 
-  const result = await confirmOrderImport(partner.company_id, request.params.id, pedido_erp);
+  const order_id = request.params.id;
+  anotarChamada(request, { detalhe: { order_id } });
+  const result = await confirmOrderImport(partner.company_id, order_id, pedido_erp, partner.name);
 
   switch (result.outcome) {
     case 'invalid_number':
-      await reply.status(400).send({
-        error: 'pedido_erp fora do formato: duas letras e ate 10 digitos (ex.: CS17379)',
-        code: 'INVALID_PEDIDO_ERP',
-        statusCode: 400,
-      });
+      await responder(request, reply, 400, CORPO_PEDIDO_ERP_INVALIDO);
       return;
     case 'not_found':
-      await reply.status(404).send({
-        error: 'Pedido não encontrado',
-        code: 'ORDER_NOT_FOUND',
-        statusCode: 404,
-      });
+      await responder(request, reply, 404, CORPO_NAO_ENCONTRADO);
       return;
     case 'conflict':
-      await reply.status(409).send({
-        error: `Pedido já confirmado com outro número: ${result.pedido_erp_atual}`,
-        code: 'ORDER_ALREADY_CONFIRMED',
-        statusCode: 409,
-        pedido_erp_atual: result.pedido_erp_atual,
-      });
+      await responder(request, reply, 409, corpoJaConfirmado(result.pedido_erp_atual));
       return;
     case 'not_confirmable':
-      await reply.status(409).send({
+      await responder(request, reply, 409, {
         error: 'so pedido aprovado pode ser confirmado',
         code: 'ORDER_NOT_APPROVED',
         statusCode: 409,
         situacao: result.situacao,
       });
       return;
-    case 'number_in_use':
-      await reply.status(409).send({
-        error: result.pedido_em_uso
-          ? `Número do Control já usado pelo pedido ${result.pedido_em_uso.numero ?? result.pedido_em_uso.id}`
-          : 'Número do Control já usado por outro pedido',
-        code: 'ERP_NUMBER_IN_USE',
+    case 'not_requested':
+      await responder(request, reply, 409, {
+        error: 'O financeiro ainda não solicitou o lançamento deste pedido ao Control — importe só o que vem na fila',
+        code: 'ORDER_NOT_REQUESTED',
         statusCode: 409,
-        pedido_em_uso: result.pedido_em_uso,
       });
       return;
+    case 'number_in_use':
+      await responder(request, reply, 409, corpoNumeroEmUso(result.pedido_em_uso));
+      return;
     case 'ok':
+      anotarChamada(request, {
+        recebidos: 1,
+        gravados: result.ja_confirmado ? 0 : 1,
+        sem_mudanca: result.ja_confirmado ? 1 : 0,
+        detalhe: { ja_confirmado: result.ja_confirmado },
+      });
       await reply.send({ ok: true, ja_confirmado: result.ja_confirmado });
       return;
     default:
       // Outcome sem `case` deixava a requisição pendurada até o timeout do
       // cliente. Melhor um 500 honesto do que silêncio.
-      await reply.status(500).send({
-        error: 'Erro interno do servidor',
-        code: 'INTERNAL_ERROR',
-        statusCode: 500,
-      });
+      await responder(request, reply, 500, CORPO_ERRO_INTERNO);
   }
+}
+
+/**
+ * POST /partner/v1/pedidos/:id/conciliar { pedido_erp } — dá o número do
+ * Control a um pedido que foi enviado ao ERP sem número (o passivo de antes da
+ * API). Pedido aprovado usa o `/confirmar`.
+ */
+export async function partnerConciliarOrderHandler(
+  request: FastifyRequest<{ Params: { id: string }; Body: { pedido_erp?: unknown } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const partner = await autenticar(request, reply);
+  if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'pedido_erp')) return;
+
+  const pedido_erp = pedidoErpDoCorpo(request.body);
+  if (!pedido_erp) {
+    await responder(request, reply, 400, CORPO_SEM_PEDIDO_ERP);
+    return;
+  }
+
+  const order_id = request.params.id;
+  anotarChamada(request, { detalhe: { order_id } });
+  const result = await conciliarPedidoErp(partner.company_id, order_id, pedido_erp, partner.name);
+
+  switch (result.outcome) {
+    case 'invalid_number':
+      await responder(request, reply, 400, CORPO_PEDIDO_ERP_INVALIDO);
+      return;
+    case 'not_found':
+      await responder(request, reply, 404, CORPO_NAO_ENCONTRADO);
+      return;
+    case 'conflict':
+      await responder(request, reply, 409, corpoJaConfirmado(result.pedido_erp_atual));
+      return;
+    case 'not_reconcilable':
+      await responder(request, reply, 409, {
+        error: 'Só pedido enviado ao ERP sem número é conciliado; pedido aprovado usa /confirmar',
+        code: 'ORDER_NOT_RECONCILABLE',
+        statusCode: 409,
+        situacao: result.situacao,
+      });
+      return;
+    case 'number_in_use':
+      await responder(request, reply, 409, corpoNumeroEmUso(result.pedido_em_uso));
+      return;
+    case 'ok':
+      anotarChamada(request, {
+        recebidos: 1,
+        gravados: result.ja_conciliado ? 0 : 1,
+        sem_mudanca: result.ja_conciliado ? 1 : 0,
+        detalhe: { ja_conciliado: result.ja_conciliado },
+      });
+      await reply.send({ ok: true, ja_conciliado: result.ja_conciliado });
+      return;
+    default:
+      await responder(request, reply, 500, CORPO_ERRO_INTERNO);
+  }
+}
+
+/**
+ * GET /partner/v1/conciliacao — só contagens da empresa da chave. Sempre
+ * liberada: não grava nada e não devolve linha nenhuma.
+ */
+export async function partnerConciliacaoHandler(
+  request: FastifyRequest,
+  reply: FastifyReply,
+): Promise<void> {
+  const partner = await autenticar(request, reply);
+  if (!partner) return;
+
+  const contagens = await contarConciliacao(partner.company_id);
+  anotarChamada(request, { detalhe: { ...contagens } });
+  await reply.send({ ...contagens, servidor_hora: new Date().toISOString() });
+}
+
+/**
+ * GET /partner/v1/pedidos/excluidos?desde=ISO — pedidos excluídos no app que
+ * já tinham número do Control. Sempre liberada (só leitura).
+ */
+export async function partnerExcluidosHandler(
+  request: FastifyRequest<{ Querystring: { desde?: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const partner = await autenticar(request, reply);
+  if (!partner) return;
+
+  const desde = typeof request.query?.desde === 'string' ? request.query.desde.trim() : undefined;
+  if (desde !== undefined && desde !== '' && !momentoComFuso(desde)) {
+    await responder(request, reply, 400, {
+      error: 'Parâmetro "desde" deve ser uma data ISO com fuso (ex.: 2026-09-15T00:00:00Z ou 2026-09-15T00:00:00-03:00)',
+      code: 'INVALID_DESDE',
+      statusCode: 400,
+    });
+    return;
+  }
+
+  const excluidos = await listarExcluidosComNumero(partner.company_id, desde || undefined);
+  anotarChamada(request, { detalhe: { excluidos: excluidos.length } });
+  await reply.send({
+    total: excluidos.length,
+    servidor_hora: new Date().toISOString(),
+    excluidos,
+  });
 }
 
 /**
@@ -166,12 +362,13 @@ export async function partnerFaturamentoHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'faturamento')) return;
 
   const lista = extrairLista<FaturamentoParceiro>(request.body, 'faturamento');
   if (!lista) {
-    await reply.status(400).send({
+    await responder(request, reply, 400, {
       error: 'Envie { "faturamento": [...] } ou uma lista no corpo',
       code: 'INVALID_BODY',
       statusCode: 400,
@@ -179,7 +376,8 @@ export async function partnerFaturamentoHandler(
     return;
   }
   if (lista.length > MAX_POR_LOTE) {
-    await reply.status(400).send({
+    anotarChamada(request, { recebidos: lista.length });
+    await responder(request, reply, 400, {
       error: `Máximo ${MAX_POR_LOTE} pedidos por requisição — divida em lotes`,
       code: 'BATCH_TOO_LARGE',
       statusCode: 400,
@@ -187,7 +385,9 @@ export async function partnerFaturamentoHandler(
     return;
   }
 
-  const resultado = await receberFaturamento(partner.company_id, lista);
+  // O nome do parceiro vai nos eventos do pedido (order_erp_events).
+  const resultado = await receberFaturamento(partner.company_id, lista, { parceiro: partner.name });
+  anotarLote(request, resultado);
   await reply.send({ ok: true, ...resultado, servidor_hora: new Date().toISOString() });
 }
 
@@ -196,12 +396,13 @@ export async function partnerClientesHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'cadastro')) return;
 
   const lista = extrairLista<ClienteParceiro>(request.body, 'clientes');
   if (!lista) {
-    await reply.status(400).send({
+    await responder(request, reply, 400, {
       error: 'Envie { "clientes": [...] } ou uma lista de clientes no corpo',
       code: 'INVALID_BODY',
       statusCode: 400,
@@ -209,7 +410,8 @@ export async function partnerClientesHandler(
     return;
   }
   if (lista.length > MAX_POR_LOTE) {
-    await reply.status(400).send({
+    anotarChamada(request, { recebidos: lista.length });
+    await responder(request, reply, 400, {
       error: `Máximo ${MAX_POR_LOTE} clientes por requisição — divida em lotes (recomendado 500)`,
       code: 'BATCH_TOO_LARGE',
       statusCode: 400,
@@ -218,6 +420,7 @@ export async function partnerClientesHandler(
   }
 
   const resultado = await receberClientes(partner.company_id, lista);
+  anotarLote(request, resultado);
   await reply.send({ ok: true, ...resultado, servidor_hora: new Date().toISOString() });
 }
 
@@ -226,12 +429,13 @@ export async function partnerRepresentantesHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const partner = await requirePartner(request, reply);
+  const partner = await autenticar(request, reply);
   if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'cadastro')) return;
 
   const lista = extrairLista<RepresentanteParceiro>(request.body, 'representantes');
   if (!lista) {
-    await reply.status(400).send({
+    await responder(request, reply, 400, {
       error: 'Envie { "representantes": [...] } ou uma lista no corpo',
       code: 'INVALID_BODY',
       statusCode: 400,
@@ -239,7 +443,8 @@ export async function partnerRepresentantesHandler(
     return;
   }
   if (lista.length > MAX_POR_LOTE) {
-    await reply.status(400).send({
+    anotarChamada(request, { recebidos: lista.length });
+    await responder(request, reply, 400, {
       error: `Máximo ${MAX_POR_LOTE} representantes por requisição — divida em lotes`,
       code: 'BATCH_TOO_LARGE',
       statusCode: 400,
@@ -248,5 +453,6 @@ export async function partnerRepresentantesHandler(
   }
 
   const resultado = await receberRepresentantes(partner.company_id, lista);
+  anotarLote(request, resultado);
   await reply.send({ ok: true, ...resultado, servidor_hora: new Date().toISOString() });
 }

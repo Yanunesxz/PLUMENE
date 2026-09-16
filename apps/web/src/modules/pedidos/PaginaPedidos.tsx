@@ -18,7 +18,13 @@ import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
 import { LINHAS_POR_FOLHA } from '../../lib/planilha/linhas.js';
 import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
-import { nomeDoComprador, origemParaExibir, seloDoPedido } from '../../lib/pedido.js';
+import {
+  faturaPeloControl,
+  nomeDoComprador,
+  origemParaExibir,
+  seloDoPedido,
+  type CanaisDoPedido,
+} from '../../lib/pedido.js';
 import { PedidosExcluidos } from './PedidosExcluidos.js';
 import type {
   Order,
@@ -142,6 +148,12 @@ export function PaginaPedidos() {
   // faturado direto do cartão, sem abrir pedido por pedido. A API confere de
   // novo que o pedido é DELA; desfazer um toque errado fica no detalhe.
   const ehVendaInterna = user?.role === 'rep' && user?.venda_interna === true;
+  // Com o faturamento vindo do Control pela API (048), o botão manual some para
+  // TODOS (decisão 11) — no detalhe e aqui no cartão. A lista não recebe os
+  // canais junto dos pedidos: pergunta uma vez. Sem resposta (offline), a tela
+  // é a de sempre e o servidor recusa o carimbo com FATURAMENTO_PELO_CONTROL.
+  const [canais, setCanais] = useState<CanaisDoPedido | null>(null);
+  const faturadoPeloControl = faturaPeloControl(canais);
   const [faturando, setFaturando] = useState<string | null>(null);
   // O carimbo trava o pedido para sempre — ninguém fatura sem confirmar antes.
   const [confirmandoFatura, setConfirmandoFatura] = useState<Order | null>(null);
@@ -190,7 +202,10 @@ export function PaginaPedidos() {
   // navegador ou no Drive vê "erro" e acha que a exportação falhou — aconteceu
   // na Plumene em 03/09/2026. A tela explica que é para extrair antes.
   const [pacoteDaExportacao, setPacoteDaExportacao] = useState<{ nome: string; planilhas: number } | null>(null);
-  const { tabelas } = useMinhasTabelas();
+  // `todas`, não `tabelas`: pedido de cliente numa tabela desligada no Control
+  // continua saindo na planilha dela. A lista de escolha (só ativas) deixaria o
+  // pedido "tabela não identificada".
+  const { todas: tabelas } = useMinhasTabelas();
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -279,6 +294,14 @@ export function PaginaPedidos() {
       .then((res) => db.products.bulkPut(res.data))
       .catch(() => {});
   }, [token, ehLoja]);
+
+  useEffect(() => {
+    if (!token || !ehVendaInterna) return;
+    api
+      .get<ApiResponse<CanaisDoPedido | null>>('/orders/canais', token)
+      .then((res) => setCanais(res.data))
+      .catch(() => setCanais(null));
+  }, [token, ehVendaInterna]);
 
   // Lista de representantes para o filtro do gerente (rep comum só vê os seus).
   useEffect(() => {
@@ -651,7 +674,7 @@ export function PaginaPedidos() {
                         ? ` em ${new Date(order.invoiced_at).toLocaleDateString('pt-BR')}`
                         : ''}
                     </p>
-                  ) : order.status === 'approved' || order.status === 'sent_erp' ? (
+                  ) : !faturadoPeloControl && (order.status === 'approved' || order.status === 'sent_erp') ? (
                     <button
                       type="button"
                       disabled={faturando === order.id}
