@@ -609,7 +609,7 @@ async function lerPedido(company_id: string, order_id: string): Promise<PedidoLi
     .select('*')
     .eq('id', order_id)
     .eq('company_id', company_id)
-    .maybeSingle();
+    .maybeSingle<PedidoLido>();
 
   // Erro de banco NÃO é "não existe": com o `.single()` de antes, um timeout
   // do Supabase virava 404 e o robô do ERP concluía que o pedido tinha sumido.
@@ -621,7 +621,7 @@ async function lerPedido(company_id: string, order_id: string): Promise<PedidoLi
     if ((error as { code?: string }).code === ID_MALFORMADO) return null;
     throw new Error(`Falha ao ler o pedido: ${error.message}`);
   }
-  return (data as PedidoLido | null) ?? null;
+  return data ?? null;
 }
 
 /**

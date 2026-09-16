@@ -116,10 +116,10 @@ async function lerPedido(
     .select('*')
     .eq('id', order_id)
     .eq('company_id', company_id)
-    .maybeSingle();
+    .maybeSingle<PedidoLido>();
   // Id sem forma de UUID é "não existe", não "falhou".
   if (error && (error as { code?: string }).code !== ID_MALFORMADO) return { erro: error.message };
-  return { pedido: (data as PedidoLido | null) ?? null };
+  return { pedido: data ?? null };
 }
 
 /** O Control tem este pedido? Número dele, ou solicitado pelo financeiro (049). */
