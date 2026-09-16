@@ -141,18 +141,27 @@ apps/api/src/
 │       │                           order_invoices e order_invoice_items (notas e itens faturados). SQL para os dois
 │       │                           bancos em _tools/SQL-PARA-RODAR-048.sql. NÃO rerodar depois da 049 (o bloco D
 │       │                           recolocaria a lista antiga no CHECK de tipo)
-│       └── 049_integracao_control_respostas.sql → as respostas do Control (decisões de 16/09/2026): orders.erp_requested_at/by
-│                                   (pedido SOLICITADO ao Control com canal 'api'; índice parcial da fila) + users.erp_email
-│                                   + order_invoices.substituida_por/em (nota nova por cima da anterior) +
-│                                   companies.sync_solicitado_em/por ("Sincronizar agora") + customers.erp_updated_at/
-│                                   retrato_referencia_em/pendencia_financeira/pendencia_financeira_em/titulos_vencidos +
-│                                   price_tables.erp_description/erp_updated_at/active + payment_conditions.erp_description/
-│                                   erp_updated_at/valor_minimo + products.erp_updated_at + product_variants.stock_updated_at
-│                                   + product_prices.erp_updated_at/preco_original/desconto_percentual + CHECK de
-│                                   order_erp_events.tipo com solicitado_ao_erp/nota_substituida/excluido_pelo_erp. Exige a
-│                                   048 (para com mensagem se ela faltar). SQL para os dois bancos em
-│                                   _tools/SQL-PARA-RODAR-049.sql. É A ÚLTIMA: o próximo número se combina por mensagem
-│                                   antes do commit
+│       ├── 049_integracao_control_respostas.sql → as respostas do Control (decisões de 16/09/2026): orders.erp_requested_at/by
+│       │                           (pedido SOLICITADO ao Control com canal 'api'; índice parcial da fila) + users.erp_email
+│       │                           + order_invoices.substituida_por/em (nota nova por cima da anterior) +
+│       │                           companies.sync_solicitado_em/por ("Sincronizar agora") + customers.erp_updated_at/
+│       │                           retrato_referencia_em/pendencia_financeira/pendencia_financeira_em/titulos_vencidos +
+│       │                           price_tables.erp_description/erp_updated_at/active + payment_conditions.erp_description/
+│       │                           erp_updated_at/valor_minimo + products.erp_updated_at + product_variants.stock_updated_at
+│       │                           + product_prices.erp_updated_at/preco_original/desconto_percentual + CHECK de
+│       │                           order_erp_events.tipo com solicitado_ao_erp/nota_substituida/excluido_pelo_erp. Exige a
+│       │                           048 (para com mensagem se ela faltar). SQL para os dois bancos em
+│       │                           _tools/SQL-PARA-RODAR-049.sql. NÃO rerodar depois da 050 (o bloco H recolocaria a
+│       │                           lista antiga no CHECK de tipo)
+│       └── 050_cliente_excluido_e_solicitacao.sql → decisões de 16/09/2026 à tarde: deleted_customers (id, company_id FK
+│                                   CASCADE, customer_id sem FK, erp_id, cnpj_digits, juntado_em sem FK = o cadastro que
+│                                   ficou, snapshot = a linha inteira do cliente, pedidos_movidos, deleted_at, deleted_by FK
+│                                   SET NULL, deleted_by_name, motivo, created_at, updated_at; índice (company_id,
+│                                   deleted_at DESC); RLS) — a cópia antes do DELETE do "Excluir cliente", e a tabela que o
+│                                   CRM pode ler para saber de cliente excluído/juntado + CHECK de order_erp_events.tipo
+│                                   com solicitacao_cancelada. Exige a 049 (para com mensagem se ela faltar). SQL para os
+│                                   dois bancos em _tools/SQL-PARA-RODAR-050.sql. Depois dela, NÃO rerodar a 048 nem a
+│                                   049. É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -189,7 +198,8 @@ apps/api/src/
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
 │   │                       eventosErp.service.ts → registrarEventoErp (order_erp_events) e
 │   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048;
-│   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 049 (a da 048 + 3)
+│   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 050 (a da 048 + 3 da 049
+│   │                       + solicitacao_cancelada)
 │   │                       notasDoPedido.service.ts → notas fiscais e peças faturadas (048):
 │   │                       lerNotasDoPedido (GET /orders/:id → `notas`, com a ativa e o
 │   │                       histórico), detectarNotas, cancelarNotasAtivas (desfazer o
@@ -400,6 +410,8 @@ _tools/
 │   │                Também grava no catálogo: mesmas travas do sync.py
 │   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-050.sql         → a 050 para colar nos DOIS bancos, DEPOIS da 049 (termina com o NOTIFY).
+│                                    Conferir depois com node _tools/conferir-050.mjs [raiz da PLUMENE]
 ├── SQL-PARA-RODAR-049.sql         → a 049 para colar nos DOIS bancos, DEPOIS da 048 (termina com o NOTIFY).
 │                                    Conferir depois com node _tools/conferir-049.mjs [raiz da PLUMENE]
 ├── SQL-PARA-RODAR-048.sql         → a 048 para colar nos DOIS bancos (termina com o NOTIFY). Conferir
@@ -414,7 +426,7 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-048 e conferir-049 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048, conferir-049 e conferir-050 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
                  → cargas e consertos pontuais direto no Supabase (fora do app).

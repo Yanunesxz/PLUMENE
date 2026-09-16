@@ -14,7 +14,8 @@ import { TIPOS_DE_EVENTO_ERP } from '../apps/api/src/modules/orders/eventosErp.s
  *   • as colunas são EXATAMENTE as combinadas com o Yan em 16/09/2026 — e o
  *     conferir-049.mjs pergunta por todas elas, nem uma a mais;
  *   • o CHECK de tipo do rastro é a lista da 048 mais os três acontecimentos
- *     novos, nesta ordem, e é a mesma lista que o código grava;
+ *     novos, nesta ordem, e é o começo da lista que o código grava (a lista
+ *     inteira passou a ser a da 050, que a recriou com um tipo a mais);
  *   • toda chave estrangeira nova é ON DELETE SET NULL: apagar um login ou
  *     uma nota nunca apaga um pedido, uma empresa ou outra nota;
  *   • nenhum status novo em orders.status.
@@ -25,6 +26,7 @@ const ler = (rel: string) => readFileSync(path.resolve(__dirname, '..', rel), 'u
 const MIGRACAO = ler('apps/api/src/config/migrations/049_integracao_control_respostas.sql');
 const MIGRACAO_048 = ler('apps/api/src/config/migrations/048_integracao_control_fase_0.sql');
 const MIGRACAO_028 = ler('apps/api/src/config/migrations/028_condicoes_de_pagamento.sql');
+const MIGRACAO_050 = ler('apps/api/src/config/migrations/050_cliente_excluido_e_solicitacao.sql');
 const PARA_RODAR = ler('_tools/SQL-PARA-RODAR-049.sql');
 const CONFERIR = ler('_tools/conferir-049.mjs');
 
@@ -178,11 +180,15 @@ describe('migração 049', () => {
     );
   });
 
-  it('o CHECK de tipo do rastro é a lista da 048 mais os três novos, e é a do código', () => {
+  it('o CHECK de tipo do rastro é a lista da 048 mais os três novos, e é o começo da do código', () => {
     const da048 = listaDoCheck(MIGRACAO_048, 'chk_order_erp_events_tipo');
     const da049 = listaDoCheck(MIGRACAO, 'chk_order_erp_events_tipo');
     expect(da049).toEqual([...da048, ...TIPOS_NOVOS]);
-    expect(da049).toEqual([...TIPOS_DE_EVENTO_ERP]);
+    // A 050 recriou este CHECK com 'solicitacao_cancelada' no fim: a lista
+    // inteira do código é a dela (tests/migracao-050.test.ts), e a daqui é o
+    // começo — nenhum tipo da 049 saiu nem mudou de lugar.
+    expect(TIPOS_DE_EVENTO_ERP.slice(0, da049.length)).toEqual(da049);
+    expect(listaDoCheck(MIGRACAO_050, 'chk_order_erp_events_tipo').slice(0, da049.length)).toEqual(da049);
     // A origem do evento não muda: a 049 não recria essa trava.
     expect(() => listaDoCheck(MIGRACAO, 'chk_order_erp_events_origem')).toThrow();
   });

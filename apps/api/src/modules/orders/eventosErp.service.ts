@@ -22,13 +22,16 @@ import { detectar } from '../../lib/detectarColuna.js';
 
 /**
  * Os tipos aceitos pelo CHECK de order_erp_events.tipo. A lista do banco é a
- * da 049 (que recriou o CHECK da 048 com três acontecimentos a mais) e esta
- * precisam ser as mesmas (tests/migracao-048.test.ts e tests/migracao-049.test.ts
- * conferem). Os três últimos só existem no banco depois da 049: gravar um deles
- * antes dela é recusado pelo CHECK e vira 'falhou' (fica no console, nunca
- * derruba quem chamou). 'excluido_pelo_erp' continua na lista (é a do banco),
- * mas a exclusão avisada pelo Control grava 'excluido' com origem 'api' —
- * decisão 12, e o rastro não depende da 049 (revisão de 16/09/2026).
+ * da 050 (que recriou o CHECK da 049 — a da 048 com três acontecimentos a
+ * mais — com 'solicitacao_cancelada') e esta precisam ser as mesmas
+ * (tests/migracao-050.test.ts confere a lista inteira; os testes da 048 e da
+ * 049 conferem que as delas são o começo desta). Os três da 049 só existem no
+ * banco depois dela, e 'solicitacao_cancelada' só depois da 050: gravar um
+ * tipo antes da migração dele é recusado pelo CHECK e vira 'falhou' (fica no
+ * console, nunca derruba quem chamou). 'excluido_pelo_erp' continua na lista
+ * (é a do banco), mas a exclusão avisada pelo Control grava 'excluido' com
+ * origem 'api' — decisão 12, e o rastro não depende da 049 (revisão de
+ * 16/09/2026).
  */
 export const TIPOS_DE_EVENTO_ERP = [
   'numero_gravado',
@@ -47,6 +50,9 @@ export const TIPOS_DE_EVENTO_ERP = [
   'solicitado_ao_erp',
   'nota_substituida',
   'excluido_pelo_erp',
+  // 050: o financeiro tirou da fila do Control um pedido solicitado que ainda
+  // não tinha número (PATCH /orders/:id/cancelar-solicitacao).
+  'solicitacao_cancelada',
 ] as const;
 export type TipoEventoErp = (typeof TIPOS_DE_EVENTO_ERP)[number];
 
