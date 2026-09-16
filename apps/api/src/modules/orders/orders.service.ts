@@ -1126,6 +1126,28 @@ interface PedidoParaSolicitar {
 }
 
 /**
+ * Lê o pedido dentro da empresa para solicitar ou cancelar a solicitação.
+ * `falhou` separa "o banco não respondeu" (500) de "não existe" (404).
+ */
+async function lerPedidoParaSolicitar(
+  id: string,
+  company_id: string,
+  rotulo: string,
+): Promise<{ pedido: PedidoParaSolicitar | null; falhou: boolean }> {
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (error) {
+    console.error(`[${rotulo}] falha ao ler o pedido ${id}: ${error.message}`);
+    return { pedido: null, falhou: true };
+  }
+  return { pedido: (data as PedidoParaSolicitar | null) ?? null, falhou: false };
+}
+
+/**
  * "Lançar no Control" com o canal de pedidos na API (049, decisão 2 de
  * 16/09/2026).
  *
@@ -1147,19 +1169,7 @@ export async function solicitarLancamentoNoErp(
   company_id: string,
   quem: { id: string; nome?: string | null },
 ): Promise<SolicitarErpResult> {
-  const ler = async (): Promise<{ pedido: PedidoParaSolicitar | null; falhou: boolean }> => {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('*')
-      .eq('id', id)
-      .eq('company_id', company_id)
-      .maybeSingle();
-    if (error) {
-      console.error(`[solicitar-erp] falha ao ler o pedido ${id}: ${error.message}`);
-      return { pedido: null, falhou: true };
-    }
-    return { pedido: (data as PedidoParaSolicitar | null) ?? null, falhou: false };
-  };
+  const ler = () => lerPedidoParaSolicitar(id, company_id, 'solicitar-erp');
 
   const responderPeloEstado = (o: PedidoParaSolicitar): SolicitarErpResult | null => {
     if (o.erp_order_id) return { ok: false, reason: 'ja_lancado', erp_order_id: o.erp_order_id };
@@ -1239,6 +1249,106 @@ export async function solicitarLancamentoNoErp(
     depois: { erp_order_id: null, status: 'approved' },
   });
   return { ok: true, solicitado_em: agora, ja_solicitado: false };
+}
+
+export type CancelarSolicitacaoResult =
+  | {
+      ok: true;
+      /** O carimbo que foi tirado (ou `null` quando outro clique já tinha tirado). */
+      solicitado_em: string | null;
+      /** `true` = outro clique cancelou no meio; nada foi gravado aqui nem registrado. */
+      ja_cancelado: boolean;
+    }
+  | {
+      ok: false;
+      reason: 'not_found' | 'nao_solicitado' | 'ja_importado' | 'sem_migracao' | 'indisponivel' | 'erro';
+      /** Em `ja_importado`: o número que o Control deu. */
+      erp_order_id?: string;
+    };
+
+/**
+ * "Cancelar solicitação" (decisão do Yan, 16/09/2026 à tarde): o financeiro
+ * clicou "Lançar no Control" e o Control ainda não importou — cancelar tira o
+ * pedido da fila que o Control puxa (GET /partner/v1/pedidos só entrega
+ * aprovado COM `erp_requested_at`). O pedido volta a ser um aprovado "a
+ * lançar", como antes do clique. Status nunca muda aqui.
+ *
+ * Regras, nesta ordem: a 049 rodou (sem ela não existe solicitação: 409
+ * MIGRACAO_PENDENTE; sonda sem resposta é "tente de novo") → o pedido existe
+ * na empresa → ainda sem número do Control (com número, JA_IMPORTADO: aí não
+ * há o que cancelar, o Control já importou) → está solicitado → UPDATE só se
+ * AINDA está solicitado e sem número (o número pode chegar entre a leitura e a
+ * gravação: ninguém afetado → relê → JA_IMPORTADO com o número) → evento
+ * 'solicitacao_cancelada', que só existe no CHECK depois da 050 — sem a 050
+ * o cancelamento acontece sem evento.
+ */
+export async function cancelarSolicitacaoAoErp(
+  id: string,
+  company_id: string,
+  quem: { id: string; nome?: string | null },
+): Promise<CancelarSolicitacaoResult> {
+  const coluna = await detectarComCerteza('orders', 'erp_requested_at');
+  if (coluna === 'nao_sei') return { ok: false, reason: 'indisponivel' };
+  if (coluna === 'nao_existe') return { ok: false, reason: 'sem_migracao' };
+
+  const ler = () => lerPedidoParaSolicitar(id, company_id, 'cancelar-solicitacao');
+
+  const leitura = await ler();
+  if (leitura.falhou) return { ok: false, reason: 'erro' };
+  if (!leitura.pedido) return { ok: false, reason: 'not_found' };
+  const o = leitura.pedido;
+
+  if (o.erp_order_id) return { ok: false, reason: 'ja_importado', erp_order_id: o.erp_order_id };
+  if (!o.erp_requested_at) return { ok: false, reason: 'nao_solicitado' };
+
+  const agora = new Date().toISOString();
+  const { data: afetadas, error } = await supabase
+    .from('orders')
+    .update({ erp_requested_at: null, erp_requested_by: null, updated_at: agora })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    // Só se o Control AINDA não deu o número e o pedido AINDA está solicitado:
+    // a confirmação que cai no meio vence, e o pedido não perde a solicitação
+    // de um número que já existe.
+    .is('erp_order_id', null)
+    .not('erp_requested_at', 'is', null)
+    .select('id');
+  if (error) {
+    console.error(`[cancelar-solicitacao] falha ao cancelar a solicitação do pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+
+  if (!Array.isArray(afetadas) || afetadas.length === 0) {
+    // Alguém mexeu entre a leitura e a gravação: responde pelo estado de agora.
+    const relido = await ler();
+    if (relido.falhou) return { ok: false, reason: 'erro' };
+    if (!relido.pedido) return { ok: false, reason: 'not_found' };
+    if (relido.pedido.erp_order_id) {
+      return { ok: false, reason: 'ja_importado', erp_order_id: relido.pedido.erp_order_id };
+    }
+    // Outro clique já tirou da fila: o que a pessoa queria já aconteceu.
+    if (!relido.pedido.erp_requested_at) return { ok: true, solicitado_em: null, ja_cancelado: true };
+    return { ok: false, reason: 'erro' };
+  }
+
+  // O rastro. 'solicitacao_cancelada' só é aceito pelo CHECK depois da 050, e
+  // a 050 é a que cria deleted_customers: é por ela que se sabe. Sem a 050 (ou
+  // sem resposta sobre ela), o cancelamento fica sem evento — ele já está
+  // gravado e o evento nunca derruba quem chamou.
+  if (await detectar('deleted_customers', 'id')) {
+    await registrarEventoErp({
+      company_id,
+      order_id: id,
+      order_number: o.order_number ?? null,
+      tipo: 'solicitacao_cancelada',
+      origem: 'tela',
+      por: quem.id,
+      por_nome: quem.nome ?? null,
+      antes: { erp_order_id: null, status: o.status },
+      depois: { erp_order_id: null, status: o.status },
+    });
+  }
+  return { ok: true, solicitado_em: o.erp_requested_at, ja_cancelado: false };
 }
 
 export type NotesResult =

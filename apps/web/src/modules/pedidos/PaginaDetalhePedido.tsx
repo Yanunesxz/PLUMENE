@@ -29,6 +29,8 @@ import {
   estadoDaEspera,
   mensagemDaEspera,
   ESPERA_DO_CONTROL,
+  podeCancelarSolicitacao,
+  PERGUNTA_CANCELAR_SOLICITACAO,
 } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
@@ -262,6 +264,50 @@ export function PaginaDetalhePedido() {
       clearInterval(timer);
     };
   }, [espera.estado, id, token]);
+
+  // ─── Cancelar a solicitação (050): o Control ainda não importou ───────────
+  // Tira o pedido da fila do Control. A espera para (a consulta só roda em
+  // 'aguardando') e a tela volta ao aprovado "a lançar", como antes do clique.
+  const [cancelandoSolicitacao, setCancelandoSolicitacao] = useState(false);
+  const cancelarSolicitacao = async () => {
+    if (!id || !token || !order || cancelandoSolicitacao) return;
+    if (!window.confirm(PERGUNTA_CANCELAR_SOLICITACAO)) return;
+    setCancelandoSolicitacao(true);
+    setErroDoLancamento(null);
+    try {
+      await api.patch<ApiResponse<{ solicitado_em: string | null; ja_cancelado: boolean }>>(
+        `/orders/${id}/cancelar-solicitacao`,
+        {},
+        token,
+      );
+      setEspera({ estado: 'parado' });
+      mudarPedido((atual) => ({ ...atual, erp_requested_at: null, erp_requested_by: null, solicitacao_erp: null }));
+      setLancando(false);
+      setToast({ message: 'Solicitação cancelada — o pedido saiu da fila do Control.', type: 'success' });
+    } catch (err) {
+      const mensagem = err instanceof Error ? err.message : 'Não foi possível cancelar a solicitação.';
+      if ((err as { code?: string }).code === 'JA_IMPORTADO') {
+        // O número chegou no meio: o pedido vem inteiro, com o número, e a
+        // espera termina como importado — o diálogo aberto mostra o "Parabéns".
+        try {
+          const r = await api.get<ApiResponse<PedidoNaTela>>(`/orders/${id}`, token);
+          recargaMaisNova.current++;
+          setOrder(r.data);
+          if (r.data.erp_order_id) {
+            void db.orders.update(id, { status: r.data.status, erp_order_id: r.data.erp_order_id });
+            setEspera({ estado: 'importado', numero: r.data.erp_order_id });
+            if (dialogoAberto.current) return;
+          }
+        } catch {
+          /* sem rede: a frase da API já diz o que houve */
+        }
+      }
+      if (dialogoAberto.current) setErroDoLancamento(mensagem);
+      else setToast({ message: mensagem, type: 'error' });
+    } finally {
+      setCancelandoSolicitacao(false);
+    }
+  };
 
   const abrirLancamento = async () => {
     setLancando(true);
@@ -1245,6 +1291,18 @@ export function PaginaDetalhePedido() {
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                   {pelaApi ? (order.erp_requested_at ? 'Conferir no Control' : 'Lançar no Control') : 'Lançar no ERP'}
                 </Button>
+                {/* Solicitado e ainda sem número: dá para tirar da fila do Control. */}
+                {podeCancelarSolicitacao(user?.role, order) && (
+                  <Button
+                    variant="outline"
+                    className="mt-2 w-full text-danger"
+                    disabled={cancelandoSolicitacao || !isOnline}
+                    onClick={() => void cancelarSolicitacao()}
+                  >
+                    <X className="h-4 w-4" strokeWidth={2.5} />
+                    {cancelandoSolicitacao ? 'Cancelando…' : 'Cancelar solicitação'}
+                  </Button>
+                )}
               </div>
             )}
 
@@ -1652,6 +1710,10 @@ export function PaginaDetalhePedido() {
           exemplo={exemploDoNumero}
           espera={espera}
           onSolicitar={() => void solicitarAoControl()}
+          {...(podeCancelarSolicitacao(user?.role, order)
+            ? { onCancelarSolicitacao: () => void cancelarSolicitacao() }
+            : {})}
+          cancelandoSolicitacao={cancelandoSolicitacao}
           onConfirmar={(n) => void lancarNoErp(n)}
           onCancelar={() => {
             setErroDoLancamento(null);

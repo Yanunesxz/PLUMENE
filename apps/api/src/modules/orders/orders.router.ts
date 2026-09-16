@@ -14,6 +14,7 @@ import {
   ultimoNumeroErpHandler,
   corrigirNumeroErpHandler,
   solicitarErpHandler,
+  cancelarSolicitacaoHandler,
   erpSyncHandler,
   deleteOrderHandler,
   listDeletedOrdersHandler,
@@ -112,6 +113,13 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/orders/:id/solicitar-erp',
     { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
     solicitarErpHandler,
+  );
+  // "Cancelar solicitação" (050): o Control ainda não importou e o financeiro
+  // tira o pedido da fila. Os mesmos papéis de quem solicita.
+  fastify.patch(
+    '/orders/:id/cancelar-solicitacao',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    cancelarSolicitacaoHandler,
   );
   // "Atualizar no ERP" (046): a venda interna editou as peças de um pedido que
   // já está no Control e avisa a fábrica; quem mexe no Control confirma depois.

@@ -267,6 +267,23 @@ export function estadoDaEspera(
   return agoraMs - inicioMs >= ESPERA_DO_CONTROL.limite_ms ? 'esgotou' : 'aguardando';
 }
 
+/**
+ * Quem vê "Cancelar solicitação" (decisão do Yan, 16/09/2026 à tarde): quem
+ * solicita — financeiro e admin —, num pedido SOLICITADO ao Control e ainda
+ * sem número. Com o número, o Control já importou e não há o que cancelar.
+ * A mesma regra do PATCH /orders/:id/cancelar-solicitacao; quem protege de
+ * verdade é a API.
+ */
+export function podeCancelarSolicitacao(
+  papel: AuthRole | undefined,
+  pedido: Pick<Order, 'erp_order_id'> & { erp_requested_at?: string | null },
+): boolean {
+  return (papel === 'financeiro' || papel === 'admin') && Boolean(pedido.erp_requested_at) && !pedido.erp_order_id;
+}
+
+/** A pergunta antes de cancelar — combinada com o Yan (16/09/2026). */
+export const PERGUNTA_CANCELAR_SOLICITACAO = 'O Control ainda não importou. Cancelar tira o pedido da fila do Control.';
+
 /** As frases combinadas com o Yan (16/09/2026) para cada desfecho da espera. */
 export function mensagemDaEspera(estado: EstadoDaEspera, numeroNoControl: string | null | undefined): string {
   if (estado === 'importado') {

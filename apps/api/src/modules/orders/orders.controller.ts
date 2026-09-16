@@ -12,6 +12,7 @@ import {
   ultimoNumeroErp,
   corrigirNumeroErp,
   solicitarLancamentoNoErp,
+  cancelarSolicitacaoAoErp,
   deleteOrder,
   listDeletedOrders,
 } from './orders.service.js';
@@ -687,6 +688,58 @@ export async function solicitarErpHandler(request: FastifyRequest, reply: Fastif
     code: resp.code,
     statusCode: resp.status,
     ...(r.reason === 'ja_lancado' && r.erp_order_id ? { erp_order_id: r.erp_order_id } : {}),
+  });
+}
+
+/**
+ * PATCH /orders/:id/cancelar-solicitacao — "Cancelar solicitação" (050).
+ *
+ * Tira da fila do Control um pedido solicitado que ainda não tem número. Não
+ * muda status: o pedido volta a ser um aprovado "a lançar". Se o número chegou
+ * no meio, 409 JA_IMPORTADO com o número — a tela recarrega e mostra.
+ */
+export async function cancelarSolicitacaoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, name } = request.user;
+  const { id } = request.params as { id: string };
+
+  const r = await cancelarSolicitacaoAoErp(id, company_id, { id: sub, nome: name ?? null });
+  if (r.ok) {
+    await reply.send({ data: { solicitado_em: r.solicitado_em, ja_cancelado: r.ja_cancelado } });
+    return;
+  }
+  const respostas = {
+    not_found: { status: 404, code: 'NOT_FOUND', error: 'Pedido não encontrado' },
+    nao_solicitado: {
+      status: 409,
+      code: 'NAO_SOLICITADO',
+      error: 'Este pedido não está solicitado ao Control — não há solicitação para cancelar',
+    },
+    ja_importado: {
+      status: 409,
+      code: 'JA_IMPORTADO',
+      error: 'O Control já importou este pedido e deu o número — não dá mais para cancelar a solicitação',
+    },
+    sem_migracao: {
+      status: 409,
+      code: 'MIGRACAO_PENDENTE',
+      error: 'A migração 049 ainda não rodou neste banco — não existe solicitação ao Control para cancelar',
+    },
+    indisponivel: {
+      status: 503,
+      code: 'BANCO_INDISPONIVEL',
+      error: 'Não deu para falar com o banco agora. Nada foi alterado — tente de novo em instantes.',
+    },
+    erro: { status: 500, code: 'UPDATE_FAILED', error: 'Não foi possível cancelar a solicitação — tente de novo' },
+  } as const;
+  const resp = respostas[r.reason];
+  await reply.status(resp.status).send({
+    error:
+      r.reason === 'ja_importado' && r.erp_order_id
+        ? `O Control já importou este pedido com o número ${r.erp_order_id} — não dá mais para cancelar a solicitação`
+        : resp.error,
+    code: resp.code,
+    statusCode: resp.status,
+    ...(r.reason === 'ja_importado' && r.erp_order_id ? { erp_order_id: r.erp_order_id } : {}),
   });
 }
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
+import { podeCancelarSolicitacao, PERGUNTA_CANCELAR_SOLICITACAO } from '../apps/web/src/lib/pedido.js';
 
 /**
  * A integração com o Control, fase 0, do lado das TELAS (frente [O]).
@@ -61,6 +62,7 @@ const base = { email: 'teste@teste.invalid', company_id: EMPRESA, price_table_id
 const TOKEN_ADMIN = assinar({ ...base, sub: 'adm-1', name: 'Admin Teste', role: 'admin' });
 const TOKEN_FINANCEIRO = assinar({ ...base, sub: 'fin-1', name: 'Financeiro Teste', role: 'financeiro' });
 const TOKEN_GERENTE = assinar({ ...base, sub: 'ger-1', name: 'Gerente Teste', role: 'manager', permissions: null });
+const TOKEN_REP = assinar({ ...base, sub: REP, name: 'Rep Teste', role: 'rep' });
 
 async function subirApp(respostas: Record<string, unknown>, ausentes?: string[]) {
   const fake = prepararFake(respostas, ausentes);
@@ -592,6 +594,234 @@ describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
       await app.close();
     }
   }, 60_000);
+});
+
+// ─── Cancelar a solicitação (050) ────────────────────────────────────────────
+
+describe('cancelar a solicitação ao Control (PATCH /orders/:id/cancelar-solicitacao)', () => {
+  const SOLICITADO_EM = '2026-09-16T13:00:00.000Z';
+  const solicitado = (extra: Record<string, unknown> = {}) => ({
+    data: {
+      id: 'o1',
+      order_number: 5,
+      status: 'approved',
+      rep_id: REP,
+      invoiced: false,
+      erp_order_id: null,
+      erp_requested_at: SOLICITADO_EM,
+      erp_requested_by: 'fin-1',
+      ...extra,
+    },
+    error: null,
+  });
+  const GRAVOU = { data: [{ id: 'o1' }], error: null };
+  const NINGUEM = { data: [], error: null };
+  const QUEM = { id: 'fin-1', nome: 'Financeiro Teste' };
+  const CAIU = { data: null, error: { message: 'fetch failed', code: '' } };
+
+  it('tira da fila: limpa erp_requested_at/by com updated_at, só se ainda solicitado e sem número — e deixa o evento (com a 050)', async () => {
+    const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos({ orders: [solicitado(), VAZIO, GRAVOU] });
+
+    const r = await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM);
+
+    expect(r).toEqual({ ok: true, solicitado_em: SOLICITADO_EM, ja_cancelado: false });
+    const gravado = valores(fake, 'orders', 'update')!;
+    expect(Object.keys(gravado).sort()).toEqual(['erp_requested_at', 'erp_requested_by', 'updated_at']);
+    expect(gravado['erp_requested_at']).toBeNull();
+    expect(gravado['erp_requested_by']).toBeNull();
+    expect(Number.isNaN(Date.parse(gravado['updated_at'] as string))).toBe(false);
+
+    // Leitura e gravação sempre pela empresa do token; o UPDATE é condicional.
+    const eqs = fake.filtrosDe('orders', 'eq').map((f) => f.args);
+    expect(eqs.filter((a) => a[0] === 'company_id')).toEqual([['company_id', EMPRESA], ['company_id', EMPRESA]]);
+    expect(eqs).toContainEqual(['id', 'o1']);
+    expect(fake.filtrosDe('orders', 'is').map((f) => f.args)).toEqual([['erp_order_id', null]]);
+    expect(fake.filtrosDe('orders', 'not').map((f) => f.args)).toEqual([['erp_requested_at', 'is', null]]);
+
+    expect(valores(fake, 'order_erp_events', 'insert')).toMatchObject({
+      company_id: EMPRESA,
+      order_id: 'o1',
+      order_number: 5,
+      tipo: 'solicitacao_cancelada',
+      origem: 'tela',
+      por: 'fin-1',
+      por_nome: 'Financeiro Teste',
+      antes: { erp_order_id: null, status: 'approved' },
+      depois: { erp_order_id: null, status: 'approved' },
+    });
+    // Status nunca muda, e o canal nem é consultado.
+    expect(fake.filtrosDe('companies')).toHaveLength(0);
+  });
+
+  it('sem a 050 (deleted_customers ausente): o cancelamento acontece, sem evento', async () => {
+    const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos(
+      { orders: [solicitado(), VAZIO, GRAVOU] },
+      [...FORA_DO_ASSUNTO, 'deleted_customers'],
+    );
+
+    expect(await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: true,
+      solicitado_em: SOLICITADO_EM,
+      ja_cancelado: false,
+    });
+    expect(valores(fake, 'orders', 'update')).toMatchObject({ erp_requested_at: null, erp_requested_by: null });
+    expect(fake.ultimaGravacao('order_erp_events')).toBeUndefined();
+  });
+
+  it('o rastro que falha não muda a resposta: o cancelamento já está gravado', async () => {
+    const erro = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const { cancelarSolicitacaoAoErp } = await servicoDePedidos({
+      orders: [solicitado(), VAZIO, GRAVOU],
+      order_erp_events: { data: null, error: { message: 'violates check constraint chk_order_erp_events_tipo' } },
+    });
+
+    expect((await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).ok).toBe(true);
+    expect(erro).toHaveBeenCalled();
+  });
+
+  it.each([
+    ['já importado (tem número)', solicitado({ erp_order_id: NUMERO, status: 'sent_erp' }), { reason: 'ja_importado', erp_order_id: NUMERO }],
+    ['não solicitado', solicitado({ erp_requested_at: null, erp_requested_by: null }), { reason: 'nao_solicitado' }],
+    ['que não existe (ou de outra empresa)', VAZIO, { reason: 'not_found' }],
+  ])('pedido %s é recusado e nada é gravado', async (_nome, pedido, esperado) => {
+    const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos({ orders: pedido });
+
+    expect(await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, ...esperado });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('falha de banco na leitura é erro (500), não "não encontrado"; falha no UPDATE também', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    const leitura = await servicoDePedidos({ orders: CAIU });
+    expect(await leitura.cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'erro' });
+    expect(leitura.fake.gravacoes).toEqual([]);
+
+    vi.resetModules();
+    const gravacao = await servicoDePedidos({ orders: [solicitado(), VAZIO, CAIU] });
+    expect(await gravacao.cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'erro' });
+    expect(gravacao.fake.ultimaGravacao('order_erp_events')).toBeUndefined();
+  });
+
+  it('sem a 049: MIGRACAO_PENDENTE sem ler nem gravar; sonda sem resposta é "tente de novo"', async () => {
+    const semColuna = await servicoDePedidos(
+      { orders: [solicitado(), VAZIO, GRAVOU] },
+      [...FORA_DO_ASSUNTO, 'orders.erp_requested_at'],
+    );
+    expect(await semColuna.cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'sem_migracao' });
+    expect(semColuna.fake.filtros).toEqual([]);
+    expect(semColuna.fake.gravacoes).toEqual([]);
+
+    vi.resetModules();
+    const fake = criarSupabaseFake({ orders: [solicitado(), VAZIO, GRAVOU] } as never);
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    vi.doMock('../apps/api/src/lib/detectarColuna.js', () => ({
+      detectar: async () => true,
+      detectarOuFalhar: async () => true,
+      detectarComCerteza: async (t: string, c?: string) =>
+        t === 'orders' && c === 'erp_requested_at' ? 'nao_sei' : 'existe',
+      esquecerDeteccoes: () => {},
+    }));
+    const { cancelarSolicitacaoAoErp } = await import('../apps/api/src/modules/orders/orders.service.js');
+    expect(await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({ ok: false, reason: 'indisponivel' });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('corrida: o número chegou entre a leitura e o UPDATE → JA_IMPORTADO com o número, sem evento', async () => {
+    const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos({
+      orders: [solicitado(), VAZIO, NINGUEM, VAZIO, solicitado({ erp_order_id: NUMERO, status: 'sent_erp' })],
+    });
+
+    expect(await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: false,
+      reason: 'ja_importado',
+      erp_order_id: NUMERO,
+    });
+    expect(fake.ultimaGravacao('order_erp_events')).toBeUndefined();
+  });
+
+  it('corrida: outro clique já cancelou → ok, já cancelado, sem evento repetido', async () => {
+    const { cancelarSolicitacaoAoErp, fake } = await servicoDePedidos({
+      orders: [solicitado(), VAZIO, NINGUEM, VAZIO, solicitado({ erp_requested_at: null, erp_requested_by: null })],
+    });
+
+    expect(await cancelarSolicitacaoAoErp('o1', EMPRESA, QUEM)).toEqual({
+      ok: true,
+      solicitado_em: null,
+      ja_cancelado: true,
+    });
+    expect(fake.ultimaGravacao('order_erp_events')).toBeUndefined();
+  });
+
+  it('a rota: 403 para rep e gerente (nada gravado); o financeiro cancela (200) e o evento leva o nome dele', async () => {
+    const { app, fake } = await subirApp({ orders: [solicitado(), VAZIO, GRAVOU] });
+    try {
+      for (const token of [TOKEN_REP, TOKEN_GERENTE]) {
+        const negado = await app.inject({
+          method: 'PATCH',
+          url: '/orders/o1/cancelar-solicitacao',
+          headers: { authorization: `Bearer ${token}` },
+        });
+        expect(negado.statusCode).toBe(403);
+      }
+      expect(fake.gravacoes).toEqual([]);
+
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/cancelar-solicitacao',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ data: { solicitado_em: SOLICITADO_EM, ja_cancelado: false } });
+      expect(valores(fake, 'orders', 'update')).toMatchObject({ erp_requested_at: null, erp_requested_by: null });
+      expect(valores(fake, 'order_erp_events', 'insert')).toMatchObject({
+        tipo: 'solicitacao_cancelada',
+        por: 'fin-1',
+        por_nome: 'Financeiro Teste',
+      });
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it.each([
+    ['sem a 049', 409, 'MIGRACAO_PENDENTE', { ausentes: [...FORA_DO_ASSUNTO, 'orders.erp_requested_at'] }],
+    ['já importado', 409, 'JA_IMPORTADO', { pedido: solicitado({ erp_order_id: NUMERO, status: 'sent_erp' }) }],
+    ['não solicitado', 409, 'NAO_SOLICITADO', { pedido: solicitado({ erp_requested_at: null }) }],
+    ['que não existe', 404, 'NOT_FOUND', { pedido: VAZIO }],
+  ])('a rota traduz "%s" em %i %s (admin), sem gravar', async (_nome, status, code, caso) => {
+    const c = caso as { ausentes?: string[]; pedido?: RespostaTabela };
+    const { app, fake } = await subirApp({ orders: c.pedido ?? solicitado() }, c.ausentes);
+    try {
+      const res = await app.inject({
+        method: 'PATCH',
+        url: '/orders/o1/cancelar-solicitacao',
+        headers: { authorization: `Bearer ${TOKEN_ADMIN}` },
+      });
+      expect(res.statusCode).toBe(status);
+      const corpo = res.json() as { code: string; error: string; erp_order_id?: string };
+      expect(corpo.code).toBe(code);
+      if (code === 'JA_IMPORTADO') {
+        expect(corpo.erp_order_id).toBe(NUMERO);
+        expect(corpo.error).toContain(NUMERO);
+      }
+      expect(fake.gravacoes).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it('na tela: só financeiro e admin, só pedido solicitado e ainda sem número; a pergunta é a combinada', () => {
+    const esperando = { erp_order_id: null, erp_requested_at: SOLICITADO_EM };
+    expect(podeCancelarSolicitacao('financeiro', esperando)).toBe(true);
+    expect(podeCancelarSolicitacao('admin', esperando)).toBe(true);
+    for (const papel of ['rep', 'manager', 'store', undefined] as const) {
+      expect(podeCancelarSolicitacao(papel, esperando)).toBe(false);
+    }
+    expect(podeCancelarSolicitacao('financeiro', { erp_order_id: NUMERO, erp_requested_at: SOLICITADO_EM })).toBe(false);
+    expect(podeCancelarSolicitacao('financeiro', { erp_order_id: null, erp_requested_at: null })).toBe(false);
+    expect(podeCancelarSolicitacao('financeiro', { erp_order_id: null })).toBe(false);
+    expect(PERGUNTA_CANCELAR_SOLICITACAO).toBe('O Control ainda não importou. Cancelar tira o pedido da fila do Control.');
+  });
 });
 
 // ─── Corrigir o número ───────────────────────────────────────────────────────

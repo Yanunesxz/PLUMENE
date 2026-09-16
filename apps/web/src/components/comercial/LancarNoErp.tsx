@@ -46,6 +46,14 @@ interface Props {
   onConfirmar: (numeroErp: string) => void;
   /** Modo 'solicitar': o clique que solicita (ou volta a conferir). */
   onSolicitar?: () => void;
+  /**
+   * Modo 'solicitar': "Cancelar solicitação" — tira o pedido da fila do
+   * Control. Quem abre o diálogo só passa quando pode (financeiro/admin, pedido
+   * solicitado e sem número); ausente, o botão não existe.
+   */
+  onCancelarSolicitacao?: () => void;
+  /** O cancelamento da solicitação está indo para a API. */
+  cancelandoSolicitacao?: boolean;
   onCancelar: () => void;
 }
 
@@ -70,7 +78,9 @@ function quando(iso: string | null | undefined): string {
  * SOLICITA o lançamento, o Control puxa o pedido e devolve o número pela
  * confirmação; enquanto isso a tela fica consultando o pedido a cada 3 s,
  * por até 3 min. Chegou: "Parabéns, pedido importado!". Não chegou: o pedido
- * fica na fila e o número aparece quando o Control responder.
+ * fica na fila e o número aparece quando o Control responder. Enquanto o
+ * número não chega, "Cancelar solicitação" tira o pedido da fila do Control
+ * (decisão do Yan, 16/09/2026 à tarde).
  */
 export function LancarNoErp({
   numeroDoPedido,
@@ -84,6 +94,8 @@ export function LancarNoErp({
   espera = { estado: 'parado' },
   onConfirmar,
   onSolicitar,
+  onCancelarSolicitacao,
+  cancelandoSolicitacao = false,
   onCancelar,
 }: Props) {
   const corrigindo = modo === 'corrigir';
@@ -106,6 +118,13 @@ export function LancarNoErp({
   // espera continua no servidor, e fechar não cancela nada.
   const esperando = solicitando && (espera.estado === 'solicitando' || espera.estado === 'aguardando');
   const terminou = solicitando && (espera.estado === 'importado' || espera.estado === 'esgotou');
+  // Cancelar a solicitação: só enquanto o número não chegou e nada está indo
+  // para a API. Importado, não há o que cancelar.
+  const mostraCancelarSolicitacao =
+    solicitando &&
+    Boolean(onCancelarSolicitacao) &&
+    espera.estado !== 'solicitando' &&
+    espera.estado !== 'importado';
 
   const titulo = corrigindo
     ? `Corrigir o número do pedido #${numeroDoPedido ?? ''}`
@@ -118,7 +137,7 @@ export function LancarNoErp({
         onSubmit={(e) => {
           e.preventDefault();
           if (solicitando) {
-            if (espera.estado === 'parado' && !ocupado) onSolicitar?.();
+            if (espera.estado === 'parado' && !ocupado && !cancelandoSolicitacao) onSolicitar?.();
             else if (terminou) onCancelar();
             return;
           }
@@ -222,6 +241,24 @@ export function LancarNoErp({
         </div>
 
         <div className="mt-5 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          {mostraCancelarSolicitacao && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="text-danger sm:mr-auto"
+              onClick={onCancelarSolicitacao}
+              disabled={cancelandoSolicitacao}
+            >
+              {cancelandoSolicitacao ? (
+                <>
+                  <Spinner />
+                  Cancelando…
+                </>
+              ) : (
+                'Cancelar solicitação'
+              )}
+            </Button>
+          )}
           {solicitando ? (
             terminou ? (
               <Button type="submit">Fechar</Button>
@@ -230,7 +267,7 @@ export function LancarNoErp({
                 <Button type="button" variant="outline" onClick={onCancelar} disabled={espera.estado === 'solicitando'}>
                   {espera.estado === 'aguardando' ? 'Fechar e esperar' : 'Cancelar'}
                 </Button>
-                <Button type="submit" disabled={ocupado || esperando}>
+                <Button type="submit" disabled={ocupado || esperando || cancelandoSolicitacao}>
                   {esperando ? (
                     <>
                       <Spinner />
