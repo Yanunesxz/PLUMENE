@@ -111,6 +111,25 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
   });
 }
 
+/**
+ * GET /orders/canais — só os dois canais que mudam a tela de pedidos (lançar
+ * e faturar), sem pedido nenhum. É o que a LISTA pergunta para esconder o
+ * "Marcar faturado" do cartão da venda interna quando o faturamento vem do
+ * Control (decisão 11); o detalhe já recebe os mesmos canais no GET
+ * /orders/:id. Sem resposta do banco, `null`: a tela fica como hoje, e o
+ * servidor recusa o carimbo de qualquer jeito.
+ */
+export async function canaisDosPedidosHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  let canais: { pedido_erp: string; faturamento: string } | null = null;
+  try {
+    const lidos = await lerCanais(request.user.company_id);
+    canais = { pedido_erp: lidos.pedido_erp, faturamento: lidos.faturamento };
+  } catch (e) {
+    request.log.error({ err: e }, 'o banco não respondeu sobre os canais da empresa (lista de pedidos)');
+  }
+  await reply.send({ data: canais });
+}
+
 /** GET /public/pedido/:token — a página pública do pedido (link do e-mail). Sem login. */
 export async function pedidoPublicoHandler(
   request: FastifyRequest<{ Params: { token: string } }>,

@@ -27,6 +27,7 @@ import {
   serieDoControl,
   exemploDeNumeroErp,
   estadoDaEspera,
+  mensagemDaEspera,
   ESPERA_DO_CONTROL,
 } from '../../lib/pedido.js';
 import { compararTamanho } from '../../components/comercial/grade.js';
@@ -193,6 +194,12 @@ export function PaginaDetalhePedido() {
   // cada 3 s, por até 3 min, até o Control devolver o número pela confirmação.
   const [espera, setEspera] = useState<EsperaPeloControl>({ estado: 'parado' });
   const inicioDaEspera = useRef(0);
+  // O diálogo está aberto AGORA? A consulta continua com ele fechado ("Fechar e
+  // esperar"), e aí o número chega num aviso em vez de no diálogo.
+  const dialogoAberto = useRef(lancando);
+  useEffect(() => {
+    dialogoAberto.current = lancando;
+  }, [lancando]);
 
   const solicitarAoControl = async () => {
     if (!id || !token || !order || espera.estado === 'solicitando') return;
@@ -216,11 +223,13 @@ export function PaginaDetalhePedido() {
     }
   };
 
-  // A consulta periódica. Só roda com o diálogo aberto e a espera em curso:
-  // fechar o diálogo para a consulta — o pedido continua solicitado no
-  // servidor e o número aparece na próxima abertura da tela.
+  // A consulta periódica, enquanto a espera está em curso (até 3 min) — COM O
+  // DIÁLOGO FECHADO TAMBÉM: "Fechar e esperar" promete que o número aparece
+  // aqui quando chegar, e antes fechar parava a consulta até recarregar a tela
+  // (revisão de 16/09/2026). Chegando com o diálogo fechado, o pedido da tela
+  // é trocado e a frase do "Parabéns" vem num aviso.
   useEffect(() => {
-    if (!lancando || espera.estado !== 'aguardando' || !id || !token) return;
+    if (espera.estado !== 'aguardando' || !id || !token) return;
     let vivo = true;
     const consultar = async () => {
       try {
@@ -233,6 +242,9 @@ export function PaginaDetalhePedido() {
           setOrder(r.data);
           void db.orders.update(id, { status: r.data.status, erp_order_id: r.data.erp_order_id });
           setEspera({ estado: 'importado', numero: r.data.erp_order_id });
+          if (!dialogoAberto.current) {
+            setToast({ message: mensagemDaEspera('importado', r.data.erp_order_id), type: 'success' });
+          }
         } else if (estado === 'esgotou') {
           setEspera({ estado: 'esgotou' });
         }
@@ -248,7 +260,7 @@ export function PaginaDetalhePedido() {
       vivo = false;
       clearInterval(timer);
     };
-  }, [lancando, espera.estado, id, token]);
+  }, [espera.estado, id, token]);
 
   const abrirLancamento = async () => {
     setLancando(true);
@@ -256,7 +268,10 @@ export function PaginaDetalhePedido() {
     // Canal na API: nada de último número nem sugestão — o diálogo só solicita.
     // Se já estava solicitado, ele abre no "conferir agora".
     if (pelaApi) {
-      setEspera({ estado: 'parado', solicitadoEm: order?.erp_requested_at ?? null });
+      // Reabrir no meio da espera volta a mostrar a espera (a consulta não parou).
+      setEspera((atual) =>
+        atual.estado === 'aguardando' ? atual : { estado: 'parado', solicitadoEm: order?.erp_requested_at ?? null },
+      );
       return;
     }
     if (!token) return;
@@ -1628,7 +1643,8 @@ export function PaginaDetalhePedido() {
           onCancelar={() => {
             setErroDoLancamento(null);
             setLancando(false);
-            setEspera({ estado: 'parado' });
+            // "Fechar e esperar": a espera segue (a consulta continua); o resto volta ao início.
+            setEspera((atual) => (atual.estado === 'aguardando' ? atual : { estado: 'parado' }));
           }}
         />
       )}

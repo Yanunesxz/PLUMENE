@@ -19,6 +19,7 @@ import {
   listDeletedOrdersHandler,
   pedidoPublicoHandler,
   listPaymentConditions,
+  canaisDosPedidosHandler,
 } from './orders.controller.js';
 
 export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
@@ -78,6 +79,9 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     { preHandler: [authenticate, requireRole(['admin'])] },
     listDeletedOrdersHandler,
   );
+  // Os canais que mudam a tela de pedidos (048) — a lista esconde o "Marcar
+  // faturado" do cartão quando o faturamento vem do Control. Sem dado de pedido.
+  fastify.get('/orders/canais', daFabricaOuLoja, canaisDosPedidosHandler);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);

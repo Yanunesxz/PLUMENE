@@ -505,6 +505,36 @@ describe('solicitar o lançamento ao Control (canal na API, 049)', () => {
     }
   }, 60_000);
 
+  it('GET /orders/canais devolve só os dois canais — a lista esconde o "Marcar faturado" do cartão; sem resposta do banco, null', async () => {
+    const TOKEN_VENDA_INTERNA = assinar({ ...base, sub: REP, name: 'Venda Interna Teste', role: 'rep', venda_interna: true });
+    const { app } = await subirApp({ companies: CANAIS_API });
+    try {
+      const res = await app.inject({
+        method: 'GET',
+        url: '/orders/canais',
+        headers: { authorization: `Bearer ${TOKEN_VENDA_INTERNA}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ data: { pedido_erp: 'api', faturamento: 'api' } });
+    } finally {
+      await app.close();
+    }
+
+    vi.resetModules();
+    const semResposta = await subirApp({ companies: { data: null, error: { message: 'timeout' } } });
+    try {
+      const res = await semResposta.app.inject({
+        method: 'GET',
+        url: '/orders/canais',
+        headers: { authorization: `Bearer ${TOKEN_FINANCEIRO}` },
+      });
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toEqual({ data: null });
+    } finally {
+      await semResposta.app.close();
+    }
+  }, 60_000);
+
   it('GET /orders/:id devolve os canais da empresa e o bloco solicitacao_erp — é o que a tela consulta a cada 3 s', async () => {
     const { app } = await subirApp({
       orders: aprovado({ company_id: EMPRESA, erp_requested_at: SOLICITADO_EM, erp_requested_by: 'fin-1' }),
