@@ -90,6 +90,26 @@ O que a auditoria apontou virou código, na worktree `SetorxWeb-control`, ainda 
 5. **Conferir no Railway e no Vercel** qual serviço é de qual marca antes de publicar a tabela de URLs (Corpo Sensual `setorxweb-production`, PLUMENE `csbapi-production`) e configurar `PARTNER_API_KEYS` com **uma chave por marca**.
 6. **Virar canal é um `UPDATE companies SET canal_… = 'api'`** por empresa, no SQL Editor, combinado com o Fábio. Enquanto não virar, a API responde `409 CANAL_FECHADO` e nada muda para quem usa o app hoje.
 
+### 0.6 Respostas do Yan em 16/09/2026
+
+As treze decisões abaixo fecham as perguntas 1, 7, 9, 10, 11, 13, 16 e 20 do §6 e viraram código na mesma branch (`mudanca/app-control-fase-0`, migração 049). O contrato vivo continua sendo `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html`, agora com **dezenove** rotas. Onde este brief disser outra coisa, vale isto:
+
+1. **Um Control por marca; uma chave e uma URL por marca.** A série do número é a da marca: `CS` (Corpo Sensual) e `PL` (PLUMENE). A série de representante que o script e a doc antiga exemplificavam **não existe mais**; a máscara continua duas letras + dígitos.
+2. **O lançamento continua sendo um clique do financeiro.** Com `canal_pedido_erp='api'`, "Lançar no Control" não digita número e não responde 409: **solicita** (`orders.erp_requested_at/by`, evento `solicitado_ao_erp`) e a tela consulta o pedido a cada 3 s por até 3 min; quando o número chega pela confirmação, mostra "Parabéns, pedido importado! O número no Control é CS…"; se estourar, "O Control ainda não respondeu. O pedido fica na fila e o número aparece aqui quando chegar". Com canal manual, tudo como hoje.
+3. **A fila da API** (`GET /partner/v1/pedidos`) é `approved AND erp_order_id IS NULL AND não faturado AND erp_requested_at IS NOT NULL` (sem a 049, a fila de antes). Campo novo `solicitado_em`; com `incluir=todos`, `alterado_apos_importacao = updated_at > erp_order_set_at`.
+4. **O CNPJ é a chave única do cliente entre os sistemas.** No pedido, `cliente.chave` (só dígitos) e `cliente.novo_no_control` quando não há código. "Cliente sem código do ERP" **deixou de ser pendência** — o Control cria o cadastro e devolve o código por `POST /clientes`, casando por CNPJ; a pendência passa a ser "cliente sem CNPJ". Em `POST /clientes` o casamento é primeiro por `cnpj_digits`, depois pelo miolo do código; cliente sem código recebe o que vier.
+5. **Um pedido tem uma nota só.** Nota cancelada/devolvida não é avisada: o Control sobe outra por cima. Nota nova (número diferente) **substitui** a anterior (`cancelada_em`, `substituida_por`, evento `nota_substituida`); a tela usa só a nota ativa.
+6. **O Control manda tudo pela API e sobrescreve:** tabelas de preço (código, descrição, coluna 1-6, ativo), condições de pagamento (código, descrição, ativo, valor mínimo), produtos e tamanhos, preço por tabela (sobrescreve o do PDF), estoque das duas marcas, retrato do cliente e pendência financeira. **O Firebird está aposentado** (as travas ficam) — `_tools/erp-sync/README.md`.
+7. **Sincronização bidirecional:** o Control **puxa** o que mudou no app por `GET /clientes`, `GET /representantes` e `GET /pedidos?incluir=todos`, todos com `?desde=`. Intervalos recomendados na doc: fila a cada 1 min; cadastros e alterações a cada 5 min; faturamento ao carimbar ou a cada 5 min; catálogo/preço/estoque a cada 30 min; retrato 1x por dia; e quando `GET /status` devolver `sincronizar_agora: true`, tudo já — o botão "Pedir sincronização agora" da tela de Integração do app (`companies.sync_solicitado_em`), que o Control limpa com `POST /sincronizacao`.
+8. **Bloqueio do Control não trava o representante.** O pedido segue; o financeiro é avisado (o aviso da tela é do Yan). O app guarda `block_reason`, `pendencia_financeira` e `titulos_vencidos` que vierem.
+9. **E-mail do Control para representante** vai em `users.erp_email`; o login não muda.
+10. **Cores são internas:** nada muda (continuam na observação do item, `cor` sempre `00001`).
+11. **Com `canal_faturamento='api'` o botão manual de faturado some/é recusado para todos** (`409 FATURAMENTO_PELO_CONTROL`), não só para pedido com número.
+12. **Exclusão de pedido com número do Control é bloqueada para todos, inclusive admin.** Se o Control excluir, ele avisa por `POST /partner/v1/pedidos/:id/excluir { motivo }` e o app exclui (cópia em `deleted_orders` com `deleted_by_name` = nome do parceiro, evento `excluido_pelo_erp`, origem `api`).
+13. **Comissão é do gerente, não do Control;** representante do pedido = dono da carteira (nada muda).
+
+O que ainda depende do Yan, além dos passos de 0.5: rodar a **049** nos dois bancos **depois** da 048 (`_tools/SQL-PARA-RODAR-049.sql`, conferir com `node _tools/conferir-049.mjs [raiz da PLUMENE]`) — sem ela tudo degrada para o comportamento de hoje; e criar o aviso ao financeiro da decisão 8.
+
 ---
 
 ## 1. ESTADO ATUAL

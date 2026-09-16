@@ -641,6 +641,7 @@
       <li><a href="#visao">Visão geral</a></li>
       <li><a href="#conceitos">Conceitos</a></li>
       <li><a href="#fluxo">Como funciona</a></li>
+      <li><a href="#maos">O que cada lado manda</a></li>
       <li><a href="#requisitos">O que você precisa</a></li>
       <li><a href="#auth">Autenticação</a></li>
       <li><a href="#urls">URLs e chaves por marca</a></li>
@@ -649,6 +650,7 @@
       <li><a href="#ep-passivo">Conciliação e excluídos</a></li>
       <li><a href="#ep-faturamento">Faturamento e notas</a></li>
       <li><a href="#ep-cadastros">Cadastros (clientes e reps)</a></li>
+      <li><a href="#ep-catalogo">Catálogo, retrato e sincronização</a></li>
       <li><a href="#campos">Dicionário de campos</a></li>
       <li><a href="#cores">Tamanhos e cores</a></li>
       <li><a href="#codigo">Exemplos de código</a></li>
@@ -706,23 +708,25 @@
 
       <h3>Por que os pedidos já vêm com os meus códigos?</h3>
       <p>
-        Porque os cadastros são <b>seus</b>. Antes de qualquer pedido existir, os
-        dados da fábrica — produtos, tamanhos, preços, estoque, clientes e
-        representantes — são carregados do seu ERP para a plataforma, junto com os
-        códigos originais de cada registro.
+        Porque os cadastros são <b>seus</b> — e chegam por esta mesma API. O
+        seu ERP <b>manda tudo</b> para a plataforma: tabelas de preço e a
+        coluna, condições de pagamento, produtos e tamanhos, o preço de cada
+        produto por tabela, o estoque, os clientes e os representantes, com os
+        códigos originais de cada registro. O aplicativo nunca conecta no seu
+        banco.
       </p>
       <p>
         Por isso, quando o pedido volta, ele não traz nomes soltos para você tentar
         adivinhar: traz o código do cliente, o código do representante, o código da
         tabela de preço e a referência do produto <b>exatamente como estão no seu
-        sistema</b>. Na prática, o seu programa de importação vira quase um
-        <code>INSERT</code> direto.
+        sistema</b> — e o <b>CNPJ do cliente como chave</b>. Na prática, o seu
+        programa de importação vira quase um <code>INSERT</code> direto.
       </p>
       <p>
-        Essa carga inicial é combinada na implantação — pode ser por um agente de
-        leitura instalado junto ao seu banco, por exportação de arquivos ou por
-        uma integração que a sua equipe já tenha. Não é assunto desta API, mas é o
-        que garante que os códigos batam.
+        A carga inicial é a mesma rotina que depois roda sozinha: as rotas de
+        envio da seção <a href="#ep-catalogo">Catálogo, retrato e
+        sincronização</a> e <a href="#ep-cadastros">Cadastros</a>, na
+        implantação com o catálogo inteiro e, daí em diante, só o que mudou.
       </p>
     </section>
 
@@ -819,36 +823,53 @@
     <section id="fluxo">
       <h2><span class="num">03</span>Como funciona</h2>
       <p class="sub">
-        Quatro chamadas no ciclo do pedido, sempre na mesma ordem. O seu programa
-        roda de tempos em tempos: a fila a cada 1 minuto (o financeiro fica
-        olhando a tela esperando o número); cadastros e alterações, nas duas
-        mãos, a cada 5 minutos; catálogo, preço e estoque a cada 30 minutos; o
-        retrato do cliente uma vez por dia — e tudo de uma vez quando
-        <code>GET /status</code> disser <code>sincronizar_agora: true</code>.
+        O lançamento do pedido no Control continua sendo <b>um clique do
+        financeiro</b> — o que muda é que ninguém digita número. Do clique ao
+        número na tela, o caminho é este:
       </p>
 
       <ol class="steps">
         <li>
-          <b>Buscar a fila</b>
-          <span><code>GET /partner/v1/pedidos</code> devolve os pedidos aprovados que
-          o financeiro <b>mandou lançar</b> no Control (o clique em "Lançar no
-          Control") e ainda não foram importados, já com os códigos do seu ERP e
-          o CNPJ do cliente como chave.</span>
+          <b>O financeiro clica "Lançar no Control"</b>
+          <span>Depois de aprovar o pedido, o financeiro clica em "Lançar no
+          Control" na tela do pedido. O pedido fica marcado como
+          <b>solicitado</b> (<code>solicitado_em</code>) e entra na fila da API.
+          A tela fica aguardando: <em>"Aguardando o Control importar o pedido…
+          Isso leva até 3 min."</em></span>
         </li>
         <li>
-          <b>Gravar no seu sistema</b>
-          <span>O seu programa insere o pedido no seu banco, com as suas regras e os
-          seus campos obrigatórios, e gera o número interno (ex.: <code>CS17379</code>).</span>
+          <b>O seu programa puxa a fila — a cada 1 minuto</b>
+          <span><code>GET /partner/v1/pedidos</code> devolve só os pedidos
+          solicitados e ainda não importados, já com os códigos do seu ERP
+          (cliente, representante, tabela e coluna, condição, referência e
+          tamanho) e o <b>CNPJ do cliente como chave</b>. Cliente que o Control
+          ainda não conhece vem com <code>novo_no_control: true</code>: crie o
+          cadastro lá e devolva o código pelo <code>POST /clientes</code>.</span>
         </li>
         <li>
-          <b>Confirmar a importação</b>
-          <span><code>POST /partner/v1/pedidos/{id}/confirmar</code> informando o número
-          gerado. O pedido sai da fila e nunca mais aparece — e a tela do
-          financeiro, que ficou esperando, mostra "pedido importado" com o
-          número.</span>
+          <b>Grava no Control</b>
+          <span>O seu programa insere o pedido no seu banco, com as suas regras e
+          os seus campos obrigatórios, e o Control gera o número na série da
+          marca (<code>CS17379</code> na Corpo Sensual, <code>PL02672</code> na
+          PLUMENE).</span>
         </li>
         <li>
-          <b>Informar o faturamento</b>
+          <b>Confirma com o número</b>
+          <span><code>POST /partner/v1/pedidos/{id}/confirmar</code> com
+          <code>{ "pedido_erp": "CS17379" }</code>. O pedido sai da fila e nunca
+          mais aparece.</span>
+        </li>
+        <li>
+          <b>A tela do aplicativo mostra o número</b>
+          <span>A tela do financeiro, que consultava o pedido a cada 3 segundos,
+          mostra: <em>"Parabéns, pedido importado! O número no Control é
+          CS17379."</em> Se em 3 minutos o número não chegou: <em>"O Control
+          ainda não respondeu. O pedido fica na fila e o número aparece aqui
+          quando chegar."</em> — o pedido continua solicitado, e o número entra
+          na próxima passada.</span>
+        </li>
+        <li>
+          <b>Informa o faturamento</b>
           <span><code>POST /partner/v1/faturamento</code> quando a nota sair. É o que
           faz o lojista ver <b>“Aprovado”</b> e o que conta como venda no painel —
           até aí, o pedido é só uma intenção.</span>
@@ -861,29 +882,59 @@
           Um pedido só sai da fila depois que você confirma. Se a sua rotina falhar,
           cair a internet ou o programa reiniciar no meio, o pedido continua lá para
           a próxima tentativa — e confirmar duas vezes com o mesmo número é seguro.
+          Pedido aprovado que ninguém mandou lançar não aparece na fila.
         </p>
       </div>
 
-      <p>
-        Por fora desse ciclo, o seu ERP mantém a plataforma com a mesma chave —
-        a cada ~5 minutos <code>POST /partner/v1/clientes</code> e
-        <code>POST /partner/v1/representantes</code> (só o que mudou) e, na mesma
-        rodada, <code>GET /partner/v1/clientes?desde=</code> e
-        <code>GET /partner/v1/representantes?desde=</code> para puxar o que mudou
-        no aplicativo (cliente novo sem código: crie no ERP e devolva o código,
-        casando pelo CNPJ). A cada ~30 minutos, o catálogo:
-        <code>POST /tabelas-preco</code>, <code>/condicoes-pagamento</code>,
-        <code>/produtos</code>, <code>/precos</code> e <code>/estoque</code>. Uma
-        vez por dia, <code>POST /retrato</code>. Está tudo nas seções
-        <a href="#ep-cadastros">Cadastros</a> e
-        <a href="#ep-catalogo">Catálogo, retrato e sincronização</a>.
-      </p>
-      <p>
-        E uma vez, na implantação: <code>GET /partner/v1/conciliacao</code> mostra
-        quantos pedidos foram para o ERP antes da integração sem o número, e
-        <code>POST /partner/v1/pedidos/{id}/conciliar</code> dá o número a cada um
-        — ver <a href="#ep-passivo">Conciliação e excluídos</a>.
-      </p>
+      <h3>Intervalos recomendados</h3>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th>O quê</th><th>Rotas</th><th>Quando</th></tr>
+          </thead>
+          <tbody>
+            <tr><td><b>Fila de pedidos</b></td><td><code>GET /pedidos</code> → grava no Control → <code>POST /pedidos/{id}/confirmar</code></td><td><b>a cada 1 minuto</b> — o financeiro fica olhando a tela esperando o número</td></tr>
+            <tr><td><b>Cadastros e alterações, nas duas mãos</b></td><td><code>POST /clientes</code>, <code>POST /representantes</code> (só o que mudou); <code>GET /clientes?desde=</code>, <code>GET /representantes?desde=</code>, <code>GET /pedidos?incluir=todos&amp;desde=</code></td><td><b>a cada 5 minutos</b></td></tr>
+            <tr><td><b>Faturamento</b></td><td><code>POST /faturamento</code></td><td><b>assim que a nota sair</b> (ou a cada 5 minutos)</td></tr>
+            <tr><td><b>Catálogo, preço e estoque</b></td><td><code>POST /tabelas-preco</code>, <code>/condicoes-pagamento</code>, <code>/produtos</code>, <code>/precos</code>, <code>/estoque</code></td><td><b>a cada 30 minutos</b></td></tr>
+            <tr><td><b>Retrato do cliente</b></td><td><code>POST /retrato</code></td><td><b>1x por dia</b></td></tr>
+            <tr><td><b>Sincronizar agora</b></td><td><code>GET /status</code> → <code>sincronizar_agora: true</code> → tudo acima → <code>POST /sincronizacao</code></td><td><b>sempre que o <code>/status</code> pedir</b> (chame-o junto com a fila)</td></tr>
+            <tr><td>Passivo (uma vez)</td><td><code>GET /conciliacao</code>, <code>POST /pedidos/{id}/conciliar</code></td><td>na implantação, com o Yan — ver <a href="#ep-passivo">Conciliação e excluídos</a></td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3 id="maos">O que cada lado manda</h3>
+      <div class="grid2">
+        <div class="card">
+          <b>O que o Control precisa mandar</b>
+          <span>Tudo pela API — o aplicativo nunca conecta no banco do Control.</span>
+          <ul>
+            <li><b>Clientes</b> — <code>POST /clientes</code>: código, razão social, fantasia, CNPJ, representante, tabela, endereço, bloqueio e motivo, limite, pendência financeira, títulos vencidos, contato, <code>data_update</code>.</li>
+            <li><b>Representantes</b> — <code>POST /representantes</code>: código, nome, razão social, e-mail do Control, ativo.</li>
+            <li><b>Tabelas de preço e a coluna</b> — <code>POST /tabelas-preco</code>: código, descrição, coluna 1–6, ativo.</li>
+            <li><b>Condições de pagamento</b> — <code>POST /condicoes-pagamento</code>: código, descrição, ativo, valor mínimo.</li>
+            <li><b>Produtos e tamanhos</b> — <code>POST /produtos</code>: código, referência, nome, grupo, coleção, marca, ativo e a grade.</li>
+            <li><b>Preços por tabela</b> — <code>POST /precos</code>: sobrescreve o que estava.</li>
+            <li><b>Estoque</b> — <code>POST /estoque</code>: quantidade e reservado por produto e tamanho.</li>
+            <li><b>Faturamento com a nota e os itens</b> — <code>POST /faturamento</code>: uma nota por pedido.</li>
+            <li><b>Retrato e pendência financeira</b> — <code>POST /retrato</code>: última compra, total, vencido, títulos, pendência, com a referência.</li>
+            <li><b>Exclusão</b> — <code>POST /pedidos/{id}/excluir</code> quando o Control exclui do lado dele.</li>
+            <li><b>Sincronização concluída</b> — <code>POST /sincronizacao</code>, depois de atender um <code>sincronizar_agora</code>.</li>
+          </ul>
+        </div>
+        <div class="card">
+          <b>O que o app entrega</b>
+          <span>O que nasce ou muda no aplicativo.</span>
+          <ul>
+            <li><b>A fila solicitada</b> — <code>GET /pedidos</code>: os aprovados que o financeiro mandou lançar, com os códigos do Control e o CNPJ como chave.</li>
+            <li><b>A confirmação</b> — <code>POST /pedidos/{id}/confirmar</code> (e <code>POST /conciliar</code> para o passivo).</li>
+            <li><b>Alterações de cliente, representante e pedido</b> — <code>GET /clientes?desde=</code> (com <code>novo_no_control</code>), <code>GET /representantes?desde=</code>, <code>GET /pedidos?incluir=todos&amp;desde=</code> (<code>alterado_apos_importacao</code>).</li>
+            <li><b>Os excluídos</b> — <code>GET /pedidos/excluidos</code>: apagados no aplicativo que já tinham número.</li>
+            <li><b>A conciliação</b> — <code>GET /conciliacao</code>: contagens da fila e do passivo; e o <code>GET /status</code>, com os canais e o <code>sincronizar_agora</code>.</li>
+          </ul>
+        </div>
+      </div>
     </section>
 
     <section id="requisitos">
@@ -980,7 +1031,7 @@
           <span class="code-lbl">Teste de conexão</span>
           <button class="copy" type="button">copiar</button>
         </div>
-        <pre><code><span class="c"># resposta esperada: {"ok":true,"parceiro":"...","servidor_hora":"...","canais":{...}}</span>
+        <pre><code><span class="c"># resposta esperada: {"ok":true,"parceiro":"...","servidor_hora":"...","canais":{...},"sincronizar_agora":false,"solicitado_em":null}</span>
 <span class="c"># Corpo Sensual; na PLUMENE: https://csbapi-production.up.railway.app/partner/v1/status</span>
 curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
   https://setorxweb-production.up.railway.app/partner/v1/status</code></pre>
@@ -1544,6 +1595,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             </div>
             <pre><code>{
   <span class="k">"fila_aprovados_sem_numero_nao_faturados"</span>: <span class="n">12</span>,
+  <span class="k">"aprovados_solicitados_ao_control"</span>: <span class="n">9</span>,
   <span class="k">"enviados_sem_numero_nao_faturados"</span>: <span class="n">42</span>,
   <span class="k">"enviados_sem_numero_faturados"</span>: <span class="n">7</span>,
   <span class="k">"aprovados_faturados_sem_numero"</span>: <span class="n">3</span>,
@@ -1557,7 +1609,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 <tr><th>Campo</th><th>O que conta</th></tr>
               </thead>
               <tbody>
-                <tr><td><code>fila_aprovados_sem_numero_nao_faturados</code></td><td>A fila do <code>GET /pedidos</code>.</td></tr>
+                <tr><td><code>fila_aprovados_sem_numero_nao_faturados</code></td><td>Aprovado, sem número, não faturado — solicitado ao Control ou ainda não.</td></tr>
+                <tr><td><code>aprovados_solicitados_ao_control</code></td><td>Desses, os que o financeiro já mandou lançar: <b>é a fila do <code>GET /pedidos</code></b>. <code>null</code> numa instalação sem a migração 049 (aí a fila é a linha de cima).</td></tr>
                 <tr><td><code>enviados_sem_numero_nao_faturados</code></td><td>O passivo que o <code>/conciliar</code> resolve.</td></tr>
                 <tr><td><code>enviados_sem_numero_faturados</code></td><td>O mesmo passivo, já faturado à mão.</td></tr>
                 <tr><td><code>aprovados_faturados_sem_numero</code></td><td>Faturado à mão sem nunca ter ido ao ERP pelo aplicativo — não importe.</td></tr>
@@ -1949,10 +2002,15 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         <li><b>Sem mudança, nada é gravado:</b> o registro que chega igual ao
             cadastro conta em <code>sem_mudanca</code>. Reenviar o mesmo lote é
             inofensivo.</li>
-        <li><b>Casamento pelo miolo do código:</b> <code>#2225</code>,
-            <code>2225</code> e <code>02225</code> são o mesmo cadastro. Dois
-            registros do mesmo lote com o mesmo miolo: vale o primeiro, o segundo
-            volta em <code>ignorados</code> (<code>código repetido no lote</code>).</li>
+        <li><b>O CNPJ é a chave entre os sistemas:</b> o cliente é procurado
+            primeiro pelo CNPJ/CPF (só dígitos), depois pelo miolo do código
+            (<code>#2225</code>, <code>2225</code> e <code>02225</code> são o
+            mesmo cadastro). Cliente achado pelo CNPJ <b>sem código</b> recebe o
+            código que veio; cliente que já tem código <b>nunca</b> tem o código
+            reescrito (código diferente vira aviso). Dois registros do mesmo lote
+            com o mesmo miolo ou o mesmo CNPJ: vale o primeiro, o segundo volta em
+            <code>ignorados</code> (<code>código repetido no lote</code> /
+            <code>CNPJ repetido no lote</code>).</li>
         <li><b>Tolerante:</b> só é recusado o registro que não dá para usar (sem
             código, sem nome, código repetido) — ele volta em
             <code>ignorados</code> com o motivo e o resto grava.</li>
@@ -1971,8 +2029,9 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             por assunto, com os códigos envolvidos.</li>
         <li>Máximo de 1000 registros por requisição
             (<span class="st er">400</span> <code>BATCH_TOO_LARGE</code> acima
-            disso). Nada é apagado por esta via. As duas rotas exigem o canal de
-            cadastro ligado para a API (<span class="st wr">409</span>
+            disso). Nada é apagado por esta via. As quatro rotas de cadastro (os
+            dois <code>POST</code> e os dois <code>GET ?desde=</code>) exigem o
+            canal de cadastro ligado para a API (<span class="st wr">409</span>
             <code>CANAL_FECHADO</code>).</li>
       </ul>
 
@@ -1983,9 +2042,13 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         </div>
         <div class="ep-body">
           <p>
-            Cria ou atualiza clientes pelo <b>código do cliente no seu ERP</b>. Quem
-            já existe é atualizado, quem não existe é criado; ninguém é apagado —
-            para desativar, mande <code>bloqueado: "S"</code>.
+            Cria ou atualiza clientes — casando <b>primeiro pelo CNPJ</b>, depois
+            pelo <b>código do cliente no seu ERP</b>. Quem já existe é atualizado,
+            quem não existe é criado, e o cliente que nasceu no aplicativo sem
+            código (o <code>novo_no_control</code> do <code>GET /pedidos</code> e
+            do <code>GET /clientes?desde=</code>) aprende o código que você
+            mandar; ninguém é apagado — para desativar, mande
+            <code>bloqueado: "S"</code>.
           </p>
 
           <div class="code">
@@ -2169,15 +2232,20 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <code>ignorados</code> traz <code>{ "codigo", "motivo" }</code> para cada
             registro recusado: <code>registro inválido</code> (não é objeto),
             <code>sem código do ERP</code>, <code>sem razão social</code>,
-            <code>código repetido no lote</code>, <code>código com mais de um
-            cadastro no app</code> ou <code>falha ao gravar: …</code>.
-            <code>avisos</code> traz, em texto, o que passou mas merece
-            conferência: tabelas de preço não encontradas (ou nenhuma tabela com
-            código do ERP, ou código usado por mais de uma tabela), clientes
-            casados pelo CNPJ, código de representante sem login no app ou gravado
-            numa grafia diferente da do login, valores de <code>bloqueado</code> ou
-            <code>limite_credito</code> não entendidos e campos que a instalação
-            ainda não guarda.
+            <code>código repetido no lote</code>, <code>CNPJ repetido no
+            lote</code>, <code>código com mais de um cadastro no app</code>,
+            <code>CNPJ com mais de um cadastro no app</code>, <code>cadastro já
+            atualizado por outro registro do lote</code> ou <code>falha ao
+            gravar: …</code>. <code>avisos</code> traz, em texto, o que passou mas
+            merece conferência: tabelas de preço não encontradas (ou nenhuma
+            tabela com código do ERP, ou código usado por mais de uma tabela),
+            clientes casados pelo CNPJ, CNPJ casado com um cadastro que já tem
+            <b>outro</b> código (o código não é reescrito), código de
+            representante sem login no app ou gravado numa grafia diferente da do
+            login, valores de <code>bloqueado</code>, <code>limite_credito</code>,
+            <code>pendencia_financeira</code> ou <code>titulos_vencidos</code> não
+            entendidos, <code>data_update</code> sem fuso e campos que a
+            instalação ainda não guarda.
           </p>
         </div>
       </div>
@@ -2276,32 +2344,362 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         de lista: corpo <code>{ "&lt;nome&gt;": [...] }</code>, <code>{ "dados": [...] }</code>
         ou a lista pura; no máximo 1000 por requisição; <b>campo que não veio não
         mexe, <code>null</code> limpa, sem mudança nada é gravado</b> (reenviar o
-        lote inteiro é inofensivo); registro com problema volta em
-        <code>ignorados</code> com o motivo e o resto grava; <code>data_update</code>
-        com fuso; códigos casam pelo miolo. Resposta sempre
-        <code>{ ok, recebidos, criados, atualizados, sem_mudanca, ignorados, avisos, servidor_hora }</code>.
-        O contrato completo, campo a campo e motivo a motivo, está em
-        <code>docs/API-PARCEIRO.md</code> (seções 5 a 7) — este resumo diz o que
-        cada rota faz.
+        lote inteiro a cada 30 minutos é inofensivo); registro com problema volta
+        em <code>ignorados</code> com o motivo e o resto grava;
+        <code>data_update</code>, quando vem, é um momento <b>com fuso</b> (sem
+        fuso o registro é ignorado; ausente = agora); códigos casam pelo miolo
+        (<code>7</code>, <code>07</code> e <code>00007</code> são a mesma tabela).
+        As cinco rotas de catálogo exigem o canal de catálogo ligado para a API
+        (<span class="st wr">409</span> <code>CANAL_FECHADO</code>) e respondem
+        <code>{ ok, recebidos, criados, atualizados, sem_mudanca, ignorados: [{ codigo, motivo }], avisos: [texto], servidor_hora }</code>.
+        Envie <b>tabelas e produtos antes de preços e estoque</b>: preço de tabela
+        ou produto que o app não tem, e estoque de tamanho fora da grade, voltam
+        como ignorados. Nada é apagado por estas rotas.
       </p>
-      <div class="tw">
-        <table>
-          <thead>
-            <tr><th>Rota</th><th>Corpo</th><th>O que faz</th></tr>
-          </thead>
-          <tbody>
-            <tr><td><code>POST /partner/v1/tabelas-preco</code></td><td><code>{ "tabelas_preco": [ { codigo, descricao, coluna, ativo, data_update } ] }</code></td><td>Cria ou atualiza a tabela pelo código. <code>coluna</code> (1–6) é obrigatória na tabela nova. A descrição do Control fica numa coluna própria — o nome que o app mostra não é regravado.</td></tr>
-            <tr><td><code>POST /partner/v1/condicoes-pagamento</code></td><td><code>{ "condicoes_pagamento": [ { codigo, descricao, ativo, valor_minimo, data_update } ] }</code></td><td>Código numérico (<code>"015"</code> = <code>15</code>). Condição inativa some do seletor do pedido. A descrição da condição que já existe não é regravada.</td></tr>
-            <tr><td><code>POST /partner/v1/produtos</code></td><td><code>{ "produtos": [ { codigo, referencia, nome, grupo, colecao, marca, ativo, tamanhos: [ { tamanho, ativo } ], data_update } ] }</code></td><td>Cria ou atualiza o produto pelo código; produto que já existia sem código (carga do PDF) e tem a mesma referência é adotado. Tamanho que falta é criado; tamanho que não veio <b>não</b> é desativado. Foto, descrição e cores são do app.</td></tr>
-            <tr><td><code>POST /partner/v1/precos</code></td><td><code>{ "precos": [ { tabela, produto, preco, preco_original, desconto_percentual, data_update } ] }</code></td><td><b>Sobrescreve</b> o preço do produto naquela tabela (inclusive o da carga do PDF). Zero ou negativo é ignorado. Mande tabelas e produtos antes.</td></tr>
-            <tr><td><code>POST /partner/v1/estoque</code></td><td><code>{ "estoque": [ { produto, tamanho, quantidade, reservado } ] }</code></td><td>Sobrescreve o estoque de prateleira (inteiro; negativo aceito) e o reservado (ausente não mexe, <code>null</code> zera) por tamanho. Tamanho fora da grade é ignorado.</td></tr>
-            <tr><td><code>POST /partner/v1/retrato</code></td><td><code>{ "retrato": [ { cnpj, codigo, ultima_compra, total_comprado, valor_vencido, titulos_vencidos, pendencia_financeira, referencia } ] }</code></td><td>Canal de retrato. Cliente pelo CNPJ (depois pelo código). <code>referencia</code> (com fuso) é obrigatória e só anda para frente; <code>ultima_compra</code> só anda para frente. Valor ruim recusa o registro inteiro. Uma vez por dia.</td></tr>
-            <tr><td><code>GET /partner/v1/clientes?desde=</code></td><td class="t-mut">—</td><td>Canal de cadastro. Os clientes que mudaram no aplicativo, <b>no mesmo formato do POST</b>, mais <code>codigo</code> (<code>null</code> = nasceu no app), <code>chave</code> (CNPJ só dígitos), <code>novo_no_control</code> (crie e devolva o código), <code>atualizado_em</code> e <code>atualizado_pelo_control_em</code>. O que o próprio Control gravou por último não volta. <code>desde</code> com fuso.</td></tr>
-            <tr><td><code>GET /partner/v1/representantes?desde=</code></td><td class="t-mut">—</td><td>Idem: <code>{ codigo, nome, razao_social, email, ativo, atualizado_em }</code>, onde <code>email</code> é o e-mail do Control (nunca o login).</td></tr>
-            <tr><td><code>POST /partner/v1/sincronizacao</code></td><td><code>{ "concluida": true, "solicitado_em": "..." }</code></td><td>O aviso de que a passada pedida por <code>sincronizar_agora: true</code> foi feita. Limpa o pedido; um pedido mais novo que <code>solicitado_em</code> fica de pé (rode de novo). Sem pedido pendente, <span class="st ok">200</span> sem gravar. <span class="st er">400</span> <code>MISSING_CONCLUIDA</code> / <code>INVALID_SOLICITADO_EM</code>.</td></tr>
-          </tbody>
-        </table>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/tabelas-preco</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            As tabelas de preço do Control: cria ou atualiza pelo código. A
+            descrição do Control fica guardada <b>numa coluna própria</b> — o
+            nome que o app mostra ao representante não é regravado. Aceita também
+            <code>{ "tabelas": [...] }</code>.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"tabelas_preco"</span>: [
+    { <span class="k">"codigo"</span>: <span class="s">"00007"</span>, <span class="k">"descricao"</span>: <span class="s">"ATACADO SUDESTE"</span>, <span class="k">"coluna"</span>: <span class="n">1</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span>, <span class="k">"data_update"</span>: <span class="s">"2026-09-16T08:00:00-03:00"</span> },
+    { <span class="k">"codigo"</span>: <span class="s">"00012"</span>, <span class="k">"descricao"</span>: <span class="s">"PROMOCIONAL"</span>, <span class="k">"coluna"</span>: <span class="n">3</span>, <span class="k">"ativo"</span>: <span class="s">"N"</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>codigo</code></td><td>sim</td><td>Código da tabela no ERP (chave, pelo miolo).</td></tr>
+                <tr><td><code>descricao</code></td><td>não</td><td>A descrição do Control, em coluna própria. Tabela nova nasce com o nome igual à descrição (ou "Tabela &lt;código&gt;").</td></tr>
+                <tr><td><code>coluna</code></td><td>na tabela nova</td><td>A coluna de preço (1 a 6). Fora disso o registro é ignorado; tabela nova sem coluna nasce com 1 e volta um aviso.</td></tr>
+                <tr><td><code>ativo</code></td><td>não</td><td><code>S</code>/<code>N</code>, <code>true</code>/<code>false</code>. Tabela nova nasce ativa.</td></tr>
+                <tr><td><code>data_update</code></td><td>não</td><td>Quando mudou no ERP, com fuso.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"ok"</span>: <span class="n">true</span>, <span class="k">"recebidos"</span>: <span class="n">2</span>, <span class="k">"criados"</span>: <span class="n">1</span>, <span class="k">"atualizados"</span>: <span class="n">1</span>, <span class="k">"sem_mudanca"</span>: <span class="n">0</span>,
+  <span class="k">"ignorados"</span>: [], <span class="k">"avisos"</span>: [], <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T11:00:00.000Z"</span> }</code></pre>
+          </div>
+          <p class="t-mut">
+            Motivos de <code>ignorados</code>: <code>registro inválido</code>,
+            <code>sem código do ERP</code>, <code>código repetido no lote</code>,
+            <code>código com mais de uma tabela no app</code>, <code>"coluna"
+            precisa ser um inteiro de 1 a 6</code>, <code>"data_update" não é uma
+            data ISO</code>, <code>"data_update" precisa de fuso (Z ou
+            -03:00)</code>, <code>falha ao gravar: …</code>.
+          </p>
+        </div>
       </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/condicoes-pagamento</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            As condições de pagamento do Control. O código é numérico
+            (<code>"015"</code> e <code>15</code> são a mesma). Condição inativa
+            some do seletor do pedido. Na condição que já existe, a descrição vai
+            para a coluna própria do Control — o texto que o app mostra não é
+            regravado. Aceita também <code>{ "condicoes": [...] }</code>.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"condicoes_pagamento"</span>: [
+    { <span class="k">"codigo"</span>: <span class="s">"021"</span>, <span class="k">"descricao"</span>: <span class="s">"30/60/90"</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span>, <span class="k">"valor_minimo"</span>: <span class="n">1500.00</span> },
+    { <span class="k">"codigo"</span>: <span class="s">"099"</span>, <span class="k">"descricao"</span>: <span class="s">"A VISTA"</span>, <span class="k">"ativo"</span>: <span class="s">"N"</span>, <span class="k">"valor_minimo"</span>: <span class="n">null</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>codigo</code></td><td>sim</td><td>Código numérico da condição no Control. Não numérico é ignorado.</td></tr>
+                <tr><td><code>descricao</code></td><td>na condição nova</td><td>Ex.: <code>"30/60/90"</code>. Sem ela a condição nova é ignorada (<code>sem descrição</code>).</td></tr>
+                <tr><td><code>ativo</code></td><td>não</td><td><code>S</code>/<code>N</code>, <code>true</code>/<code>false</code>. Inativa some do seletor.</td></tr>
+                <tr><td><code>valor_minimo</code></td><td>não</td><td>O menor pedido que a condição aceita (número ou <code>"1.500,50"</code>). <code>null</code> limpa; negativo ou ilegível não mexe e avisa.</td></tr>
+                <tr><td><code>data_update</code></td><td>não</td><td>Com fuso.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="t-mut">
+            Resposta no formato comum. Motivos: <code>registro inválido</code>,
+            <code>sem código do ERP</code>, <code>código da condição precisa ser
+            numérico</code>, <code>código repetido no lote</code>, <code>código
+            com mais de uma condição no app</code>, <code>sem descrição</code>,
+            <code>"data_update" …</code>, <code>falha ao gravar: …</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/produtos</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Os produtos e a grade de tamanhos. Produto que já existia no app
+            <b>sem código</b> (carregado do PDF do catálogo) e tem a mesma
+            referência é <em>adotado</em>: aprende o código em vez de nascer
+            duplicado. Foto, descrição e cores do catálogo são do app — esta rota
+            nunca as toca.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"produtos"</span>: [
+    { <span class="k">"codigo"</span>: <span class="s">"0706"</span>, <span class="k">"referencia"</span>: <span class="s">"0706"</span>, <span class="k">"nome"</span>: <span class="s">"CONJUNTO TESTE"</span>,
+      <span class="k">"grupo"</span>: <span class="s">"CONJUNTOS"</span>, <span class="k">"colecao"</span>: <span class="s">"VERAO 2027"</span>, <span class="k">"marca"</span>: <span class="s">"CORPO SENSUAL"</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span>,
+      <span class="k">"tamanhos"</span>: [ { <span class="k">"tamanho"</span>: <span class="s">"P"</span> }, { <span class="k">"tamanho"</span>: <span class="s">"M"</span> }, { <span class="k">"tamanho"</span>: <span class="s">"G"</span> }, { <span class="k">"tamanho"</span>: <span class="s">"GG"</span>, <span class="k">"ativo"</span>: <span class="s">"N"</span> } ],
+      <span class="k">"data_update"</span>: <span class="s">"2026-09-16T08:00:00-03:00"</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>codigo</code></td><td>sim</td><td>Código do produto no ERP (chave).</td></tr>
+                <tr><td><code>referencia</code></td><td>recomendado</td><td>A referência do catálogo. Vira a referência do app só quando o produto nasce (ou está sem).</td></tr>
+                <tr><td><code>nome</code></td><td>no produto novo</td><td><code>null</code> <b>não</b> apaga o nome.</td></tr>
+                <tr><td><code>grupo</code>, <code>colecao</code>, <code>marca</code></td><td>não</td><td><code>null</code> limpa.</td></tr>
+                <tr><td><code>ativo</code></td><td>não</td><td><code>S</code>/<code>N</code>, <code>true</code>/<code>false</code>.</td></tr>
+                <tr><td><code>tamanhos</code></td><td>não</td><td>A grade. Tamanho que falta no app é criado (estoque 0); o que já existe só troca <code>ativo</code>. <b>Tamanho que não veio não é desativado</b> — para tirar um tamanho, mande-o com <code>ativo: "N"</code>.</td></tr>
+                <tr><td><code>data_update</code></td><td>não</td><td>Com fuso.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"ok"</span>: <span class="n">true</span>, <span class="k">"recebidos"</span>: <span class="n">1</span>, <span class="k">"criados"</span>: <span class="n">0</span>, <span class="k">"atualizados"</span>: <span class="n">1</span>, <span class="k">"sem_mudanca"</span>: <span class="n">0</span>,
+  <span class="k">"tamanhos_criados"</span>: <span class="n">1</span>, <span class="k">"tamanhos_atualizados"</span>: <span class="n">1</span>,
+  <span class="k">"ignorados"</span>: [], <span class="k">"avisos"</span>: [], <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T11:00:00.000Z"</span> }</code></pre>
+          </div>
+          <p class="t-mut">
+            Motivos: <code>registro inválido</code>, <code>sem código do
+            ERP</code>, <code>código repetido no lote</code>, <code>código com
+            mais de um produto no app</code>, <code>sem nome</code> (só no novo),
+            <code>"data_update" …</code>, <code>falha ao gravar: …</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/precos</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            O preço de cada produto em cada tabela. <b>Sobrescreve</b> o que
+            estava — inclusive o preço da carga do PDF. Mande tabelas e produtos
+            antes: tabela ou produto que o app não tem volta como ignorado, com
+            o aviso apontando a rota que cadastra o que faltou.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"precos"</span>: [
+    { <span class="k">"tabela"</span>: <span class="s">"00007"</span>, <span class="k">"produto"</span>: <span class="s">"0706"</span>, <span class="k">"preco"</span>: <span class="n">89.90</span>, <span class="k">"preco_original"</span>: <span class="n">99.90</span>, <span class="k">"desconto_percentual"</span>: <span class="n">10</span> },
+    { <span class="k">"tabela"</span>: <span class="s">"00007"</span>, <span class="k">"produto"</span>: <span class="s">"0999"</span>, <span class="k">"preco"</span>: <span class="n">55.00</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>tabela</code></td><td>sim</td><td>Código da tabela de preço no ERP (miolo).</td></tr>
+                <tr><td><code>produto</code></td><td>sim</td><td>Código do produto no ERP (miolo).</td></tr>
+                <tr><td><code>preco</code></td><td>sim</td><td>O preço que vale nessa tabela. Zero ou negativo é ignorado; não há como apagar um preço pela API.</td></tr>
+                <tr><td><code>preco_original</code>, <code>desconto_percentual</code></td><td>não</td><td>O preço antes do desconto do ERP e o desconto (0 a 100) — informativos.</td></tr>
+                <tr><td><code>data_update</code></td><td>não</td><td>Com fuso.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"ok"</span>: <span class="n">true</span>, <span class="k">"recebidos"</span>: <span class="n">2</span>, <span class="k">"criados"</span>: <span class="n">0</span>, <span class="k">"atualizados"</span>: <span class="n">1</span>, <span class="k">"sem_mudanca"</span>: <span class="n">0</span>,
+  <span class="k">"ignorados"</span>: [ { <span class="k">"codigo"</span>: <span class="s">"0999"</span>, <span class="k">"motivo"</span>: <span class="s">"produto não encontrado no app"</span> } ],
+  <span class="k">"avisos"</span>: [ <span class="s">"Produto sem cadastro no app (mande-o em POST /partner/v1/produtos): 0999."</span> ],
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T11:00:00.000Z"</span> }</code></pre>
+          </div>
+          <p class="t-mut">
+            Motivos: <code>registro inválido</code>, <code>sem código do
+            produto</code>, <code>sem código da tabela</code>, <code>repetido no
+            lote (tabela X)</code>, <code>"preco" precisa ser um número maior que
+            zero</code>, <code>tabela X não encontrada no app</code>, <code>tabela
+            X com mais de um cadastro no app</code>, <code>produto não encontrado
+            no app</code>, <code>produto com mais de um cadastro no app</code>,
+            <code>"data_update" …</code>, <code>falha ao gravar: …</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/estoque</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            O estoque por produto e tamanho (as duas marcas). Sobrescreve a
+            quantidade de prateleira; o reservado só quando vem. A grade nasce em
+            <code>POST /produtos</code> — tamanho fora dela é ignorado.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"estoque"</span>: [
+    { <span class="k">"produto"</span>: <span class="s">"0706"</span>, <span class="k">"tamanho"</span>: <span class="s">"M"</span>, <span class="k">"quantidade"</span>: <span class="n">42</span>, <span class="k">"reservado"</span>: <span class="n">5</span> },
+    { <span class="k">"produto"</span>: <span class="s">"0706"</span>, <span class="k">"tamanho"</span>: <span class="s">"G"</span>, <span class="k">"quantidade"</span>: <span class="n">0</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>produto</code></td><td>sim</td><td>Código do produto no ERP (miolo).</td></tr>
+                <tr><td><code>tamanho</code></td><td>sim</td><td>O tamanho, como está na grade (<code>P</code>, <code>M</code>, <code>G</code>, <code>48</code>…).</td></tr>
+                <tr><td><code>quantidade</code></td><td>sim</td><td>Estoque de prateleira, inteiro — <b>sobrescreve</b>; negativo é aceito como o ERP conta.</td></tr>
+                <tr><td><code>reservado</code></td><td>não</td><td>Reservado em pedidos, inteiro. Ausente não mexe; <code>null</code> zera.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="t-mut">
+            Resposta no formato comum (<code>criados</code> é sempre 0;
+            <code>ignorados[].codigo</code> sai como <code>PRODUTO|TAMANHO</code>).
+            Motivos: <code>registro inválido</code>, <code>sem código do
+            produto</code>, <code>sem tamanho</code>, <code>repetido no lote</code>,
+            <code>"quantidade" precisa ser um número inteiro</code>,
+            <code>"reservado" precisa ser um número inteiro</code>, <code>produto
+            não encontrado no app</code>, <code>produto com mais de um cadastro no
+            app</code>, <code>tamanho não encontrado na grade do app</code>,
+            <code>falha ao gravar: …</code>.
+          </p>
+        </div>
+      </div>
+
+      <div class="note">
+        <span class="note-t">Instalação sem a migração 049</span>
+        <p>
+          Numa instalação onde a migração 049 ainda não rodou, a descrição do
+          Control, <code>ativo</code> e <code>data_update</code> das tabelas,
+          <code>valor_minimo</code> das condições,
+          <code>preco_original</code>/<code>desconto_percentual</code> e a data
+          do estoque ficam de fora, e o lote volta com um aviso fixo dizendo
+          isso; o resto grava normalmente.
+        </p>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/retrato</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            O retrato do cliente: última compra, total comprado, vencido,
+            títulos vencidos e pendência financeira, com a data de referência.
+            Exige o canal de retrato ligado para a API. Uma vez por dia é o
+            suficiente. O cliente é achado <b>primeiro pelo CNPJ</b> (com ou sem
+            pontuação), depois pelo <code>codigo</code>; informe pelo menos um
+            dos dois.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"retrato"</span>: [
+    { <span class="k">"cnpj"</span>: <span class="s">"00.000.000/0001-00"</span>, <span class="k">"codigo"</span>: <span class="s">"01234"</span>,
+      <span class="k">"ultima_compra"</span>: <span class="s">"2026-09-10"</span>, <span class="k">"total_comprado"</span>: <span class="n">18450.30</span>,
+      <span class="k">"valor_vencido"</span>: <span class="n">0</span>, <span class="k">"titulos_vencidos"</span>: <span class="n">0</span>, <span class="k">"pendencia_financeira"</span>: <span class="n">0</span>,
+      <span class="k">"referencia"</span>: <span class="s">"2026-09-16T03:00:00-03:00"</span> }
+  ]
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Campo</th><th>Precisa?</th><th>Observação</th></tr></thead>
+              <tbody>
+                <tr><td><code>referencia</code></td><td>sim</td><td>De quando é o retrato, momento <b>com fuso</b>. Retrato com referência mais antiga que a guardada é ignorado.</td></tr>
+                <tr><td><code>ultima_compra</code></td><td>não</td><td><code>AAAA-MM-DD</code> ou momento com fuso. <b>Só anda para frente</b>; <code>null</code> não mexe.</td></tr>
+                <tr><td><code>total_comprado</code>, <code>valor_vencido</code>, <code>pendencia_financeira</code></td><td>não</td><td>R$ (número ou texto numérico). <code>null</code> limpa.</td></tr>
+                <tr><td><code>titulos_vencidos</code></td><td>não</td><td>Quantidade de títulos vencidos (inteiro, ≥ 0).</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"ok"</span>: <span class="n">true</span>, <span class="k">"recebidos"</span>: <span class="n">1</span>, <span class="k">"atualizados"</span>: <span class="n">1</span>, <span class="k">"sem_mudanca"</span>: <span class="n">0</span>,
+  <span class="k">"ignorados"</span>: [], <span class="k">"avisos"</span>: [], <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T06:00:10.000Z"</span> }</code></pre>
+          </div>
+          <p class="t-mut">
+            Um valor ilegível ou negativo recusa <b>o registro inteiro</b>.
+            <code>ignorados</code> traz <code>{ cliente, motivo }</code>:
+            <code>registro inválido</code>, <code>informe "cnpj" ou
+            "codigo"</code>, <code>CNPJ com mais de um cadastro no app</code>,
+            <code>código com mais de um cadastro no app</code>, <code>cliente não
+            encontrado nesta empresa</code>, <code>cliente repetido no lote</code>,
+            <code>referência mais antiga que o retrato guardado</code>,
+            <code>"referencia" …</code>, <code>"ultima_compra" …</code>,
+            <code>"total_comprado" …</code> (idem os outros valores),
+            <code>falha ao gravar: …</code>. Sem a migração 036, última compra,
+            total e vencido ficam de fora com aviso; sem a 049, pendência,
+            títulos e a referência.
+          </p>
+        </div>
+      </div>
+
       <div class="note">
         <span class="note-t">O bloqueio do Control não trava o representante</span>
         <p>
@@ -2311,6 +2709,138 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
           <code>POST /retrato</code>) ficam no cadastro e são o que o financeiro
           vê na hora de decidir o pedido.
         </p>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/clientes?desde=</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            A outra mão: o que o representante ou o escritório mudou no cadastro
+            do cliente <b>dentro do app</b> (cliente novo, WhatsApp, endereço,
+            tabela trocada), para o seu ERP espelhar. <code>desde</code> é
+            opcional e precisa de fuso (sem fuso, <span class="st er">400</span>
+            <code>INVALID_DESDE</code>; fuso positivo vai na URL como
+            <code>%2B</code>). Sem <code>desde</code>, vem tudo. Exige o canal de
+            cadastro ligado para a API.
+          </p>
+          <p>
+            Cada cliente sai <b>no mesmo formato do <code>POST /clientes</code></b>
+            — você pode devolver o registro como veio — mais estes campos só de
+            leitura: <code>codigo</code> (<code>null</code> = nasceu no app),
+            <code>chave</code> (o CNPJ só dígitos), <code>novo_no_control</code>
+            (<code>true</code> = crie o cadastro no seu ERP e devolva o código pelo
+            <code>POST /clientes</code>), <code>pendencia_financeira</code> e
+            <code>titulos_vencidos</code> (o que o próprio Control mandou por
+            último), <code>atualizado_em</code> e
+            <code>atualizado_pelo_control_em</code>. <b>O que o próprio Control
+            gravou por último não volta</b>; se algum eco voltar, reenviar é
+            <code>sem_mudanca</code>.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200 — um cliente que o representante cadastrou no app hoje</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"total"</span>: <span class="n">1</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T16:05:00.000Z"</span>,
+  <span class="k">"clientes"</span>: [
+    { <span class="k">"codigo"</span>: <span class="n">null</span>, <span class="k">"chave"</span>: <span class="s">"00000000000200"</span>, <span class="k">"novo_no_control"</span>: <span class="n">true</span>,
+      <span class="k">"razao_social"</span>: <span class="s">"LOJA NOVA TESTE LTDA"</span>, <span class="k">"nome_fantasia"</span>: <span class="s">"Loja Nova"</span>, <span class="k">"cnpj_cpf"</span>: <span class="s">"00.000.000/0002-00"</span>,
+      <span class="k">"representante"</span>: <span class="s">"00042"</span>, <span class="k">"tabela_preco"</span>: <span class="s">"00007"</span>,
+      <span class="k">"endereco"</span>: { <span class="k">"logradouro"</span>: <span class="s">"Rua Teste"</span>, <span class="k">"numero"</span>: <span class="s">"200"</span>, <span class="k">"complemento"</span>: <span class="n">null</span>, <span class="k">"bairro"</span>: <span class="s">"Centro"</span>, <span class="k">"cidade"</span>: <span class="s">"Cidade Teste"</span>, <span class="k">"uf"</span>: <span class="s">"MG"</span>, <span class="k">"cep"</span>: <span class="s">"00000000"</span> },
+      <span class="k">"inscricao_estadual"</span>: <span class="n">null</span>, <span class="k">"observacoes"</span>: <span class="n">null</span>,
+      <span class="k">"bloqueado"</span>: <span class="s">"N"</span>, <span class="k">"motivo_bloqueio"</span>: <span class="n">null</span>, <span class="k">"limite_credito"</span>: <span class="n">null</span>,
+      <span class="k">"whatsapp"</span>: <span class="s">"00900000001"</span>, <span class="k">"email"</span>: <span class="n">null</span>,
+      <span class="k">"pendencia_financeira"</span>: <span class="n">null</span>, <span class="k">"titulos_vencidos"</span>: <span class="n">null</span>,
+      <span class="k">"atualizado_em"</span>: <span class="s">"2026-09-16T15:40:12.000+00:00"</span>, <span class="k">"atualizado_pelo_control_em"</span>: <span class="n">null</span> }
+  ],
+  <span class="k">"avisos"</span>: []
+}</code></pre>
+          </div>
+          <p class="t-mut">
+            O seu ERP cria o cadastro, gera o código (ex.: <code>01235</code>) e
+            devolve <code>POST /clientes</code> com <code>codigo</code>,
+            <code>razao_social</code> e o mesmo <code>cnpj_cpf</code> — o
+            cadastro do app é casado pelo CNPJ e aprende o código.
+          </p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/representantes?desde=</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            Mesmas regras. Cada representante sai como
+            <code>{ codigo, nome, razao_social, email, ativo: "S"/"N", atualizado_em }</code>,
+            onde <code>email</code> é o e-mail <b>do Control</b> que você mandou
+            (nunca o login do app). Numa instalação sem a data de alteração do
+            representante (migração 048) a lista vem inteira, com aviso.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"total"</span>: <span class="n">1</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-09-16T16:05:00.000Z"</span>,
+  <span class="k">"representantes"</span>: [
+    { <span class="k">"codigo"</span>: <span class="s">"00042"</span>, <span class="k">"nome"</span>: <span class="s">"REPRESENTANTE TESTE"</span>, <span class="k">"razao_social"</span>: <span class="s">"REPRESENTACOES TESTE LTDA"</span>,
+      <span class="k">"email"</span>: <span class="s">"rep.teste@exemplo.com"</span>, <span class="k">"ativo"</span>: <span class="s">"S"</span>, <span class="k">"atualizado_em"</span>: <span class="s">"2026-09-16T14:02:00.000+00:00"</span> }
+  ],
+  <span class="k">"avisos"</span>: []
+}</code></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb post">POST</span>
+          <span class="path">/partner/v1/sincronizacao</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            A tela "Integração" do app tem o botão <b>"Pedir sincronização
+            agora"</b>. Ele grava um pedido, e a partir daí <code>GET /status</code>
+            responde <code>"sincronizar_agora": true</code> com
+            <code>"solicitado_em"</code>. O que o seu ERP faz: roda a rodada
+            inteira (fila, cadastros nas duas mãos, faturamento, catálogo,
+            retrato) e avisa aqui. Funciona com qualquer canal.
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Corpo da requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{ <span class="k">"concluida"</span>: <span class="n">true</span>, <span class="k">"solicitado_em"</span>: <span class="s">"2026-09-16T14:00:00.000Z"</span> }</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead><tr><th>Resposta</th><th><code>code</code></th><th>Significado</th></tr></thead>
+              <tbody>
+                <tr><td><span class="st ok">200</span> <code>{ ok, limpo, sincronizar_agora, solicitado_em, servidor_hora }</code></td><td class="t-mut">—</td><td><code>limpo: true</code> = o pedido pendente foi apagado. <code>sincronizar_agora: true</code> na resposta = já há um pedido <b>novo</b> (alguém clicou de novo enquanto você rodava): rode de novo.</td></tr>
+                <tr><td><span class="st er">400</span></td><td><code>MISSING_CONCLUIDA</code></td><td>Falta <code>"concluida": true</code>.</td></tr>
+                <tr><td><span class="st er">400</span></td><td><code>INVALID_SOLICITADO_EM</code></td><td><code>solicitado_em</code> veio sem fuso ou fora do formato.</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="t-mut">
+            <code>solicitado_em</code> é opcional, mas mande o que veio no
+            <code>/status</code>: um pedido mais novo que ele fica de pé. Sem
+            pedido pendente a rota responde <span class="st ok">200</span> sem
+            gravar nada (repetir é seguro). <b>Enquanto o Control não chamar esta
+            rota, <code>sincronizar_agora</code> continua <code>true</code></b> —
+            e a tela do app mostra há quanto tempo o pedido espera.
+          </p>
+        </div>
       </div>
     </section>
 
@@ -2538,7 +3068,32 @@ curl -X POST \
   -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
   -H <span class="s">"Content-Type: application/json"</span> \
   -d <span class="s">'{"faturamento":[{"pedido_erp":"CS17379","faturado_em":"2026-08-13T14:02:00-03:00","valor_faturado":870.50}]}'</span> \
-  <span class="s">"$BASE/partner/v1/faturamento"</span></code></pre>
+  <span class="s">"$BASE/partner/v1/faturamento"</span>
+
+<span class="c"># 5. mandar o catálogo (mesmo formato nas cinco rotas)</span>
+curl -X POST \
+  -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"tabelas_preco":[{"codigo":"00007","descricao":"ATACADO","coluna":1,"ativo":"S"}]}'</span> \
+  <span class="s">"$BASE/partner/v1/tabelas-preco"</span>
+
+<span class="c"># 6. o retrato do cliente (1x por dia)</span>
+curl -X POST \
+  -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"retrato":[{"cnpj":"00000000000100","ultima_compra":"2026-09-10","total_comprado":18450.30,"valor_vencido":0,"referencia":"2026-09-16T06:00:00-03:00"}]}'</span> \
+  <span class="s">"$BASE/partner/v1/retrato"</span>
+
+<span class="c"># 7. puxar o que mudou no aplicativo (fuso positivo vai como %2B)</span>
+curl -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  <span class="s">"$BASE/partner/v1/clientes?desde=2026-09-16T13:00:00-03:00"</span>
+
+<span class="c"># 8. avisar que a passada pedida pelo "sincronizar agora" foi feita</span>
+curl -X POST \
+  -H <span class="s">"X-API-Key: SUA_CHAVE"</span> \
+  -H <span class="s">"Content-Type: application/json"</span> \
+  -d <span class="s">'{"concluida":true,"solicitado_em":"2026-09-16T14:00:00.000Z"}'</span> \
+  <span class="s">"$BASE/partner/v1/sincronizacao"</span></code></pre>
         </div>
       </div>
 
@@ -2958,6 +3513,9 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             em <code>canais</code> quais rotas já estão ligadas para a API.</li>
         <li>Chamar <code>/partner/v1/conciliacao</code> e, com o responsável, dar o
             número aos pedidos do passivo por <code>/partner/v1/pedidos/{id}/conciliar</code>.</li>
+        <li>Mandar o catálogo inteiro, nesta ordem: <code>/partner/v1/tabelas-preco</code>,
+            <code>/condicoes-pagamento</code>, <code>/produtos</code>, <code>/precos</code>
+            e <code>/estoque</code>; depois os clientes e os representantes.</li>
         <li>Chamar <code>/partner/v1/pedidos</code> e inspecionar o JSON de um pedido real.</li>
         <li>Conferir se os códigos de cliente, representante, tabela e produto batem
             com os cadastros do seu ERP.</li>
@@ -2971,8 +3529,15 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             <code>itens</code> — e conferir, com <code>incluir=todos</code>, que o
             pedido aparece faturado.</li>
         <li>Ligar o envio dos cadastros (<code>/partner/v1/clientes</code> e
-            <code>/partner/v1/representantes</code>), mandando só o que mudou.</li>
-        <li>Agendar a rotina (serviço, tarefa agendada ou cron) a cada 1 a 5 minutos.</li>
+            <code>/partner/v1/representantes</code>), mandando só o que mudou — e,
+            na mesma rodada, puxar <code>/partner/v1/clientes?desde=</code> e
+            <code>/partner/v1/representantes?desde=</code>.</li>
+        <li>Ligar o retrato do cliente (<code>/partner/v1/retrato</code>), uma vez por dia.</li>
+        <li>Agendar a rotina (serviço, tarefa agendada ou cron): a fila a cada 1
+            minuto; cadastros e alterações a cada 5; catálogo, preço e estoque a
+            cada 30; retrato 1x por dia — e tudo de uma vez quando o
+            <code>/status</code> disser <code>sincronizar_agora: true</code>,
+            avisando depois em <code>/partner/v1/sincronizacao</code>.</li>
         <li>Registrar log de cada importação: id, número gerado, data e resultado.</li>
       </ul>
 

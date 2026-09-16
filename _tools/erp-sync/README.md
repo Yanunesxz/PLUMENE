@@ -1,9 +1,42 @@
-# _tools/erp-sync — o agente Python que fala com o Firebird do Control
+# _tools/erp-sync — o agente Python que falava com o Firebird do Control
 
-Atualizado em 15/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`.
+Atualizado em 16/09/2026. Toda afirmação abaixo aponta para `sync.py:linha`.
 **Atenção:** as âncoras de linha são de ANTES das travas da fase 0 (seção
 "Travas no código", abaixo), que acrescentaram linhas ao docstring, ao topo e
 antes do `main`. Localize por nome de função. Se mexer no script, atualize aqui.
+
+## DECISÃO — 16/09/2026: o Firebird está APOSENTADO. Tudo vem pela API.
+
+Decisão do Yan (decisão 6 das respostas de 16/09, registradas em
+`docs/BRIEF-ERP-FABIO.md`, §0.6): **o Control manda TUDO pela API de Parceiro
+e sobrescreve** — tabelas de preço (código, descrição, coluna, ativo),
+condições de pagamento (código, descrição, ativo, valor mínimo), produtos e
+tamanhos, preço por tabela (sobrescreve o do PDF), estoque das duas marcas,
+clientes e representantes, o retrato do cliente (última compra, total
+comprado, vencido, pendência financeira) e o faturamento com a nota. As rotas
+estão em `apps/api/src/modules/partner/` e o contrato em `docs/API-PARCEIRO.md`
+(seções 5 a 7) e `apps/web/public/api-parceiro.html`.
+
+O que isso significa para esta pasta:
+
+- **Nenhum modo deste script deve rodar contra produção**, nem o leitor
+  TypeScript do Firebird (`apps/api/src/erp/firebird/`, `ERP_SYNC_ENABLED`),
+  nem o `photos.py` no que escreve no catálogo. Não é "até decidir": a decisão
+  foi tomada — o caminho é a API. As travas da fase 0 (abaixo) continuam no
+  código e são a garantia de que um `--mode` digitado por engano não sobe.
+- **`push-orders` está morto de vez.** O modelo é o publicado: o financeiro
+  clica "Lançar no Control", o pedido entra na fila solicitada, o programa do
+  Fábio puxa `GET /partner/v1/pedidos` a cada 1 minuto, grava no Control, e
+  devolve o número por `POST /partner/v1/pedidos/:id/confirmar`. O número é
+  cunhado pelo Control, na série da marca (`CS` na Corpo Sensual, `PL` na
+  PLUMENE) — a série de representante que este script configurava em
+  `ERP_ORDER_PREFIX` não existe mais.
+- **As tabelas de preço deixam de vir do PDF:** o preço que vale é o que o
+  Control manda por `POST /partner/v1/precos`. A pergunta 9 do brief está
+  respondida.
+- **O código não é apagado** (é a prova de como a leitura direta funcionava),
+  mas o resto deste README passa a ser **histórico**: descreve o que o script
+  faz, para ninguém precisar abri-lo, não o que deve ser feito.
 
 ## O que há nesta pasta
 
@@ -71,10 +104,12 @@ banco de produção do Control**. Passo a passo, com a linha:
    (`sync.py:457-458`). Isso é **DDL no banco de produção do Fábio**, feito
    por um script nosso, sem ninguém do lado de lá saber.
 3. **Cunha o número** (`sync.py:534-538`): `SELECT GEN_ID(GEN_PEDIDO_UNIVERSAL, 1)`
-   dentro do Firebird e monta `SX` + sequência (`ERP_ORDER_PREFIX`,
-   `sync.py:80`). O `GEN_PEDIDO_UNIVERSAL` é a sequência **única compartilhada
-   por todas as séries** do Control (CS/SX/PL entrelaçam o mesmo contador,
-   `sync.py:77-79`, `.env.example:19-23`). `GEN_ID` não é transacional no
+   dentro do Firebird e monta o prefixo de `ERP_ORDER_PREFIX` + sequência
+   (`sync.py:80`; o prefixo configurado era o de uma série de representante
+   que não existe mais — a série é a da marca). O `GEN_PEDIDO_UNIVERSAL` é a
+   sequência **única compartilhada por todas as séries** do Control (as séries
+   entrelaçam o mesmo contador, `sync.py:77-79`, `.env.example:19-23`).
+   `GEN_ID` não é transacional no
    Firebird: qualquer falha depois da linha 534 (o `rollback` em
    `sync.py:598` e `602`) **queima um número** da numeração do Fábio.
 4. **Insere `PEDIDO`** (`sync.py:543-556`): `STATUS = 'A'`,
@@ -88,7 +123,7 @@ banco de produção do Control**. Passo a passo, com a linha:
    ou de `products.erp_id` + `variants.size` (`sync.py:486-493`). Commit em
    `sync.py:569`.
 6. **Confirma no Supabase** por PATCH direto (`gravar_numero_do_pedido`):
-   `status = sent_erp`, `erp_order_id = SXnnnnn`, `synced_at`, `updated_at`,
+   `status = sent_erp`, `erp_order_id = <prefixo>nnnnn`, `synced_at`, `updated_at`,
    `erp_order_source = 'sync_py'` e `erp_order_set_at` (migração 048), filtrando
    `company_id` e `erp_order_id IS NULL`. Se o pedido já tinha número (gravado
    pela tela ou pela API no meio do caminho), nada é regravado e o log pede
@@ -131,7 +166,7 @@ O `push-orders` faz o contrário: escreve `PEDIDO`, `ITENS_PEDIDO` e, se
 precisar, o próprio generator no Firebird de produção. Enquanto o script
 existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-lo.
 
-## DECISÃO — 15/09/2026
+## DECISÃO — 15/09/2026 (mantida; a de 16/09, acima, fecha o que faltava)
 
 1. **O canal oficial é a API de Parceiro.** O programa do Fábio **PUXA** os
    pedidos em `GET /partner/v1/pedidos`, grava no Control e devolve o número
@@ -146,13 +181,11 @@ existir com esse modo, a frase do contrato só é verdadeira se ninguém rodá-l
    catálogo. Os padrões são o comportamento de hoje; virar um canal é um
    `UPDATE` por empresa, feito à mão pelo Yan.
 2. **`--mode push-orders` NÃO deve ser executado em produção**, em nenhuma das
-   duas marcas, até decisão explícita do Yan com o Fábio. As perguntas que
-   destravam isso estão no §6 do brief (`docs/BRIEF-ERP-FABIO.md`):
-   - **Pergunta 1** — o Fábio fica com o modelo publicado (ele puxa e confirma)
-     ou prefere que o app insira direto no Firebird? Um dos dois morre.
-   - **Pergunta 5** — alguém já rodou `push-orders` em produção? Existe
-     `PEDIDO` com `IDPEDIDO_EXTERNO` preenchido? O `GEN_PEDIDO_UNIVERSAL` já
-     existia no Control ou foi o nosso script que criou?
+   duas marcas. Em 16/09/2026 a decisão ficou definitiva (ver o topo): o
+   modelo é o publicado — o Control puxa e confirma. A pergunta 1 do §6 do
+   brief está respondida; a pergunta 5 (alguém já rodou `push-orders`? existe
+   `PEDIDO` com `IDPEDIDO_EXTERNO`? o `GEN_PEDIDO_UNIVERSAL` já existia?)
+   continua valendo como conferência histórica com o Fábio.
 3. **O código não é apagado.** É decisão registrada, não remoção: ele é a
    prova de como a inserção direta funcionaria, caso a resposta da pergunta 1
    vá por esse caminho. Se um dia for ligado, precisa antes: paginar a fila,
@@ -197,19 +230,23 @@ rotas `/erp/sync`, que respondem 409 `CANAL_FECHADO`).
   (`sync.py:319`) estoura no Postgres ("ON CONFLICT DO UPDATE command cannot
   affect row a second time"). O `full` também derruba a descrição dos produtos
   (`sync.py:227`).
-- **As tabelas de preço em produção vêm dos PDFs de 2027**
+- **As tabelas de preço em produção vieram dos PDFs de 2027**
   (`_tools/tabelas-2027/carregar.mjs`), com `erp_code` vazio **de propósito**
-  para o sync não sobrescrevê-las. Preencher `erp_code` reabre as tabelas ao
-  Firebird. Quem manda no preço — o PDF ou o Control — é a pergunta 9 do §6,
-  não uma coluna esquecida.
+  para o sync não sobrescrevê-las. Desde 16/09/2026 quem manda no preço é o
+  Control, por `POST /partner/v1/tabelas-preco` (que preenche o `erp_code`) e
+  `POST /partner/v1/precos` (que sobrescreve o preço) — pela API, nunca pelo
+  Firebird. A pergunta 9 do §6 está respondida.
 
 ## O que pode rodar hoje sem susto
 
 **Só `--mode test` e `--mode prices-audit`** — os dois só leem e não pedem
 liberação. Todo o resto grava, exige `ERP_SYNC_PY_LIBERADO=sim` na janela do
 terminal e **continua com os defeitos abaixo**: a trava só impede o acidente,
-não conserta o modo. Não libere nenhum deles sem corrigir antes o que está
-listado aqui (medições de 15/09/2026):
+não conserta o modo. Desde 16/09/2026 nenhum deles é para ser liberado: o dado
+que cada um gravava chega pela API (`customers` → `POST /clientes`; `products`
+e `stock` → `POST /produtos` e `POST /estoque`; `prices` e `full` →
+`POST /tabelas-preco` e `POST /precos`; `reconcile` → o `ativo` de
+`POST /produtos`). A lista fica como registro (medições de 15/09/2026):
 
 - **`customers`** casa só por `erp_id` exato no upsert
   (`on_conflict=company_id,erp_id`): `2225` e `02225` viram dois cadastros, e os

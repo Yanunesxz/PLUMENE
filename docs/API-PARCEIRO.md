@@ -54,6 +54,85 @@ e o número do ERP confirmado numa marca não existem na outra.
 Os exemplos desta página usam a URL da Corpo Sensual; na PLUMENE, troque só a
 URL e a chave — as rotas, os campos e os códigos são os mesmos.
 
+## Como funciona
+
+O lançamento do pedido no Control continua sendo **um clique do financeiro** —
+o que muda é que ninguém digita número. O caminho inteiro, do clique ao número
+na tela:
+
+1. O representante fecha o pedido no aplicativo e o financeiro **aprova**.
+2. O financeiro clica **"Lançar no Control"** na tela do pedido. O pedido fica
+   marcado como **solicitado** (`solicitado_em`) e entra na fila da API. A tela
+   fica aguardando: *"Aguardando o Control importar o pedido… Isso leva até
+   3 min."*
+3. O programa do Fábio puxa a fila **a cada 1 minuto** — `GET /partner/v1/pedidos`
+   — e recebe só os pedidos solicitados, já com os códigos do Control (cliente,
+   representante, tabela e coluna, condição, referência e tamanho) e o **CNPJ do
+   cliente como chave**. Cliente que o Control ainda não conhece vem com
+   `novo_no_control: true`: o programa cria o cadastro lá e devolve o código
+   pelo `POST /clientes`.
+4. O programa **grava o pedido no Control**, que cunha o número na série da
+   marca (`CS17379` na Corpo Sensual, `PL02672` na PLUMENE).
+5. O programa **confirma** — `POST /partner/v1/pedidos/{id}/confirmar
+   { "pedido_erp": "CS17379" }`. O pedido sai da fila e vira `sent_erp`.
+6. A tela do financeiro, que consultava o pedido a cada 3 segundos, mostra:
+   *"Parabéns, pedido importado! O número no Control é CS17379."* Se em 3
+   minutos o número não chegar: *"O Control ainda não respondeu. O pedido fica
+   na fila e o número aparece aqui quando chegar."* — o pedido continua
+   solicitado, e o número aparece na próxima passada.
+7. Quando a nota sai, o programa informa o **faturamento** — é isso que faz o
+   lojista ver "Aprovado" e a venda contar no painel.
+
+Por fora do pedido, o mesmo programa mantém o aplicativo com a mesma chave:
+manda o catálogo, os cadastros e o retrato do cliente, e **puxa** o que mudou
+no aplicativo (`GET /clientes`, `GET /representantes` e
+`GET /pedidos?incluir=todos` com `?desde=`). Os intervalos estão em "Fluxo
+recomendado".
+
+## O que cada lado manda
+
+**O que o Control precisa mandar** (tudo pela API; o aplicativo nunca conecta
+no banco do Control — o Firebird está aposentado):
+
+- **clientes** — `POST /clientes`: código, razão social, fantasia, CNPJ,
+  representante, tabela, endereço, bloqueio e motivo, limite, pendência
+  financeira, títulos vencidos, contato, `data_update`;
+- **representantes** — `POST /representantes`: código, nome, razão social,
+  e-mail do Control, ativo;
+- **tabelas de preço e a coluna** — `POST /tabelas-preco`: código, descrição,
+  coluna (1 a 6), ativo;
+- **condições de pagamento** — `POST /condicoes-pagamento`: código, descrição,
+  ativo, valor mínimo;
+- **produtos e tamanhos** — `POST /produtos`: código, referência, nome, grupo,
+  coleção, marca, ativo e a grade;
+- **preços por tabela** — `POST /precos`: o preço de cada produto em cada tabela
+  (sobrescreve o que estava);
+- **estoque** — `POST /estoque`: quantidade e reservado por produto e tamanho;
+- **faturamento com a nota e os itens** — `POST /faturamento`: data, valor, a
+  nota (uma por pedido) e as peças que ela levou;
+- **retrato e pendência financeira** — `POST /retrato`: última compra, total
+  comprado, vencido, títulos vencidos, pendência, com a data de referência;
+- **exclusão** — `POST /pedidos/{id}/excluir` quando o Control exclui um pedido
+  do lado dele;
+- e o **aviso de sincronização concluída** — `POST /sincronizacao`, depois de
+  atender um `sincronizar_agora: true`.
+
+**O que o app entrega:**
+
+- **a fila solicitada** — `GET /pedidos`: os pedidos aprovados que o financeiro
+  mandou lançar, com os códigos do Control e o CNPJ como chave;
+- **a confirmação do número** — `POST /pedidos/{id}/confirmar` (e
+  `POST /conciliar` para o passivo);
+- **as alterações feitas no aplicativo** — `GET /clientes?desde=` (cliente
+  novo ou editado, com `novo_no_control`), `GET /representantes?desde=` e
+  `GET /pedidos?incluir=todos&desde=` (pedido editado depois da importação,
+  `alterado_apos_importacao`);
+- **os excluídos** — `GET /pedidos/excluidos`: pedidos apagados no aplicativo
+  que já tinham número do Control;
+- **a conciliação** — `GET /conciliacao`: as contagens da fila e do passivo; e
+  o `GET /status`, que diz quais canais estão ligados e se alguém pediu
+  "sincronizar agora".
+
 ## Os endpoints
 
 | Método e rota | Para quê | Canal exigido |
@@ -141,6 +220,18 @@ que aconteceu com o envio das 14h".
 
 ## Fluxo recomendado
 
+### Intervalos recomendados
+
+| O quê | Rotas | Quando |
+|---|---|---|
+| **Fila de pedidos** | `GET /pedidos` → grava no Control → `POST /pedidos/{id}/confirmar` | **a cada 1 minuto** — o financeiro fica olhando a tela esperando o número |
+| **Cadastros e alterações, nas duas mãos** | `POST /clientes`, `POST /representantes` (só o que mudou); `GET /clientes?desde=`, `GET /representantes?desde=`, `GET /pedidos?incluir=todos&desde=` | **a cada 5 minutos** |
+| **Faturamento** | `POST /faturamento` | **assim que a nota sair** (ou a cada 5 minutos) |
+| **Catálogo, preço e estoque** | `POST /tabelas-preco`, `/condicoes-pagamento`, `/produtos`, `/precos`, `/estoque` | **a cada 30 minutos** |
+| **Retrato do cliente** | `POST /retrato` | **1x por dia** |
+| **Sincronizar agora** | `GET /status` → `sincronizar_agora: true` → tudo acima → `POST /sincronizacao` | **sempre que o `/status` pedir** (o `/status` é barato: chame-o junto com a fila) |
+| Passivo (uma vez) | `GET /conciliacao`, `POST /pedidos/{id}/conciliar` | na implantação, com o Yan |
+
 ```
 uma vez, na implantação (com o Yan):
   GET  /partner/v1/conciliacao                 → quantos pedidos foram ao ERP sem número
@@ -200,7 +291,8 @@ estar em dois pedidos da mesma empresa (`409 ERP_NUMBER_IN_USE`).
 
 **A série é a da marca:** `CS` na Corpo Sensual, `PL` na PLUMENE — um Control
 por marca, uma chave e uma URL por marca. A máscara continua duas letras e a
-numeração; a série `SX` não existe mais.
+numeração; não existe série própria de representante nem de integração — o
+número é sempre o da série da marca.
 
 ---
 
@@ -243,7 +335,8 @@ para ver os canais.
 Sem chave ou com chave errada (inclusive a chave de uma marca na URL da outra, e
 a chave que ainda não foi cadastrada): `401 PARTNER_UNAUTHORIZED`. Integração
 ainda não liberada naquele servidor (nenhuma chave configurada):
-`503 PARTNER_API_DISABLED`. Vale para as nove rotas.
+`503 PARTNER_API_DISABLED`. Vale para as dezenove rotas — chave errada responde
+`401` em qualquer uma delas, nunca `404`.
 
 ---
 
@@ -746,7 +839,9 @@ Desfazer não recua a última compra.
 
 Cinco rotas, todas com o canal de catálogo ligado para a API
 (`409 CANAL_FECHADO`), corpo `{ "<nome>": [...] }`, `{ "dados": [...] }` ou a
-lista pura, no máximo 1000 registros por requisição, e a mesma resposta:
+lista pura (`tabelas-preco` aceita também `{ "tabelas": [...] }` e
+`condicoes-pagamento`, `{ "condicoes": [...] }`), no máximo 1000 registros por
+requisição, e a mesma resposta:
 
 ```json
 { "ok": true, "recebidos": 120, "criados": 3, "atualizados": 40, "sem_mudanca": 77,
@@ -778,7 +873,24 @@ Nada é apagado por estas rotas.
 
 Motivos de `ignorados`: `registro inválido`, `sem código do ERP`, `código
 repetido no lote`, `código com mais de uma tabela no app`, `"coluna" precisa
-ser um inteiro de 1 a 6`, `falha ao gravar: …`.
+ser um inteiro de 1 a 6`, `"data_update" não é uma data ISO`, `"data_update"
+precisa de fuso (Z ou -03:00)`, `falha ao gravar: …`. Avisos: tabela nova sem
+coluna (gravada com 1), `ativo` não reconhecido, e o aviso fixo da 049.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/tabelas-preco
+{ "tabelas_preco": [
+  { "codigo": "00007", "descricao": "ATACADO SUDESTE", "coluna": 1, "ativo": "S", "data_update": "2026-09-16T08:00:00-03:00" },
+  { "codigo": "00012", "descricao": "PROMOCIONAL", "coluna": 3, "ativo": "N" }
+] }
+```
+
+```json
+{ "ok": true, "recebidos": 2, "criados": 1, "atualizados": 1, "sem_mudanca": 0,
+  "ignorados": [], "avisos": [], "servidor_hora": "2026-09-16T11:00:00.000Z" }
+```
 
 ### POST /partner/v1/condicoes-pagamento
 
@@ -794,7 +906,24 @@ ser um inteiro de 1 a 6`, `falha ao gravar: …`.
 
 Motivos: `registro inválido`, `sem código do ERP`, `código da condição precisa
 ser numérico`, `código repetido no lote`, `código com mais de uma condição no
-app`, `sem descrição` (só na nova), `falha ao gravar: …`.
+app`, `sem descrição` (só na nova), `"data_update" não é uma data ISO` /
+`"data_update" precisa de fuso (Z ou -03:00)`, `falha ao gravar: …`. Avisos:
+`ativo` não reconhecido, `valor_minimo` negativo ou ilegível, e o fixo da 049.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/condicoes-pagamento
+{ "condicoes_pagamento": [
+  { "codigo": "021", "descricao": "30/60/90", "ativo": "S", "valor_minimo": 1500.00 },
+  { "codigo": "099", "descricao": "A VISTA", "ativo": "N", "valor_minimo": null }
+] }
+```
+
+```json
+{ "ok": true, "recebidos": 2, "criados": 0, "atualizados": 2, "sem_mudanca": 0,
+  "ignorados": [], "avisos": [], "servidor_hora": "2026-09-16T11:00:00.000Z" }
+```
 
 ### POST /partner/v1/produtos
 
@@ -812,8 +941,30 @@ app`, `sem descrição` (só na nova), `falha ao gravar: …`.
 
 A resposta traz também `tamanhos_criados` e `tamanhos_atualizados`. Motivos:
 `registro inválido`, `sem código do ERP`, `código repetido no lote`, `código
-com mais de um produto no app`, `sem nome` (só no novo), `falha ao gravar: …`.
-Foto, descrição e cores do catálogo são do app: esta rota nunca as toca.
+com mais de um produto no app`, `sem nome` (só no novo), `"data_update" não é
+uma data ISO` / `"data_update" precisa de fuso (Z ou -03:00)`, `falha ao
+gravar: …`. Avisos: tamanho que não deu para gravar (o produto foi gravado),
+entrada de `tamanhos` sem tamanho ou repetida, produtos que existiam sem código
+e aprenderam o do Control, `ativo` não reconhecido, e o fixo da 049. Foto,
+descrição e cores do catálogo são do app: esta rota nunca as toca.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/produtos
+{ "produtos": [
+  { "codigo": "0706", "referencia": "0706", "nome": "CONJUNTO TESTE", "grupo": "CONJUNTOS",
+    "colecao": "VERAO 2027", "marca": "CORPO SENSUAL", "ativo": "S",
+    "tamanhos": [ { "tamanho": "P" }, { "tamanho": "M" }, { "tamanho": "G" }, { "tamanho": "GG", "ativo": "N" } ],
+    "data_update": "2026-09-16T08:00:00-03:00" }
+] }
+```
+
+```json
+{ "ok": true, "recebidos": 1, "criados": 0, "atualizados": 1, "sem_mudanca": 0,
+  "tamanhos_criados": 1, "tamanhos_atualizados": 1,
+  "ignorados": [], "avisos": [], "servidor_hora": "2026-09-16T11:00:00.000Z" }
+```
 
 ### POST /partner/v1/precos
 
@@ -832,7 +983,27 @@ Motivos: `registro inválido`, `sem código do produto`, `sem código da tabela`
 `repetido no lote (tabela X)`, `"preco" precisa ser um número maior que zero`,
 `tabela X não encontrada no app`, `tabela X com mais de um cadastro no app`,
 `produto não encontrado no app`, `produto com mais de um cadastro no app`,
-`falha ao gravar: …`. Os avisos apontam a rota que cadastra o que faltou.
+`"data_update" não é uma data ISO` / `"data_update" precisa de fuso (Z ou
+-03:00)`, `falha ao gravar: …`. Os avisos apontam a rota que cadastra o que
+faltou (`POST /tabelas-preco`, `POST /produtos`), `preco_original` ou
+`desconto_percentual` ilegíveis, e o fixo da 049.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/precos
+{ "precos": [
+  { "tabela": "00007", "produto": "0706", "preco": 89.90, "preco_original": 99.90, "desconto_percentual": 10 },
+  { "tabela": "00007", "produto": "0999", "preco": 55.00 }
+] }
+```
+
+```json
+{ "ok": true, "recebidos": 2, "criados": 0, "atualizados": 1, "sem_mudanca": 0,
+  "ignorados": [ { "codigo": "0999", "motivo": "produto não encontrado no app" } ],
+  "avisos": [ "Produto sem cadastro no app (mande-o em POST /partner/v1/produtos): 0999." ],
+  "servidor_hora": "2026-09-16T11:00:00.000Z" }
+```
 
 ### POST /partner/v1/estoque
 
@@ -849,7 +1020,24 @@ Motivos: `registro inválido`, `sem código do produto`, `sem tamanho`, `repetid
 no lote`, `"quantidade" precisa ser um número inteiro`, `"reservado" precisa ser
 um número inteiro`, `produto não encontrado no app`, `produto com mais de um
 cadastro no app`, `tamanho não encontrado na grade do app` (mande o tamanho em
-`POST /produtos` antes), `falha ao gravar: …`.
+`POST /produtos` antes), `falha ao gravar: …`. No estoque `criados` é sempre
+`0` (a grade nasce em `POST /produtos`); `ignorados[].codigo` sai como
+`PRODUTO|TAMANHO`.
+
+**Exemplo:**
+
+```json
+POST /partner/v1/estoque
+{ "estoque": [
+  { "produto": "0706", "tamanho": "M", "quantidade": 42, "reservado": 5 },
+  { "produto": "0706", "tamanho": "G", "quantidade": 0 }
+] }
+```
+
+```json
+{ "ok": true, "recebidos": 2, "criados": 0, "atualizados": 2, "sem_mudanca": 0,
+  "ignorados": [], "avisos": [], "servidor_hora": "2026-09-16T11:00:00.000Z" }
+```
 
 **Avisos "migração 049":** numa instalação onde a migração 049 ainda não rodou,
 descrição do Control, `ativo` e `data_update` das tabelas, `valor_minimo` das
@@ -891,8 +1079,21 @@ Retrato igual ao guardado conta em `sem_mudanca`. Resposta:
 Motivos: `registro inválido`, `informe "cnpj" ou "codigo"`, `CNPJ com mais de
 um cadastro no app`, `código com mais de um cadastro no app`, `cliente não
 encontrado nesta empresa`, `cliente repetido no lote`, `referência mais antiga
-que o retrato guardado`, e os de valor (`"referencia" precisa de fuso…`,
-`"ultima_compra" não é uma data…`, `"total_comprado" precisa ser um número…`).
+que o retrato guardado`, `falha ao gravar: …`, e os de valor: `"referencia" é
+obrigatória (momento com fuso, …)`, `"referencia" não é uma data ISO`,
+`"referencia" precisa de fuso (Z ou -03:00)`, `"ultima_compra" precisa ser
+AAAA-MM-DD ou um momento com fuso (Z ou -03:00)`, `"total_comprado" precisa ser
+um número maior ou igual a zero` (idem `valor_vencido` e
+`pendencia_financeira`), `"titulos_vencidos" precisa ser um inteiro maior ou
+igual a zero`. Avisos fixos: numa instalação sem a migração 036, última compra,
+total e vencido ficam de fora; sem a 049, pendência, títulos e a referência.
+
+**Resposta do exemplo acima:**
+
+```json
+{ "ok": true, "recebidos": 1, "atualizados": 1, "sem_mudanca": 0,
+  "ignorados": [], "avisos": [], "servidor_hora": "2026-09-16T06:00:10.000Z" }
+```
 
 **O bloqueio do Control não trava o representante.** Cliente bloqueado
 (`bloqueado: "S"` no `POST /clientes`) continua podendo receber pedido no app;
@@ -917,9 +1118,16 @@ Content-Type: application/json
 { "concluida": true, "solicitado_em": "2026-09-16T14:00:00.000Z" }
 ```
 
+**Resposta 200:**
+
+```json
+{ "ok": true, "limpo": true, "sincronizar_agora": false, "solicitado_em": null,
+  "servidor_hora": "2026-09-16T14:06:30.000Z" }
+```
+
 | Resposta | `code` | Significado |
 |---|---|---|
-| `200 { ok, limpo, sincronizar_agora, solicitado_em, servidor_hora }` | — | `limpo: true` = o pedido pendente foi apagado. `sincronizar_agora: true` na resposta = já há um pedido **novo** (alguém clicou de novo enquanto você rodava): rode de novo |
+| `200 { ok, limpo, sincronizar_agora, solicitado_em, servidor_hora }` | — | `limpo: true` = o pedido pendente foi apagado. `sincronizar_agora: true` na resposta = já há um pedido **novo** (alguém clicou de novo enquanto você rodava), e `solicitado_em` é o momento dele: rode de novo |
 | `400` | `MISSING_CONCLUIDA` | Falta `"concluida": true` |
 | `400` | `INVALID_SOLICITADO_EM` | `solicitado_em` veio sem fuso ou fora do formato |
 
@@ -989,6 +1197,24 @@ curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
 curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
   -d "{\"faturamento\":[{\"pedido_erp\":\"CS17379\",\"faturado_em\":\"2026-08-13T14:02:00-03:00\",\"valor_faturado\":870.50}]}" \
   "$BASE/partner/v1/faturamento"
+
+# mandar o catálogo (mesmo formato nas cinco rotas)
+curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
+  -d "{\"tabelas_preco\":[{\"codigo\":\"00007\",\"descricao\":\"ATACADO\",\"coluna\":1,\"ativo\":\"S\"}]}" \
+  "$BASE/partner/v1/tabelas-preco"
+
+# o retrato do cliente (1x por dia)
+curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
+  -d "{\"retrato\":[{\"cnpj\":\"00000000000100\",\"ultima_compra\":\"2026-09-10\",\"total_comprado\":18450.30,\"valor_vencido\":0,\"referencia\":\"2026-09-16T06:00:00-03:00\"}]}" \
+  "$BASE/partner/v1/retrato"
+
+# puxar o que mudou no app (fuso positivo vai como %2B)
+curl -H "X-API-Key: SUA_CHAVE" "$BASE/partner/v1/clientes?desde=2026-09-16T13:00:00-03:00"
+
+# avisar que a passada pedida pelo "sincronizar agora" foi feita
+curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
+  -d "{\"concluida\":true,\"solicitado_em\":\"2026-09-16T14:00:00.000Z\"}" \
+  "$BASE/partner/v1/sincronizacao"
 ```
 
 ## Boas práticas
@@ -1241,8 +1467,50 @@ registro como veio — mais estes campos só de leitura:
 
 **O que o próprio Control gravou por último não volta** (o app compara a data
 da mudança com a data da sua última gravação), então o eco é raro; se algum
-voltar, reenviar é `sem_mudanca`. Resposta:
+voltar, reenviar é `sem_mudanca`. Numa instalação sem a migração 049 a lista
+traz também o que o Control acabou de mandar, com aviso. Resposta:
 `{ total, servidor_hora, clientes: [...], avisos: [...] }`.
+
+**Exemplo** — um cliente que o representante cadastrou no app hoje:
+
+```json
+GET /partner/v1/clientes?desde=2026-09-16T13:00:00-03:00
+
+{
+  "total": 1,
+  "servidor_hora": "2026-09-16T16:05:00.000Z",
+  "clientes": [
+    {
+      "codigo": null,
+      "chave": "00000000000200",
+      "novo_no_control": true,
+      "razao_social": "LOJA NOVA TESTE LTDA",
+      "nome_fantasia": "Loja Nova",
+      "cnpj_cpf": "00.000.000/0002-00",
+      "representante": "00042",
+      "tabela_preco": "00007",
+      "endereco": { "logradouro": "Rua Teste", "numero": "200", "complemento": null,
+                    "bairro": "Centro", "cidade": "Cidade Teste", "uf": "MG", "cep": "00000000" },
+      "inscricao_estadual": null,
+      "observacoes": null,
+      "bloqueado": "N",
+      "motivo_bloqueio": null,
+      "limite_credito": null,
+      "whatsapp": "00900000001",
+      "email": null,
+      "pendencia_financeira": null,
+      "titulos_vencidos": null,
+      "atualizado_em": "2026-09-16T15:40:12.000+00:00",
+      "atualizado_pelo_control_em": null
+    }
+  ],
+  "avisos": []
+}
+```
+
+O seu ERP cria o cadastro, gera o código (ex.: `01235`) e devolve
+`POST /clientes { "clientes": [ { "codigo": "01235", "razao_social": "LOJA NOVA TESTE LTDA", "cnpj_cpf": "00.000.000/0002-00", ... } ] }`
+— o cadastro do app é casado pelo CNPJ e aprende o código.
 
 ## GET /partner/v1/representantes?desde= — o que mudou no app
 
@@ -1256,6 +1524,18 @@ Mesmas regras. Cada representante sai como
 instalação sem a data de alteração do representante (migração 048) a lista vem
 inteira, com aviso. Resposta:
 `{ total, servidor_hora, representantes: [...], avisos: [...] }`.
+
+```json
+{
+  "total": 1,
+  "servidor_hora": "2026-09-16T16:05:00.000Z",
+  "representantes": [
+    { "codigo": "00042", "nome": "REPRESENTANTE TESTE", "razao_social": "REPRESENTACOES TESTE LTDA",
+      "email": "rep.teste@exemplo.com", "ativo": "S", "atualizado_em": "2026-09-16T14:02:00.000+00:00" }
+  ],
+  "avisos": []
+}
+```
 
 ## Erros
 

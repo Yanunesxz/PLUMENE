@@ -50,7 +50,8 @@ packages/shared/src/
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
 ├── pedidos/              → regras do pedido que a API e a tela precisam contar IGUAL
-│   ├── numeroErp.ts      → o número do Control ("SX14627"): normaliza, valida, sugere o próximo
+│   ├── numeroErp.ts      → o número do Control ("CS17379"; série da marca, CS/PL): normaliza,
+│   │                       valida, sugere o próximo
 │   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido)
 │   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
 │   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
@@ -264,7 +265,9 @@ apps/api/src/
 │   ├── push/             → /push/* — Web Push (assinar o aparelho, enviar aviso)
 │   └── ia/               → relatório da carteira sob demanda (Anthropic ou OpenAI, por env)
 │
-├── erp/                  → integração com o ERP (Firebird)
+├── erp/                  → integração com o ERP (Firebird) — APOSENTADA em 16/09/2026: o Control
+│                           manda tudo pela API de Parceiro (modules/partner). Fica como prova de
+│                           como a leitura direta funcionava; as travas por canal continuam.
 │   ├── adapter.ts        → abstração (troca mock ↔ real sem mexer no resto). sendOrder
 │   │                       LANÇA (EnvioAoErpDesligadoError): o número vem do Control
 │   └── firebird/         → connection, queries, types, erpSyncService. Além de
@@ -375,9 +378,10 @@ _tools/
 │   ├── extrair.py      → lê os 3 PDFs oficiais → tabelas-2027.json (as 2 faixas)
 │   ├── carregar.mjs    → substitui as tabelas de preço pelas do PDF
 │   └── carregar-faixa-maior.mjs → preenche price_larger (exige a migração 026)
-├── erp-sync/
-│   ├── README.md  → LEIA ANTES DE RODAR: o que cada modo faz, linha por linha, e a
-│   │                DECISÃO de 15/09/2026 sobre o push-orders
+├── erp-sync/     → APOSENTADO em 16/09/2026: o Control manda tudo pela API de Parceiro.
+│   │                Nenhum modo roda contra produção; o código fica como registro.
+│   ├── README.md  → LEIA ANTES DE RODAR: a DECISÃO de 16/09/2026 (Firebird aposentado), a de
+│   │                15/09/2026 sobre o push-orders e o que cada modo fazia, linha por linha
 │   ├── sync.py    → Firebird → Supabase. Modos: full, products, prices, customers,
 │   │                stock, reconcile (liga/desliga ativo), prices-audit (diagnóstico), test
 │   │                e push-orders — o ÚNICO que escreve NO FIREBIRD do Fábio (insere
@@ -435,7 +439,7 @@ _tools/
 | Mudar um **tipo de dado** | `packages/shared/src/types/` |
 | Mudar o **banco** (colunas) | nova migration em `apps/api/src/config/migrations/` |
 | Mexer na **API de Parceiro** (o que o Control puxa/confirma/manda) | `apps/api/src/modules/partner/` — e os DOIS docs juntos: `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html`. Rota nova entra também em `ROTAS_DO_PARCEIRO` (`modules/integracao/integracao.service.ts`) para a tela dar o título |
-| Mexer no **sync do ERP** (Firebird → Supabase) | `_tools/erp-sync/sync.py` — leia `_tools/erp-sync/README.md` antes |
-| Rodar o **push-orders** (app → Firebird) | NÃO. Vetado em produção — `_tools/erp-sync/README.md`, seção "DECISÃO" |
+| Mexer no **sync do ERP** (Firebird → Supabase) | NÃO. Aposentado em 16/09/2026: o dado chega pela API de Parceiro (`modules/partner/partner.catalogo.service.ts`, `partner.sync.service.ts`, `partner.retrato.service.ts`) — `_tools/erp-sync/README.md` explica |
+| Rodar o **push-orders** (app → Firebird) | NÃO. Morto — o Control puxa a fila e confirma o número; `_tools/erp-sync/README.md`, seção "DECISÃO" |
 | Mexer no **offline** | `apps/web/src/offline/` |
 ```
