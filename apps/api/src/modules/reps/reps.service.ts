@@ -47,6 +47,11 @@ async function detectarVendaInterna(): Promise<boolean> {
   return detectar('users', 'venda_interna');
 }
 
+/** `users.updated_at` vem da migração 048 — mesmo cuidado das outras. */
+async function detectarAtualizadoEm(): Promise<boolean> {
+  return detectar('users', 'updated_at');
+}
+
 async function repSelect(): Promise<string> {
   let colunas = REP_BASE;
   if (await detectarErpRepId()) colunas += ', erp_rep_id';
@@ -402,6 +407,10 @@ export async function updateRep(
   if (body.password) update.password_hash = await hashPassword(body.password);
 
   if (Object.keys(update).length === 0) return { ok: false, reason: 'error' };
+
+  // `users.updated_at` vem da 048 (sem gatilho): mandar a coluna antes do SQL
+  // faria o PostgREST recusar a edição inteira do representante.
+  if (await detectarAtualizadoEm()) update.updated_at = new Date().toISOString();
 
   const { data, error } = await supabase
     .from('users')

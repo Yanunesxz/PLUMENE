@@ -240,6 +240,10 @@ export async function atualizarUsuario(
     };
   }
 
+  // `users.updated_at` vem da 048 (sem gatilho): só vai com a coluna no banco,
+  // senão o PostgREST recusaria a edição inteira do login.
+  if (await detectar('users', 'updated_at')) update['updated_at'] = new Date().toISOString();
+
   const { data, error } = await supabase
     .from('users')
     .update(update)

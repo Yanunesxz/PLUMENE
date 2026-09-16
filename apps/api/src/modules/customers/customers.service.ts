@@ -399,13 +399,17 @@ export async function marcarInatividade(
   const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
   if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
 
+  // `updated_at` junto: é por ele que o CRM (e quem mais sincroniza) descobre
+  // que o cadastro mudou desde a última leitura.
+  const agora = new Date().toISOString();
   const { error } = await supabase
     .from('customers')
     .update({
       inactivity_reason: body.motivo.trim(),
       inactivity_note: body.observacao?.trim() || null,
       inactivity_updated_by: quem,
-      inactivity_updated_at: new Date().toISOString(),
+      inactivity_updated_at: agora,
+      updated_at: agora,
     })
     .eq('id', customer_id)
     .eq('company_id', company_id);
@@ -439,7 +443,7 @@ export async function marcarVarejo(
   const marcado_em = new Date().toISOString();
   const { error } = await supabase
     .from('customers')
-    .update({ varejo, varejo_marcado_por: quem, varejo_marcado_em: marcado_em })
+    .update({ varejo, varejo_marcado_por: quem, varejo_marcado_em: marcado_em, updated_at: marcado_em })
     .eq('id', customer_id)
     .eq('company_id', company_id);
 
@@ -464,12 +468,16 @@ export async function atualizarTabelaDoCliente(
   price_table_id: string,
   escopo: EscopoDaCarteira,
 ): Promise<TrocaDeTabela> {
-  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  const cliente = await clienteDaCarteira<CustomerListItem>(company_id, customer_id, escopo, CUSTOMER_COLUMNS);
   if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  // Já é esta a tabela: nada a gravar — nem o `updated_at`, que faria o CRM
+  // reler um cadastro que não mudou.
+  if (cliente.price_table_id === price_table_id) return { ok: true, cliente };
 
   const { data, error } = await supabase
     .from('customers')
-    .update({ price_table_id })
+    .update({ price_table_id, updated_at: new Date().toISOString() })
     .eq('id', customer_id)
     .eq('company_id', company_id)
     .select(CUSTOMER_COLUMNS)

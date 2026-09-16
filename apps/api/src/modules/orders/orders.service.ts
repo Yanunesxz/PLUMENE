@@ -1,10 +1,13 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
+import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.js';
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
+import { gravarOrigemDoNumero, registrarEventoErp } from './eventosErp.service.js';
+import { lerCanais } from '../../lib/canais.js';
 import type {
   Order,
   OrderWithItems,
@@ -95,6 +98,9 @@ export async function getOrderById(
   // que a fábrica está com a versão velha depois de a venda interna editar.
   const sincronia = await lerSincronia(pedido.id, company_id);
   if (sincronia) pedido.erp_sync = sincronia;
+  // As notas que o Control informou, com as peças de cada uma (048): é o
+  // "como foi faturado" de verdade. Sem a 048, lista vazia.
+  pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
   return pedido;
 }
 
@@ -452,7 +458,7 @@ export async function createOrder(
 
 export type DeleteOrderResult =
   | { ok: true }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'sem_copia' };
+  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'tem_numero_erp' | 'sem_copia' };
 
 // ─── Pedidos excluídos (migração 040) ────────────────────────────────────────
 //
@@ -528,15 +534,20 @@ export async function deleteOrder(
 ): Promise<DeleteOrderResult> {
   const { data: order } = await supabase
     .from('orders')
-    .select('id, rep_id, invoiced')
+    .select('id, rep_id, invoiced, erp_order_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
 
   if (!order) return { ok: false, reason: 'not_found' };
-  const o = order as { rep_id: string; invoiced: boolean | null };
+  const o = order as { rep_id: string; invoiced: boolean | null; erp_order_id?: string | null };
   if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
   if (o.invoiced) return { ok: false, reason: 'invoiced' };
+  // Pedido com número do Control já existe LÁ (integração, fase 0). Apagar aqui
+  // deixaria o Control com um pedido que o app não conhece mais — e o
+  // faturamento dele chegaria procurando um número sem dono. Vale para todos,
+  // admin incluído: o caminho é o financeiro corrigir, não o pedido sumir.
+  if (o.erp_order_id) return { ok: false, reason: 'tem_numero_erp' };
 
   // Com a tabela no ar, a cópia é obrigatória: se ela não gravou, o pedido não
   // é apagado — é exatamente o "sumiu sem rastro" que a 040 existe para evitar.
@@ -721,7 +732,17 @@ export interface ItemEditado {
 
 export type EditarPecasResult =
   | { ok: true; order: OrderWithItems }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'price_not_found' | 'save_failed' | 'sem_foto_do_erp' };
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'forbidden'
+        | 'tarde_demais'
+        | 'price_not_found'
+        | 'save_failed'
+        | 'sem_foto_do_erp'
+        | 'original_nao_guardado';
+    };
 
 /**
  * Troca as peças de um pedido que ainda não foi para a fábrica.
@@ -761,8 +782,14 @@ export async function setOrderItems(
 
   // ANTES de trocar qualquer peça: a foto do que o representante fechou (044).
   // Só a primeira vale, e rascunho não entra — quem está montando o pedido não
-  // está cortando nada. É acessório: falhar aqui não impede a edição.
-  await guardarOriginal(o, 'edicao', user_id);
+  // está cortando nada.
+  //
+  // Se a foto FALHA (a tabela existe e o banco recusou), a edição não passa:
+  // cortar sem ela apagaria o original para sempre — a próxima foto já sairia
+  // com o corte dentro, e o "veio assim, foi faturado assado" perderia a
+  // primeira metade. Tabela ausente (044 não rodou) ou foto já tirada seguem.
+  const original = await guardarOriginal(o, 'edicao', user_id);
+  if (original === 'falhou') return { ok: false, reason: 'original_nao_guardado' };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
   // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
@@ -943,20 +970,32 @@ export async function corrigirNumeroErp(
   id: string,
   company_id: string,
   numeroDigitado: string,
+  /** Quem corrigiu — vai para a origem do número e para o rastro (048). */
+  quem: { id?: string | null; nome?: string | null } = {},
 ): Promise<CorrigirNumeroErpResult> {
   const numero = normalizarNumeroErp(numeroDigitado);
   if (!numero || !numeroErpValido(numero)) return { ok: false, motivo: 'formato' };
 
   const { data: pedido } = await supabase
     .from('orders')
-    .select('id, status, invoiced, erp_order_id')
+    .select('id, order_number, status, invoiced, erp_order_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
   if (!pedido) return { ok: false, motivo: 'not_found' };
-  const o = pedido as { status: Order['status']; invoiced: boolean | null; erp_order_id: string | null };
+  const o = pedido as {
+    order_number?: number | null;
+    status: Order['status'];
+    invoiced: boolean | null;
+    erp_order_id: string | null;
+  };
   if (o.status !== 'sent_erp' || !o.erp_order_id) return { ok: false, motivo: 'nao_lancado' };
   if (o.invoiced) return { ok: false, motivo: 'ja_faturado' };
+
+  // O mesmo número de novo (duplo toque): nada a gravar. Regravar trocaria a
+  // origem e o "quando" do número sem mudança nenhuma. Grafia diferente do que
+  // está gravado segue e grava — é a normalização chegando.
+  if (o.erp_order_id === numero) return { ok: true, erp_order_id: numero };
 
   const { data: dono } = await supabase
     .from('orders')
@@ -967,9 +1006,15 @@ export async function corrigirNumeroErp(
     .limit(1);
   if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
 
+  // A correção é um dos quatro escritores do número: fica dito no pedido (048).
+  const patch = await gravarOrigemDoNumero(
+    { erp_order_id: numero, updated_at: new Date().toISOString() },
+    'correcao',
+    quem.id ?? null,
+  );
   const { error } = await supabase
     .from('orders')
-    .update({ erp_order_id: numero, updated_at: new Date().toISOString() })
+    .update(patch)
     .eq('id', id)
     .eq('company_id', company_id);
   if (error) {
@@ -977,6 +1022,18 @@ export async function corrigirNumeroErp(
   }
   // A foto do que o Control conhece passa a apontar o número certo (046).
   await atualizarNumeroNaFoto(id, company_id, numero);
+  // E o rastro: de qual número para qual, e quem. Nunca derruba a correção.
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: o.order_number ?? null,
+    tipo: 'numero_corrigido',
+    origem: 'tela',
+    por: quem.id ?? null,
+    por_nome: quem.nome ?? null,
+    antes: { erp_order_id: o.erp_order_id },
+    depois: { erp_order_id: numero },
+  });
   return { ok: true, erp_order_id: numero };
 }
 
@@ -1061,6 +1118,31 @@ async function detectarUltimaCompra(): Promise<boolean> {
   return detectar('customers', 'last_purchase_at');
 }
 
+/** A data do calendário (AAAA-MM-DD) de um momento, no fuso da fábrica. */
+const DIA_EM_SAO_PAULO = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'America/Sao_Paulo',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+});
+
+/**
+ * O DIA da compra, em America/Sao_Paulo.
+ *
+ * `slice(0, 10)` de um ISO em UTC errava a noite: faturado às 22h de 13/08 em
+ * São Paulo é 01h de 14/08 em UTC, e o selo da carteira ganhava um dia que não
+ * houve. Data pura (AAAA-MM-DD) já é o dia e vale como veio. `null` quando não
+ * dá para ler.
+ */
+export function diaDaCompra(quando: string | null | undefined): string | null {
+  if (!quando) return null;
+  const texto = quando.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(texto)) return texto;
+  const ms = Date.parse(texto);
+  if (Number.isNaN(ms)) return null;
+  return DIA_EM_SAO_PAULO.format(new Date(ms));
+}
+
 /**
  * O carimbo do faturamento empurra a última compra do cliente para FRENTE — é
  * o que mantém o selo da carteira vivo para quem vende pelo app.
@@ -1068,25 +1150,52 @@ async function detectarUltimaCompra(): Promise<boolean> {
  * Só para frente, nunca para trás: desfazer um faturamento não apaga a compra
  * que existiu, e um carimbo retroativo não rejuvenesce o retrato. Falha aqui
  * não derruba o faturamento — o selo é acessório do carimbo, não o contrário.
+ *
+ * Quem chama só chama na TRANSIÇÃO para faturado: um recarimbo não é compra
+ * nova. `company_id`, quando vem, entra no filtro (toda gravação é da empresa).
  */
 export async function registrarCompraDoCliente(
   customer_id: string | null | undefined,
   quando: string | null | undefined,
+  company_id?: string | null,
 ): Promise<void> {
-  if (!customer_id || !quando) return;
-  if (!(await detectarUltimaCompra())) return;
-  const dia = quando.slice(0, 10);
+  if (!customer_id) return;
+  const dia = diaDaCompra(quando);
+  if (!dia) return;
   try {
-    await supabase
+    if (!(await detectarUltimaCompra())) return;
+    let consulta = supabase
       .from('customers')
       .update({ last_purchase_at: dia, updated_at: new Date().toISOString() })
-      .eq('id', customer_id)
-      .or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
-  } catch {
+      .eq('id', customer_id);
+    if (company_id) consulta = consulta.eq('company_id', company_id);
+    const { error } = await consulta.or(`last_purchase_at.is.null,last_purchase_at.lt.${dia}`);
+    if (error) console.error(`[faturado] falha ao empurrar a última compra do cliente ${customer_id}: ${error.message}`);
+  } catch (e) {
     /* acessório — nunca derruba o carimbo */
+    console.error(`[faturado] falha ao empurrar a última compra do cliente ${customer_id}: ${String(e)}`);
   }
 }
 
+export type FaturadoResult =
+  | {
+      ok: true;
+      order: Order;
+      /** `false` = o pedido já estava assim; nada foi gravado nem avisado. */
+      mudou: boolean;
+    }
+  | { ok: false; reason: 'not_found' | 'faturamento_pelo_control' | 'erro' };
+
+/**
+ * O botão manual de faturado (e o desfazer).
+ *
+ * - Com `canal_faturamento='api'` (048), o faturado de pedido que JÁ TEM número
+ *   do Control vem do Control, pela API: o botão recusa, para não haver dois
+ *   escritores do mesmo carimbo. Pedido sem número segue como sempre.
+ * - Recarimbo (já faturado) não grava nada: não move `invoiced_at`, não empurra
+ *   a última compra e não avisa o representante de novo.
+ * - Desfazer limpa também `invoiced_total` (027), como a API faz.
+ */
 export async function setOrderInvoiced(
   id: string,
   company_id: string,
@@ -1094,39 +1203,108 @@ export async function setOrderInvoiced(
   opcoes: {
     /** Venda interna: o rep só carimba o PRÓPRIO pedido. Nulo = sem restrição. */
     somenteDoRep?: string | null;
+    /** Quem apertou o botão — para o rastro (048). */
+    por?: string | null;
+    por_nome?: string | null;
   } = {},
-): Promise<Order | null> {
+): Promise<FaturadoResult> {
+  // `*` de propósito: traz `invoiced_total` só quando a 027 existe — e é a
+  // presença da chave que diz se o desfazer tem um valor para limpar.
+  const lerPedido = async (): Promise<(Order & Record<string, unknown>) | null> => {
+    let leitura = supabase.from('orders').select('*').eq('id', id).eq('company_id', company_id);
+    if (opcoes.somenteDoRep) leitura = leitura.eq('rep_id', opcoes.somenteDoRep);
+    const resposta = await leitura.maybeSingle();
+    return (resposta.data as (Order & Record<string, unknown>) | null) ?? null;
+  };
+  const atual = await lerPedido();
+  if (!atual) return { ok: false, reason: 'not_found' };
+
+  // O canal só é lido quando importa (pedido com número). Banco que não
+  // responde LANÇA: um soluço não pode reabrir o botão com o canal na API.
+  if (atual.erp_order_id) {
+    const canais = await lerCanais(company_id);
+    if (canais.faturamento === 'api') return { ok: false, reason: 'faturamento_pelo_control' };
+  }
+
+  const temValor = Object.prototype.hasOwnProperty.call(atual, 'invoiced_total');
+  const jaFaturado = atual.invoiced === true;
+
+  if (invoiced && jaFaturado) return { ok: true, order: atual, mudou: false };
+  if (!invoiced && !jaFaturado && !atual.invoiced_at && (!temValor || atual.invoiced_total == null)) {
+    return { ok: true, order: atual, mudou: false };
+  }
+
   // O carimbo fecha o pedido para sempre. Se ninguém tinha cortado peça, esta
   // é a hora da foto (044): daí em diante todo pedido faturado tem o original
   // registrado, e o "veio assim, foi faturado assado" sempre tem as duas metades.
-  if (invoiced) {
-    const { data: antes } = await supabase
-      .from('orders')
-      .select('id, company_id, status')
-      .eq('id', id)
-      .eq('company_id', company_id)
-      .maybeSingle();
-    if (antes) await guardarOriginal(antes as Pick<Order, 'id' | 'company_id' | 'status'>, 'faturamento');
-  }
+  if (invoiced) await guardarOriginal(atual, 'faturamento', opcoes.por ?? null);
 
-  let query = supabase
-    .from('orders')
-    .update({
-      invoiced,
-      invoiced_at: invoiced ? new Date().toISOString() : null,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .eq('company_id', company_id);
+  const agora = new Date().toISOString();
+  const patch: Record<string, unknown> = {
+    invoiced,
+    invoiced_at: invoiced ? agora : null,
+    updated_at: agora,
+  };
+  if (!invoiced && temValor) patch['invoiced_total'] = null;
 
+  let query = supabase.from('orders').update(patch).eq('id', id).eq('company_id', company_id);
   if (opcoes.somenteDoRep) query = query.eq('rep_id', opcoes.somenteDoRep);
+  // Dois toques ao mesmo tempo: só o primeiro carimba (e só ele avisa o rep).
+  if (invoiced) query = query.or('invoiced.is.null,invoiced.eq.false');
 
   const { data, error } = await query.select().maybeSingle();
+  if (error) {
+    console.error(`[faturado] falha ao gravar o faturado do pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+  if (!data) {
+    // O outro toque chegou antes: o pedido já está como pedido.
+    const agoraLido = await lerPedido();
+    return agoraLido ? { ok: true, order: agoraLido, mudou: false } : { ok: false, reason: 'not_found' };
+  }
 
-  if (error || !data) return null;
   const order = data as Order;
-  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? undefined);
-  return order;
+  if (invoiced) await registrarCompraDoCliente(order.customer_id, order.invoiced_at ?? agora, company_id);
+
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: order.order_number ?? atual.order_number ?? null,
+    tipo: invoiced ? 'faturado' : 'faturamento_desfeito',
+    origem: 'tela',
+    por: opcoes.por ?? null,
+    por_nome: opcoes.por_nome ?? null,
+    antes: {
+      invoiced: atual.invoiced ?? false,
+      invoiced_at: atual.invoiced_at ?? null,
+      ...(temValor ? { invoiced_total: atual.invoiced_total ?? null } : {}),
+    },
+    depois: {
+      invoiced,
+      invoiced_at: invoiced ? (order.invoiced_at ?? agora) : null,
+      ...(temValor ? { invoiced_total: invoiced ? (atual.invoiced_total ?? null) : null } : {}),
+    },
+  });
+
+  // Desfazer à mão cancela as notas ativas (048), como o `faturado: false` da
+  // API. Acessório: o desfazer já está gravado e não volta atrás.
+  if (!invoiced) {
+    const canceladas = await cancelarNotasAtivas(id, company_id, agora);
+    for (const nota of canceladas ?? []) {
+      await registrarEventoErp({
+        company_id,
+        order_id: id,
+        order_number: order.order_number ?? atual.order_number ?? null,
+        tipo: 'nota_cancelada',
+        origem: 'tela',
+        por: opcoes.por ?? null,
+        por_nome: opcoes.por_nome ?? null,
+        antes: { numero: nota.numero, serie: nota.serie, cancelada_em: null },
+        depois: { numero: nota.numero, serie: nota.serie, cancelada_em: agora },
+      });
+    }
+  }
+  return { ok: true, order, mudou: true };
 }
 
 export async function updateOrderStatus(
@@ -1136,17 +1314,19 @@ export async function updateOrderStatus(
   body: UpdateOrderStatusRequest,
   role?: AuthRole,
   vendaInterna = false,
+  /** Nome de quem decidiu — vai para o rastro do lançamento (048). */
+  por_nome: string | null = null,
 ): Promise<Order | null> {
   const { data: current, error: currentError } = await supabase
     .from('orders')
-    .select('status, rep_id')
+    .select('status, rep_id, erp_order_id')
     .eq('id', id)
     .eq('company_id', company_id)
     .single();
 
   if (currentError || !current) return null;
 
-  const row = current as { status: Order['status']; rep_id: string };
+  const row = current as { status: Order['status']; rep_id: string; erp_order_id?: string | null };
 
   // Representante só mexe no status dos próprios pedidos (ex.: enviar para aprovação).
   if (role === 'rep' && row.rep_id !== approverId) {
@@ -1210,6 +1390,13 @@ export async function updateOrderStatus(
   // vez que ela for lançar tem que carregar e seguir o padrão da fábrica"). O
   // app nunca inventa esse número; e um número do Control é de UM pedido só.
   if (body.status === 'sent_erp') {
+    // Com o canal de pedidos ligado na API (048), o número vem do Control pela
+    // API de parceiro — a tela deixa de ser um segundo escritor do mesmo campo.
+    // Antes de validar o número: não adianta a Larissa acertar a digitação de
+    // algo que a tela não pode mais gravar. Banco que não responde LANÇA (500).
+    const canais = await lerCanais(company_id);
+    if (canais.pedido_erp === 'api') throw new Error('CANAL_API');
+
     const numero = normalizarNumeroErp(body.erp_order_id);
     if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
     const { data: dono } = await supabase
@@ -1222,6 +1409,8 @@ export async function updateOrderStatus(
     if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
     update.erp_order_id = numero;
     update.synced_at = new Date().toISOString();
+    // De onde veio o número: do lançamento na tela, por quem (048).
+    await gravarOrigemDoNumero(update, 'lancamento', approverId);
   }
 
   if (body.notes) {
@@ -1249,6 +1438,18 @@ export async function updateOrderStatus(
   // venda interna editar as peças mais tarde. Acessório: não derruba o lançamento.
   if (body.status === 'sent_erp') {
     await registrarNoErp(id, company_id, approverId);
+    // O rastro do número (048). Nunca derruba o lançamento.
+    await registrarEventoErp({
+      company_id,
+      order_id: id,
+      order_number: (data as Order).order_number ?? null,
+      tipo: 'numero_gravado',
+      origem: 'tela',
+      por: approverId,
+      por_nome,
+      antes: { erp_order_id: row.erp_order_id ?? null, status: row.status },
+      depois: { erp_order_id: update.erp_order_id ?? null, status: 'sent_erp' },
+    });
   }
 
   // O e-mail de confirmação acompanha o FECHAMENTO de verdade. Quando o pedido

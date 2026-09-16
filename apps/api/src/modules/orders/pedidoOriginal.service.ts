@@ -1,5 +1,5 @@
 import { supabase } from '../../config/supabase.js';
-import { detectar } from '../../lib/detectarColuna.js';
+import { detectar, detectarComCerteza } from '../../lib/detectarColuna.js';
 import type { Order, PedidoOriginal } from '@csb/shared';
 
 /**
@@ -45,15 +45,28 @@ export async function guardarOriginal(
 ): Promise<'guardada' | 'ja_tinha' | 'sem_tabela' | 'falhou'> {
   // Rascunho não tem original: ele AINDA é a montagem.
   if (order.status === 'draft') return 'ja_tinha';
-  if (!(await detectarTabela())) return 'sem_tabela';
+  // Um soluço do banco na sonda NÃO é "tabela ausente": seguir como se fosse
+  // deixaria a edição de peças gravar sem a foto, e o original sumiria para
+  // sempre. Na dúvida, 'falhou' — quem edita recusa e o usuário tenta de novo.
+  const tabela = await detectarComCerteza('order_originals', 'order_id');
+  if (tabela === 'nao_existe') return 'sem_tabela';
+  if (tabela === 'nao_sei') {
+    console.error(`[044] sem resposta do banco sobre order_originals; original do pedido ${order.id} não guardado`);
+    return 'falhou';
+  }
 
   // Pergunta antes de montar a foto: o caso comum é já existir, e aí nem vale
   // o select rico (que puxa produtos e variantes de um pedido inteiro).
-  const { data: existente } = await supabase
+  const { data: existente, error: erroExistente } = await supabase
     .from('order_originals')
     .select('order_id')
     .eq('order_id', order.id)
+    .eq('company_id', order.company_id)
     .maybeSingle();
+  if (erroExistente) {
+    console.error(`[044] falha ao conferir o original do pedido ${order.id}: ${erroExistente.message}`);
+    return 'falhou';
+  }
   if (existente) return 'ja_tinha';
 
   let pedido: unknown = null;

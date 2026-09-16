@@ -79,6 +79,31 @@ export interface Order {
   updated_at: string;
 }
 
+/**
+ * Uma peça que a nota fiscal levou, como o Control informou (migração 048).
+ * `produto` e `tamanho` são os mesmos códigos que o GET /partner/v1/pedidos
+ * manda; `variant_id` é a variante do catálogo que o app achou para eles
+ * (null quando não achou — o item continua guardado).
+ */
+export interface ItemDaNota {
+  produto: string;
+  tamanho: string;
+  variant_id: string | null;
+  quantidade: number;
+  preco_unitario: number | null;
+}
+
+/** Uma nota fiscal do pedido (migração 048). Série vazia = o Control não mandou. */
+export interface NotaDoPedido {
+  numero: string;
+  serie: string;
+  emitida_em: string | null;
+  valor: number | null;
+  /** Preenchida quando a nota foi cancelada: os itens dela deixam de contar. */
+  cancelada_em: string | null;
+  itens: ItemDaNota[];
+}
+
 export interface OrderWithItems extends Order {
   items: OrderItem[];
   /**
@@ -93,6 +118,13 @@ export interface OrderWithItems extends Order {
    * fábrica está com a versão velha e alguém tem de atualizar lá.
    */
   erp_sync?: SincroniaComOErp | null;
+  /**
+   * As notas fiscais que o Control informou para este pedido (migração 048),
+   * com os itens que cada uma faturou de verdade. Nota cancelada continua na
+   * lista, com `cancelada_em`. Lista vazia = nenhuma nota chegou ainda, ou a
+   * 048 ainda não rodou. Ausente no cache offline.
+   */
+  notas?: NotaDoPedido[];
   /**
    * O link público do pedido (o mesmo do e-mail), montado pela API no
    * GET /orders/:id — o token é assinado no servidor. É o que o representante

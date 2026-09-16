@@ -262,6 +262,14 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
       await reply.status(409).send({ error: 'Pedido faturado não pode ser excluído', code: 'ORDER_INVOICED', statusCode: 409 });
       return;
     }
+    if (result.reason === 'tem_numero_erp') {
+      await reply.status(409).send({
+        error: 'Este pedido já está no Control e não pode ser excluído. Peça a correção ao financeiro.',
+        code: 'ORDER_HAS_ERP_NUMBER',
+        statusCode: 409,
+      });
+      return;
+    }
     if (result.reason === 'sem_copia') {
       // A cópia para a aba "Excluídos" não gravou — o pedido fica onde está.
       await reply.status(500).send({
@@ -288,7 +296,7 @@ export async function listDeletedOrdersHandler(request: FastifyRequest, reply: F
 }
 
 export async function setInvoicedHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
-  const { company_id, role, sub, venda_interna } = request.user;
+  const { company_id, role, sub, venda_interna, name } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(setInvoicedSchema, request.body, reply);
   if (!body) return;
@@ -304,18 +312,37 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
     return;
   }
 
-  const order = await setOrderInvoiced(id, company_id, body.invoiced, {
+  const r = await setOrderInvoiced(id, company_id, body.invoiced, {
     somenteDoRep: role === 'rep' ? sub : null,
+    por: sub,
+    por_nome: name ?? null,
   });
-  if (!order) {
+  if (!r.ok) {
+    if (r.reason === 'faturamento_pelo_control') {
+      await reply.status(409).send({
+        error: 'O faturamento deste pedido vem do Control pela integração — o botão manual está desligado nesta empresa.',
+        code: 'FATURAMENTO_PELO_CONTROL',
+        statusCode: 409,
+      });
+      return;
+    }
+    if (r.reason === 'erro') {
+      await reply.status(500).send({
+        error: 'Não foi possível gravar o faturamento — tente de novo',
+        code: 'UPDATE_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
     await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
     return;
   }
 
-  // A notícia que o rep mais espera — só no CARIMBO, nunca no desfazer.
-  if (body.invoiced) avisarFaturadoAoRep(company_id, order, sub);
+  // A notícia que o rep mais espera — só no CARIMBO de verdade: nunca no
+  // desfazer, e nunca no recarimbo de um pedido que já estava faturado.
+  if (body.invoiced && r.mudou) avisarFaturadoAoRep(company_id, r.order, sub);
 
-  await reply.send({ data: order });
+  await reply.send({ data: r.order });
 }
 
 export async function setDiscountHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
@@ -518,6 +545,13 @@ export async function setItemsHandler(request: FastifyRequest, reply: FastifyRep
         statusCode: 503,
       });
       return;
+    case 'original_nao_guardado':
+      await reply.status(503).send({
+        error: 'Não deu para guardar a cópia do pedido original antes de mexer nas peças. Nada foi alterado — tente de novo em instantes.',
+        code: 'ORIGINAL_NAO_GUARDADO',
+        statusCode: 503,
+      });
+      return;
     default:
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
   }
@@ -528,12 +562,12 @@ export async function corrigirNumeroErpHandler(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const { company_id } = request.user;
+  const { company_id, sub, name } = request.user;
   const { id } = request.params as { id: string };
   const body = await parseBody(corrigirNumeroErpSchema, request.body, reply);
   if (!body) return;
 
-  const r = await corrigirNumeroErp(id, company_id, body.erp_order_id);
+  const r = await corrigirNumeroErp(id, company_id, body.erp_order_id, { id: sub, nome: name ?? null });
   if (r.ok) {
     await reply.send({ data: { erp_order_id: r.erp_order_id } });
     return;
@@ -570,6 +604,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       { status: body.status, notes: body.notes ?? '', ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}) },
       role,
       request.user.venda_interna === true,
+      request.user.name ?? null,
     );
     if (!order) {
       await reply.status(404).send({ error: 'Pedido não encontrado', code: 'NOT_FOUND', statusCode: 404 });
@@ -596,6 +631,14 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
         error: 'Aprovar, recusar e lançar pedido no ERP é do financeiro',
         code: 'FORBIDDEN',
         statusCode: 403,
+      });
+      return;
+    }
+    if (err instanceof Error && err.message === 'CANAL_API') {
+      await reply.status(409).send({
+        error: 'Lançar no ERP pela tela está desligado nesta empresa: o número agora vem do Control pela API.',
+        code: 'CANAL_API',
+        statusCode: 409,
       });
       return;
     }
