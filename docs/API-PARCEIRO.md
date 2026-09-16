@@ -186,7 +186,9 @@ O canal muda o que o **app** faz também: com `pedido_erp = api`, o botão
 Control e a tela espera o número chegar pela sua confirmação; com
 `faturamento = api`, o botão manual de faturado some para todo mundo (o
 faturado só chega por `POST /faturamento`); com `catalogo = api`, o preço que
-vale é o que você manda (sobrescreve o da carga do catálogo).
+vale é o que você manda (sobrescreve o da carga do catálogo) e a importação de
+catálogo por planilha no app fica desligada — ela desfaria o preço e o estoque
+que você mandou.
 
 Com o canal em outro valor, a rota responde `409` **antes de ler o corpo ou os
 parâmetros** e sem gravar nada:

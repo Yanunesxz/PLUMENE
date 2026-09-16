@@ -1134,7 +1134,9 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         chegar pela sua confirmação; com <code>faturamento = api</code>, o botão
         manual de faturado some para todo mundo (o faturado só chega por
         <code>POST /faturamento</code>); com <code>catalogo = api</code>, o preço
-        que vale é o que você manda.
+        que vale é o que você manda, e a importação de catálogo por planilha no
+        aplicativo fica desligada (ela desfaria o preço e o estoque que você
+        mandou).
       </p>
       <p>
         Com o canal em outro valor, a rota responde <span class="st wr">409</span>
