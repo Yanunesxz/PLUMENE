@@ -28,6 +28,11 @@
 --    WHERE erp_code IS NOT NULL GROUP BY 1, 2 HAVING count(*) > 1;
 --   (a conferência exata pelo miolo só existe depois da função; hoje há 0
 --    códigos preenchidos nos dois bancos)
+--
+-- DEPOIS DA 050, NÃO RERODAR ESTE ARQUIVO: o bloco D recoloca a lista antiga do
+-- CHECK de order_erp_events.tipo (sem os tipos da 049 e sem
+-- 'solicitacao_cancelada'), e os eventos novos passam a ser recusados. Se
+-- precisar rerodar, rode a 049 e a 050 em seguida, nesta ordem.
 -- ─────────────────────────────────────────────────────────────────────────────
 
 

@@ -28,6 +28,11 @@
 --
 -- A 049 NÃO muda o canal de nenhuma empresa. Depois dela, NÃO rerode a 048: o
 -- bloco D dela recolocaria a lista antiga no CHECK de order_erp_events.tipo.
+--
+-- DEPOIS DA 050, NÃO RERODAR ESTE ARQUIVO: o bloco H recoloca a lista antiga do
+-- CHECK de order_erp_events.tipo (sem 'solicitacao_cancelada'), e o evento do
+-- cancelamento da solicitação passa a ser recusado (fica só no console). Se
+-- precisar rerodar, rode a 050 em seguida.
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- ─── 0. A 048 precisa estar aplicada ─────────────────────────────────────────
