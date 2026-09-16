@@ -24,7 +24,7 @@ SetorxWeb/
 | `package.json` | Scripts raiz (`dev:web`, `dev:api`, `seed`) e workspaces |
 | `pnpm-workspace.yaml` | Define os pacotes do monorepo |
 | `tsconfig.base.json` | Config TypeScript compartilhada |
-| `Dockerfile` + `railway.toml` | Build/deploy da **API** no Railway |
+| `Dockerfile` + `railway.toml` | Build/deploy da **API** no Railway. Uma instalação por marca: Corpo Sensual em `setorxweb-production.up.railway.app`, PLUMENE em `csbapi-production.up.railway.app` — as duas URLs (e a regra de uma chave de parceiro por marca) estão em `docs/API-PARCEIRO.md` |
 | `.claude/launch.json` | Servidor de preview (porta 5173) |
 | `vitest.config.ts` | Configuração dos testes (`pnpm test`) |
 | `README.md` | Visão geral |
@@ -47,6 +47,12 @@ packages/shared/src/
 ├── constants/            → uniões + rótulos PT
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
+├── pedidos/              → regras do pedido que a API e a tela precisam contar IGUAL
+│   ├── numeroErp.ts      → o número do Control ("SX14627"): normaliza, valida, sugere o próximo
+│   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido)
+│   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
+│   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
+│                           (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
 ├── cadastro/
 │   └── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
 │                           GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
@@ -261,6 +267,8 @@ apps/web/
     │   │                    BotaoTema (claro/escuro/automático)
     │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
     │   └── comercial/     → CartaoProduto, SeletorTamanho, CartaoDecisao (aprovar/recusar),
+    │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela,
+    │                        PedidoOriginal (o original x o faturado, peça por peça),
     │                        grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)

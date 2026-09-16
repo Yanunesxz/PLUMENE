@@ -66,6 +66,30 @@ site ── CRM (CSP 360) ──┬── app Corpo Sensual ──┬── ERP 
 - O comando do §8 sobre `partner/v1` devolve dois comentários, não vazio.
 - No CRM: `mapearStatus` faz `invoiced === true` vencer qualquer status (até `rejected`); o catch do insert de clientes não descarta pedidos (caem em "A vincular"); `deleted_orders` é filtrada por `deleted_at` (a falta de trigger é irrelevante ali); peças são reescritas se `orcamento` OU pedido sem itens.
 
+### 0.5 Fase 0 implementada (branch `mudanca/app-control-fase-0`)
+
+O que a auditoria apontou virou código, na worktree `SetorxWeb-control`, ainda **fora do `main`**. Resumo do que mudou — o contrato vivo é `docs/API-PARCEIRO.md` + `apps/web/public/api-parceiro.html` (a mesma especificação nos dois), que já descrevem **nove** rotas; o §2.2 deste brief fala de seis e está defasado.
+
+**O que mudou no app**
+
+- **Canal por empresa** (`companies.canal_*`, migração 048, `apps/api/src/lib/canais.ts`): cada fluxo tem um escritor só. A API de parceiro responde `409 CANAL_FECHADO` nas rotas que gravam enquanto o canal daquela empresa não for `'api'`; `GET /partner/v1/status` devolve `canais`. Padrões = o comportamento de hoje (manual/carga), então **sem a 048 a API fica fechada**.
+- **Três rotas novas**, todas só de leitura menos a primeira: `POST /partner/v1/pedidos/:id/conciliar` (dá número ao passivo `sent_erp` sem número), `GET /partner/v1/conciliacao` (só contagens) e `GET /partner/v1/pedidos/excluidos`.
+- **Faturamento idempotente**: campo ausente não apaga, `null` limpa, momento sem fuso é ignorado, só `approved`/`sent_erp` fatura, contador `inalterados`, e os campos novos `nota` e `itens` (tabelas `order_invoices` e `order_invoice_items`, 048) — com aviso e sem perder o resto quando a 048 ainda não rodou. Resolve o 0.2.1.
+- **Cadastros que não apagam o que não veio** em `POST /clientes` e `/representantes`, com `sem_mudanca`, miolo do código, colunas da 041 gravadas, `legal_name` e o e-mail do Control que **não** troca o login. Resolve o 0.3 (`/clientes` apaga, `/representantes`) e o 0.2.4.
+- **Fila sem pedido faturado**, corrida do `confirmOrderImport` fechada (`.is('erp_order_id', null)`), tabela do pedido (`orders.price_table_id`) no `GET /pedidos` e lista inteira com `buscarTudoOuFalhar`. Resolve o resto do 0.3.
+- **Rastro**: toda chamada do parceiro em `erp_sync_log` e todo acontecimento do pedido com o Control em `order_erp_events` (048), sem dado de cliente.
+- **Tela**: pedido com número do Control não pode ser excluído (`409 ORDER_HAS_ERP_NUMBER`); com `canal_pedido_erp='api'`, lançar no ERP pela tela responde `409 CANAL_API` (corrigir o número continua); com `canal_faturamento='api'`, o botão manual de faturado responde `409 FATURAMENTO_PELO_CONTROL`; edição de peças sem foto do original responde `503 ORIGINAL_NAO_GUARDADO`.
+- **Firebird e scripts travados**: o sync TS só roda para empresa com `canal_catalogo='firebird'` / `canal_cadastro='firebird'`; o `sync.py` recusa todo modo que grava sem `ERP_SYNC_PY_LIBERADO=sim` na janela do terminal, e o `push-orders` exige ainda `canal_pedido_erp='sync_py'`; `faturar-retroativo.mjs` exige `--empresa=<uuid>` e só grava com `--aplicar`; `seedDemoOrders` exige empresa explícita.
+
+**O que depende do Yan (nesta ordem)**
+
+1. **Reservar o número 048 por mensagem** entre as sessões antes do merge (regra do CLAUDE.md).
+2. **Só na Corpo Sensual:** rodar a consulta de repetidos do cabeçalho de `_tools/SQL-PARA-RODAR-013-042-NA-CS.sql` (deve vir vazia) e colar o arquivo — é a 013 inteira + o índice único da 042, que ainda faltam lá.
+3. **Nos dois bancos:** rodar as duas consultas do cabeçalho de `_tools/SQL-PARA-RODAR-048.sql` (`price_column` fora de 1–6 e `erp_code` repetido; as duas devem vir vazias), colar o arquivo e conferir com `node _tools/conferir-048.mjs` e `node _tools/conferir-048.mjs <raiz da PLUMENE>`.
+4. **Ler e aprovar o texto publicado** (`docs/API-PARCEIRO.md` e `apps/web/public/api-parceiro.html`): ele vai ao ar no Vercel quando a branch entrar no `main`.
+5. **Conferir no Railway e no Vercel** qual serviço é de qual marca antes de publicar a tabela de URLs (Corpo Sensual `setorxweb-production`, PLUMENE `csbapi-production`) e configurar `PARTNER_API_KEYS` com **uma chave por marca**.
+6. **Virar canal é um `UPDATE companies SET canal_… = 'api'`** por empresa, no SQL Editor, combinado com o Fábio. Enquanto não virar, a API responde `409 CANAL_FECHADO` e nada muda para quem usa o app hoje.
+
 ---
 
 ## 1. ESTADO ATUAL
