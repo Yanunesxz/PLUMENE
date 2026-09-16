@@ -27,6 +27,7 @@ const PaginaLogins = lazy(() => import('../modules/logins/PaginaLogins.js').then
 const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLoja.js').then((m) => ({ default: m.PaginaMinhaAreaLoja })));
 const PaginaAtividades = lazy(() => import('../modules/atividades/PaginaAtividades.js').then((m) => ({ default: m.PaginaAtividades })));
 const PaginaAlertas = lazy(() => import('../modules/alertas/PaginaAlertas.js').then((m) => ({ default: m.PaginaAlertas })));
+const PaginaIntegracao = lazy(() => import('../modules/integracao/PaginaIntegracao.js').then((m) => ({ default: m.PaginaIntegracao })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
 const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
@@ -145,6 +146,14 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'logins',
             element: <PrivateRoute roles={['admin']} />,
             children: [{ index: true, element: <AoCarregar><PaginaLogins /></AoCarregar> }],
+          },
+          {
+            // O estado da integração com o Control e o botão de pedir uma
+            // passada agora. O gerente olha; financeiro e admin pedem (a
+            // API nega o PATCH ao gerente e a tela esconde o botão).
+            path: 'integracao',
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaIntegracao /></AoCarregar> }],
           },
         ],
       },
