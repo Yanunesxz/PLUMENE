@@ -10,7 +10,7 @@ antes do `main`. Localize por nome de função. Se mexer no script, atualize aqu
 | Arquivo | O que é |
 |---|---|
 | `sync.py` | O agente. Lê o Firebird 2.5 do Control e grava no Supabase — e, num modo só, faz o caminho inverso (ver **push-orders**). |
-| `photos.py` | Ingestão única de fotos: pasta de rede MARKETING → Supabase Storage → `products.image_url` (`photos.py:3-16`). Não toca no Firebird. |
+| `photos.py` | Ingestão única de fotos: pasta de rede MARKETING → Supabase Storage → `products.image_url` (`photos.py:3-16`). Não toca no Firebird, mas **escreve no catálogo** — por isso pede as mesmas travas do `sync.py`: `ERP_SYNC_PY_LIBERADO=sim` no ambiente da execução e `companies.canal_catalogo='firebird'` na `COMPANY_ID` (ver `conferir_travas`). `--dry-run` continua livre. |
 | `.env.example` | As variáveis que o agente lê. Copie para `.env` ao lado do script. |
 | `skus_sem_foto.txt`, `skus_sem_preco.txt` | Saídas de rodadas antigas do `photos.py` e do `--mode prices-audit`. Só diagnóstico. |
 | `fbembed25_x64/` (não versionada) | As DLLs do Firebird. O script procura primeiro aqui e depois em `_tools/firebird-reader/fbembed25_x64` (`sync.py:38-42`) — **essa segunda pasta não existe no disco**; sem as DLLs ao lado do script, nada sobe. |

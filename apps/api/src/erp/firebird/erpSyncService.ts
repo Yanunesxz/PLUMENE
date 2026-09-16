@@ -347,6 +347,13 @@ export async function syncCustomers(company_id: string): Promise<SyncResult> {
       email: c.EMAIL?.trim() ?? null,
       // Sempre agora: o CRM lê `customers` por `updated_at` com folga de 15 min.
       // A DATA_UPDATE do ERP (antiga) esconderia a gravação dele.
+      //
+      // RESSALVA para quem um dia ligar `canal_cadastro='firebird'` (hoje
+      // nenhuma empresa está nesse canal, e sem ele esta parte nem roda): este
+      // upsert manda a base INTEIRA a cada rodada, então carimba `updated_at`
+      // em cliente que não mudou e o CRM relê os 2.600+ toda vez. O jeito certo
+      // é comparar linha a linha antes, como o `receberClientes` da API de
+      // parceiro faz (`mesmoValor`), e só mandar — com `updated_at` — quem mudou.
       updated_at: new Date().toISOString(),
     }));
 

@@ -220,7 +220,11 @@ apps/api/src/
 │
 └── jobs/
     ├── seed.ts           → popula dados de teste (pnpm seed)
-    ├── seedDemoOrders.ts → pedidos de demonstração: exige --empresa=<uuid>, recusa produção
+    ├── liberacaoDoAmbiente.ts → copia process.env ANTES do dotenv: o "sim" de quem roda
+    │                            não pode vir do .env (que aponta para produção)
+    ├── seedDemoOrders.ts → pedidos de demonstração: exige --empresa=<uuid> e
+    │                       SEED_DEMO_LIBERADO=sim no ambiente, recusa produção, e o
+    │                       DELETE de pedido vazio nunca pega pedido com número do Control
     └── erpSyncScheduler.ts → agenda o sync periódico (só empresas com canal 'firebird')
 ```
 
@@ -326,7 +330,9 @@ _tools/
 │   │                Trava no código (fase 0): os modos que gravam recusam sem a env
 │   │                ERP_SYNC_PY_LIBERADO=sim NA JANELA do terminal (no .env não vale); o
 │   │                push-orders exige ainda companies.canal_pedido_erp='sync_py'.
-│   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url
+│   ├── photos.py  → fotos da pasta MARKETING → Supabase Storage → products.image_url.
+│   │                Também grava no catálogo: mesmas travas do sync.py
+│   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
 ├── SQL-PARA-RODAR-048.sql         → a 048 para colar nos DOIS bancos (termina com o NOTIFY). Conferir
 │                                    depois com node _tools/conferir-048.mjs [raiz da PLUMENE]
@@ -346,7 +352,8 @@ _tools/
                  → cargas e consertos pontuais direto no Supabase (fora do app).
                    faturar-retroativo.mjs exige --empresa=<uuid>, é ensaio por padrão
                    (--aplicar grava) e recusa empresa com canal_faturamento='api'.
-                   apps/api/src/jobs/seedDemoOrders.ts também exige --empresa=<uuid>.
+                   apps/api/src/jobs/seedDemoOrders.ts também exige --empresa=<uuid>
+                   e SEED_DEMO_LIBERADO=sim no ambiente da execução.
 ```
 
 > `_tools/firebird-reader/` **não existe no disco** (este mapa a listava). O `sync.py:38-42`

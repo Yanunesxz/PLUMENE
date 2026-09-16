@@ -58,6 +58,15 @@ ALTER TABLE erp_sync_log
 CREATE INDEX IF NOT EXISTS idx_erp_sync_log_rota
   ON erp_sync_log (company_id, rota, started_at DESC);
 
+-- EXPURGO (combinado, não automático): a tabela só cresce. Chamada com chave
+-- errada também entra — é o que interessa ver —, e requisição SEM chave nenhuma
+-- não entra (partner.chamada.ts, `vaiParaOLog`), senão qualquer varredura da
+-- internet escreveria aqui. Quando o registro passar de uns meses, rode à mão;
+-- o índice acima atende o filtro:
+--
+--   DELETE FROM erp_sync_log
+--    WHERE sync_type = 'parceiro' AND started_at < now() - interval '180 days';
+
 
 -- ─── B. Canal oficial de cada fluxo, por empresa ─────────────────────────────
 -- Um fluxo tem UM escritor. Os padrões reproduzem o comportamento de hoje
@@ -200,6 +209,16 @@ ALTER TABLE price_tables ADD CONSTRAINT chk_price_tables_price_column_1_a_6
 CREATE UNIQUE INDEX IF NOT EXISTS idx_price_tables_erp_code_miolo
   ON price_tables (company_id, public.codigo_miolo(erp_code))
   WHERE erp_code IS NOT NULL;
+
+-- ATENÇÃO, no dia em que o CORPO de codigo_miolo() mudar (por exemplo para
+-- tirar também ponto ou hífen, acompanhando codigoErp.ts): o Postgres aceita o
+-- CREATE OR REPLACE acima e NÃO reconstrói este índice — ele continua guardando
+-- as chaves da regra antiga, e dois códigos que a regra nova considera iguais
+-- entram sem colidir, em silêncio. Depois de mudar a função, rode:
+--
+--   REINDEX INDEX idx_price_tables_erp_code_miolo;
+--
+-- (e confira antes os repetidos com a consulta do fim deste arquivo).
 
 
 -- ─── H. users.updated_at ─────────────────────────────────────────────────────
