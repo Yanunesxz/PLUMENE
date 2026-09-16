@@ -24,7 +24,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { SeletorDeTabela } from '../../components/comercial/SeletorDeTabela.js';
 import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
-import { situacaoDoCliente, type NivelDaCarteira } from '../../lib/carteira.js';
+import { dataDaUltimaCompra, situacaoDoCliente, type NivelDaCarteira } from '../../lib/carteira.js';
 import { mesmoCodigoErp } from '../../lib/codigoErp.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import {
@@ -674,7 +674,7 @@ export function PaginaClientes() {
                     >
                       {situacao.rotulo}
                       {customer.last_purchase_at
-                        ? ` · ${new Date(customer.last_purchase_at).toLocaleDateString('pt-BR')}`
+                        ? ` · ${dataDaUltimaCompra(customer.last_purchase_at) ?? ''}`
                         : ''}
                     </p>
                   )}
