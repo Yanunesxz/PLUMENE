@@ -371,3 +371,80 @@ describe('GET /partner/v1/status com os canais virados (048 aplicada)', () => {
     });
   });
 });
+
+describe('GET /partner/v1/status com "Sincronizar agora" pedido (049) — o pedido expira em 15 min', () => {
+  const MIN = 60_000;
+
+  /** A empresa com os canais na API e o carimbo do pedido `minutosAtras`. */
+  async function subirCom(minutosAtras: number) {
+    process.env['PARTNER_API_KEYS'] = CHAVES;
+    vi.resetModules();
+    const solicitado_em = new Date(Date.now() - minutosAtras * MIN).toISOString();
+    // Fila de um item: as sondas e as duas leituras de companies recebem a mesma linha.
+    const fake = criarSupabaseFake({
+      companies: {
+        data: {
+          canal_pedido_erp: 'api',
+          canal_faturamento: 'api',
+          canal_cadastro: 'api',
+          canal_retrato: 'carga',
+          canal_catalogo: 'carga',
+          sync_solicitado_em: solicitado_em,
+          sync_solicitado_por: '00000000-0000-0000-0000-0000000000f1',
+        },
+        error: null,
+      },
+    });
+    vi.doMock(SUPABASE, () => ({ supabase: fake.cliente }));
+    const { buildApp } = await import('../apps/api/src/app.js');
+    const app = await buildApp();
+    await app.ready();
+    return { app, fake, solicitado_em };
+  }
+
+  afterEach(() => {
+    vi.doUnmock(SUPABASE);
+    delete process.env['PARTNER_API_KEYS'];
+  });
+
+  it('pedido de 2 min atrás: sincronizar_agora true, com o solicitado_em para o aviso de concluída', async () => {
+    const { app, fake, solicitado_em } = await subirCom(2);
+    try {
+      const antes = fake.gravacoes.length;
+      const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+
+      expect(res.statusCode).toBe(200);
+      expect(res.json()).toMatchObject({ ok: true, sincronizar_agora: true, solicitado_em });
+      await vi.waitFor(() => {
+        expect(fake.gravacoes.slice(antes).some((g) => g.tabela === 'erp_sync_log')).toBe(true);
+      });
+      const linha = fake.ultimaGravacao('erp_sync_log', 'insert')?.valores as Record<string, unknown>;
+      expect(linha['detalhe']).toMatchObject({ sincronizar_agora: true });
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it('pedido de 20 min atrás: expirou — sincronizar_agora false, o solicitado_em continua saindo, e fica anotado', async () => {
+    const { app, fake, solicitado_em } = await subirCom(20);
+    try {
+      const antes = fake.gravacoes.length;
+      const res = await app.inject({ method: 'GET', url: '/partner/v1/status', headers: { 'x-api-key': CHAVE } });
+
+      expect(res.statusCode).toBe(200);
+      const corpo = res.json() as Record<string, unknown>;
+      expect(corpo).toMatchObject({ ok: true, sincronizar_agora: false, solicitado_em });
+      // Os campos não mudam: nada novo no contrato do parceiro.
+      expect(Object.keys(corpo).sort()).toEqual(['canais', 'ok', 'parceiro', 'servidor_hora', 'sincronizar_agora', 'solicitado_em']);
+      await vi.waitFor(() => {
+        expect(fake.gravacoes.slice(antes).some((g) => g.tabela === 'erp_sync_log')).toBe(true);
+      });
+      const linha = fake.ultimaGravacao('erp_sync_log', 'insert')?.valores as Record<string, unknown>;
+      expect(linha['detalhe']).toMatchObject({ sincronizar_agora: 'expirado' });
+      // Ler o status nunca limpa o pedido: quem limpa é o aviso de concluída.
+      expect(fake.gravacoes.filter((g) => g.tabela === 'companies')).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+});

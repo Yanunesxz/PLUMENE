@@ -62,6 +62,12 @@ interface EstadoDaIntegracao {
   canais: Canais | null;
   sincronizar_agora: boolean;
   solicitacao: SolicitacaoDeSync | null;
+  /**
+   * O pedido pendente e se já expirou (15 min sem o Control concluir). Opcional
+   * de propósito: a tela pode subir antes da API que devolve o campo — sem ele,
+   * nada está expirado, como antes.
+   */
+  sincronizacao?: { solicitado_em: string | null; expirado: boolean };
   chamadas: UltimaChamada[] | null;
   fila: ContagensDaFila | null;
   migracoes: {
@@ -165,8 +171,16 @@ export function PaginaIntegracao() {
     try {
       const r = await api.patch<ApiResponse<RespostaDoPedido>>('/erp/integracao/sincronizar', {}, token);
       setEstado((atual) =>
-        atual ? { ...atual, sincronizar_agora: true, solicitacao: r.data.solicitacao } : atual,
+        atual
+          ? {
+              ...atual,
+              sincronizar_agora: true,
+              solicitacao: r.data.solicitacao,
+              sincronizacao: { solicitado_em: r.data.solicitacao.solicitado_em, expirado: false },
+            }
+          : atual,
       );
+      setAgora(Date.now());
       setToast({
         message: r.data.ja_solicitado
           ? 'Já havia um pedido registrado; o Control puxa na próxima passagem.'
@@ -184,6 +198,10 @@ export function PaginaIntegracao() {
   };
 
   const pendente = estado?.solicitacao ?? null;
+  // Expirado (15 min sem o Control concluir): o Control não roda mais por este
+  // pedido, e o botão volta a poder pedir.
+  const expirado = Boolean(pendente) && estado?.sincronizacao?.expirado === true;
+  const aguardando = Boolean(pendente) && !expirado;
 
   return (
     <div className="p-4 md:p-6">
@@ -236,6 +254,21 @@ export function PaginaIntegracao() {
                   A migração 049 ainda não rodou neste banco: o pedido de sincronização ainda não tem onde
                   ficar. O Control continua passando sozinho, nos intervalos dele.
                 </p>
+              ) : pendente && expirado ? (
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-danger" strokeWidth={2} />
+                  <div className="text-sm">
+                    <p className="font-medium text-foreground">
+                      Pedido expirado (o Control não respondeu em 15 min).
+                    </p>
+                    <p className="text-muted-foreground">
+                      O pedido foi registrado {quando(pendente.solicitado_em)}
+                      {pendente.solicitado_por_nome ? ` por ${pendente.solicitado_por_nome}` : ''} (
+                      {haQuanto(pendente.solicitado_em, agora)}) e o Control não avisou que rodou. Ele não
+                      roda mais por este pedido: veja as chamadas abaixo e, se precisar, peça de novo.
+                    </p>
+                  </div>
+                </div>
               ) : pendente ? (
                 <div className="flex items-start gap-3">
                   <Clock3 className="mt-0.5 h-5 w-5 shrink-0 text-warn-soft-foreground" strokeWidth={2} />
@@ -247,7 +280,8 @@ export function PaginaIntegracao() {
                     </p>
                     <p className="text-muted-foreground">
                       O Control puxa na próxima passagem e avisa quando terminar — aí este aviso some. Se
-                      passar de uns 10 minutos, o Control não está chegando aqui: veja as chamadas abaixo.
+                      passar de 15 minutos, o pedido expira: o Control não está chegando aqui — veja as
+                      chamadas abaixo.
                     </p>
                   </div>
                 </div>
@@ -263,9 +297,15 @@ export function PaginaIntegracao() {
 
               {podePedir && estado.migracoes.sincronizacao && (
                 <div className="mt-4 flex justify-end">
-                  <Button disabled={pedindo || Boolean(pendente)} onClick={() => void pedir()}>
+                  <Button disabled={pedindo || aguardando} onClick={() => void pedir()}>
                     <Radio className="h-4 w-4" strokeWidth={2.5} />
-                    {pedindo ? 'Registrando…' : pendente ? 'Já pedido' : 'Pedir sincronização agora'}
+                    {pedindo
+                      ? 'Registrando…'
+                      : aguardando
+                        ? 'Já pedido'
+                        : expirado
+                          ? 'Pedir de novo'
+                          : 'Pedir sincronização agora'}
                   </Button>
                 </div>
               )}

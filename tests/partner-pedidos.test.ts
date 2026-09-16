@@ -1237,7 +1237,7 @@ async function carregarController(resultado: unknown, canalPedido = 'api') {
   const getPartnerOrders = vi.fn().mockResolvedValue(resultado);
   vi.doMock(SERVICO, () => ({ confirmOrderImport, getPartnerOrders }));
   vi.doMock(INTEGRACAO, () => ({
-    lerSolicitacaoDeSync: vi.fn().mockResolvedValue({ migracao: true, solicitacao: null }),
+    lerSolicitacaoDeSync: vi.fn().mockResolvedValue({ migracao: true, solicitacao: null, expirado: false }),
   }));
   const { partnerConfirmOrderHandler, partnerOrdersHandler } = await import(
     '../apps/api/src/modules/partner/partner.controller.js'
@@ -1266,6 +1266,8 @@ async function carregarStatus(resposta: boolean | Error) {
           solicitacao: resposta
             ? { solicitado_em: SOLICITADO_EM, solicitado_por: 'fin-1', solicitado_por_nome: 'Ana Financeiro' }
             : null,
+          // A leitura já diz se expirou (expiracaoDoSync.ts); aqui, pedido dentro dos 15 min.
+          expirado: false,
         });
   vi.doMock(INTEGRACAO, () => ({ lerSolicitacaoDeSync }));
   const { partnerStatusHandler } = await import('../apps/api/src/modules/partner/partner.controller.js');

@@ -107,18 +107,27 @@ export async function partnerStatusHandler(
   // segue o horário normal dele) e fica anotado. É sempre booleano, para o
   // robô do parceiro não ter de interpretar um terceiro valor; `solicitado_em`
   // é o que ele devolve no aviso de concluída.
+  //
+  // O pedido EXPIRA em 15 minutos (expiracaoDoSync.ts; a leitura já diz se
+  // expirou, a mesma que a tela usa): mais velho que isso, `sincronizar_agora`
+  // é false — o Control que voltar depois de horas parado não roda uma rodada
+  // que ninguém espera mais — e o `solicitado_em` continua saindo, para
+  // diagnóstico.
   let sincronizar_agora = false;
   let solicitado_em: string | null = null;
+  let expirado = false;
   try {
-    const { solicitacao } = await lerSolicitacaoDeSync(partner.company_id);
-    sincronizar_agora = Boolean(solicitacao);
-    solicitado_em = solicitacao?.solicitado_em ?? null;
+    const lida = await lerSolicitacaoDeSync(partner.company_id);
+    solicitado_em = lida.solicitacao?.solicitado_em ?? null;
+    expirado = Boolean(lida.solicitacao && lida.expirado);
+    sincronizar_agora = Boolean(lida.solicitacao) && !expirado;
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     console.error(`[parceiro] /status sem resposta do banco sobre o "sincronizar agora": ${msg}`);
     anotarChamada(request, { detalhe: { sincronizar_agora: 'nao_lido' } });
   }
   if (sincronizar_agora) anotarChamada(request, { detalhe: { sincronizar_agora: true } });
+  else if (expirado) anotarChamada(request, { detalhe: { sincronizar_agora: 'expirado' } });
 
   await reply.send({
     ok: true,

@@ -2,6 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import crypto from 'node:crypto';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { criarSupabaseFake, type Filtro, type RespostaTabela } from './supabaseFake.js';
+import {
+  EXPIRACAO_DO_PEDIDO_DE_SYNC_MS,
+  pedidoDeSyncExpirado,
+} from '../apps/api/src/modules/integracao/expiracaoDoSync.js';
 
 /**
  * A tela da integração com o Control (decisão 7 de 16/09/2026):
@@ -11,7 +15,10 @@ import { criarSupabaseFake, type Filtro, type RespostaTabela } from './supabaseF
  *     fila em contagens (count exact + head), tudo pela empresa do token.
  *     Cada bloco falha sozinho: `null` + aviso, e o resto sai.
  *   • PATCH /erp/integracao/sincronizar — grava companies.sync_solicitado_em
- *     (049) UMA vez: pedido pendente não é regravado.
+ *     (049) UMA vez: pedido pendente não é regravado — a não ser que tenha
+ *     EXPIRADO (15 min sem o Control concluir): aí grava um carimbo novo.
+ *   • O pedido expira em 15 min: a tela recebe `sincronizacao.expirado` e o
+ *     `sincronizar_agora` vira false (o mesmo valor que o Control vê).
  *   • POST /partner/v1/sincronizacao { concluida: true } — o Control limpa o
  *     pedido; sem pedido, nada gravado; pedido mais novo que o que ele viu fica.
  *
@@ -51,6 +58,13 @@ const PEDIDO_EM = '2026-09-16T14:00:00.000Z';
 const SEM_PEDIDO: RespostaTabela = { data: { sync_solicitado_em: null, sync_solicitado_por: null }, error: null };
 const COM_PEDIDO: RespostaTabela = { data: { sync_solicitado_em: PEDIDO_EM, sync_solicitado_por: USUARIO }, error: null };
 const NOME: RespostaTabela = { data: { name: 'Ana Financeiro' }, error: null };
+
+/** O relógio do teste, a partir do pedido: só `Date` é falsificado. */
+const depoisDoPedido = (ms: number) => {
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date(Date.parse(PEDIDO_EM) + ms));
+};
+const MIN = 60_000;
 
 const linhaDoRegistro = (over: Record<string, unknown>): RespostaTabela => ({
   data: [
@@ -131,6 +145,7 @@ beforeEach(() => {
   vi.resetModules();
 });
 afterEach(async () => {
+  vi.useRealTimers();
   vi.doUnmock(SUPABASE);
   vi.doUnmock(AUTH_PARCEIRO);
   vi.restoreAllMocks();
@@ -141,6 +156,7 @@ afterEach(async () => {
 
 describe('lerEstadoDaIntegracao', () => {
   it('com a 048 e a 049: canais, pedido pendente com o nome, última chamada por rota e a fila em contagens', async () => {
+    depoisDoPedido(5 * MIN);
     const { lerEstadoDaIntegracao, ROTAS_DO_PARCEIRO, fake } = await carregar({
       // sonda canal_pedido_erp, a linha dos canais, sonda sync_solicitado_em, a linha do pedido
       companies: emSequencia(SONDA_OK, CANAIS_LIGADOS, SONDA_OK, COM_PEDIDO),
@@ -165,6 +181,7 @@ describe('lerEstadoDaIntegracao', () => {
       solicitado_por: USUARIO,
       solicitado_por_nome: 'Ana Financeiro',
     });
+    expect(estado.sincronizacao).toEqual({ solicitado_em: PEDIDO_EM, expirado: false });
     // O nome é lido dentro da empresa do token.
     expect(fake.filtrosDe('users', 'eq').map((f) => f.args)).toEqual(
       expect.arrayContaining([['id', USUARIO], ['company_id', EMPRESA]]),
@@ -248,6 +265,7 @@ describe('lerEstadoDaIntegracao', () => {
     expect(estado.canais).toMatchObject({ pedido_erp: 'manual', faturamento: 'manual', cadastro: 'carga', migracao: false });
     expect(estado.sincronizar_agora).toBe(false);
     expect(estado.solicitacao).toBeNull();
+    expect(estado.sincronizacao).toEqual({ solicitado_em: null, expirado: false });
     expect(estado.chamadas).toEqual([]);
     expect(estado.fila).toEqual({
       aguardando_clique: null,
@@ -259,6 +277,31 @@ describe('lerEstadoDaIntegracao', () => {
     expect(fake.filtrosDe('orders').some((f) => f.metodo !== 'select' && f.args[0] === 'erp_requested_at')).toBe(false);
     // Só uma leitura de companies (a sonda): sem a 048 não se lê a empresa.
     expect(consultasDe(fake.filtrosDe('companies'))).toHaveLength(2);
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('pedido com mais de 15 min sem o Control concluir: expirado — sincronizar_agora false, o pedido continua aparecendo', async () => {
+    depoisDoPedido(16 * MIN);
+    const { lerEstadoDaIntegracao, fake } = await carregar({
+      companies: emSequencia(SONDA_OK, CANAIS_LIGADOS, SONDA_OK, COM_PEDIDO),
+      users: NOME,
+      erp_sync_log: semColuna('erp_sync_log.rota'),
+      orders: [SONDA_OK, SONDA_OK, SONDA_OK, SONDA_OK, contagem(0)],
+    });
+
+    const estado = await lerEstadoDaIntegracao(EMPRESA);
+
+    expect(estado.avisos).toEqual([]);
+    expect(estado.migracoes.sincronizacao).toBe(true);
+    expect(estado.sincronizar_agora).toBe(false);
+    expect(estado.sincronizacao).toEqual({ solicitado_em: PEDIDO_EM, expirado: true });
+    // Quem pediu e quando continuam na tela: é o que explica o "expirado".
+    expect(estado.solicitacao).toEqual({
+      solicitado_em: PEDIDO_EM,
+      solicitado_por: USUARIO,
+      solicitado_por_nome: 'Ana Financeiro',
+    });
+    // Ler o estado nunca limpa nem regrava o pedido expirado.
     expect(fake.gravacoes).toEqual([]);
   });
 
@@ -331,7 +374,8 @@ describe('pedirSincronizacao', () => {
     expect(filtros).toEqual(expect.arrayContaining([['eq', 'id', EMPRESA], ['is', 'sync_solicitado_em', null]]));
   });
 
-  it('com pedido pendente: não grava de novo e devolve o que está lá', async () => {
+  it('com pedido pendente (dentro dos 15 min): não grava de novo e devolve o que está lá', async () => {
+    depoisDoPedido(15 * MIN);
     const { pedirSincronizacao, fake } = await carregar({
       companies: emSequencia(SONDA_OK, COM_PEDIDO),
       users: NOME,
@@ -345,6 +389,108 @@ describe('pedirSincronizacao', () => {
       solicitacao: { solicitado_em: PEDIDO_EM, solicitado_por: USUARIO, solicitado_por_nome: 'Ana Financeiro' },
     });
     expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('com pedido EXPIRADO: grava um carimbo novo por cima, só se o expirado ainda for o que está lá', async () => {
+    depoisDoPedido(20 * MIN);
+    const NOVO = new Date(Date.parse(PEDIDO_EM) + 20 * MIN).toISOString();
+    const GRAVOU: RespostaTabela = { data: [{ sync_solicitado_em: NOVO, sync_solicitado_por: 'fin-2' }], error: null };
+    const { pedirSincronizacao, fake } = await carregar({
+      companies: emSequencia(SONDA_OK, COM_PEDIDO, GRAVOU),
+      users: NOME,
+    });
+
+    const r = await pedirSincronizacao(EMPRESA, { id: 'fin-2', nome: 'Bia Financeiro' });
+
+    expect(r).toEqual({
+      ok: true,
+      ja_solicitado: false,
+      solicitacao: { solicitado_em: NOVO, solicitado_por: 'fin-2', solicitado_por_nome: 'Bia Financeiro' },
+    });
+    const v = fake.ultimaGravacao('companies', 'update')!.valores as Record<string, unknown>;
+    expect(Object.keys(v).sort()).toEqual(['sync_solicitado_em', 'sync_solicitado_por']);
+    expect(v['sync_solicitado_por']).toBe('fin-2');
+    expect(v['sync_solicitado_em']).toBe(NOVO);
+    const filtros = fake.filtrosDe('companies').map((f) => [f.metodo, ...f.args]);
+    expect(filtros).toEqual(expect.arrayContaining([['eq', 'id', EMPRESA], ['eq', 'sync_solicitado_em', PEDIDO_EM]]));
+    expect(filtros).not.toContainEqual(['is', 'sync_solicitado_em', null]);
+  });
+
+  it('pedido expirado e outro clique regravou no meio: responde pelo pedido novo, sem gravar de novo', async () => {
+    depoisDoPedido(20 * MIN);
+    const NOVO = new Date(Date.parse(PEDIDO_EM) + 19 * MIN).toISOString();
+    const NINGUEM: RespostaTabela = { data: [], error: null };
+    const COM_PEDIDO_NOVO: RespostaTabela = { data: { sync_solicitado_em: NOVO, sync_solicitado_por: USUARIO }, error: null };
+    const { pedirSincronizacao, fake } = await carregar({
+      // sonda, o pedido expirado, o UPDATE que ninguém afetou, a releitura
+      companies: emSequencia(SONDA_OK, COM_PEDIDO, NINGUEM, COM_PEDIDO_NOVO),
+      users: NOME,
+    });
+
+    const r = await pedirSincronizacao(EMPRESA, { id: 'fin-2', nome: 'Bia Financeiro' });
+
+    expect(r).toEqual({
+      ok: true,
+      ja_solicitado: true,
+      solicitacao: { solicitado_em: NOVO, solicitado_por: USUARIO, solicitado_por_nome: 'Ana Financeiro' },
+    });
+    expect(fake.gravacoes.filter((g) => g.operacao === 'update')).toHaveLength(1);
+  });
+
+  it('UPDATE que ninguém afeta duas vezes seguidas: lança (vira 503 "tente de novo"), sem laço infinito', async () => {
+    const NINGUEM: RespostaTabela = { data: [], error: null };
+    const { pedirSincronizacao, fake } = await carregar({
+      companies: emSequencia(SONDA_OK, SEM_PEDIDO, NINGUEM, SEM_PEDIDO, NINGUEM),
+    });
+
+    await expect(pedirSincronizacao(EMPRESA, { id: USUARIO, nome: 'Ana Financeiro' })).rejects.toThrow(/nenhuma linha gravada/);
+    expect(fake.gravacoes.filter((g) => g.operacao === 'update')).toHaveLength(2);
+  });
+});
+
+// ─── A expiração do pedido (expiracaoDoSync.ts) ──────────────────────────────
+
+describe('expiração do "Sincronizar agora"', () => {
+  const base = Date.parse(PEDIDO_EM);
+
+  it('é uma constante só, de 15 minutos', () => {
+    expect(EXPIRACAO_DO_PEDIDO_DE_SYNC_MS).toBe(15 * 60 * 1000);
+  });
+
+  it('até 15 min inclusive vale; passou disso, expirou; sem pedido nada expira; data ilegível conta como expirada', () => {
+    expect(pedidoDeSyncExpirado(PEDIDO_EM, base)).toBe(false);
+    expect(pedidoDeSyncExpirado(PEDIDO_EM, base + 15 * MIN)).toBe(false);
+    expect(pedidoDeSyncExpirado(PEDIDO_EM, base + 15 * MIN + 1)).toBe(true);
+    // Relógio do servidor atrás do carimbo: vale.
+    expect(pedidoDeSyncExpirado(PEDIDO_EM, base - 2 * MIN)).toBe(false);
+    expect(pedidoDeSyncExpirado(null, base)).toBe(false);
+    expect(pedidoDeSyncExpirado(undefined, base)).toBe(false);
+    expect(pedidoDeSyncExpirado('ontem à tarde', base)).toBe(true);
+    // O formato do PostgREST (microssegundos e +00:00) é lido.
+    expect(pedidoDeSyncExpirado('2026-09-16T14:00:00.123456+00:00', base + 10 * MIN)).toBe(false);
+  });
+
+  it('a leitura que as duas rotas fazem (lerSolicitacaoDeSync) já diz se o pedido expirou', async () => {
+    depoisDoPedido(5 * MIN);
+    const novo = await carregar({ companies: emSequencia(SONDA_OK, COM_PEDIDO), users: NOME });
+    expect(await novo.lerSolicitacaoDeSync(EMPRESA)).toEqual({
+      migracao: true,
+      solicitacao: { solicitado_em: PEDIDO_EM, solicitado_por: USUARIO, solicitado_por_nome: 'Ana Financeiro' },
+      expirado: false,
+    });
+
+    vi.resetModules();
+    depoisDoPedido(16 * MIN);
+    const velho = await carregar({ companies: emSequencia(SONDA_OK, COM_PEDIDO), users: NOME });
+    expect(await velho.lerSolicitacaoDeSync(EMPRESA)).toMatchObject({ migracao: true, expirado: true });
+
+    vi.resetModules();
+    const semPedido = await carregar({ companies: emSequencia(SONDA_OK, SEM_PEDIDO) });
+    expect(await semPedido.lerSolicitacaoDeSync(EMPRESA)).toEqual({ migracao: true, solicitacao: null, expirado: false });
+
+    vi.resetModules();
+    const semMigracao = await carregar({ companies: semColuna('companies.sync_solicitado_em') });
+    expect(await semMigracao.lerSolicitacaoDeSync(EMPRESA)).toEqual({ migracao: false, solicitacao: null, expirado: false });
   });
 });
 
@@ -469,6 +615,27 @@ describe('POST /partner/v1/sincronizacao (handler)', () => {
     expect(req.partnerLog).toMatchObject({ recebidos: 1, gravados: 1, sem_mudanca: 0, detalhe: { limpo: true } });
   });
 
+  it('pedido mais novo que ficou de pé: sincronizar_agora segue a expiração de 15 min, como no /status', async () => {
+    // O Control conclui a passada do pedido das 13:50; alguém pediu de novo às 14:00.
+    const ANTERIOR = '2026-09-16T13:50:00.000Z';
+
+    depoisDoPedido(2 * MIN);
+    let carregado = await carregarHandler({ companies: emSequencia(SONDA_OK, COM_PEDIDO) });
+    let resposta = replyFalso();
+    await carregado.partnerSincronizacaoHandler(requisicao({ concluida: true, solicitado_em: ANTERIOR }), resposta.reply);
+    expect(resposta.enviado.corpo).toMatchObject({ ok: true, limpo: false, sincronizar_agora: true, solicitado_em: PEDIDO_EM });
+    expect(carregado.fake.gravacoes).toEqual([]);
+
+    vi.resetModules();
+    depoisDoPedido(16 * MIN);
+    carregado = await carregarHandler({ companies: emSequencia(SONDA_OK, COM_PEDIDO) });
+    resposta = replyFalso();
+    await carregado.partnerSincronizacaoHandler(requisicao({ concluida: true, solicitado_em: ANTERIOR }), resposta.reply);
+    // Expirado: o Control não roda de novo por ele; o momento continua saindo.
+    expect(resposta.enviado.corpo).toMatchObject({ ok: true, limpo: false, sincronizar_agora: false, solicitado_em: PEDIDO_EM });
+    expect(carregado.fake.gravacoes).toEqual([]);
+  });
+
   it('concluida sem pedido pendente: ok sem gravar, anotado como sem mudança', async () => {
     const { partnerSincronizacaoHandler, fake } = await carregarHandler({
       companies: emSequencia(SONDA_OK, SEM_PEDIDO),
@@ -542,8 +709,33 @@ describe('as rotas /erp/integracao', () => {
     expect(data.chamadas).toEqual([]);
     expect(data.fila).toEqual({ aguardando_clique: null, solicitados_sem_numero: 0, enviados_sem_numero: 0, sem_faturamento: 0 });
     expect(typeof data.servidor_hora).toBe('string');
+    expect((data as unknown as { sincronizacao: unknown }).sincronizacao).toEqual({ solicitado_em: null, expirado: false });
 
     expect((await chamar(app, 'GET', '/erp/integracao/status', TOKEN.gerente)).statusCode).toBe(200);
+  });
+
+  it('status com pedido de sincronização de 20 min atrás: sincronizacao.expirado true e sincronizar_agora false', async () => {
+    // Carimbo relativo ao relógio de verdade: o token do teste também é.
+    const VELHO = new Date(Date.now() - 20 * MIN).toISOString();
+    const { app, fake } = await comBanco({
+      companies: emSequencia(SONDA_OK, CANAIS_LIGADOS, SONDA_OK, {
+        data: { sync_solicitado_em: VELHO, sync_solicitado_por: USUARIO },
+        error: null,
+      }),
+      erp_sync_log: semColuna('erp_sync_log.rota'),
+      orders: [SONDA_OK, SONDA_OK, SONDA_OK, SONDA_OK, contagem(0)],
+    });
+
+    const res = await chamar(app, 'GET', '/erp/integracao/status', TOKEN.financeiro);
+
+    expect(res.statusCode).toBe(200);
+    const { data } = res.json() as {
+      data: { sincronizar_agora: boolean; solicitacao: { solicitado_em: string } | null; sincronizacao: unknown };
+    };
+    expect(data.sincronizacao).toEqual({ solicitado_em: VELHO, expirado: true });
+    expect(data.sincronizar_agora).toBe(false);
+    expect(data.solicitacao?.solicitado_em).toBe(VELHO);
+    expect(fake.gravacoes.filter((g) => g.tabela === 'companies')).toEqual([]);
   });
 
   it('sincronizar: 403 para gerente e rep; 503 MIGRACAO_PENDENTE sem a 049; 200 para o admin com a 049', async () => {

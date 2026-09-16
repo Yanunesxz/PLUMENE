@@ -1,6 +1,7 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { lerCanais, type Canais } from '../../lib/canais.js';
+import { pedidoDeSyncExpirado } from './expiracaoDoSync.js';
 
 /**
  * A TELA DA INTEGRAÇÃO COM O CONTROL (decisão 7 de 16/09/2026).
@@ -15,7 +16,8 @@ import { lerCanais, type Canais } from '../../lib/canais.js';
  * Três regras:
  *   1. Só leitura, exceto o pedido de sincronização — que é UM carimbo em
  *      `companies` (migração 049), idempotente: pedir de novo com um pedido
- *      pendente não grava nada.
+ *      pendente não grava nada. O pedido expira em 15 minutos
+ *      (expiracaoDoSync.ts): expirado, pedir de novo grava um carimbo novo.
  *   2. Cada bloco da tela lê por conta própria: um soluço do banco numa parte
  *      (o registro de chamadas, por exemplo) vira `null` + aviso naquela parte,
  *      e o resto da tela sai. A tela existe para diagnosticar; um 500 inteiro
@@ -101,9 +103,19 @@ export interface EstadoDaIntegracao {
   servidor_hora: string;
   /** `null` = o banco não respondeu sobre os canais agora (ver `avisos`). */
   canais: Canais | null;
-  /** `true` enquanto há um pedido de sincronização que o Control ainda não concluiu. */
+  /**
+   * `true` enquanto há um pedido de sincronização que o Control ainda não
+   * concluiu E que não expirou — o mesmo valor que o Control lê no `/status`.
+   */
   sincronizar_agora: boolean;
+  /** O pedido pendente, expirado ou não (`null` = nenhum). */
   solicitacao: SolicitacaoDeSync | null;
+  /**
+   * O pedido pendente e se ele já expirou (15 min sem o Control concluir).
+   * Expirado, a tela diz "pedido expirado" e o botão pode pedir de novo.
+   * Sem pedido (ou sem conseguir ler), `{ solicitado_em: null, expirado: false }`.
+   */
+  sincronizacao: { solicitado_em: string | null; expirado: boolean };
   /** Uma linha por rota. `null` = não deu para ler o registro agora. */
   chamadas: UltimaChamada[] | null;
   /** `null` = não deu para contar agora. */
@@ -161,18 +173,27 @@ async function nomeDoUsuario(company_id: string, user_id: string): Promise<strin
  *
  * `migracao: false` = a 049 ainda não rodou (não há onde guardar o pedido).
  * É a mesma pergunta que o `GET /partner/v1/status` faz para devolver
- * `sincronizar_agora` ao Control. Lança quando o banco não respondeu —
+ * `sincronizar_agora` ao Control.
+ *
+ * Devolve o pedido pendente EXPIRADO OU NÃO, e diz qual (`expirado`, regra de
+ * 15 min em expiracaoDoSync.ts): expirado, o `solicitado_em` continua
+ * aparecendo — na tela e no `/status` —, mas `sincronizar_agora` é false. As
+ * duas rotas perguntam a esta função, e por isso dizem a mesma coisa.
+ *
+ * Lança quando o banco não respondeu —
  * inclusive na sonda da coluna: um soluço de rede lido como "a 049 não rodou"
  * fazia o botão responder MIGRACAO_PENDENTE com a 049 já rodada (revisão de
  * 16/09/2026). Só a ausência de verdade vira `migracao: false`.
  */
 export async function lerSolicitacaoDeSync(
   company_id: string,
-): Promise<{ migracao: boolean; solicitacao: SolicitacaoDeSync | null }> {
-  if (!(await detectarOuFalhar('companies', 'sync_solicitado_em'))) return { migracao: false, solicitacao: null };
+): Promise<{ migracao: boolean; solicitacao: SolicitacaoDeSync | null; expirado: boolean }> {
+  if (!(await detectarOuFalhar('companies', 'sync_solicitado_em'))) {
+    return { migracao: false, solicitacao: null, expirado: false };
+  }
 
   const linha = await lerLinhaDaSolicitacao(company_id);
-  if (!linha?.sync_solicitado_em) return { migracao: true, solicitacao: null };
+  if (!linha?.sync_solicitado_em) return { migracao: true, solicitacao: null, expirado: false };
 
   const por = linha.sync_solicitado_por ?? null;
   return {
@@ -182,6 +203,7 @@ export async function lerSolicitacaoDeSync(
       solicitado_por: por,
       solicitado_por_nome: por ? await nomeDoUsuario(company_id, por) : null,
     },
+    expirado: pedidoDeSyncExpirado(linha.sync_solicitado_em),
   };
 }
 
@@ -189,48 +211,64 @@ export type ResultadoDoPedidoDeSync =
   | { ok: true; ja_solicitado: boolean; solicitacao: SolicitacaoDeSync }
   | { ok: false; motivo: 'sem_migracao' };
 
+/** Quantas vezes o botão relê e tenta gravar quando alguém mexe no meio. */
+const TENTATIVAS_DO_PEDIDO_DE_SYNC = 2;
+
 /**
  * O botão "Pedir sincronização agora".
  *
- * Grava `sync_solicitado_em = now()` e quem pediu. Com um pedido já pendente,
- * NÃO regrava: o Control lê `sincronizar_agora = true` do mesmo jeito, e o
- * momento que interessa é o do primeiro pedido — é dele que se mede a demora.
- * O filtro `sync_solicitado_em IS NULL` no UPDATE é o que segura dois cliques
- * ao mesmo tempo: só um grava, o outro lê o que ficou.
+ * Grava `sync_solicitado_em = now()` e quem pediu. Com um pedido já pendente
+ * e ainda dentro dos 15 minutos, NÃO regrava: o Control lê
+ * `sincronizar_agora = true` do mesmo jeito, e o momento que interessa é o do
+ * primeiro pedido — é dele que se mede a demora.
+ *
+ * Pedido EXPIRADO (15 min sem o Control concluir) não vale mais: pedir de novo
+ * grava um carimbo novo por cima, e o Control volta a ver
+ * `sincronizar_agora = true`.
+ *
+ * O UPDATE é condicional ao que foi lido — `sync_solicitado_em IS NULL` sem
+ * pedido, `= <o expirado>` com pedido expirado. É o que segura dois cliques ao
+ * mesmo tempo: só um grava; o outro relê e responde pelo que ficou.
  */
 export async function pedirSincronizacao(
   company_id: string,
   quem: { id: string; nome: string },
 ): Promise<ResultadoDoPedidoDeSync> {
-  const atual = await lerSolicitacaoDeSync(company_id);
-  if (!atual.migracao) return { ok: false, motivo: 'sem_migracao' };
-  if (atual.solicitacao) return { ok: true, ja_solicitado: true, solicitacao: atual.solicitacao };
+  for (let tentativa = 0; tentativa < TENTATIVAS_DO_PEDIDO_DE_SYNC; tentativa++) {
+    const atual = await lerSolicitacaoDeSync(company_id);
+    if (!atual.migracao) return { ok: false, motivo: 'sem_migracao' };
+    const anterior = atual.solicitacao;
+    if (anterior && !atual.expirado) {
+      return { ok: true, ja_solicitado: true, solicitacao: anterior };
+    }
 
-  const agora = new Date().toISOString();
-  const { data, error } = await supabase
-    .from('companies')
-    .update({ sync_solicitado_em: agora, sync_solicitado_por: quem.id })
-    .eq('id', company_id)
-    .is('sync_solicitado_em', null)
-    .select('sync_solicitado_em, sync_solicitado_por');
-  if (error) throw new Error(`Falha ao registrar o pedido de sincronização: ${error.message}`);
+    const agora = new Date().toISOString();
+    let gravar = supabase
+      .from('companies')
+      .update({ sync_solicitado_em: agora, sync_solicitado_por: quem.id })
+      .eq('id', company_id);
+    gravar = anterior
+      ? gravar.eq('sync_solicitado_em', anterior.solicitado_em)
+      : gravar.is('sync_solicitado_em', null);
+    const { data, error } = await gravar.select('sync_solicitado_em, sync_solicitado_por');
+    if (error) throw new Error(`Falha ao registrar o pedido de sincronização: ${error.message}`);
 
-  const gravada = (Array.isArray(data) ? data[0] : data) as LinhaDaSolicitacao | null | undefined;
-  if (!gravada?.sync_solicitado_em) {
-    // Alguém gravou entre a leitura e o UPDATE: vale o pedido que ficou.
-    const depois = await lerSolicitacaoDeSync(company_id);
-    if (depois.solicitacao) return { ok: true, ja_solicitado: true, solicitacao: depois.solicitacao };
-    throw new Error('Falha ao registrar o pedido de sincronização: nenhuma linha gravada');
+    const gravada = (Array.isArray(data) ? data[0] : data) as LinhaDaSolicitacao | null | undefined;
+    if (gravada?.sync_solicitado_em) {
+      return {
+        ok: true,
+        ja_solicitado: false,
+        solicitacao: {
+          solicitado_em: gravada.sync_solicitado_em,
+          solicitado_por: gravada.sync_solicitado_por ?? quem.id,
+          solicitado_por_nome: quem.nome,
+        },
+      };
+    }
+    // Alguém gravou (ou o Control concluiu) entre a leitura e o UPDATE: relê e
+    // responde pelo que ficou — ou tenta de novo sobre o estado novo.
   }
-  return {
-    ok: true,
-    ja_solicitado: false,
-    solicitacao: {
-      solicitado_em: gravada.sync_solicitado_em,
-      solicitado_por: gravada.sync_solicitado_por ?? quem.id,
-      solicitado_por_nome: quem.nome,
-    },
-  };
+  throw new Error('Falha ao registrar o pedido de sincronização: nenhuma linha gravada');
 }
 
 export interface ConclusaoDeSync {
@@ -472,11 +510,16 @@ export async function lerEstadoDaIntegracao(company_id: string): Promise<EstadoD
     seguro('a fila de pedidos', () => contarFila(company_id)),
   ]);
 
+  const solicitacao = empresa.solicitacao?.solicitacao ?? null;
+  // A mesma leitura do GET /partner/v1/status: o que a tela diz é o que o Control vê.
+  const expirado = Boolean(solicitacao && empresa.solicitacao?.expirado);
+
   return {
     servidor_hora: new Date().toISOString(),
     canais: empresa.canais,
-    sincronizar_agora: Boolean(empresa.solicitacao?.solicitacao),
-    solicitacao: empresa.solicitacao?.solicitacao ?? null,
+    sincronizar_agora: Boolean(solicitacao) && !expirado,
+    solicitacao,
+    sincronizacao: { solicitado_em: solicitacao?.solicitado_em ?? null, expirado },
     chamadas: registro?.chamadas ?? null,
     fila: contagem?.fila ?? null,
     migracoes: {

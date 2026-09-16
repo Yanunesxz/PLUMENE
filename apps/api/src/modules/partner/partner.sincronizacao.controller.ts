@@ -2,6 +2,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify';
 import { anotarChamada } from './partner.chamada.js';
 import { autenticar, momentoComFuso } from './partner.porta.js';
 import { concluirSincronizacao } from '../integracao/integracao.service.js';
+import { pedidoDeSyncExpirado } from '../integracao/expiracaoDoSync.js';
 
 /**
  * POST /partner/v1/sincronizacao { concluida: true } — o Control avisa que
@@ -64,8 +65,9 @@ export async function partnerSincronizacaoHandler(
   await reply.send({
     ok: true,
     limpo: r.limpo,
-    // O que o Control veria num /status logo depois: `true` = há pedido novo.
-    sincronizar_agora: r.pendente != null,
+    // O que o Control veria num /status logo depois: `true` = há pedido novo e
+    // ainda dentro dos 15 minutos (expiracaoDoSync.ts, a mesma regra do /status).
+    sincronizar_agora: r.pendente != null && !pedidoDeSyncExpirado(r.pendente),
     solicitado_em: r.pendente,
     servidor_hora: new Date().toISOString(),
   });
