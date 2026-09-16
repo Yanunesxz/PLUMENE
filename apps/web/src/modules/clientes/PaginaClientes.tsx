@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useRef, type FormEvent } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Search,
   Users,
@@ -102,6 +102,16 @@ export function PaginaClientes() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // Quem chega da ficha depois de excluir um cliente (só admin) traz o aviso
+  // no state da navegação. Sai do histórico logo em seguida: voltar para esta
+  // tela não repete o aviso.
+  const location = useLocation();
+  useEffect(() => {
+    const aviso = (location.state as { aviso?: unknown } | null)?.aviso;
+    if (typeof aviso !== 'string' || !aviso) return;
+    setToast({ message: aviso, type: 'success' });
+    void navigate(`${location.pathname}${location.search}`, { replace: true, state: null });
+  }, [location, navigate]);
   const setF = (k: keyof typeof EMPTY_CUST) => (e: { target: { value: string } }) =>
     setForm((f) => ({ ...f, [k]: e.target.value }));
   const isOnline = useOnlineStatus();

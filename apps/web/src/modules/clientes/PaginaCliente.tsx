@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Receipt,
   CalendarClock,
+  Trash2,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api, esquecerCache } from '../../services/api.js';
@@ -21,6 +22,8 @@ import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
+import { ExcluirCliente } from './ExcluirCliente.js';
+import { linhasDoDono } from '../../lib/donoDoCliente.js';
 import { seloDoPedido } from '../../lib/pedido.js';
 import { situacaoDoCliente, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -46,6 +49,12 @@ export function PaginaCliente() {
   const [erro, setErro] = useState('');
   const [trocando, setTrocando] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+
+  // ─── Excluir cliente (só admin, migração 050) ─────────────────────────────
+  // O cadastro em dobro: o diálogo mostra o que está ligado ao cliente e pede
+  // o cadastro que fica. A API recusa os outros papéis com 403.
+  const podeExcluir = user?.role === 'admin';
+  const [excluindo, setExcluindo] = useState(false);
 
   // ─── Marcar visita para o representante (fluxo da Bruna) ───────────────────
   const ehEscritorio =
@@ -368,6 +377,14 @@ export function PaginaCliente() {
             rotulo={apenasDigitos(cliente.cnpj).length === 11 ? 'CPF' : 'CNPJ'}
             valor={cliente.cnpj ? formatarDocumento(cliente.cnpj) : null}
           />
+          {/* De quem é o cliente: o representante do código do Control e, se
+              for outro, quem cadastrou no app. Sem `dono`, a API é anterior. */}
+          {cliente.dono && (
+            <>
+              <Dado rotulo="Representante" valor={linhasDoDono(cliente.dono).representante} />
+              <Dado rotulo="Cadastrado por" valor={linhasDoDono(cliente.dono).cadastradoPor} />
+            </>
+          )}
           <Dado rotulo="Inscrição Estadual" valor={cliente.inscricao_estadual ?? null} />
           <Dado rotulo="Limite de crédito" valor={cliente.credit_limit != null ? formatBRL(cliente.credit_limit) : null} />
           <Dado
@@ -425,6 +442,12 @@ export function PaginaCliente() {
             <Button variant="outline" onClick={() => setMarcando((v) => !v)}>
               <CalendarClock className="h-4 w-4" strokeWidth={2.5} />
               {marcando ? 'Cancelar' : 'Marcar visita pro rep'}
+            </Button>
+          )}
+          {podeExcluir && (
+            <Button variant="outline" className="text-danger" onClick={() => setExcluindo(true)}>
+              <Trash2 className="h-4 w-4" strokeWidth={2.5} />
+              Excluir cliente
             </Button>
           )}
         </div>
@@ -652,6 +675,14 @@ export function PaginaCliente() {
           }}
           onErro={(m) => setToast({ message: m, type: 'error' })}
           onFechar={() => setTrocando(false)}
+        />
+      )}
+
+      {excluindo && (
+        <ExcluirCliente
+          cliente={cliente}
+          onExcluido={(aviso) => void navigate('/customers', { replace: true, state: { aviso } })}
+          onFechar={() => setExcluindo(false)}
         />
       )}
 

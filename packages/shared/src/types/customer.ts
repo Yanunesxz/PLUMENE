@@ -272,6 +272,75 @@ export interface CustomerDetail {
   varejo?: boolean | null;
   varejo_marcado_em?: string | null;
   varejo_marcado_por_nome?: string | null;
+  /**
+   * De quem é o cliente. Opcional: a API anterior não mandava, e o app
+   * instalado no celular pode estar falando com ela.
+   */
+  dono?: DonoDoCliente;
   /** Do mais recente para o mais antigo. */
   pedidos: PedidoDoCliente[];
+}
+
+/**
+ * Os dois representantes que importam na ficha.
+ *
+ * Quem CADASTROU (`rep_id`, o login que criou o cliente no app) e quem é o
+ * DONO pelo código do Control (`rep_erp_id`, casado pelo miolo com o
+ * `erp_rep_id` de um representante da mesma empresa). Em cliente que veio do
+ * ERP o primeiro é nulo; em cliente nascido no app o segundo pode ainda não
+ * existir. Só nomes de representante — nunca de outro cliente.
+ */
+export interface DonoDoCliente {
+  rep_id: string | null;
+  rep_nome: string | null;
+  /** O código do representante no Control, como está no cadastro do cliente. */
+  rep_erp_id: string | null;
+  /** O login de representante com esse código. Nulo = nenhum login tem o código. */
+  rep_pelo_codigo_id: string | null;
+  rep_pelo_codigo_nome: string | null;
+}
+
+/**
+ * O que está preso ao cliente e impede apagá-lo sem juntar em outro cadastro.
+ * Convites, vitrines e tarefas contam os de qualquer situação (usados,
+ * revogados, feitas): apagar o cliente apagaria ou soltaria todos eles.
+ */
+export interface VinculosDoCliente {
+  pedidos: number;
+  logins: number;
+  convites: number;
+  vitrines: number;
+  tarefas: number;
+}
+
+/** GET /customers/:id/vinculos — o que o diálogo de exclusão mostra antes de confirmar. */
+export interface VinculosParaExcluir {
+  contagens: VinculosDoCliente;
+  /** true = o banco ainda não tem a migração 050 e a exclusão vai ser recusada. */
+  migracao_pendente: boolean;
+}
+
+/**
+ * POST /customers/:id/excluir (só admin). `juntar_em` é o cadastro que fica com
+ * pedidos, convites, vitrines, tarefas e login de loja — obrigatório quando o
+ * cliente tem algum deles.
+ */
+export interface ExcluirClienteRequest {
+  juntar_em?: string | null;
+  motivo?: string | null;
+}
+
+/** O que a exclusão fez, para a tela dizer. */
+export interface ClienteExcluido {
+  customer_id: string;
+  juntado_em: string | null;
+  pedidos_movidos: number;
+  convites_movidos: number;
+  convites_revogados: number;
+  vitrines_movidas: number;
+  tarefas_movidas: number;
+  /** O login de loja do excluído passou para o cadastro que ficou. */
+  login_herdado: boolean;
+  /** Logins de loja desligados (active=false, sem cliente) — nunca apagados. */
+  logins_desligados: number;
 }

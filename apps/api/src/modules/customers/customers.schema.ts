@@ -59,3 +59,15 @@ export const trocarTabelaDoClienteSchema = z.object({
 export const atrelarCodigoErpSchema = z.object({
   erp_id: z.string().trim().min(1, 'Informe o código do cliente no ERP').max(10),
 });
+
+/**
+ * Excluir cliente (só admin). `juntar_em` é o cadastro que fica com o que o
+ * excluído tinha; se é da mesma empresa, quem confere é o service.
+ */
+export const excluirClienteSchema = z.object({
+  juntar_em: z.string().uuid('O cadastro que fica é inválido').nullable().optional(),
+  motivo: z.string().trim().max(500, 'O motivo passa de 500 caracteres').nullable().optional(),
+});
+
+/** O `:id` das rotas de exclusão. Id que não é UUID não é cliente de ninguém. */
+export const idDeClienteSchema = z.string().uuid();
