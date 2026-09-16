@@ -650,6 +650,36 @@ async function donoDoNumero(
   return dono ? { id: dono.id, numero: dono.order_number ?? null } : null;
 }
 
+/**
+ * O financeiro já tinha solicitado este pedido ao Control e depois CANCELOU a
+ * solicitação? (revisão de 16/09/2026, à tarde)
+ *
+ * O app não sabe se o Control já puxou o pedido: entre o GET /pedidos (o
+ * Control grava no Firebird) e o POST /confirmar o pedido continua sem número,
+ * e o financeiro pode cancelar nessa janela. Recusar a confirmação deixaria o
+ * pedido no Control sem o número no app — e um novo "Lançar no Control" o
+ * importaria de novo. Então o número VENCE o cancelamento.
+ *
+ * Quem chama já sabe que o pedido está aprovado e sem `erp_requested_at`. Aqui
+ * basta saber se ele JÁ FOI solicitado: só o cancelamento tira o carimbo, e o
+ * rastro guarda `solicitado_ao_erp` (049) — e `solicitacao_cancelada` com a
+ * 050. Sem rastro (048 ausente, ou o evento da solicitação que não gravou), a
+ * resposta é a de antes: não solicitado. Soluço do banco sobe (500): o robô
+ * tenta de novo, em vez de levar um 409 que ele trataria como definitivo.
+ */
+async function solicitacaoFoiCancelada(company_id: string, order_id: string): Promise<boolean> {
+  if (!(await detectarOuFalhar('order_erp_events', 'id'))) return false;
+  const { data, error } = await supabase
+    .from('order_erp_events')
+    .select('id, tipo')
+    .eq('company_id', company_id)
+    .eq('order_id', order_id)
+    .in('tipo', ['solicitado_ao_erp', 'solicitacao_cancelada'])
+    .limit(1);
+  if (error) throw new Error(`Falha ao ler o rastro do pedido: ${error.message}`);
+  return Array.isArray(data) && data.length > 0;
+}
+
 /** Pedido que já tem número: o mesmo é idempotente, outro é conflito. */
 function respostaParaJaConfirmado(atual: string, numero: string): ConfirmResult {
   if (normalizarNumeroErp(atual) === numero) return { outcome: 'ok', ja_confirmado: true };
@@ -675,7 +705,9 @@ function primeiraAfetada(afetadas: unknown): { id: string; order_number?: number
  * Solicitado (decisões 2 e 3 de 16/09/2026): com a 049 no banco, aprovado sem
  * `erp_requested_at` não é confirmado — o financeiro não mandou lançar, e só a
  * doc impedia o Control de promover a `sent_erp` um pedido da reconciliação.
- * Sem a 049, como antes.
+ * Sem a 049, como antes. A exceção é o pedido cuja solicitação o financeiro
+ * CANCELOU depois (`solicitacaoFoiCancelada`): o Control pode tê-lo puxado da
+ * fila antes, e a confirmação dele é aceita — o número vence.
  *
  * `parceiro` é o nome da chave que confirmou — vai só para o rastro (048).
  */
@@ -703,13 +735,17 @@ export async function confirmOrderImport(
   if (!destinos?.includes('sent_erp')) return { outcome: 'not_confirmable', situacao: pedido.status };
 
   // A sonda só quando a leitura não trouxe a solicitação: sem a coluna, a
-  // chave nem vem; soluço na sonda sobe (500) e o robô tenta de novo.
+  // chave nem vem; soluço na sonda sobe (500) e o robô tenta de novo. O
+  // aprovado cuja solicitação foi CANCELADA depois passa: o Control pode tê-lo
+  // puxado antes do cancelamento, e o número dele vence.
+  let confirmadoDepoisDoCancelamento = false;
   if (
     pedido.status === 'approved' &&
     !pedido.erp_requested_at &&
     (await detectarOuFalhar('orders', 'erp_requested_at'))
   ) {
-    return { outcome: 'not_requested' };
+    if (!(await solicitacaoFoiCancelada(company_id, order_id))) return { outcome: 'not_requested' };
+    confirmadoDepoisDoCancelamento = true;
   }
 
   const dono = await donoDoNumero(company_id, numero, order_id);
@@ -768,6 +804,11 @@ export async function confirmOrderImport(
     tipo: 'numero_gravado',
     origem: 'api',
     parceiro,
+    // O rastro diz que o número chegou DEPOIS de o financeiro cancelar: é o
+    // pedido que o Control já tinha puxado da fila.
+    motivo: confirmadoDepoisDoCancelamento
+      ? 'confirmado pelo Control depois de a solicitação ser cancelada no app'
+      : null,
     antes: { erp_order_id: null, status: pedido.status },
     depois: { erp_order_id: numero, status: 'sent_erp' },
   });

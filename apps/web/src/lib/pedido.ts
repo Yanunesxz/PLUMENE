@@ -281,8 +281,16 @@ export function podeCancelarSolicitacao(
   return (papel === 'financeiro' || papel === 'admin') && Boolean(pedido.erp_requested_at) && !pedido.erp_order_id;
 }
 
-/** A pergunta antes de cancelar — combinada com o Yan (16/09/2026). */
-export const PERGUNTA_CANCELAR_SOLICITACAO = 'O Control ainda não importou. Cancelar tira o pedido da fila do Control.';
+/**
+ * A pergunta antes de cancelar (16/09/2026). O app não tem como saber se o
+ * Control já puxou o pedido da fila: entre a importação e a confirmação o
+ * pedido continua sem número. Por isso a frase não afirma que ele não
+ * importou — e, se importou, o número dele ainda chega e vale (revisão de
+ * 16/09/2026 à tarde: o POST /confirmar aceita o pedido de solicitação
+ * cancelada).
+ */
+export const PERGUNTA_CANCELAR_SOLICITACAO =
+  'Se o Control ainda não importou, cancelar tira o pedido da fila do Control. Se ele já importou, o número ainda chega e vale.';
 
 /** As frases combinadas com o Yan (16/09/2026) para cada desfecho da espera. */
 export function mensagemDaEspera(estado: EstadoDaEspera, numeroNoControl: string | null | undefined): string {

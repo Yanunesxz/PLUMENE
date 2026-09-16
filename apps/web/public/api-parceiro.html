@@ -1252,6 +1252,19 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             mandou lançar, e pedido faturado à mão no aplicativo, não entram aqui.
           </p>
           <p>
+            <b>Pedido que sai da fila depois de entregue:</b> enquanto o pedido
+            não tem número, o financeiro pode <b>cancelar a solicitação</b> na
+            tela do aplicativo, e o pedido some da fila. O aplicativo não sabe se
+            você já o puxou — entre a sua leitura da fila e o
+            <code>POST /confirmar</code> ele continua sem número —, então o
+            cancelamento não invalida o que você já importou: se o pedido já está
+            no seu ERP, confirme normalmente; a confirmação é aceita e <b>o número
+            vence o cancelamento</b>. Se o financeiro pedir de novo, o mesmo
+            <code>id</code> volta à fila: confira pelo <code>id</code> antes de
+            importar e, se ele já está no seu ERP, só confirme com o número que
+            já tem.
+          </p>
+          <p>
             A resposta traz <b>todos</b> os pedidos que casam com o filtro, sem
             paginação do seu lado (não existe <code>?page</code> nem
             <code>?limit</code>), e <code>total</code> é a contagem real. Se a
@@ -1392,7 +1405,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             Avisa que o pedido entrou no seu ERP e informa o número gerado. A partir
             daí ele sai da fila. A confirmação grava a situação
             <code>sent_erp</code>, o número, <code>synced_at</code> e
-            <code>updated_at</code>. O contrato desta rota não mudou na fase 0.
+            <code>updated_at</code>. O contrato desta rota não mudou na fase 0,
+            fora a solicitação ao Control: aprovado que o financeiro nunca
+            solicitou é recusado, e o que ele solicitou e depois cancelou é
+            aceito (você pode tê-lo puxado da fila antes do cancelamento).
           </p>
 
           <div class="code">
@@ -1479,9 +1495,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 <tr>
                   <td><span class="st wr">409</span></td>
                   <td><code>ORDER_NOT_REQUESTED</code></td>
-                  <td>Pedido aprovado que o financeiro <b>não solicitou</b> ao
+                  <td>Pedido aprovado que o financeiro <b>nunca solicitou</b> ao
                       Control (veio da lista <code>incluir=todos</code>, não da
-                      fila).</td>
+                      fila). O que ele solicitou e depois cancelou não cai aqui:
+                      a confirmação é aceita.</td>
                   <td class="t-mut">Não importar: espere o pedido aparecer na
                       fila.</td>
                 </tr>
@@ -1521,8 +1538,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           <p>
             As checagens correm nesta ordem: campo presente → formato → pedido
             existe → já tem número (o mesmo = 200, outro = 409) → situação aceita
-            confirmação → solicitado pelo financeiro (aprovado) → número livre →
-            gravação. Duas confirmações ao mesmo tempo
+            confirmação → solicitado pelo financeiro, ou solicitado e cancelado
+            depois (aprovado) → número livre → gravação. Duas confirmações ao mesmo tempo
             não passam: a segunda recebe <code>ja_confirmado: true</code> (mesmo
             número) ou <span class="st wr">409</span>
             <code>ORDER_ALREADY_CONFIRMED</code>.
@@ -1710,7 +1727,12 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             Exige o canal de pedidos ligado para a API. <b>Só vale para pedido que
             o Control tem:</b> com número do Control, ou solicitado ao Control pelo
             financeiro. Rascunho, pedido aguardando aceite e aprovado que ninguém
-            mandou lançar não são excluídos por aqui.
+            mandou lançar não são excluídos por aqui. O pedido cuja solicitação
+            o financeiro cancelou (e que você não confirmou) volta a ser um
+            aprovado que ninguém mandou lançar: se você o importou e depois o
+            excluiu do seu ERP, o aviso responde
+            <span class="st wr">409</span> <code>ORDER_NOT_IN_CONTROL</code> e o
+            aplicativo mantém o pedido, fora da fila — do seu lado, nada a fazer.
           </p>
           <div class="tw">
             <table>
@@ -1721,7 +1743,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                 <tr><td><span class="st ok">200</span> <code>{ ok, excluido_em }</code></td><td class="t-mut">—</td><td>Apagado agora.</td></tr>
                 <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>Não existe pedido com esse <code>id</code> na sua empresa, ou já foi apagado — repetir é seguro.</td></tr>
                 <tr><td><span class="st wr">409</span></td><td><code>ORDER_INVOICED</code></td><td>Pedido <b>faturado</b> não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (<code>POST /faturamento</code> com <code>"faturado": false</code>). Também quando o faturamento chega no mesmo instante: nada é apagado.</td></tr>
-                <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>Sem número do Control e não solicitado: o Control nunca recebeu este pedido, e o aplicativo não o exclui por aviso.</td></tr>
+                <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>Sem número do Control e não solicitado (nunca foi, ou o financeiro cancelou a solicitação): o aplicativo não o exclui por aviso.</td></tr>
                 <tr><td><span class="st wr">409</span></td><td><code>CANAL_FECHADO</code></td><td>Canal de pedidos não ligado para a API.</td></tr>
                 <tr><td><span class="st er">500</span></td><td><code>SEM_COPIA</code></td><td>A cópia do histórico não gravou — <b>o pedido não foi apagado</b>; tente de novo.</td></tr>
               </tbody>
@@ -3022,7 +3044,9 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
           <code>pedido sem itens</code> e — só com <code>incluir=todos</code> —
           <code>pedido não solicitado pelo financeiro</code> (aprovado que ninguém
           mandou lançar: não importe; o <code>POST /confirmar</code> dele responde
-          <span class="st wr">409</span> <code>ORDER_NOT_REQUESTED</code>).
+          <span class="st wr">409</span> <code>ORDER_NOT_REQUESTED</code>. O
+          pedido cuja solicitação o financeiro cancelou também sai assim — se
+          você já o tinha importado, confirme: o número vence o cancelamento).
           <code>importavel</code> é <code>true</code>
           exatamente quando a lista está vazia — condição de pagamento ausente
           (<code>condicao_pagamento: null</code>) não gera pendência.
@@ -3521,12 +3545,12 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Número fora do formato (duas letras e até 10 dígitos).</td></tr>
             <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>POST /confirmar, POST /conciliar, POST /excluir</td><td>Não há pedido com esse <code>id</code> na sua empresa.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_INVOICED</code></td><td>POST /excluir</td><td>Pedido faturado não é excluído; desfaça o faturamento antes.</td></tr>
-            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>POST /excluir</td><td>Pedido sem número do Control e não solicitado: o Control nunca o recebeu.</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_IN_CONTROL</code></td><td>POST /excluir</td><td>Pedido sem número do Control e não solicitado (ou de solicitação cancelada): o aplicativo não o exclui.</td></tr>
             <tr><td><span class="st er">500</span></td><td><code>SEM_COPIA</code></td><td>POST /excluir</td><td>A cópia do histórico não gravou; o pedido <b>não</b> foi apagado — tente de novo.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>MISSING_CONCLUIDA</code>, <code>INVALID_SOLICITADO_EM</code></td><td>POST /sincronizacao</td><td>Falta <code>"concluida": true</code>, ou <code>solicitado_em</code> sem fuso.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>POST /confirmar, POST /conciliar</td><td>Já tem outro número (<code>pedido_erp_atual</code>).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_APPROVED</code></td><td>POST /confirmar</td><td>A situação do pedido não aceita confirmação (<code>situacao</code>).</td></tr>
-            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_REQUESTED</code></td><td>POST /confirmar</td><td>Aprovado que o financeiro não solicitou ao Control.</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_REQUESTED</code></td><td>POST /confirmar</td><td>Aprovado que o financeiro nunca solicitou ao Control (o de solicitação cancelada é aceito).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_RECONCILABLE</code></td><td>POST /conciliar</td><td>Só pedido <code>sent_erp</code> sem número é conciliado (<code>situacao</code>).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ERP_NUMBER_IN_USE</code></td><td>POST /confirmar, POST /conciliar</td><td>Número já gravado em outro pedido (<code>pedido_em_uso</code>).</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_BODY</code></td><td>POSTs de lista</td><td>O corpo não é uma lista nem <code>{ "&lt;nome da rota&gt;": [...] }</code> (<code>faturamento</code>, <code>clientes</code>, <code>representantes</code>, <code>tabelas_preco</code>, <code>condicoes_pagamento</code>, <code>produtos</code>, <code>precos</code>, <code>estoque</code>, <code>retrato</code>) nem <code>{ "dados": [...] }</code>.</td></tr>

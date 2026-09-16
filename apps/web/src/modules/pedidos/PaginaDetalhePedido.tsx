@@ -265,9 +265,11 @@ export function PaginaDetalhePedido() {
     };
   }, [espera.estado, id, token]);
 
-  // ─── Cancelar a solicitação (050): o Control ainda não importou ───────────
+  // ─── Cancelar a solicitação (050): enquanto o número não chega ────────────
   // Tira o pedido da fila do Control. A espera para (a consulta só roda em
   // 'aguardando') e a tela volta ao aprovado "a lançar", como antes do clique.
+  // Se o Control já tinha puxado o pedido, a confirmação dele ainda é aceita e
+  // o número aparece quando a tela recarregar o pedido.
   const [cancelandoSolicitacao, setCancelandoSolicitacao] = useState(false);
   const cancelarSolicitacao = async () => {
     if (!id || !token || !order || cancelandoSolicitacao) return;

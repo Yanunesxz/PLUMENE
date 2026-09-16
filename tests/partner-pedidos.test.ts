@@ -1070,6 +1070,78 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
     expect(fake.filtrosDe('orders', 'select')[0]!.args[0]).toBe('*');
   });
 
+  describe('confirmar depois de o financeiro cancelar a solicitação (o número vence)', () => {
+    const NAO_SOLICITADO = LIDO({ id: 'o1', status: 'approved', erp_order_id: null, erp_requested_at: null });
+
+    it.each([
+      ['com a 050: o rastro tem solicitacao_cancelada', 'solicitacao_cancelada'],
+      ['sem a 050: o cancelamento não deixou evento, mas o pedido tinha solicitado_ao_erp', 'solicitado_ao_erp'],
+    ])('%s → grava o número e o rastro diz que chegou depois do cancelamento', async (_nome, tipo) => {
+      const { confirmOrderImport, fake, registrarNoErp } = await carregar({
+        orders: emSequencia(NAO_SOLICITADO, OK, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
+        order_erp_events: emSequencia(OK, { data: [{ id: 'ev-1', tipo }], error: null }, OK),
+      });
+
+      expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379', 'control-cs')).toEqual({
+        outcome: 'ok',
+        ja_confirmado: false,
+      });
+      expect(fake.ultimaGravacao('orders', 'update')?.valores).toMatchObject({
+        status: 'sent_erp',
+        erp_order_id: 'CS17379',
+      });
+      expect(registrarNoErp).toHaveBeenCalledWith('o1', EMPRESA, null);
+
+      // O rastro do pedido é lido pela empresa da chave e só pelos dois tipos da solicitação.
+      const eqs = fake.filtrosDe('order_erp_events', 'eq').map((f) => f.args);
+      expect(eqs).toContainEqual(['company_id', EMPRESA]);
+      expect(eqs).toContainEqual(['order_id', 'o1']);
+      expect(fake.filtrosDe('order_erp_events', 'in')[0]!.args).toEqual([
+        'tipo',
+        ['solicitado_ao_erp', 'solicitacao_cancelada'],
+      ]);
+
+      expect(fake.ultimaGravacao('order_erp_events', 'insert')?.valores).toMatchObject({
+        tipo: 'numero_gravado',
+        origem: 'api',
+        parceiro: 'control-cs',
+        motivo: 'confirmado pelo Control depois de a solicitação ser cancelada no app',
+        depois: { erp_order_id: 'CS17379', status: 'sent_erp' },
+      });
+    });
+
+    it('nunca solicitado (rastro sem solicitação) continua 409 not_requested, sem gravar', async () => {
+      const { confirmOrderImport, fake } = await carregar({
+        orders: emSequencia(NAO_SOLICITADO, OK),
+        order_erp_events: emSequencia(OK, { data: [], error: null }),
+      });
+
+      expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'not_requested' });
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+      expect(fake.ultimaGravacao('order_erp_events', 'insert')).toBeUndefined();
+    });
+
+    it('sem a 048 (sem rastro nenhum): not_requested, como antes', async () => {
+      const { confirmOrderImport, fake } = await carregar({
+        orders: emSequencia(NAO_SOLICITADO, OK),
+        order_erp_events: COLUNA_AUSENTE,
+      });
+
+      expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'not_requested' });
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    });
+
+    it('rastro que não responde LANÇA (500) — o robô tenta de novo, não leva um 409 definitivo', async () => {
+      const { confirmOrderImport, fake } = await carregar({
+        orders: emSequencia(NAO_SOLICITADO, OK),
+        order_erp_events: emSequencia(OK, { data: null, error: { message: 'timeout' } }),
+      });
+
+      await expect(confirmOrderImport(EMPRESA, 'o1', 'CS17379')).rejects.toThrow(/rastro/);
+      expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    });
+  });
+
   it('sem a 049 (42703 na sonda): aprovado sem a solicitação confirma como antes; sonda que falha por rede LANÇA', async () => {
     const semColuna = await carregar({
       orders: emSequencia(LIDO({ id: 'o1', status: 'approved', erp_order_id: null }), COLUNA_AUSENTE, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),

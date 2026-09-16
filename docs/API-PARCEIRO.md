@@ -371,6 +371,17 @@ faturado à mão no aplicativo, não entram na fila — aparecem só com
 `incluir=todos`. (Numa instalação onde a migração 049 ainda não rodou, a fila é
 a de antes: todo aprovado sem número e não faturado.)
 
+**Pedido que sai da fila depois de entregue:** enquanto o pedido não tem
+número, o financeiro pode **cancelar a solicitação** na tela do app. O pedido
+some da fila (com `incluir=todos` volta com `solicitado_em: null` e a pendência
+`pedido não solicitado pelo financeiro`). O app não sabe se você já o puxou —
+entre a sua leitura da fila e o `POST /confirmar` ele continua sem número —,
+então o cancelamento **não invalida o que você já importou**: se o pedido já
+está no seu ERP, confirme normalmente; o `POST /confirmar` aceita e **o número
+vence o cancelamento**. Se o financeiro pedir de novo, o mesmo `id` volta à
+fila: confira pelo `id` antes de importar e, se ele já está no seu ERP, só
+confirme com o número que já tem.
+
 **Importar a partir de `incluir=todos`:** a lista traz `approved` e `sent_erp`,
 faturados ou não, e o `sent_erp` sai com `importavel: true` como qualquer
 outro. Importe **só quem tem `pedido_erp` nulo, `faturado` falso e
@@ -501,7 +512,9 @@ seguinte.
 6. `pedido não solicitado pelo financeiro` — só com `incluir=todos`: pedido
    aprovado que o financeiro ainda não mandou lançar. O lançamento é o clique
    dele; não importe (o `POST /confirmar` desse pedido responde
-   `409 ORDER_NOT_REQUESTED`). Na fila padrão nunca aparece
+   `409 ORDER_NOT_REQUESTED`). Na fila padrão nunca aparece. Também sai assim
+   o pedido cuja solicitação o financeiro cancelou: se você já o tinha
+   importado, confirme — ver "Pedido que sai da fila depois de entregue"
 
 `importavel` é `true` exatamente quando a lista está vazia. Recomendação:
 importar apenas os `importavel: true` e reportar os demais, para o cadastro ser
@@ -554,7 +567,11 @@ Content-Type: application/json
 
 `pedido_erp` é normalizado (ver "O número do pedido no ERP") e é a forma
 normalizada que fica gravada. A confirmação grava a situação `sent_erp`, o
-número, `synced_at` e `updated_at`. O contrato desta rota não mudou na fase 0.
+número, `synced_at` e `updated_at`. O contrato desta rota não mudou na fase 0,
+fora a solicitação ao Control (049): pedido aprovado que o financeiro não
+solicitou é recusado — **menos** o que ele solicitou e depois cancelou, que é
+aceito (você pode tê-lo puxado da fila antes do cancelamento; ver "Pedido que
+sai da fila depois de entregue", na seção 2).
 
 | Resposta | `code` | Significado | O que fazer |
 |---|---|---|---|
@@ -565,14 +582,15 @@ número, `synced_at` e `updated_at`. O contrato desta rota não mudou na fase 0.
 | `404` | `ORDER_NOT_FOUND` | Não existe pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID — cortado ou digitado errado) | Registrar e avisar o suporte |
 | `409` | `ORDER_ALREADY_CONFIRMED` | Já confirmado com **outro** número; a resposta traz `pedido_erp_atual` (grafia gravada) | Investigar: sinal de importação duplicada do seu lado |
 | `409` | `ORDER_NOT_APPROVED` | O pedido não está numa situação que aceite confirmação (só pedido aprovado — ou marcado com erro de envio ao ERP — pode ser confirmado); a resposta traz a `situacao` atual | Não importar — esse pedido não estava na fila. Registrar |
-| `409` | `ORDER_NOT_REQUESTED` | Pedido aprovado que o financeiro **não solicitou** ao Control (veio da lista `incluir=todos`, não da fila) | Não importar — espere o pedido aparecer na fila |
+| `409` | `ORDER_NOT_REQUESTED` | Pedido aprovado que o financeiro **nunca solicitou** ao Control (veio da lista `incluir=todos`, não da fila). O que ele solicitou e depois cancelou **não** cai aqui: a confirmação é aceita | Não importar — espere o pedido aparecer na fila |
 | `409` | `ERP_NUMBER_IN_USE` | Esse número já está gravado em **outro** pedido; a resposta traz `pedido_em_uso` — `{ id, numero }`, ou `null` (o objeto inteiro) quando o outro pedido não pôde ser lido no momento. `numero` é o número do outro pedido no aplicativo e vem `null` se o banco ainda não tiver essa coluna. Teste `pedido_em_uso` antes de ler `.id`/`.numero` | Conferir a numeração do seu lado |
 | `409` | `CANAL_FECHADO` | Canal de pedidos não ligado para a API na sua empresa | Combinar com o Yan |
 | `500` | `INTERNAL_ERROR` | Falha ao ler ou gravar. Não significa que o pedido não existe | Não trate como confirmado nem como inexistente: tente de novo na próxima rodada |
 
 As checagens correm nesta ordem: campo presente → formato → pedido existe → já
 tem número (o mesmo = 200, outro = 409) → situação aceita confirmação →
-solicitado pelo financeiro (aprovado) → número livre → gravação. Duas confirmações ao mesmo tempo não passam: a segunda recebe
+solicitado pelo financeiro, ou solicitado e cancelado depois (aprovado) →
+número livre → gravação. Duas confirmações ao mesmo tempo não passam: a segunda recebe
 `ja_confirmado: true` (mesmo número) ou `409 ORDER_ALREADY_CONFIRMED`.
 
 **Formato de toda resposta de erro** (nesta e nas outras rotas):
@@ -701,13 +719,17 @@ API. **Só vale para pedido que o Control tem:** com número do Control, ou
 solicitado ao Control pelo financeiro (está na fila, ou você o importou e
 excluiu antes de confirmar). Rascunho, pedido aguardando aceite e aprovado que
 ninguém mandou lançar não são excluídos por aqui (`409 ORDER_NOT_IN_CONTROL`).
+O pedido cuja solicitação o financeiro **cancelou** (e que você não confirmou)
+volta a ser um aprovado que ninguém mandou lançar: se você o importou e depois
+o excluiu do seu ERP, o aviso responde `409 ORDER_NOT_IN_CONTROL` e o app
+mantém o pedido, fora da fila — do seu lado, nada a fazer.
 
 | Resposta | `code` | Significado |
 |---|---|---|
 | `200 {"ok":true,"excluido_em":"…"}` | — | Apagado agora |
 | `404` | `ORDER_NOT_FOUND` | Não existe pedido com esse `id` na sua empresa (ou já foi apagado — repetir é seguro) |
 | `409` | `ORDER_INVOICED` | Pedido **faturado** não é excluído: tem nota e conta como venda. Desfaça o faturamento antes (`POST /faturamento` com `"faturado": false`). Também quando o faturamento chega no mesmo instante da exclusão: nada é apagado |
-| `409` | `ORDER_NOT_IN_CONTROL` | O pedido não tem número do Control e não foi solicitado: o Control nunca o recebeu, e o app não o exclui por aviso |
+| `409` | `ORDER_NOT_IN_CONTROL` | O pedido não tem número do Control e não está solicitado (nunca foi, ou o financeiro cancelou a solicitação): o app não o exclui por aviso |
 | `409` | `CANAL_FECHADO` | Canal de pedidos não ligado para a API |
 | `500` | `SEM_COPIA` | A cópia do histórico não gravou — **o pedido não foi apagado**; tente de novo |
 | `500` | `INTERNAL_ERROR` | O banco recusou apagar — tente de novo |
@@ -1180,13 +1202,13 @@ Toda resposta de erro tem o formato `{ "error": "<mensagem>", "code":
 | `400` | `INVALID_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Número fora do formato (duas letras e até 10 dígitos) |
 | `404` | `ORDER_NOT_FOUND` | `POST /confirmar`, `POST /conciliar`, `POST /excluir` | Não há pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID) |
 | `409` | `ORDER_INVOICED` | `POST /excluir` | Pedido faturado não é excluído; desfaça o faturamento antes |
-| `409` | `ORDER_NOT_IN_CONTROL` | `POST /excluir` | Pedido sem número do Control e não solicitado: o Control nunca o recebeu |
+| `409` | `ORDER_NOT_IN_CONTROL` | `POST /excluir` | Pedido sem número do Control e não solicitado (ou de solicitação cancelada): o app não o exclui |
 | `500` | `SEM_COPIA` | `POST /excluir` | A cópia do histórico não gravou; o pedido **não** foi apagado — tente de novo |
 | `400` | `MISSING_CONCLUIDA` | `POST /sincronizacao` | Falta `"concluida": true` |
 | `400` | `INVALID_SOLICITADO_EM` | `POST /sincronizacao` | `solicitado_em` sem fuso ou fora do formato |
 | `409` | `ORDER_ALREADY_CONFIRMED` | `POST /confirmar`, `POST /conciliar` | Já tem outro número (`pedido_erp_atual`) |
 | `409` | `ORDER_NOT_APPROVED` | `POST /confirmar` | A situação do pedido não aceita confirmação (`situacao`) |
-| `409` | `ORDER_NOT_REQUESTED` | `POST /confirmar` | Aprovado que o financeiro não solicitou ao Control |
+| `409` | `ORDER_NOT_REQUESTED` | `POST /confirmar` | Aprovado que o financeiro nunca solicitou ao Control (o de solicitação cancelada é aceito) |
 | `409` | `ORDER_NOT_RECONCILABLE` | `POST /conciliar` | Só pedido `sent_erp` sem número é conciliado (`situacao`) |
 | `409` | `ERP_NUMBER_IN_USE` | `POST /confirmar`, `POST /conciliar` | Número já gravado em outro pedido (`pedido_em_uso`) |
 | `400` | `INVALID_BODY` | `POST` de lista | O corpo não é uma lista nem `{ "<nome da rota>": [...] }` (`faturamento`, `clientes`, `representantes`, `tabelas_preco`, `condicoes_pagamento`, `produtos`, `precos`, `estoque`, `retrato`) nem `{ "dados": [...] }` |
@@ -1770,7 +1792,9 @@ afetado. Entraram nesse dia:
   por marca.
 
 **As mudanças de 16/09/2026 também são correção da v1** (ainda sem chave
-emitida): a fila passa a ser só o que o financeiro solicitou (`solicitado_em`);
+emitida): a fila passa a ser só o que o financeiro solicitou (`solicitado_em`),
+e ele pode cancelar a solicitação enquanto o pedido não tem número (a
+confirmação de quem já o puxou continua aceita);
 `alterado_apos_importacao`; `cliente.chave` e `cliente.novo_no_control` no
 pedido, com a pendência `cliente sem CNPJ` no lugar de `cliente sem código do
 ERP`; uma nota por pedido (a nova substitui a anterior); `POST

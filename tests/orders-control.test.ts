@@ -820,7 +820,10 @@ describe('cancelar a solicitação ao Control (PATCH /orders/:id/cancelar-solici
     expect(podeCancelarSolicitacao('financeiro', { erp_order_id: NUMERO, erp_requested_at: SOLICITADO_EM })).toBe(false);
     expect(podeCancelarSolicitacao('financeiro', { erp_order_id: null, erp_requested_at: null })).toBe(false);
     expect(podeCancelarSolicitacao('financeiro', { erp_order_id: null })).toBe(false);
-    expect(PERGUNTA_CANCELAR_SOLICITACAO).toBe('O Control ainda não importou. Cancelar tira o pedido da fila do Control.');
+    // A frase não afirma que o Control não importou: o app não tem como saber.
+    expect(PERGUNTA_CANCELAR_SOLICITACAO).toBe(
+      'Se o Control ainda não importou, cancelar tira o pedido da fila do Control. Se ele já importou, o número ainda chega e vale.',
+    );
   });
 });
 
