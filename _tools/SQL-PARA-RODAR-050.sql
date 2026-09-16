@@ -81,6 +81,8 @@ CREATE TABLE IF NOT EXISTS deleted_customers (
 );
 
 -- A consulta do CRM e do admin: "os excluídos desta empresa, os mais recentes primeiro".
+-- A cópia é gravada ANTES de mover os pedidos e do DELETE, e sai se a exclusão
+-- for desfeita: quem lê confere em customers antes de agir (ver o COMMENT).
 CREATE INDEX IF NOT EXISTS idx_deleted_customers_da_empresa
   ON deleted_customers (company_id, deleted_at DESC);
 
@@ -88,7 +90,7 @@ CREATE INDEX IF NOT EXISTS idx_deleted_customers_da_empresa
 ALTER TABLE deleted_customers ENABLE ROW LEVEL SECURITY;
 
 COMMENT ON TABLE deleted_customers IS
-  'Cópia de cada cliente no instante em que foi excluído pelo app (só admin), com o cadastro em que foi juntado. Sem FK em customer_id e juntado_em: sobrevive à exclusão. Migração 050.';
+  'Cópia de cada cliente no instante em que foi excluído pelo app (só admin), com o cadastro em que foi juntado. Gravada ANTES de a exclusão terminar (e apagada se ela for desfeita): antes de agir numa linha, conferir que customer_id não existe mais em customers e que juntado_em existe, e ler só linhas com deleted_at de alguns minutos atrás. Sem FK em customer_id e juntado_em: sobrevive à exclusão. Migração 050.';
 COMMENT ON COLUMN deleted_customers.juntado_em IS
   'O cliente que ficou com os pedidos, convites, vitrines, tarefas e o login de loja deste. NULL = excluído sem juntar. Migração 050.';
 

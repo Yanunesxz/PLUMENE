@@ -70,7 +70,8 @@ packages/shared/src/
     │                       E pelo app (mostra a tela) — precisa ser o MESMO.
     ├── tabelaAtiva.ts    → tabela desligada no Control (049, price_tables.active): some de toda
     │                       ESCOLHA, mas quem já está nela continua; rotuloDaTabela marca
-    │                       "(inativa no Control)"
+    │                       "(inativa no Control)"; podeTrocarTabelaDoCliente deixa trocar
+    │                       com uma ativa só quando o cliente está numa desligada
     └── priceTier.ts      → (LEGADO/abandonado) regra de preço por total do pedido
 ```
 
@@ -208,8 +209,10 @@ apps/api/src/
 │   │                       GET /customers/:id/vinculos (as contagens do diálogo) e POST
 │   │                       /customers/:id/excluir { juntar_em?, motivo? } — cópia em
 │   │                       deleted_customers ANTES; pedidos, convites, vitrines e tarefas vão para
-│   │                       juntar_em; login de loja herdado ou desligado (nunca apagado); falha no
-│   │                       meio desfaz o que já moveu. Sem a 050: 409 MIGRACAO_PENDENTE
+│   │                       juntar_em; login de loja herdado ou desligado (nunca apagado), e o
+│   │                       convite pendente do que fica com login é revogado; sem juntar_em,
+│   │                       reconta os vínculos logo antes do DELETE; falha no meio desfaz o
+│   │                       que já moveu. Sem a 050: 409 MIGRACAO_PENDENTE
 │   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
@@ -230,11 +233,15 @@ apps/api/src/
 │   │                       orders.service.ts: solicitarLancamentoNoErp (049) — com
 │   │                       canal_pedido_erp='api' o "Lançar" SOLICITA (erp_requested_at)
 │   │                       e a tela espera a confirmação do Control; cliente bloqueado
-│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026).
+│   │                       NÃO trava o pedido (decisão 8 de 16/09/2026). createOrder segue
+│   │                       deleted_customers.juntado_em (050) quando o cliente foi excluído
+│   │                       e juntado; o /sync devolve em failed o pedido que não nasceu.
 │   │                       cancelarSolicitacaoAoErp → PATCH /orders/:id/cancelar-solicitacao
 │   │                       (financeiro/admin): tira da fila do Control o solicitado sem número
 │   │                       (UPDATE condicional; número que chega no meio = 409 JA_IMPORTADO);
-│   │                       evento solicitacao_cancelada só com a 050; sem a 049, 409
+│   │                       evento solicitacao_cancelada só com a 050; sem a 049, 409.
+│   │                       O POST /partner/v1/pedidos/:id/confirmar aceita o pedido de
+│   │                       solicitação cancelada (o Control pode tê-lo puxado): o número vence
 │   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
 │   │                       valor_minimo (detectar), que a tela usa só para AVISAR
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
