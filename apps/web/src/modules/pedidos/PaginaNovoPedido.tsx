@@ -71,7 +71,7 @@ export function PaginaNovoPedido() {
   // ─── A tabela vem do cadastro do cliente ───────────────────────────────────
   // Ninguém escolhe aqui: quem manda no preço é o cadastro. O que a tela faz é
   // não deixar o representante ver um preço e o servidor cobrar outro.
-  const { nomeDe } = useMinhasTabelas();
+  const { nomeDe, precisaEscolher } = useMinhasTabelas();
 
   /** A tabela que precifica ESTE pedido: a do cliente, caindo para a do rep. */
   const tabelaDoPedido = ehLoja
@@ -192,6 +192,10 @@ export function PaginaNovoPedido() {
    */
   const confirmacaoDaTabela = (() => {
     if (ehLoja || !customerId) return null;
+    // Com UMA tabela só não há o que conferir: é a dele, e o pedido sai nela.
+    // Yan (16/09/2026): "essa msg só aparece pra quem tem mais de uma tabela;
+    // se a pessoa tem só uma, só ela que vai enviar".
+    if (!precisaEscolher) return null;
     const doCliente = selectedCustomer?.price_table_id ?? null;
 
     if (!doCliente) {
