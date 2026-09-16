@@ -289,12 +289,20 @@ function textoOuNull(v: unknown): string | null {
   return t ? t : null;
 }
 
-/** O CNPJ só com dígitos — a chave do cliente entre os sistemas. `null` sem CNPJ. */
+/**
+ * O CNPJ só com dígitos — a chave do cliente entre os sistemas. `null` sem
+ * documento, ou com menos de 11 dígitos (CPF): é a mesma régua do POST
+ * /clientes e do /retrato, que só casam a partir de 11. Uma "chave" `123`
+ * tirava a pendência e o Control nunca casaria por ela.
+ */
 function chaveDoCliente(cnpj: unknown): string | null {
   if (typeof cnpj !== 'string') return null;
   const digitos = cnpj.replace(/\D/g, '');
-  return digitos ? digitos : null;
+  return digitos.length >= 11 ? digitos : null;
 }
+
+/** A pendência do pedido aprovado que o financeiro ainda não mandou lançar (049). */
+export const PENDENCIA_NAO_SOLICITADO = 'pedido não solicitado pelo financeiro';
 
 /** O que o Control conhece de cada pedido (a foto da 046), por id do pedido. */
 type FotosDoControl = Map<string, PedidoParaComparar>;
@@ -369,9 +377,22 @@ async function fotosDoControl(company_id: string, rows: OrderRow[]): Promise<Fot
   return fotos;
 }
 
-function mapOrder(row: OrderRow, tableMap: MapaDeTabelas, fotos: FotosDoControl | null): PartnerOrder {
+function mapOrder(
+  row: OrderRow,
+  tableMap: MapaDeTabelas,
+  fotos: FotosDoControl | null,
+  exigeSolicitacao: boolean,
+): PartnerOrder {
   const pendencias: string[] = [];
   const customer = row.customer;
+
+  // Na reconciliação (`incluir=todos`, com a 049) vem também o aprovado que
+  // ninguém mandou lançar: o lançamento é o clique do financeiro (decisões 2 e
+  // 3), então ele NÃO é importável. Na fila isto nunca acontece — o filtro já
+  // exige a solicitação.
+  if (exigeSolicitacao && row.status === 'approved' && !row.erp_order_id && !row.erp_requested_at) {
+    pendencias.push(PENDENCIA_NAO_SOLICITADO);
+  }
 
   // O CNPJ é a chave do cliente entre os sistemas (16/09/2026): sem código do
   // Control o pedido segue (`novo_no_control`: o Control cria o cadastro e
@@ -549,7 +570,8 @@ export async function getPartnerOrders(
   const tableMap = await getPriceTableMap(company_id);
   // Na fila nenhum pedido tem número: só a reconciliação lê as fotos.
   const fotos = await fotosDoControl(company_id, linhas);
-  return linhas.map((row) => mapOrder(row, tableMap, fotos));
+  const exigeSolicitacao = Boolean(opts.incluirImportados) && colunas.solicitado;
+  return linhas.map((row) => mapOrder(row, tableMap, fotos, exigeSolicitacao));
 }
 
 export type ConfirmResult =
@@ -561,6 +583,8 @@ export type ConfirmResult =
   | { outcome: 'conflict'; pedido_erp_atual: string }
   /** O status atual não deixa o pedido ir para sent_erp (rascunho, recusado, em triagem…). */
   | { outcome: 'not_confirmable'; situacao: string }
+  /** Aprovado que o financeiro não solicitou ao Control (049): o lançamento é o clique dele. */
+  | { outcome: 'not_requested' }
   /** O número já é de OUTRO pedido desta empresa. `pedido_em_uso` é null se não deu para achá-lo. */
   | { outcome: 'number_in_use'; pedido_em_uso: { id: string; numero: number | null } | null };
 
@@ -574,12 +598,15 @@ interface PedidoLido {
   id: string;
   status: string;
   erp_order_id: string | null;
+  /** 049. A chave só vem onde a coluna existe (o select é `*`). */
+  erp_requested_at?: string | null;
 }
 
+/** `*`: traz `erp_requested_at` onde a 049 existe sem mandar coluna inexistente onde não existe. */
 async function lerPedido(company_id: string, order_id: string): Promise<PedidoLido | null> {
   const { data, error } = await supabase
     .from('orders')
-    .select('id, status, erp_order_id')
+    .select('*')
     .eq('id', order_id)
     .eq('company_id', company_id)
     .maybeSingle();
@@ -641,9 +668,14 @@ function primeiraAfetada(afetadas: unknown): { id: string; order_number?: number
  * pedido da fila. Idempotente — repetir com o mesmo número responde ok.
  *
  * A ordem das checagens é contrato (15/09/2026): formato → existe → já tem
- * número → status permite → número livre → grava (só se ninguém gravou no
- * meio). O "já tem número" vem ANTES do status para reconfirmar um `sent_erp`
- * continuar idempotente.
+ * número → status permite → solicitado (049) → número livre → grava (só se
+ * ninguém gravou no meio). O "já tem número" vem ANTES do status para
+ * reconfirmar um `sent_erp` continuar idempotente.
+ *
+ * Solicitado (decisões 2 e 3 de 16/09/2026): com a 049 no banco, aprovado sem
+ * `erp_requested_at` não é confirmado — o financeiro não mandou lançar, e só a
+ * doc impedia o Control de promover a `sent_erp` um pedido da reconciliação.
+ * Sem a 049, como antes.
  *
  * `parceiro` é o nome da chave que confirmou — vai só para o rastro (048).
  */
@@ -669,6 +701,16 @@ export async function confirmOrderImport(
   // direto para "enviado ao ERP".
   const destinos = (ORDER_STATUS_FLOW as Record<string, OrderStatus[] | undefined>)[pedido.status];
   if (!destinos?.includes('sent_erp')) return { outcome: 'not_confirmable', situacao: pedido.status };
+
+  // A sonda só quando a leitura não trouxe a solicitação: sem a coluna, a
+  // chave nem vem; soluço na sonda sobe (500) e o robô tenta de novo.
+  if (
+    pedido.status === 'approved' &&
+    !pedido.erp_requested_at &&
+    (await detectarOuFalhar('orders', 'erp_requested_at'))
+  ) {
+    return { outcome: 'not_requested' };
+  }
 
   const dono = await donoDoNumero(company_id, numero, order_id);
   if (dono) return { outcome: 'number_in_use', pedido_em_uso: dono };

@@ -175,7 +175,7 @@ describe('a confirmação pela API do parceiro também tira a foto', () => {
     // antecipação do dublê.
     const fake = criarSupabaseFake({
       orders: [
-        { data: { id: 'o1', status: 'approved', erp_order_id: null }, error: null }, // o pedido
+        { data: { id: 'o1', status: 'approved', erp_order_id: null, erp_requested_at: '2026-09-16T12:00:00Z' }, error: null }, // o pedido (solicitado ao Control)
         { data: [], error: null }, // o espaço da antecipação do dublê
         { data: [], error: null }, // a sonda de order_number (existe)
         { data: [], error: null }, // espaço

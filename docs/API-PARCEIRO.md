@@ -461,7 +461,7 @@ seguinte.
 | `solicitado_em` | data ISO ou null | Quando o financeiro clicou em "Lançar no Control". Na fila vem sempre preenchido; `null` no passivo, no pedido lançado à mão e em instalação sem a migração 049 |
 | `alterado_apos_importacao` | booleano ou null | O pedido está diferente do que o Control conhece (peças, desconto, condição, observação)? `null` sem número (na fila é sempre `null`) ou sem a foto do lançamento — ver "Pedido editado depois da importação" |
 | `cliente.codigo_erp` | texto ou null | **Código do cliente no seu ERP** (campo CLIENTE). `null` quando o cliente nasceu no app e o Control ainda não devolveu o código |
-| `cliente.chave` | texto ou null | **A chave única do cliente entre os sistemas: o CNPJ/CPF só com dígitos.** É por ela que o seu ERP casa o cadastro. `null` quando o cadastro não tem documento (aí vira a pendência `cliente sem CNPJ`) |
+| `cliente.chave` | texto ou null | **A chave única do cliente entre os sistemas: o CNPJ/CPF só com dígitos.** É por ela que o seu ERP casa o cadastro. `null` quando o cadastro não tem documento, ou tem menos de 11 dígitos (aí vira a pendência `cliente sem CNPJ`) — a mesma régua do `POST /clientes`, que só casa a partir de 11 |
 | `cliente.novo_no_control` | booleano | `true` = o app não tem o código deste cliente no Control. **Crie o cadastro no ERP** (casando pela `chave`) e devolva o código pelo `POST /clientes` — não é pendência, o pedido é importável |
 | `cliente.cnpj` | texto ou null | CNPJ/CPF como está no cadastro (com pontuação, se tiver) |
 | `cliente.razao_social` / `cliente.nome_fantasia` | texto ou null | Nomes do cadastro |
@@ -477,9 +477,9 @@ seguinte.
 | `faturado_em` | data ISO ou null | Quando a nota saiu |
 | `valor_faturado` | número ou null | O valor que a nota fechou |
 | `importavel` | booleano | `true` = todos os vínculos com o ERP presentes (`pendencias` vazia). Não diz se o pedido já foi importado — para isso, `pedido_erp` |
-| `pendencias` | lista de texto | O que falta quando `importavel=false`. Cinco textos fixos — ver abaixo |
+| `pendencias` | lista de texto | O que falta quando `importavel=false`. Seis textos fixos — ver abaixo |
 
-### As cinco pendências
+### As pendências
 
 `pendencias` só contém estes textos, sem repetição:
 
@@ -488,6 +488,10 @@ seguinte.
 3. `pedido sem tabela de preço vinculada no ERP`
 4. `item sem vínculo de produto/tamanho com o ERP`
 5. `pedido sem itens`
+6. `pedido não solicitado pelo financeiro` — só com `incluir=todos`: pedido
+   aprovado que o financeiro ainda não mandou lançar. O lançamento é o clique
+   dele; não importe (o `POST /confirmar` desse pedido responde
+   `409 ORDER_NOT_REQUESTED`). Na fila padrão nunca aparece
 
 `importavel` é `true` exatamente quando a lista está vazia. Recomendação:
 importar apenas os `importavel: true` e reportar os demais, para o cadastro ser
@@ -551,13 +555,14 @@ número, `synced_at` e `updated_at`. O contrato desta rota não mudou na fase 0.
 | `404` | `ORDER_NOT_FOUND` | Não existe pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID — cortado ou digitado errado) | Registrar e avisar o suporte |
 | `409` | `ORDER_ALREADY_CONFIRMED` | Já confirmado com **outro** número; a resposta traz `pedido_erp_atual` (grafia gravada) | Investigar: sinal de importação duplicada do seu lado |
 | `409` | `ORDER_NOT_APPROVED` | O pedido não está numa situação que aceite confirmação (só pedido aprovado — ou marcado com erro de envio ao ERP — pode ser confirmado); a resposta traz a `situacao` atual | Não importar — esse pedido não estava na fila. Registrar |
+| `409` | `ORDER_NOT_REQUESTED` | Pedido aprovado que o financeiro **não solicitou** ao Control (veio da lista `incluir=todos`, não da fila) | Não importar — espere o pedido aparecer na fila |
 | `409` | `ERP_NUMBER_IN_USE` | Esse número já está gravado em **outro** pedido; a resposta traz `pedido_em_uso` — `{ id, numero }`, ou `null` (o objeto inteiro) quando o outro pedido não pôde ser lido no momento. `numero` é o número do outro pedido no aplicativo e vem `null` se o banco ainda não tiver essa coluna. Teste `pedido_em_uso` antes de ler `.id`/`.numero` | Conferir a numeração do seu lado |
 | `409` | `CANAL_FECHADO` | Canal de pedidos não ligado para a API na sua empresa | Combinar com o Yan |
 | `500` | `INTERNAL_ERROR` | Falha ao ler ou gravar. Não significa que o pedido não existe | Não trate como confirmado nem como inexistente: tente de novo na próxima rodada |
 
 As checagens correm nesta ordem: campo presente → formato → pedido existe → já
-tem número (o mesmo = 200, outro = 409) → situação aceita confirmação → número
-livre → gravação. Duas confirmações ao mesmo tempo não passam: a segunda recebe
+tem número (o mesmo = 200, outro = 409) → situação aceita confirmação →
+solicitado pelo financeiro (aprovado) → número livre → gravação. Duas confirmações ao mesmo tempo não passam: a segunda recebe
 `ja_confirmado: true` (mesmo número) ou `409 ORDER_ALREADY_CONFIRMED`.
 
 **Formato de toda resposta de erro** (nesta e nas outras rotas):
@@ -1169,6 +1174,7 @@ Toda resposta de erro tem o formato `{ "error": "<mensagem>", "code":
 | `400` | `INVALID_SOLICITADO_EM` | `POST /sincronizacao` | `solicitado_em` sem fuso ou fora do formato |
 | `409` | `ORDER_ALREADY_CONFIRMED` | `POST /confirmar`, `POST /conciliar` | Já tem outro número (`pedido_erp_atual`) |
 | `409` | `ORDER_NOT_APPROVED` | `POST /confirmar` | A situação do pedido não aceita confirmação (`situacao`) |
+| `409` | `ORDER_NOT_REQUESTED` | `POST /confirmar` | Aprovado que o financeiro não solicitou ao Control |
 | `409` | `ORDER_NOT_RECONCILABLE` | `POST /conciliar` | Só pedido `sent_erp` sem número é conciliado (`situacao`) |
 | `409` | `ERP_NUMBER_IN_USE` | `POST /confirmar`, `POST /conciliar` | Número já gravado em outro pedido (`pedido_em_uso`) |
 | `400` | `INVALID_BODY` | `POST` de lista | O corpo não é uma lista nem `{ "<nome da rota>": [...] }` (`faturamento`, `clientes`, `representantes`, `tabelas_preco`, `condicoes_pagamento`, `produtos`, `precos`, `estoque`, `retrato`) nem `{ "dados": [...] }` |

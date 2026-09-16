@@ -213,6 +213,13 @@ export async function partnerConfirmOrderHandler(
         situacao: result.situacao,
       });
       return;
+    case 'not_requested':
+      await responder(request, reply, 409, {
+        error: 'O financeiro ainda não solicitou o lançamento deste pedido ao Control — importe só o que vem na fila',
+        code: 'ORDER_NOT_REQUESTED',
+        statusCode: 409,
+      });
+      return;
     case 'number_in_use':
       await responder(request, reply, 409, corpoNumeroEmUso(result.pedido_em_uso));
       return;

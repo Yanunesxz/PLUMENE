@@ -346,6 +346,38 @@ describe('a fila é o que o financeiro SOLICITOU (049)', () => {
     expect(fake.filtrosDe('orders', 'range')).toHaveLength(0);
   });
 
+  it('`incluir=todos` com a 049: aprovado não solicitado sai com a pendência e NÃO é importável; sem a 049, como antes', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({ id: 'nao-pedido', erp_requested_at: null }),
+            pedido({ id: 'pedido', erp_requested_at: SOLICITADO }),
+            pedido({ id: 'no-control', status: 'sent_erp', erp_order_id: 'CS17379', erp_requested_at: null }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
+
+    expect(lista.map((p) => [p.id, p.importavel, p.pendencias])).toEqual([
+      ['nao-pedido', false, ['pedido não solicitado pelo financeiro']],
+      ['pedido', true, []],
+      ['no-control', true, []],
+    ]);
+
+    vi.resetModules();
+    const sem049 = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ id: 'antigo' })], error: null }], SEM_049),
+      price_tables: { data: [], error: null },
+    });
+    const [antigo] = await sem049.getPartnerOrders(EMPRESA, { incluirImportados: true });
+    expect(antigo).toMatchObject({ importavel: true, pendencias: [] });
+  });
+
   it('`incluir=todos` não exige solicitação — é a reconciliação, e traz o solicitado_em de cada um', async () => {
     const { getPartnerOrders, fake } = await carregar({
       orders: filaDaListagem([
@@ -545,6 +577,9 @@ describe('o pedido como o ERP recebe', () => {
             pedido({ customer: { ...CLIENTE, cnpj: null } }),
             pedido({ id: 'o2', customer: { ...CLIENTE, cnpj: '   ' } }),
             pedido({ id: 'o3', customer: { ...CLIENTE, cnpj: 'sem numero' } }),
+            // Menos de 11 dígitos não é documento: o POST /clientes nunca casaria por ele.
+            pedido({ id: 'o4', customer: { ...CLIENTE, cnpj: '123' } }),
+            pedido({ id: 'o5', customer: { ...CLIENTE, cnpj: '1234567890' } }),
           ],
           error: null,
         },
@@ -854,7 +889,8 @@ describe('o cliente do pedido ganha endereço em pedaços, IE, WhatsApp e e-mail
 // ─── O confirmar ─────────────────────────────────────────────────────────────
 
 const LIDO = (linha: Record<string, unknown> | null): RespostaTabela => ({ data: linha, error: null });
-const APROVADO = LIDO({ id: 'o1', status: 'approved', erp_order_id: null });
+/** Aprovado E solicitado pelo financeiro (049): o que o Control pode confirmar. */
+const APROVADO = LIDO({ id: 'o1', status: 'approved', erp_order_id: null, erp_requested_at: '2026-09-16T12:00:00Z' });
 /** A sonda de `order_number` que a pré-checagem faz (o dono volta com o número do app). */
 const SONDA = OK;
 const NUMERO_LIVRE: RespostaTabela = { data: [], error: null };
@@ -1020,6 +1056,33 @@ describe('confirmOrderImport — o ERP devolve o número', () => {
       expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
     },
   );
+
+  it('com a 049: aprovado que o financeiro NÃO solicitou é recusado (not_requested), sem conferir número nem gravar', async () => {
+    const { confirmOrderImport, fake, registrarNoErp } = await carregar({
+      orders: emSequencia(LIDO({ id: 'o1', status: 'approved', erp_order_id: null, erp_requested_at: null }), OK),
+    });
+
+    expect(await confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'not_requested' });
+    expect(fake.filtrosDe('orders', 'neq')).toHaveLength(0);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(registrarNoErp).not.toHaveBeenCalled();
+    // O select da leitura é `*`: traz erp_requested_at onde a 049 existe.
+    expect(fake.filtrosDe('orders', 'select')[0]!.args[0]).toBe('*');
+  });
+
+  it('sem a 049 (42703 na sonda): aprovado sem a solicitação confirma como antes; sonda que falha por rede LANÇA', async () => {
+    const semColuna = await carregar({
+      orders: emSequencia(LIDO({ id: 'o1', status: 'approved', erp_order_id: null }), COLUNA_AUSENTE, SONDA, NUMERO_LIVRE, SONDA_ORIGEM, GRAVOU),
+    });
+    expect(await semColuna.confirmOrderImport(EMPRESA, 'o1', 'CS17379')).toEqual({ outcome: 'ok', ja_confirmado: false });
+
+    vi.resetModules();
+    const soluco = await carregar({
+      orders: emSequencia(LIDO({ id: 'o1', status: 'approved', erp_order_id: null }), { data: null, error: { message: 'timeout' } }),
+    });
+    await expect(soluco.confirmOrderImport(EMPRESA, 'o1', 'CS17379')).rejects.toThrow(/erp_requested_at/);
+    expect(soluco.fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
 
   it('pedido em error_erp pode ser confirmado — é a única outra entrada de sent_erp no fluxo', async () => {
     const { confirmOrderImport } = await carregar({
@@ -1406,6 +1469,16 @@ describe('POST /pedidos/:id/confirmar — o que o programador do Fábio vê', ()
       statusCode: 409,
       pedido_erp_atual: 'CS17000',
     });
+  });
+
+  it('not_requested → 409 ORDER_NOT_REQUESTED', async () => {
+    const { partnerConfirmOrderHandler } = await carregarController({ outcome: 'not_requested' });
+    const { reply, enviado } = replyFalso();
+
+    await partnerConfirmOrderHandler(requisicao({ pedido_erp: 'CS17379' }), reply);
+
+    expect(enviado.status).toBe(409);
+    expect(enviado.corpo).toMatchObject({ code: 'ORDER_NOT_REQUESTED', statusCode: 409 });
   });
 
   it('not_confirmable → 409 ORDER_NOT_APPROVED com a situação atual', async () => {

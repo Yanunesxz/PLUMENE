@@ -1465,6 +1465,15 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                 </tr>
                 <tr>
                   <td><span class="st wr">409</span></td>
+                  <td><code>ORDER_NOT_REQUESTED</code></td>
+                  <td>Pedido aprovado que o financeiro <b>não solicitou</b> ao
+                      Control (veio da lista <code>incluir=todos</code>, não da
+                      fila).</td>
+                  <td class="t-mut">Não importar: espere o pedido aparecer na
+                      fila.</td>
+                </tr>
+                <tr>
+                  <td><span class="st wr">409</span></td>
                   <td><code>ERP_NUMBER_IN_USE</code></td>
                   <td>Esse número já está gravado em <em>outro</em> pedido. A
                       resposta traz <code>pedido_em_uso</code>:
@@ -1499,7 +1508,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           <p>
             As checagens correm nesta ordem: campo presente → formato → pedido
             existe → já tem número (o mesmo = 200, outro = 409) → situação aceita
-            confirmação → número livre → gravação. Duas confirmações ao mesmo tempo
+            confirmação → solicitado pelo financeiro (aprovado) → número livre →
+            gravação. Duas confirmações ao mesmo tempo
             não passam: a segunda recebe <code>ja_confirmado: true</code> (mesmo
             número) ou <span class="st wr">409</span>
             <code>ORDER_ALREADY_CONFIRMED</code>.
@@ -2902,7 +2912,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><td><code>faturado_em</code></td><td class="t-mut">data</td><td>Quando a nota saiu.</td></tr>
             <tr><td><code>valor_faturado</code></td><td class="t-mut">número</td><td>O valor que a nota fechou (pode ser menor que o pedido).</td></tr>
             <tr><td><code>importavel</code></td><td class="t-mut">booleano</td><td><code>true</code> quando todos os vínculos com o ERP estão presentes (<code>pendencias</code> vazia). Não diz se o pedido já foi importado — para isso, <code>pedido_erp</code>.</td></tr>
-            <tr><td><code>pendencias</code></td><td class="t-mut">lista</td><td>O que falta quando <code>importavel</code> é <code>false</code>. Cinco textos fixos, sem repetição — ver abaixo.</td></tr>
+            <tr><td><code>pendencias</code></td><td class="t-mut">lista</td><td>O que falta quando <code>importavel</code> é <code>false</code>. Seis textos fixos, sem repetição — ver abaixo.</td></tr>
           </tbody>
         </table>
       </div>
@@ -2988,12 +2998,16 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         <span class="note-t">Pedidos com cadastro incompleto</span>
         <p>
           Quando falta um vínculo, o pedido vem com <code>importavel: false</code> e a
-          lista <code>pendencias</code> explicando o motivo. São cinco textos fixos,
-          sem repetição: <code>cliente sem CNPJ</code>,
-          <code>cliente sem representante vinculado no ERP</code>,
-          <code>pedido sem tabela de preço vinculada no ERP</code>,
-          <code>item sem vínculo de produto/tamanho com o ERP</code> e
-          <code>pedido sem itens</code>. <code>importavel</code> é <code>true</code>
+          lista <code>pendencias</code> explicando o motivo. São seis textos fixos,
+          sem repetição: <code>cliente sem CNPJ</code> (sem documento, ou com
+          menos de 11 dígitos), <code>cliente sem representante vinculado no
+          ERP</code>, <code>pedido sem tabela de preço vinculada no ERP</code>,
+          <code>item sem vínculo de produto/tamanho com o ERP</code>,
+          <code>pedido sem itens</code> e — só com <code>incluir=todos</code> —
+          <code>pedido não solicitado pelo financeiro</code> (aprovado que ninguém
+          mandou lançar: não importe; o <code>POST /confirmar</code> dele responde
+          <span class="st wr">409</span> <code>ORDER_NOT_REQUESTED</code>).
+          <code>importavel</code> é <code>true</code>
           exatamente quando a lista está vazia — condição de pagamento ausente
           (<code>condicao_pagamento: null</code>) não gera pendência.
         </p>
@@ -3496,6 +3510,7 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             <tr><td><span class="st er">400</span></td><td><code>MISSING_CONCLUIDA</code>, <code>INVALID_SOLICITADO_EM</code></td><td>POST /sincronizacao</td><td>Falta <code>"concluida": true</code>, ou <code>solicitado_em</code> sem fuso.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_ALREADY_CONFIRMED</code></td><td>POST /confirmar, POST /conciliar</td><td>Já tem outro número (<code>pedido_erp_atual</code>).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_APPROVED</code></td><td>POST /confirmar</td><td>A situação do pedido não aceita confirmação (<code>situacao</code>).</td></tr>
+            <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_REQUESTED</code></td><td>POST /confirmar</td><td>Aprovado que o financeiro não solicitou ao Control.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ORDER_NOT_RECONCILABLE</code></td><td>POST /conciliar</td><td>Só pedido <code>sent_erp</code> sem número é conciliado (<code>situacao</code>).</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>ERP_NUMBER_IN_USE</code></td><td>POST /confirmar, POST /conciliar</td><td>Número já gravado em outro pedido (<code>pedido_em_uso</code>).</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_BODY</code></td><td>POSTs de lista</td><td>O corpo não é uma lista nem <code>{ "&lt;nome da rota&gt;": [...] }</code> (<code>faturamento</code>, <code>clientes</code>, <code>representantes</code>, <code>tabelas_preco</code>, <code>condicoes_pagamento</code>, <code>produtos</code>, <code>precos</code>, <code>estoque</code>, <code>retrato</code>) nem <code>{ "dados": [...] }</code>.</td></tr>
