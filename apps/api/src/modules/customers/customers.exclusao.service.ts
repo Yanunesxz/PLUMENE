@@ -188,8 +188,11 @@ async function idsDosPedidos(company_id: string, customer_id: string): Promise<s
  *   4. vitrines e tarefas → juntar_em
  *   5. login de loja: o que fica herda o de acesso mais recente, se não tiver
  *      login; os outros são desligados (active=false, sem cliente) — nunca
- *      apagados, e o índice único idx_users_customer só aceita um por cliente
- *   6. updated_at do que fica
+ *      apagados, e o índice único idx_users_customer só aceita um por cliente.
+ *      Se o que fica terminou com login, o convite pendente dele é revogado
+ *      (não teria como ser aceito)
+ *   6. updated_at do que fica — ou, sem junção, a recontagem dos vínculos
+ *      (se algo chegou no meio, desfaz e responde CLIENTE_COM_VINCULOS)
  *   7. DELETE do cliente
  */
 export async function excluirCliente(
@@ -428,6 +431,38 @@ export async function excluirCliente(
         });
       }
 
+      // ─── 5b. Convite pendente de quem já tem login ─────────────────────────
+      // O cadastro que fica terminou com login (herdado ou dele): um convite
+      // pendente dele — próprio ou movido no passo 3 — nunca mais funciona. Ao
+      // aceitar, o INSERT em users bate no índice único idx_users_customer, o
+      // convite é devolvido e a loja fica com um link que falha para sempre.
+      if (herdeiro || ids(doQueFica).length > 0) {
+        const { data, error } = await supabase
+          .from('store_invites')
+          .update({ revoked_at: agora })
+          .eq('company_id', company_id)
+          .eq('customer_id', juntar_em)
+          .is('used_at', null)
+          .is('revoked_at', null)
+          .select('id');
+        exigir('revogar o convite pendente do cadastro que fica', error);
+        const revogados = ids(data);
+        resultado.convites_revogados += revogados.length;
+        if (revogados.length > 0) {
+          feitos.push({
+            nome: 'reabrir o convite do cadastro que fica',
+            desfazer: async () => {
+              const { error: e } = await supabase
+                .from('store_invites')
+                .update({ revoked_at: null })
+                .eq('company_id', company_id)
+                .in('id', revogados);
+              exigir('reabrir o convite do cadastro que fica', e);
+            },
+          });
+        }
+      }
+
       // ─── 6. O que fica mudou ───────────────────────────────────────────────
       // Sem desfazer: um updated_at adiantado só faz o CRM reler o cadastro.
       const { error: erroDoToque } = await supabase
@@ -436,6 +471,28 @@ export async function excluirCliente(
         .eq('id', juntar_em)
         .eq('company_id', company_id);
       exigir('marcar o cadastro que fica como alterado', erroDoToque);
+    } else {
+      // ─── 6b. Sem junção: nada chegou no meio? ──────────────────────────────
+      // A contagem lá em cima e o DELETE não são atômicos, e users.customer_id e
+      // store_invites.customer_id são ON DELETE CASCADE (014): a loja que aceita
+      // o convite neste intervalo perderia o login junto com o cliente (e
+      // vitrine e tarefa novas ficariam soltas). Reconta logo antes de apagar.
+      const recontagem = await contarVinculos(company_id, customer_id);
+      if (!recontagem) throw new Error('recontar os vínculos antes de apagar: não deu para contar');
+      if (temVinculos(recontagem)) {
+        const desfeito = await desfazerTudo(
+          feitos,
+          { company_id, customer_id, rastro_id, motivo },
+          'o cliente ganhou vínculos durante a exclusão',
+        );
+        if (desfeito) return { ok: false, motivo: 'com_vinculos', contagens: recontagem };
+        return {
+          ok: false,
+          motivo: 'falhou_no_meio',
+          desfeito: false,
+          detalhe: 'o cliente ganhou vínculos durante a exclusão e a cópia não pôde ser apagada',
+        };
+      }
     }
 
     // ─── 7. O DELETE ─────────────────────────────────────────────────────────

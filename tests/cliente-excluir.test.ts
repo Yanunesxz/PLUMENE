@@ -120,7 +120,9 @@ function juncaoCompleta(sobrescrever: Record<string, RespostaTabela | RespostaTa
       ok([]),
       ok(),
     ),
-    store_invites: emOrdem(conta(1), ok([]), ok([{ id: 'convite-1' }])),
+    // contagem, pendente do que fica (nenhum), mover, e o pendente do que fica
+    // depois que ele herdou o login (nenhum)
+    store_invites: emOrdem(conta(1), ok([]), ok([{ id: 'convite-1' }]), ok([])),
     showcase_links: emOrdem(conta(1), ok([{ id: 'vitrine-1' }])),
     rep_tasks: emOrdem(conta(1), ok([{ id: 'tarefa-1' }])),
     ...sobrescrever,
@@ -342,8 +344,10 @@ describe('POST /customers/:id/excluir — juntando em outro cadastro', () => {
     expect(typeof pedidos.updated_at).toBe('string');
     expect(fake.filtrosDe('orders', 'in').some((f) => JSON.stringify(f.args[1]) === '["ped-1","ped-2"]')).toBe(true);
 
-    // Convites, vitrines e tarefas.
-    expect((fake.ultimaGravacao('store_invites', 'update')!.valores as Valores).customer_id).toBe(FICA);
+    // Convites, vitrines e tarefas. (A última gravação em convites é a revogação
+    // do pendente do que fica, que herdou o login — aqui não havia nenhum.)
+    const convites = fake.gravacoes.filter((g) => g.tabela === 'store_invites');
+    expect(convites.map((g) => g.valores)).toEqual([{ customer_id: FICA }, { revoked_at: expect.any(String) }]);
     expect((fake.ultimaGravacao('showcase_links', 'update')!.valores as Valores).customer_id).toBe(FICA);
     const tarefas = fake.ultimaGravacao('rep_tasks', 'update')!.valores as Valores;
     expect(tarefas.customer_id).toBe(FICA);
@@ -409,16 +413,77 @@ describe('POST /customers/:id/excluir — juntando em outro cadastro', () => {
   it('o que fica já tem convite pendente: o pendente do que sai é revogado antes de mover', async () => {
     const { res, fake, corpo } = await excluir(
       juncaoCompleta({
-        store_invites: emOrdem(conta(1), ok([{ id: 'pendente-do-que-fica' }]), ok([{ id: 'convite-1' }]), ok([{ id: 'convite-1' }])),
+        store_invites: emOrdem(
+          conta(1),
+          ok([{ id: 'pendente-do-que-fica' }]),
+          ok([{ id: 'convite-1' }]),
+          ok([{ id: 'convite-1' }]),
+          // o que fica herdou o login: o pendente dele também é revogado
+          ok([{ id: 'pendente-do-que-fica' }]),
+        ),
       }),
       { juntar_em: FICA },
     );
 
     expect(res.statusCode).toBe(200);
-    expect((corpo.data as Valores).convites_revogados).toBe(1);
+    expect((corpo.data as Valores).convites_revogados).toBe(2);
     const convites = fake.gravacoes.filter((g) => g.tabela === 'store_invites');
     expect(Object.keys(convites[0]!.valores as Valores)).toEqual(['revoked_at']);
     expect(convites[1]!.valores).toEqual({ customer_id: FICA });
+    expect(Object.keys(convites[2]!.valores as Valores)).toEqual(['revoked_at']);
+  });
+
+  it('o que fica termina com login herdado: o convite pendente dele (o movido) é revogado — aceitar bateria no índice de um login por loja', async () => {
+    const { res, fake, corpo } = await excluir(
+      juncaoCompleta({
+        store_invites: emOrdem(conta(1), ok([]), ok([{ id: 'convite-1' }]), ok([{ id: 'convite-1' }])),
+      }),
+      { juntar_em: FICA },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(corpo.data).toMatchObject({ convites_movidos: 1, convites_revogados: 1, login_herdado: true });
+    const convites = fake.gravacoes.filter((g) => g.tabela === 'store_invites');
+    expect(convites.map((g) => Object.keys(g.valores as Valores))).toEqual([['customer_id'], ['revoked_at']]);
+    // A revogação é do cadastro que fica, só do pendente, na empresa do token.
+    const eqs = fake.filtrosDe('store_invites', 'eq').map((f) => f.args);
+    expect(eqs.filter((a) => a[0] === 'customer_id').at(-1)).toEqual(['customer_id', FICA]);
+    expect(eqs.filter((a) => a[0] === 'company_id').every((a) => a[1] === EMPRESA)).toBe(true);
+    const iss = fake.filtrosDe('store_invites', 'is').map((f) => f.args);
+    expect(iss).toContainEqual(['used_at', null]);
+    expect(iss).toContainEqual(['revoked_at', null]);
+  });
+
+  it('a revogação do convite do que fica é desfeita quando a exclusão falha depois', async () => {
+    const { res, fake, corpo } = await excluir(
+      juncaoCompleta({
+        customers: emOrdem(ok(CLIENTE_QUE_SAI), ok({ id: FICA }), ok(), falha('violates foreign key constraint', '23503')),
+        store_invites: emOrdem(conta(1), ok([]), ok([{ id: 'convite-1' }]), ok([{ id: 'convite-1' }]), ok()),
+      }),
+      { juntar_em: FICA },
+    );
+
+    expect(res.statusCode).toBe(500);
+    expect(corpo.desfeito).toBe(true);
+    const indiceDoDelete = fake.gravacoes.findIndex((g) => g.tabela === 'customers' && g.operacao === 'delete');
+    const depois = fake.gravacoes.slice(indiceDoDelete + 1);
+    // O primeiro a ser desfeito é o último feito: o convite do que fica reabre.
+    expect(depois[0]).toMatchObject({ tabela: 'store_invites', operacao: 'update', valores: { revoked_at: null } });
+    expect(depois.at(-1)).toMatchObject({ tabela: 'deleted_customers', operacao: 'delete' });
+  });
+
+  it('o que fica termina sem login: o convite pendente dele continua valendo', async () => {
+    const { res, fake, corpo } = await excluir(
+      juncaoCompleta({
+        users: emOrdem(conta(0), ok([]), ok([])),
+      }),
+      { juntar_em: FICA },
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(corpo.data).toMatchObject({ convites_revogados: 0, login_herdado: false, logins_desligados: 0 });
+    const convites = fake.gravacoes.filter((g) => g.tabela === 'store_invites');
+    expect(convites.map((g) => g.valores)).toEqual([{ customer_id: FICA }]);
   });
 
   it('se mudou de dono um número de pedidos diferente do contado, a cópia é corrigida', async () => {
@@ -458,6 +523,61 @@ describe('POST /customers/:id/excluir — juntando em outro cadastro', () => {
     expect(copia.juntado_em).toBeNull();
     expect(copia.pedidos_movidos).toBe(0);
     expect(copia.motivo).toBeNull();
+  });
+
+  it('sem juntar_em: login que chegou entre a contagem e o DELETE → desfaz a cópia e 409 com as contagens novas, sem apagar', async () => {
+    const { res, fake, corpo } = await excluir(
+      juncaoCompleta({
+        deleted_customers: emOrdem(ok([]), ok({ id: 'rastro-1' }), ok()),
+        customers: emOrdem(ok(CLIENTE_QUE_SAI), ok()),
+        orders: conta(0),
+        // a loja aceitou o convite no meio: a recontagem acha o login
+        users: emOrdem(conta(0), conta(1)),
+        store_invites: conta(0),
+        showcase_links: conta(0),
+        rep_tasks: conta(0),
+      }),
+      {},
+    );
+
+    expect(res.statusCode).toBe(409);
+    expect(corpo.code).toBe('CLIENTE_COM_VINCULOS');
+    expect(corpo.contagens).toEqual({ pedidos: 0, logins: 1, convites: 0, vitrines: 0, tarefas: 0 });
+    // A cópia de uma exclusão que não aconteceu sai; o cliente (e o login dele) ficam.
+    expect(fake.gravacoes.map((g) => `${g.tabela}.${g.operacao}`)).toEqual([
+      'deleted_customers.insert',
+      'deleted_customers.delete',
+    ]);
+    expect(fake.ultimaGravacao('customers', 'delete')).toBeUndefined();
+    // As duas contagens de logins são do cliente que sai, na empresa do token.
+    const eqsDeUsers = fake.filtrosDe('users', 'eq').map((f) => f.args);
+    expect(eqsDeUsers.filter((a) => a[0] === 'customer_id')).toEqual([
+      ['customer_id', SAI],
+      ['customer_id', SAI],
+    ]);
+  });
+
+  it('sem juntar_em: recontagem que falha não vira zero — desfaz e 500, sem apagar', async () => {
+    const { res, fake, corpo } = await excluir(
+      juncaoCompleta({
+        deleted_customers: emOrdem(ok([]), ok({ id: 'rastro-1' }), ok()),
+        customers: emOrdem(ok(CLIENTE_QUE_SAI), ok()),
+        orders: conta(0),
+        users: emOrdem(conta(0), falha('statement timeout')),
+        store_invites: conta(0),
+        showcase_links: conta(0),
+        rep_tasks: conta(0),
+      }),
+      {},
+    );
+
+    expect(res.statusCode).toBe(500);
+    expect(corpo.code).toBe('EXCLUSAO_FALHOU');
+    expect(corpo.desfeito).toBe(true);
+    expect(fake.gravacoes.map((g) => `${g.tabela}.${g.operacao}`)).toEqual([
+      'deleted_customers.insert',
+      'deleted_customers.delete',
+    ]);
   });
 });
 
@@ -506,7 +626,8 @@ describe('POST /customers/:id/excluir — falha no meio', () => {
     const depois = fake.gravacoes.slice(indiceDoDelete + 1);
     const resumo = depois.map((g) => `${g.tabela}.${g.operacao}`);
 
-    // Do último passo para o primeiro; a cópia sai por último.
+    // Do último passo para o primeiro; a cópia sai por último. (Sem convite
+    // pendente no cadastro que fica, a revogação do passo 5b não entra aqui.)
     expect(resumo).toEqual([
       'users.update', // religa o desligado
       'users.update', // devolve o herdado
