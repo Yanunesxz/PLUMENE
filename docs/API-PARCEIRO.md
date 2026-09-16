@@ -975,13 +975,14 @@ POST /partner/v1/produtos
 
 ### POST /partner/v1/precos
 
-`{ "precos": [ { "tabela", "produto", "preco", "preco_original", "desconto_percentual", "data_update" } ] }`
+`{ "precos": [ { "tabela", "produto", "preco", "preco_faixa_maior", "preco_original", "desconto_percentual", "data_update" } ] }`
 
 | Campo | Precisa? | Observação |
 |---|---|---|
 | `tabela` | **Sim** | Código da tabela de preço no ERP (miolo) |
 | `produto` | **Sim** | Código do produto no ERP (miolo) |
 | `preco` | **Sim** | O preço que vale nessa tabela — **sobrescreve** o que estava (inclusive o da carga do PDF). Zero ou negativo é ignorado; não há como apagar um preço pela API |
+| `preco_faixa_maior` | Recomendado | O preço dos tamanhos da **faixa maior** (EG/XG e 48 a 54) nessa tabela — o pedido cobra esse valor nesses tamanhos. `null` = não há preço diferente: todo tamanho paga `preco`. **Ausente não mexe**: se a carga do PDF tinha deixado um preço de faixa maior, ele continua valendo e volta um aviso com o produto. Zero ou negativo não mexe e avisa |
 | `preco_original` | Não | O preço antes do desconto do ERP (informativo) |
 | `desconto_percentual` | Não | 0 a 100 (informativo) |
 | `data_update` | Não | Com fuso |
@@ -992,15 +993,16 @@ Motivos: `registro inválido`, `sem código do produto`, `sem código da tabela`
 `produto não encontrado no app`, `produto com mais de um cadastro no app`,
 `"data_update" não é uma data ISO` / `"data_update" precisa de fuso (Z ou
 -03:00)`, `falha ao gravar: …`. Os avisos apontam a rota que cadastra o que
-faltou (`POST /tabelas-preco`, `POST /produtos`), `preco_original` ou
-`desconto_percentual` ilegíveis, e o fixo da 049.
+faltou (`POST /tabelas-preco`, `POST /produtos`), `preco_original`,
+`desconto_percentual` ou `preco_faixa_maior` ilegíveis, o preço da faixa maior
+que continua o de antes (mande `preco_faixa_maior`, ou `null`), e o fixo da 049.
 
 **Exemplo:**
 
 ```json
 POST /partner/v1/precos
 { "precos": [
-  { "tabela": "00007", "produto": "0706", "preco": 89.90, "preco_original": 99.90, "desconto_percentual": 10 },
+  { "tabela": "00007", "produto": "0706", "preco": 89.90, "preco_faixa_maior": 99.90, "preco_original": 99.90, "desconto_percentual": 10 },
   { "tabela": "00007", "produto": "0999", "preco": 55.00 }
 ] }
 ```

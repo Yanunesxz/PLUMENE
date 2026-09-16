@@ -82,6 +82,13 @@ export interface PrecoParceiro {
   produto?: string | number | null;
   /** O preço que vale na tabela — sobrescreve o que estava (inclusive o do PDF). */
   preco?: number | string | null;
+  /**
+   * O preço da FAIXA MAIOR (EG/XG, 48 a 54) na tabela — product_prices.
+   * price_larger (026), que precifica esses tamanhos no pedido. `null` limpa:
+   * todos os tamanhos passam a pagar `preco`. Ausente não mexe (e, se o PDF
+   * tinha deixado um preço de faixa maior, volta um aviso).
+   */
+  preco_faixa_maior?: number | string | null;
   preco_original?: number | string | null;
   desconto_percentual?: number | string | null;
   data_update?: string | null;
@@ -1021,11 +1028,22 @@ const COLUNAS_DO_PRECO_049 = 'preco_original, desconto_percentual, erp_updated_a
 
 type LinhaPreco = { product_id: string; price_table_id: string; price: number | string | null } & Record<string, unknown>;
 
+/** Aviso fixo: `preco_faixa_maior` chegou num banco sem a 026. */
+export const AVISO_SEM_026_FAIXA_MAIOR =
+  '"preco_faixa_maior" fica guardado depois da migração 026 — por ora só o preço normal foi gravado.';
+
 /**
  * POST /partner/v1/precos. Upsert em `product_prices` por (produto, tabela):
  * o preço do Control SOBRESCREVE o que estava (o do PDF inclusive). Com a 049
- * guarda também o preço original, o desconto e o carimbo. `price_larger` e
- * `variant_id` não são tocados. Tabela ou produto que o app não tem → ignorado.
+ * guarda também o preço original, o desconto e o carimbo. `variant_id` não é
+ * tocado. Tabela ou produto que o app não tem → ignorado.
+ *
+ * A FAIXA MAIOR (revisão de 16/09/2026): o pedido precifica EG/XG e 48 a 54
+ * por `price_larger` sempre que ele não é nulo (precoDoTamanho, em shared).
+ * Gravar só `price` deixava o preço da faixa maior do PDF valendo depois de o
+ * Control mandar o dele. `preco_faixa_maior` grava a coluna (`null` limpa: todo
+ * tamanho paga `preco`); ausente não mexe — campo ausente nunca apaga — e,
+ * quando o que está lá veio de antes (o PDF), volta um aviso por produto.
  */
 export async function receberPrecos(company_id: string, precos: readonly unknown[]): Promise<ResultadoCatalogo> {
   const r = resultadoVazio(precos.length);
@@ -1033,6 +1051,7 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
 
   // ── 1. Leituras dos cadastros que o preço aponta.
   const com049 = await detectarOuFalhar('product_prices', 'erp_updated_at');
+  const comFaixaMaior = await detectarOuFalhar('product_prices', 'price_larger');
   const tabelas = await buscarTudoOuFalhar<{ id: string; erp_code: string | null }>((de, ate) =>
     supabase.from('price_tables').select('id, erp_code').eq('company_id', company_id).order('id').range(de, ate),
   );
@@ -1045,6 +1064,7 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
     product_id: string;
     price_table_id: string;
     preco: number;
+    faixaMaior: RecebidoOuInvalido<number>;
     original: RecebidoOuInvalido<number>;
     desconto: RecebidoOuInvalido<number>;
     momento: Momento;
@@ -1053,6 +1073,9 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
   const vistosNoLote = new Set<string>();
   const originaisInvalidos = new Set<string>();
   const descontosInvalidos = new Set<string>();
+  const faixasMaioresInvalidas = new Set<string>();
+  const faixaMaiorDeAntes = new Set<string>();
+  let faixaMaiorSem026 = false;
   const tabelasNaoAchadas = new Set<string>();
   const produtosNaoAchados = new Set<string>();
   let precisamDa049 = false;
@@ -1112,6 +1135,11 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
     }
     const original = lerValor(raw, 'preco_original', 0);
     if (original.veio === 'invalido') originaisInvalidos.add(produto);
+    // Zero não é preço (como em `preco`): vira inválido, não mexe e avisa.
+    let faixaMaior = lerValor(raw, 'preco_faixa_maior', 0);
+    if (faixaMaior.veio === true && faixaMaior.valor !== null && faixaMaior.valor <= 0) faixaMaior = { veio: 'invalido' };
+    if (faixaMaior.veio === 'invalido') faixasMaioresInvalidas.add(produto);
+    if (faixaMaior.veio === true && !comFaixaMaior) faixaMaiorSem026 = true;
     const desconto = lerValor(raw, 'desconto_percentual', 0, 100);
     if (desconto.veio === 'invalido') descontosInvalidos.add(produto);
     if (!com049 && (original.veio === true || desconto.veio === true || momento.veio === true)) precisamDa049 = true;
@@ -1121,6 +1149,7 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
       product_id: produtoAchado.id,
       price_table_id: tabelaAchada.id,
       preco: preco.valor,
+      faixaMaior,
       original,
       desconto,
       momento,
@@ -1131,7 +1160,9 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
   const existentes = new Map<string, LinhaPreco>();
   const tabelasEnvolvidas = [...new Set(lidos.map((l) => l.price_table_id))];
   if (tabelasEnvolvidas.length > 0) {
-    const colunas = com049 ? `${COLUNAS_DO_PRECO}, ${COLUNAS_DO_PRECO_049}` : COLUNAS_DO_PRECO;
+    const colunas = [COLUNAS_DO_PRECO, comFaixaMaior ? 'price_larger' : null, com049 ? COLUNAS_DO_PRECO_049 : null]
+      .filter(Boolean)
+      .join(', ');
     const linhas = await buscarTudoOuFalhar<LinhaPreco>((de, ate) =>
       supabase
         .from('product_prices')
@@ -1150,6 +1181,12 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
   for (const l of lidos) {
     const existente = existentes.get(`${l.product_id}|${l.price_table_id}`);
     const pedido: Record<string, unknown> = { price: l.preco };
+    if (comFaixaMaior) {
+      if (l.faixaMaior.veio === true) pedido['price_larger'] = l.faixaMaior.valor;
+      else if (l.faixaMaior.veio === false && existente && existente['price_larger'] != null) {
+        faixaMaiorDeAntes.add(l.codigo);
+      }
+    }
     if (com049) {
       if (l.original.veio === true) pedido['preco_original'] = l.original.valor;
       if (l.desconto.veio === true) pedido['desconto_percentual'] = l.desconto.valor;
@@ -1187,6 +1224,15 @@ export async function receberPrecos(company_id: string, precos: readonly unknown
   if (descontosInvalidos.size > 0) {
     r.avisos.push(`"desconto_percentual" fora de 0 a 100 ou ilegível — não foi mexido: ${listar(descontosInvalidos)}.`);
   }
+  if (faixasMaioresInvalidas.size > 0) {
+    r.avisos.push(`"preco_faixa_maior" precisa ser um número maior que zero — não foi mexido: ${listar(faixasMaioresInvalidas)}.`);
+  }
+  if (faixaMaiorDeAntes.size > 0) {
+    r.avisos.push(
+      `Preço da faixa maior (EG/XG, 48 a 54) continua o que estava (a carga do PDF) e é ele que o pedido usa nesses tamanhos — mande "preco_faixa_maior", ou null para todos os tamanhos pagarem "preco": ${listar(faixaMaiorDeAntes)}.`,
+    );
+  }
+  if (faixaMaiorSem026) r.avisos.push(AVISO_SEM_026_FAIXA_MAIOR);
   if (precisamDa049) r.avisos.push(AVISO_SEM_049.precos);
   return r;
 }

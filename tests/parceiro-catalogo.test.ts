@@ -740,13 +740,63 @@ describe('preço por tabela', () => {
     const doNovo = linhas.find((l) => l['product_id'] === 'p-2')!;
     expect(doNovo).toMatchObject({ company_id: EMPRESA, price_table_id: 't-1', price: 30 });
     for (const l of linhas) {
-      // A faixa maior e a variante não são do Control: ficam como estão.
+      // Sem `preco_faixa_maior` no corpo a faixa maior não é mexida; a variante nunca.
       expect('price_larger' in l).toBe(false);
       expect('variant_id' in l).toBe(false);
       esperarSoColunasReais(l, 'product_prices', 49);
     }
     expect(r.avisos.some((a) => a.includes('9999') && a.includes('/produtos'))).toBe(true);
     expect(r.avisos.some((a) => a.includes('7') && a.includes('/tabelas-preco'))).toBe(true);
+  });
+
+  it('preco_faixa_maior grava price_larger; null limpa; ausente não mexe e avisa quando o PDF tinha deixado um; zero é inválido', async () => {
+    // O pedido precifica EG/XG e 48–54 por price_larger sempre que ele não é
+    // nulo: só `price` deixava o preço da faixa maior do PDF valendo.
+    const { service, fake, sondas } = await carregar({
+      price_tables: { data: [{ id: 't-1', erp_code: '00001' }], error: null },
+      products: {
+        data: [
+          { id: 'p-1', erp_id: '1', sku: '1' },
+          { id: 'p-2', erp_id: '2', sku: '2' },
+          { id: 'p-3', erp_id: '3', sku: '3' },
+          { id: 'p-4', erp_id: '4', sku: '4' },
+        ],
+        error: null,
+      },
+      product_prices: emSequencia(
+        {
+          data: [
+            { product_id: 'p-1', price_table_id: 't-1', price: '40.00', price_larger: '48.00', erp_updated_at: null },
+            { product_id: 'p-2', price_table_id: 't-1', price: '40.00', price_larger: '48.00', erp_updated_at: null },
+            { product_id: 'p-3', price_table_id: 't-1', price: '40.00', price_larger: '48.00', erp_updated_at: null },
+            { product_id: 'p-4', price_table_id: 't-1', price: '40.00', price_larger: '48.00', erp_updated_at: null },
+          ],
+          error: null,
+        },
+        OK,
+      ),
+    });
+
+    const r = await service.receberPrecos(EMPRESA, [
+      { tabela: '1', produto: '1', preco: 42, preco_faixa_maior: '52,90' },
+      { tabela: '1', produto: '2', preco: 42, preco_faixa_maior: null },
+      { tabela: '1', produto: '3', preco: 42 },
+      { tabela: '1', produto: '4', preco: 42, preco_faixa_maior: 0 },
+    ]);
+
+    expect(sondas).toContain('product_prices.price_larger');
+    expect(String(fake.filtrosDe('product_prices', 'select').at(-1)!.args[0])).toContain('price_larger');
+    const linhas = fake.gravacoes
+      .filter((g) => g.tabela === 'product_prices' && g.operacao === 'upsert')
+      .flatMap(linhasDe);
+    const de = (id: string) => linhas.find((l) => l['product_id'] === id)!;
+    expect(de('p-1')).toMatchObject({ price: 42, price_larger: 52.9 });
+    expect(de('p-2')).toMatchObject({ price: 42, price_larger: null });
+    expect('price_larger' in de('p-3')).toBe(false);
+    expect('price_larger' in de('p-4')).toBe(false);
+    for (const l of linhas) esperarSoColunasReais(l, 'product_prices', 49);
+    expect(r.avisos.find((a) => a.startsWith('Preço da faixa maior'))).toMatch(/: 3\.$/);
+    expect(r.avisos.some((a) => a.includes('"preco_faixa_maior" precisa ser um número maior que zero') && a.includes('4'))).toBe(true);
   });
 
   it('mesmo preço (centavos) e mesmo carimbo: nada gravado', async () => {

@@ -2551,7 +2551,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             </div>
             <pre><code>{
   <span class="k">"precos"</span>: [
-    { <span class="k">"tabela"</span>: <span class="s">"00007"</span>, <span class="k">"produto"</span>: <span class="s">"0706"</span>, <span class="k">"preco"</span>: <span class="n">89.90</span>, <span class="k">"preco_original"</span>: <span class="n">99.90</span>, <span class="k">"desconto_percentual"</span>: <span class="n">10</span> },
+    { <span class="k">"tabela"</span>: <span class="s">"00007"</span>, <span class="k">"produto"</span>: <span class="s">"0706"</span>, <span class="k">"preco"</span>: <span class="n">89.90</span>, <span class="k">"preco_faixa_maior"</span>: <span class="n">99.90</span>, <span class="k">"preco_original"</span>: <span class="n">99.90</span>, <span class="k">"desconto_percentual"</span>: <span class="n">10</span> },
     { <span class="k">"tabela"</span>: <span class="s">"00007"</span>, <span class="k">"produto"</span>: <span class="s">"0999"</span>, <span class="k">"preco"</span>: <span class="n">55.00</span> }
   ]
 }</code></pre>
@@ -2563,6 +2563,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                 <tr><td><code>tabela</code></td><td>sim</td><td>Código da tabela de preço no ERP (miolo).</td></tr>
                 <tr><td><code>produto</code></td><td>sim</td><td>Código do produto no ERP (miolo).</td></tr>
                 <tr><td><code>preco</code></td><td>sim</td><td>O preço que vale nessa tabela. Zero ou negativo é ignorado; não há como apagar um preço pela API.</td></tr>
+                <tr><td><code>preco_faixa_maior</code></td><td>recomendado</td><td>O preço dos tamanhos da <b>faixa maior</b> (EG/XG e 48 a 54) nessa tabela — o pedido cobra esse valor nesses tamanhos. <code>null</code> = todo tamanho paga <code>preco</code>. <b>Ausente não mexe</b>: se a carga do PDF tinha deixado um preço de faixa maior, ele continua valendo e volta um aviso com o produto. Zero ou negativo não mexe e avisa.</td></tr>
                 <tr><td><code>preco_original</code>, <code>desconto_percentual</code></td><td>não</td><td>O preço antes do desconto do ERP e o desconto (0 a 100) — informativos.</td></tr>
                 <tr><td><code>data_update</code></td><td>não</td><td>Com fuso.</td></tr>
               </tbody>
