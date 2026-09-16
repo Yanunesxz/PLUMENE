@@ -53,6 +53,14 @@ const digitos = (v) => {
   const d = s.replace(/\D/g, '');
   return d.length >= 11 ? d : null; // CPF 11 / CNPJ 14; menos que isso é lixo
 };
+// Só é telefone o que tem número de telefone. A coluna "Contato zap" do Curva ABC
+// traz o NOME de quem atende ("SILVANA PROPRIETÁRIA"); sem este filtro ele caía
+// no campo WhatsApp quando a coluna Whatsapp vinha vazia — 11 clientes da CS
+// ficaram com um nome no lugar do número nas cargas de agosto.
+const telefone = (v) => {
+  const s = txt(v);
+  return s && s.replace(/\D/g, '').length >= 8 ? s : null;
+};
 const miolo = (v) => String(v ?? '').replace(/\D/g, '').replace(/^0+/, '');
 const nomeChave = (v) => (txt(v) ?? '').toUpperCase().replace(/\s+/g, ' ').trim();
 
@@ -110,7 +118,7 @@ for (const l of brutas) {
     razao,
     cnpjTexto,
     cnpj: digitos(cnpjTexto),
-    whatsapp: txt(l[col.whats]) ?? txt(l[col.zap]) ?? txt(l[col.tel]),
+    whatsapp: telefone(l[col.whats]) ?? telefone(l[col.zap]) ?? telefone(l[col.tel]),
     endereco: [
       txt(l[col.endereco]),
       txt(l[col.bairro]),
