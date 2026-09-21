@@ -161,15 +161,25 @@ apps/api/src/
 │       │                           048 (para com mensagem se ela faltar). SQL para os dois bancos em
 │       │                           _tools/SQL-PARA-RODAR-049.sql. NÃO rerodar depois da 050 (o bloco H recolocaria a
 │       │                           lista antiga no CHECK de tipo)
-│       └── 050_cliente_excluido_e_solicitacao.sql → decisões de 16/09/2026 à tarde: deleted_customers (id, company_id FK
-│                                   CASCADE, customer_id sem FK, erp_id, cnpj_digits, juntado_em sem FK = o cadastro que
-│                                   ficou, snapshot = a linha inteira do cliente, pedidos_movidos, deleted_at, deleted_by FK
-│                                   SET NULL, deleted_by_name, motivo, created_at, updated_at; índice (company_id,
-│                                   deleted_at DESC); RLS) — a cópia antes do DELETE do "Excluir cliente", e a tabela que o
-│                                   CRM pode ler para saber de cliente excluído/juntado + CHECK de order_erp_events.tipo
-│                                   com solicitacao_cancelada. Exige a 049 (para com mensagem se ela faltar). SQL para os
-│                                   dois bancos em _tools/SQL-PARA-RODAR-050.sql. Depois dela, NÃO rerodar a 048 nem a
-│                                   049. É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│       ├── 050_cliente_excluido_e_solicitacao.sql → decisões de 16/09/2026 à tarde: deleted_customers (id, company_id FK
+│       │                           CASCADE, customer_id sem FK, erp_id, cnpj_digits, juntado_em sem FK = o cadastro que
+│       │                           ficou, snapshot = a linha inteira do cliente, pedidos_movidos, deleted_at, deleted_by FK
+│       │                           SET NULL, deleted_by_name, motivo, created_at, updated_at; índice (company_id,
+│       │                           deleted_at DESC); RLS) — a cópia antes do DELETE do "Excluir cliente", e a tabela que o
+│       │                           CRM pode ler para saber de cliente excluído/juntado + CHECK de order_erp_events.tipo
+│       │                           com solicitacao_cancelada. Exige a 049 (para com mensagem se ela faltar). SQL para os
+│       │                           dois bancos em _tools/SQL-PARA-RODAR-050.sql. Depois dela, NÃO rerodar a 048 nem a
+│       │                           049
+│       └── 051_edicao_do_cadastro_do_cliente.sql → editar o cadastro do cliente no app (Yan, 17/09/2026: "quando mudar
+│                                   lá tem que mudar no ERP do Fábio também"): customer_changes (id, company_id FK CASCADE,
+│                                   customer_id FK CASCADE, alterado_por FK SET NULL, alterado_por_nome, alterado_em,
+│                                   campos JSONB = {coluna: {antes, depois}} normalizados, com address quando recalculado,
+│                                   erp_pendente = o cliente já tinha erp_id, erp_atualizado_em/por/por_nome,
+│                                   erp_atualizado_via 'app'|'api'; índice (company_id, customer_id, alterado_em DESC) e
+│                                   parcial das pendentes; RLS). Pendente = erp_pendente AND erp_atualizado_em IS NULL.
+│                                   Sem ela a edição NÃO acontece (503 MIGRACAO_PENDENTE) e a API de Parceiro segue como
+│                                   antes. Idempotente; SQL para os dois bancos em _tools/SQL-PARA-RODAR-051.sql (termina
+│                                   com o NOTIFY). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -213,6 +223,20 @@ apps/api/src/
 │   │                       convite pendente do que fica com login é revogado; sem juntar_em,
 │   │                       reconta os vínculos logo antes do DELETE; falha no meio desfaz o
 │   │                       que já moveu. Sem a 050: 409 MIGRACAO_PENDENTE
+│   │                       customers.edicao.service.ts → "Editar cadastro" (051, 17/09/2026):
+│   │                       PATCH /customers/:id/cadastro { novo, vistos } — rep/venda interna na
+│   │                       carteira, gerente/admin/financeiro em qualquer cliente; CPF/CNPJ só
+│   │                       admin/financeiro (403 DOCUMENTO_SO_ESCRITORIO). Só o que mudou
+│   │                       (normalizado pelo @csb/shared cadastro/edicao.ts), vistos diferentes
+│   │                       ou compare-and-set com 0 linhas = 409 MUDOU_DE_NOVO, address
+│   │                       recalculado, histórico em customer_changes (se falhar, desfaz o
+│   │                       cliente). Com erp_id fica pendente e avisa financeiro+admin por push
+│   │                       (canal de cadastro != 'api'). Sem a 051: 503 MIGRACAO_PENDENTE.
+│   │                       customers.alteracoes.service.ts → a ficha (`alteracoes` no GET
+│   │                       /customers/:id), GET /customers/alteracoes-pendentes (financeiro/admin/
+│   │                       gerente; a fila da Minha área), POST /customers/:id/alteracoes/confirmar
+│   │                       { ids } ("Já atualizei no Control", financeiro/admin; só os ids vistos
+│   │                       e ainda pendentes) e as leituras/marcações em lote da API de Parceiro
 │   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
@@ -266,7 +290,7 @@ apps/api/src/
 │   │                         POST /partner/v1/faturamento            (partner.faturamento.service; UMA nota por pedido)
 │   │                         POST /partner/v1/clientes               (partner.sync.service; casa por CNPJ, depois código)
 │   │                         POST /partner/v1/representantes         (partner.sync.service; email → users.erp_email)
-│   │                         GET  /partner/v1/clientes?desde=        (o Control PUXA o que mudou no app)
+│   │                         GET  /partner/v1/clientes?desde=        (o Control PUXA o que mudou no app; + alterado_no_app, 051)
 │   │                         GET  /partner/v1/representantes?desde=  (idem; partner.cadastros.controller)
 │   │                         POST /partner/v1/tabelas-preco          (partner.catalogo.service)
 │   │                         POST /partner/v1/condicoes-pagamento    (idem)
@@ -292,7 +316,14 @@ apps/api/src/
 │   │                       partner.controller.ts / partner.service.ts → status, fila, confirmar,
 │   │                       conciliar, conciliação (+ aprovados_solicitados_ao_control), excluídos
 │   │                       partner.cadastros.controller.ts → GET clientes/representantes ?desde= e
-│   │                       a exclusão avisada pelo Control
+│   │                       a exclusão avisada pelo Control. `servidor_hora` tomado ANTES da
+│   │                       consulta (17/09/2026: depois dela, mudança gravada durante a leitura sumia)
+│   │                       partner.edicaoNoApp.ts → a edição do cadastro feita no app (051) diante
+│   │                       do POST /clientes: coluna pendente com outro valor NÃO é gravada (aviso
+│   │                       "mantido o valor do app"); o mesmo valor resolve a edição com via 'api';
+│   │                       endereço confere como grupo; o valor do app é o `depois` da edição
+│   │                       pendente mais recente. Pendências lidas em lote (uma ida por lote de
+│   │                       clientes casados); sem a 051, nada muda
 │   │                       partner.catalogo.{controller,service}.ts → decisão 6: o Control manda
 │   │                       tabelas, condições, produtos/tamanhos, preços e estoque e sobrescreve;
 │   │                       name/description do CRM NUNCA regravados (descrição vai em erp_description)
@@ -462,6 +493,8 @@ _tools/
 │   │                Também grava no catálogo: mesmas travas do sync.py
 │   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-051.sql         → a 051 (customer_changes) para colar nos DOIS bancos (idempotente; termina com o
+│                                    NOTIFY). Conferir depois com node _tools/conferir-051.mjs (sem argumento mede os dois)
 ├── SQL-PARA-RODAR-050.sql         → a 050 para colar nos DOIS bancos, DEPOIS da 049 (termina com o NOTIFY).
 │                                    Conferir depois com node _tools/conferir-050.mjs [raiz da PLUMENE]
 ├── SQL-PARA-RODAR-049.sql         → a 049 para colar nos DOIS bancos, DEPOIS da 048 (termina com o NOTIFY).
@@ -478,7 +511,7 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-048, conferir-049 e conferir-050 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048, conferir-049, conferir-050 e conferir-051 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
                  → cargas e consertos pontuais direto no Supabase (fora do app).

@@ -27,7 +27,30 @@ export interface Filtro {
   args: unknown[];
 }
 
-type Respostas = Record<string, RespostaTabela | RespostaTabela[]>;
+/**
+ * Uma consulta inteira, como o service a montou — o que um `Responder` recebe
+ * na hora do `await`, com todos os filtros já aplicados.
+ */
+export interface ConsultaFeita {
+  tabela: string;
+  /** `select` quando não houve insert/update/delete/upsert. */
+  operacao: 'select' | Gravacao['operacao'];
+  /** O que foi passado ao insert/update/upsert (undefined no select e no delete). */
+  valores: unknown;
+  /** Os métodos encadeados, na ordem (inclui o `select` e o `order`). */
+  filtros: Array<{ metodo: string; args: unknown[] }>;
+  /** Terminou em `single()`/`maybeSingle()`. */
+  umaLinha: boolean;
+}
+
+/**
+ * Resposta calculada na hora, a partir da consulta montada. Para testes que
+ * precisam de um banco que REAGE (um UPDATE condicional que só afeta a linha
+ * se o valor ainda bate, por exemplo) em vez de uma fila de respostas.
+ */
+export type Responder = (consulta: ConsultaFeita) => RespostaTabela;
+
+type Respostas = Record<string, RespostaTabela | RespostaTabela[] | Responder>;
 
 export function criarSupabaseFake(respostas: Respostas) {
   const gravacoes: Gravacao[] = [];
@@ -35,8 +58,10 @@ export function criarSupabaseFake(respostas: Respostas) {
   // Uma tabela pode ser consultada várias vezes com respostas diferentes; nesse
   // caso o teste passa um array e cada consulta consome a próxima.
   const filas = new Map<string, RespostaTabela[]>();
+  const responders = new Map<string, Responder>();
   for (const [tabela, r] of Object.entries(respostas)) {
-    filas.set(tabela, Array.isArray(r) ? [...r] : [r]);
+    if (typeof r === 'function') responders.set(tabela, r);
+    else filas.set(tabela, Array.isArray(r) ? [...r] : [r]);
   }
 
   const proxima = (tabela: string): RespostaTabela => {
@@ -46,7 +71,10 @@ export function criarSupabaseFake(respostas: Respostas) {
   };
 
   const from = (tabela: string) => {
-    let resposta = proxima(tabela);
+    const responder = responders.get(tabela);
+    // Com responder não há fila: a resposta sai na hora do `await`.
+    let resposta = responder ? { data: null, error: null } : proxima(tabela);
+    const consulta: ConsultaFeita = { tabela, operacao: 'select', valores: undefined, filtros: [], umaLinha: false };
 
     const query: Record<string, unknown> = {};
     const encadeia = [
@@ -56,35 +84,32 @@ export function criarSupabaseFake(respostas: Respostas) {
     for (const metodo of encadeia) {
       query[metodo] = (...args: unknown[]) => {
         filtros.push({ tabela, metodo, args });
+        consulta.filtros.push({ metodo, args });
         return query;
       };
     }
 
-    query['insert'] = (valores: unknown) => {
-      gravacoes.push({ tabela, operacao: 'insert', valores });
+    const grava = (operacao: Gravacao['operacao'], valores: unknown) => {
+      gravacoes.push({ tabela, operacao, valores });
+      consulta.operacao = operacao;
+      consulta.valores = operacao === 'delete' ? undefined : valores;
       return query;
     };
+    query['insert'] = (valores: unknown) => grava('insert', valores);
     // O upsert do PostgREST: grava por cima quando a chave ja existe. Fica
     // separado do insert para o teste conseguir distinguir os dois.
-    query['upsert'] = (valores: unknown) => {
-      gravacoes.push({ tabela, operacao: 'upsert', valores });
-      return query;
-    };
-    query['update'] = (valores: unknown) => {
-      gravacoes.push({ tabela, operacao: 'update', valores });
-      return query;
-    };
-    query['delete'] = () => {
-      gravacoes.push({ tabela, operacao: 'delete', valores: null });
-      return query;
-    };
+    query['upsert'] = (valores: unknown) => grava('upsert', valores);
+    query['update'] = (valores: unknown) => grava('update', valores);
+    query['delete'] = () => grava('delete', null);
 
     const entrega = () => {
+      if (responder) return responder(consulta);
       const r = resposta;
       resposta = proxima(tabela); // consultas seguintes na mesma tabela avançam
       return r;
     };
     const um = () => {
+      consulta.umaLinha = true;
       const r = entrega();
       const d = Array.isArray(r.data) ? (r.data[0] ?? null) : r.data;
       return Promise.resolve({ ...r, data: d });

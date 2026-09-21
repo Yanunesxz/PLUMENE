@@ -20,7 +20,10 @@
  * O preço da folga: uma edição do app feita MENOS de 5 s depois de o Control
  * gravar o mesmo cliente não volta no GET. É janela de segundos por cliente;
  * a solução sem relógio (uma coluna gravada só pelos caminhos do app, ou o
- * carimbo com now() numa RPC) precisa de migração nova.
+ * carimbo com now() numa RPC) precisa de migração nova. A edição do CADASTRO
+ * pela tela (051, 17/09/2026) já escapa desse preço: o cliente com edição
+ * pendente em customer_changes sai no GET mesmo dentro da folga, e o POST não
+ * carimba enquanto ela está pendente (partner.sync.service.ts).
  *
  * O carimbo só é gravado quando a última mão JÁ era a do Control (ou nunca
  * houve carimbo): se o app mexeu depois e o Control ainda não puxou, carimbar

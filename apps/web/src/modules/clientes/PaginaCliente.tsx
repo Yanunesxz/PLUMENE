@@ -12,23 +12,51 @@ import {
   Receipt,
   CalendarClock,
   Trash2,
+  Pencil,
 } from 'lucide-react';
 import { useAuthStore } from '../../store/authStore.js';
 import { api, esquecerCache } from '../../services/api.js';
 import { db } from '../../offline/db.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
+import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { EditarCadastroDoCliente } from '../../components/comercial/EditarCadastroDoCliente.js';
+import { AlteracoesParaOControl } from '../../components/comercial/AlteracoesParaOControl.js';
 import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { ExcluirCliente } from './ExcluirCliente.js';
 import { linhasDoDono } from '../../lib/donoDoCliente.js';
 import { seloDoPedido } from '../../lib/pedido.js';
 import { situacaoDoCliente, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
-import { formatarDocumento, formatarCep, apenasDigitos, podeTrocarTabelaDoCliente } from '@csb/shared';
-import type { ApiResponse, CustomerDetail } from '@csb/shared';
+import {
+  avisoDaConfirmacao,
+  avisoDaConfirmacaoInterrompida,
+  avisoDoCadastroSalvo,
+  avisoSemReleituraDaFicha,
+  camposDaListaDoCliente,
+  confirmacaoTalvezGravada,
+  emLotesDeConfirmacao,
+  marcarConfirmadasNaFicha,
+  mensagemDoErroDaConfirmacao,
+} from '../../lib/edicaoDoCadastro.js';
+import {
+  formatarDocumento,
+  formatarCep,
+  apenasDigitos,
+  podeTrocarTabelaDoCliente,
+  podeEditarCadastroDoCliente,
+  podeConfirmarAlteracaoNoControl,
+} from '@csb/shared';
+import type {
+  AlteracaoDoCliente,
+  AlteracoesConfirmadas,
+  ApiResponse,
+  ConfirmarAlteracoesDoClienteRequest,
+  CustomerDetail,
+} from '@csb/shared';
 
 /**
  * A ficha do cliente.
@@ -55,6 +83,22 @@ export function PaginaCliente() {
   // o cadastro que fica. A API recusa os outros papéis com 403.
   const podeExcluir = user?.role === 'admin';
   const [excluindo, setExcluindo] = useState(false);
+
+  // ─── Editar o cadastro (migração 051) ─────────────────────────────────────
+  // "Não tem como alterar esses dados nem sendo admin lá dentro. Quero poder
+  // mudar sim, e quando mudar lá tem que mudar no ERP do Fábio também." (Yan,
+  // 17/09/2026). Representante e venda interna editam o que é da carteira — e
+  // esta ficha só abre para cliente da carteira dele —; gerente, admin e
+  // financeiro, qualquer um. O relacionamento só lê. A API confere o mesmo.
+  const isOnline = useOnlineStatus();
+  const podeEditarCadastro = podeEditarCadastroDoCliente(user?.role);
+  const [editandoCadastro, setEditandoCadastro] = useState(false);
+
+  // "Já atualizei no Control": quem mexe lá (financeiro e admin) dá a baixa
+  // nas alterações que o cartão mostrou.
+  const podeConfirmarNoControl = podeConfirmarAlteracaoNoControl(user?.role);
+  const [confirmandoNoControl, setConfirmandoNoControl] = useState(false);
+  const [erroAoConfirmar, setErroAoConfirmar] = useState<string | null>(null);
 
   // ─── Marcar visita para o representante (fluxo da Bruna) ───────────────────
   const ehEscritorio =
@@ -194,13 +238,25 @@ export function PaginaCliente() {
     }
   };
 
+  // O motivo e o título da visita nascem do cadastro — mas só voltam a ele
+  // quando o que eles mostram muda (revisão de 17/09/2026). Presos ao objeto
+  // `cliente` inteiro, toda troca dele apagava o que estava sendo digitado:
+  // salvar o cadastro, o 409 que recarrega, "Já atualizei no Control" — o
+  // formulário do motivo continuava aberto, vazio.
+  const idDoCliente = cliente?.id;
+  const motivoGravado = cliente?.inactivity_reason ?? '';
+  const obsDoMotivoGravada = cliente?.inactivity_note ?? '';
+  const tituloPadraoDaVisita = cliente ? `Visitar ${cliente.trade_name || cliente.name}` : '';
   useEffect(() => {
-    if (cliente) {
-      setTituloVisita(`Visitar ${cliente.trade_name || cliente.name}`);
-      setMotivo(cliente.inactivity_reason ?? '');
-      setObsMotivo(cliente.inactivity_note ?? '');
-    }
-  }, [cliente]);
+    if (!idDoCliente) return;
+    setMotivo(motivoGravado);
+    setObsMotivo(obsDoMotivoGravada);
+  }, [idDoCliente, motivoGravado, obsDoMotivoGravada]);
+  useEffect(() => {
+    // Com o formulário da visita aberto, o título digitado fica (o nome pode ter
+    // mudado na edição do cadastro).
+    if (idDoCliente && !marcando) setTituloVisita(tituloPadraoDaVisita);
+  }, [idDoCliente, tituloPadraoDaVisita, marcando]);
 
   const marcarVisita = async () => {
     if (!token || !id || salvandoVisita) return;
@@ -246,6 +302,99 @@ export function PaginaCliente() {
   useEffect(() => {
     void carregar();
   }, [carregar]);
+
+  /**
+   * A edição ficou gravada, mas a resposta foi erro (17/09/2026): relê a ficha
+   * e põe o cadastro novo na lista do aparelho. Falhando a releitura, a ficha
+   * fica como está (não vira a tela de erro) e o aviso diz para reabrir — sem
+   * apagar o aviso do salvar (`aviso`): no ALTERACAO_SEM_HISTORICO é ele que
+   * diz que a mudança não vai chegar ao Control e pede para avisar o suporte.
+   */
+  const relerDepoisDeGravar = async (aviso: { mensagem: string; tipo: 'success' | 'error' }) => {
+    if (!token || !id) return;
+    try {
+      const res = await api.get<ApiResponse<CustomerDetail>>(`/customers/${id}`, token);
+      setCliente(res.data);
+      await db.customers.update(res.data.id, camposDaListaDoCliente(res.data)).catch(() => {});
+    } catch {
+      const semReler = avisoSemReleituraDaFicha(aviso);
+      setToast({ message: semReler.mensagem, type: semReler.tipo });
+    }
+  };
+
+  const confirmarNoControl = async (ids: string[]) => {
+    if (!token || !id || confirmandoNoControl || ids.length === 0) return;
+    setConfirmandoNoControl(true);
+    setErroAoConfirmar(null);
+    // Fora do try: o catch precisa saber o que os lotes anteriores já marcaram.
+    const confirmadas: string[] = [];
+    try {
+      // A rota aceita até 50 ids por vez. Um cliente com mais de 50 edições
+      // esperando é improvável, mas a baixa tem de cobrir tudo o que a pessoa viu.
+      let alteracoes: AlteracaoDoCliente[] | null = null;
+      for (const lote of emLotesDeConfirmacao(ids)) {
+        const corpo: ConfirmarAlteracoesDoClienteRequest = { ids: lote };
+        const res = await api.post<ApiResponse<AlteracoesConfirmadas>>(
+          `/customers/${id}/alteracoes/confirmar`,
+          corpo,
+          token,
+        );
+        confirmadas.push(...res.data.confirmadas);
+        alteracoes = res.data.alteracoes;
+      }
+      if (alteracoes) {
+        const lista = alteracoes;
+        setCliente((c) => (c ? { ...c, alteracoes: lista } : c));
+      } else {
+        // Gravou, mas a releitura falhou lá: relê a ficha — sem a tela de erro
+        // (revisão de 17/09/2026). Pelo `carregar`, a falha desta releitura
+        // trocava a ficha inteira por "não foi possível abrir o cliente", o
+        // toast de marcado nunca aparecia e o financeiro não sabia se a baixa
+        // tinha ficado. Falhando, a ficha fica e o cartão já tira o que foi marcado.
+        try {
+          const res = await api.get<ApiResponse<CustomerDetail>>(`/customers/${id}`, token);
+          setCliente(res.data);
+          alteracoes = res.data.alteracoes ?? null;
+        } catch {
+          const em = new Date().toISOString();
+          const quem = { id: user?.id ?? null, nome: user?.name ?? null };
+          setCliente((c) =>
+            c ? { ...c, alteracoes: marcarConfirmadasNaFicha(c.alteracoes ?? [], confirmadas, quem, em) } : c,
+          );
+          setToast({
+            message: `${avisoDaConfirmacao(ids.length, confirmadas.length, null)} Não deu para recarregar a ficha — feche e abra de novo para ver as alterações de agora.`,
+            type: 'success',
+          });
+          return;
+        }
+      }
+      setToast({ message: avisoDaConfirmacao(ids.length, confirmadas.length, alteracoes), type: 'success' });
+    } catch (err) {
+      // Falha de rede vira frase que se entende (17/09/2026) — não "Load failed".
+      setErroAoConfirmar(mensagemDoErroDaConfirmacao(err));
+      // A baixa pode ter ficado (17/09/2026): a resposta se perdeu depois de a
+      // API marcar, ou um lote anterior já marcou. Sem reler, o cartão seguia
+      // pedindo o que já tinha baixa. A releitura não vira a tela de erro.
+      if (confirmadas.length > 0 || confirmacaoTalvezGravada(err)) {
+        try {
+          const res = await api.get<ApiResponse<CustomerDetail>>(`/customers/${id}`, token);
+          setCliente(res.data);
+          setErroAoConfirmar(avisoDaConfirmacaoInterrompida(confirmadas.length, true));
+        } catch {
+          if (confirmadas.length > 0) {
+            const em = new Date().toISOString();
+            const quem = { id: user?.id ?? null, nome: user?.name ?? null };
+            setCliente((c) =>
+              c ? { ...c, alteracoes: marcarConfirmadasNaFicha(c.alteracoes ?? [], confirmadas, quem, em) } : c,
+            );
+            setErroAoConfirmar(avisoDaConfirmacaoInterrompida(confirmadas.length, false));
+          }
+        }
+      }
+    } finally {
+      setConfirmandoNoControl(false);
+    }
+  };
 
   if (erro) {
     return (
@@ -444,6 +593,12 @@ export function PaginaCliente() {
               {marcando ? 'Cancelar' : 'Marcar visita pro rep'}
             </Button>
           )}
+          {podeEditarCadastro && (
+            <Button variant="outline" onClick={() => setEditandoCadastro(true)}>
+              <Pencil className="h-4 w-4" strokeWidth={2.5} />
+              Editar cadastro
+            </Button>
+          )}
           {podeExcluir && (
             <Button variant="outline" className="text-danger" onClick={() => setExcluindo(true)}>
               <Trash2 className="h-4 w-4" strokeWidth={2.5} />
@@ -499,6 +654,21 @@ export function PaginaCliente() {
           </form>
         )}
       </div>
+
+      {/* ─── O que mudou no cadastro e ainda não chegou ao Control (051) ────
+          Sem `alteracoes`, o banco ainda não tem a 051 (ou a API é anterior):
+          nada a mostrar. */}
+      {cliente.alteracoes && cliente.alteracoes.length > 0 && (
+        <AlteracoesParaOControl
+          alteracoes={cliente.alteracoes}
+          erpId={cliente.erp_id ?? null}
+          podeConfirmar={podeConfirmarNoControl}
+          online={isOnline}
+          ocupado={confirmandoNoControl}
+          erro={erroAoConfirmar}
+          onConfirmar={(ids) => void confirmarNoControl(ids)}
+        />
+      )}
 
       {/* ─── O porquê do cliente vermelho (controle de inatividade) ────────
           Vermelho SEM motivo é pendência: o rep (ou a Bruna) registra por que
@@ -593,7 +763,9 @@ export function PaginaCliente() {
             </p>
           )}
         </div>
-        {/* O financeiro não troca tabela de cliente — cadastro é leitura pra ele.
+        {/* O financeiro não troca tabela de cliente. Desde 17/09/2026 ele edita
+            o cadastro (nome, documento, contato, endereço), mas o preço segue
+            com quem vende.
             Com uma ativa só, o botão aparece para tirar o cliente de uma tabela
             desligada no Control (podeTrocarTabelaDoCliente). */}
         {podeTrocarTabelaDoCliente(todasAsTabelas, cliente.price_table_id) && user?.role !== 'financeiro' && (
@@ -677,6 +849,26 @@ export function PaginaCliente() {
           }}
           onErro={(m) => setToast({ message: m, type: 'error' })}
           onFechar={() => setTrocando(false)}
+        />
+      )}
+
+      {editandoCadastro && (
+        <EditarCadastroDoCliente
+          cliente={cliente}
+          onSalvo={(resposta) => {
+            setCliente(resposta.data);
+            setEditandoCadastro(false);
+            setErroAoConfirmar(null);
+            setToast({ message: avisoDoCadastroSalvo(resposta, user?.role), type: 'success' });
+          }}
+          onRecarregado={setCliente}
+          onGravadoApesarDoErro={(aviso) => {
+            setEditandoCadastro(false);
+            setErroAoConfirmar(null);
+            setToast({ message: aviso.mensagem, type: aviso.tipo });
+            void relerDepoisDeGravar(aviso);
+          }}
+          onFechar={() => setEditandoCadastro(false)}
         />
       )}
 

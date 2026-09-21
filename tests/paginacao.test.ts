@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buscarPelaChaveOuFalhar,
   buscarTudo,
   buscarTudoOuFalhar,
   buscarPorIds,
+  depoisDaChave,
   emLotes,
   LIMITE_POSTGREST,
 } from '../apps/api/src/lib/paginacao.js';
@@ -141,6 +143,40 @@ describe('listagem inteira que não engole erro', () => {
 
     expect(tudo).toEqual([]);
     expect(chamadas).toBe(1);
+  });
+});
+
+describe('listagem pela chave (updated_at, id) — revisão de 17/09/2026', () => {
+  it('o filtro da página seguinte: depois da hora, ou a mesma hora com id maior; nulos no fim', () => {
+    expect(depoisDaChave({ id: 'b', updated_at: '2026-09-17T10:00:00.5+00:00' })).toBe(
+      'updated_at.gt."2026-09-17T10:00:00.5+00:00",and(updated_at.eq."2026-09-17T10:00:00.5+00:00",id.gt."b"),updated_at.is.null',
+    );
+    expect(depoisDaChave({ id: 'b', updated_at: null })).toBe('and(updated_at.is.null,id.gt."b")');
+  });
+
+  it('a linha gravada de novo entre as páginas aparece uma vez só, na posição nova', async () => {
+    const pagina1 = Array.from({ length: LIMITE_POSTGREST }, (_, i) => ({ id: `l-${i}`, updated_at: 't0' }));
+    const pedidas: Array<string | null> = [];
+    const tudo = await buscarPelaChaveOuFalhar<{ id: string; updated_at: string }>((ultima) => {
+      pedidas.push(ultima ? ultima.id : null);
+      return Promise.resolve(
+        ultima ? { data: [{ id: 'l-0', updated_at: 't9' }, { id: 'ultima', updated_at: 't9' }], error: null } : { data: pagina1, error: null },
+      );
+    });
+    expect(pedidas).toEqual([null, `l-${LIMITE_POSTGREST - 1}`]);
+    expect(tudo).toHaveLength(LIMITE_POSTGREST + 1);
+    expect(tudo.filter((l) => l.id === 'l-0')).toEqual([{ id: 'l-0', updated_at: 't9' }]);
+    expect(tudo.slice(-2).map((l) => l.id)).toEqual(['l-0', 'ultima']);
+  });
+
+  it('página que não anda (o filtro da chave não foi aplicado) LANÇA em vez de girar para sempre; erro de página também', async () => {
+    const cheia = Array.from({ length: LIMITE_POSTGREST }, (_, i) => ({ id: `l-${i}`, updated_at: 't0' }));
+    await expect(buscarPelaChaveOuFalhar(() => Promise.resolve({ data: cheia, error: null }))).rejects.toThrow(
+      /não avançou/,
+    );
+    await expect(
+      buscarPelaChaveOuFalhar(() => Promise.resolve({ data: null, error: { message: 'soluço' } })),
+    ).rejects.toThrow(/soluço/);
   });
 });
 

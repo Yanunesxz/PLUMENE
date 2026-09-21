@@ -9,8 +9,10 @@
  *   pedido vai para a fábrica     → a MESA (gerente, admin, financeiro)
  *   fábrica aceita ou recusa      → o REPRESENTANTE dono
  *   pedido faturado               → o REPRESENTANTE dono
+ *   cadastro de cliente alterado  → FINANCEIRO e admin (atualizar no Control)
  */
-import { enviarParaUsuarios, enviarParaPapeis } from './push.service.js';
+import { rotulosDosCamposAlterados } from '@csb/shared';
+import { enviarParaUsuarios, enviarParaPapeis, type AvisoPush } from './push.service.js';
 
 /** O que os avisos precisam saber de um pedido. */
 interface PedidoParaAviso {
@@ -188,11 +190,25 @@ export async function avisarPedidoMudouNoErp(
     tag: `erp-sync-${pedido.id}`,
   };
 
-  // Financeiro e admin contados separados: quem atualiza o Control é a Larissa,
-  // e "saiu para 1 aparelho" não pode esconder que foi só o do admin.
+  return avisarFinanceiroEAdminComTeto(company_id, aviso, quemPediu, 'pedido mudou no ERP');
+}
+
+/**
+ * Manda o aviso para o financeiro e para o admin (menos `exceto`) e espera no
+ * máximo TETO_DO_AVISO_MS. Usado por quem precisa dizer na resposta para onde
+ * o aviso saiu.
+ */
+async function avisarFinanceiroEAdminComTeto(
+  company_id: string,
+  aviso: AvisoPush,
+  exceto: string,
+  assunto: string,
+): Promise<{ financeiro: number; admin: number } | null> {
+  // Financeiro e admin contados separados: quem atualiza o Control é o
+  // financeiro, e "saiu para 1 aparelho" não pode esconder que foi só o do admin.
   const envio = Promise.all([
-    enviarParaPapeis(company_id, ['financeiro'], aviso, quemPediu),
-    enviarParaPapeis(company_id, ['admin'], aviso, quemPediu),
+    enviarParaPapeis(company_id, ['financeiro'], aviso, exceto),
+    enviarParaPapeis(company_id, ['admin'], aviso, exceto),
   ]).then(([financeiro, admin]) => ({ financeiro, admin }));
 
   // Teto de tempo: o web-push não tem timeout próprio, e um serviço de push que
@@ -207,9 +223,40 @@ export async function avisarPedidoMudouNoErp(
   try {
     return await Promise.race([envio, teto]);
   } catch (err) {
-    console.error('[push] aviso de pedido mudou no ERP:', err);
+    console.error(`[push] aviso de ${assunto}:`, err);
     return null;
   } finally {
     if (relogio) clearTimeout(relogio);
   }
+}
+
+/**
+ * O CADASTRO de um cliente que já está no Control mudou pelo app (051).
+ *
+ * "Quando mudar lá tem que mudar no ERP do Fábio também" (Yan, 17/09/2026). O
+ * app não escreve no Control: quem leva a mudança é o financeiro, então é ele
+ * (e o admin, como válvula) quem recebe — nunca quem editou. O controller só
+ * chama quando a edição ficou pendente e o canal de cadastro da empresa NÃO é
+ * a API (com a API ligada, o Control puxa a mudança sozinho).
+ *
+ * A tag é por cliente: duas edições seguidas do mesmo cadastro viram um aviso
+ * só na tela do celular, e o cartão da ficha mostra as duas.
+ */
+export async function avisarCadastroAlteradoNoControl(
+  company_id: string,
+  cliente: { id: string; name: string; erp_id: string | null },
+  colunas: readonly string[],
+  quemEditou: string,
+): Promise<{ financeiro: number; admin: number } | null> {
+  const noControl = cliente.erp_id ? ` (cód. ${cliente.erp_id} no Control)` : '';
+  const oQue = rotulosDosCamposAlterados(colunas);
+  const aviso: AvisoPush = {
+    title: 'Cadastro alterado — atualize no Control',
+    body: oQue.length
+      ? `${cliente.name}${noControl} mudou no app: ${oQue.join(', ')}. Atualize no Control.`
+      : `${cliente.name}${noControl} mudou no app. Atualize no Control.`,
+    url: `/customers/${cliente.id}`,
+    tag: `cliente-alterado-${cliente.id}`,
+  };
+  return avisarFinanceiroEAdminComTeto(company_id, aviso, quemEditou, 'cadastro alterado');
 }

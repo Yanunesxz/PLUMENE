@@ -3,6 +3,14 @@ import type { User } from '@csb/shared';
 
 const API_BASE = (import.meta.env['VITE_API_URL'] as string | undefined) ?? 'http://localhost:3001';
 
+/** O erro que `request` lança quando a API responde fora do 2xx. */
+export type ErroDaApi = Error & {
+  /** O `code` da resposta ({ error, code, statusCode }), quando veio. */
+  code?: string | undefined;
+  /** O corpo JSON da resposta de erro, inteiro (vazio se não era JSON). */
+  corpo?: Record<string, unknown> | undefined;
+};
+
 // Garante que apenas uma renovação de token aconteça por vez: se várias
 // requisições receberem 401 ao mesmo tempo, todas aguardam o mesmo refresh.
 let refreshPromise: Promise<string | null> | null = null;
@@ -66,8 +74,12 @@ async function request<T>(
 
   if (!res.ok) {
     const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string };
-    const err = new Error(body.error ?? `HTTP ${res.status}`);
-    (err as Error & { code?: string | undefined }).code = body.code;
+    const err = new Error(body.error ?? `HTTP ${res.status}`) as ErroDaApi;
+    err.code = body.code;
+    // O corpo inteiro vai junto: algumas respostas de erro trazem mais que a
+    // frase — a edição do cadastro (17/09/2026) manda os erros por campo no 400
+    // e a ficha de agora no 409 MUDOU_DE_NOVO. Quem não precisa, ignora.
+    err.corpo = body as Record<string, unknown>;
     throw err;
   }
 

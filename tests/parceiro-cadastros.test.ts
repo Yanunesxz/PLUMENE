@@ -53,6 +53,13 @@ interface Opcoes {
   usersErpEmail?: boolean;
   /** As colunas da 049 em customers existem (pendencia_financeira etc.). Padrão: não. */
   com049?: boolean;
+  /**
+   * A 051 rodou (customer_changes existe). Padrão: sim, e sem nenhuma edição do
+   * app pendente — o dublê não tem linha nessa tabela. Tudo aqui tem de sair
+   * igual a antes da 051; as edições pendentes são testadas em
+   * parceiro-edicao-no-app.test.ts.
+   */
+  com051?: boolean;
   /** Usa o detectarColuna de verdade, sondando pelo dublê. */
   sondaReal?: boolean;
 }
@@ -67,6 +74,7 @@ async function carregar(respostas: Record<string, RespostaTabela | RespostaTabel
       'customers.pendencia_financeira': opcoes.com049 ?? false,
       'users.updated_at': opcoes.usersUpdatedAt ?? false,
       'users.erp_email': opcoes.usersErpEmail ?? false,
+      'customer_changes.id': opcoes.com051 ?? true,
     };
     const responder = async (tabela: string, coluna?: string) => {
       const chave = `${tabela}.${coluna ?? ''}`;
@@ -1589,6 +1597,8 @@ describe('o que mudou no app — listarClientesAlterados', () => {
         whatsapp: '00900000000',
         email: 'loja@teste.invalid',
         atualizado_em: '2026-09-16T12:00:00+00:00',
+        // Campo novo da 051 (17/09/2026), aditivo: nada editado no app à espera do Control.
+        alterado_no_app: null,
       },
     ]);
     // Sem a 049 a lista pode trazer o eco do próprio Control: fica dito.
