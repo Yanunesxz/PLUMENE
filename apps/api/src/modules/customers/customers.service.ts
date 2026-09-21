@@ -9,6 +9,7 @@ import type {
 } from '@csb/shared';
 import type { AuthRole } from '@csb/shared';
 import { documento, formatarDocumento, linhaDeEndereco, apenasDigitos, codigoMiolo } from '@csb/shared';
+import { lerAlteracoesDoCliente } from './customers.alteracoes.service.js';
 
 // O PostgREST devolve no máximo 1000 linhas por requisição. Gerente/admin podem
 // ter milhares de clientes, então paginamos em blocos até pegar todos.
@@ -124,11 +125,36 @@ export interface ClienteDuplicado {
  * Com a 041, `cnpj_digits` é gerada pelo banco e enxerga "22.518.613/0001-58"
  * e "22518613000158" como o mesmo documento. Sem a 041, cobre as duas formas
  * mais comuns (só dígitos e a máscara padrão) — o que as cargas gravaram.
+ *
+ * `exceto_id`: a edição do cadastro (17/09/2026) procura o documento em OUTRO
+ * cliente. Sem excluir o próprio, trocar a máscara de um documento — ou
+ * qualquer cliente que já tenha o documento — acharia a si mesmo como
+ * duplicado.
+ *
+ * Engole o erro do banco (erro = "ninguém tem"): é o comportamento de sempre do
+ * cadastro novo. Quem não pode confundir as duas coisas usa
+ * `buscarClienteComOMesmoDocumento`.
  */
-async function clienteComOMesmoDocumento(
+export async function clienteComOMesmoDocumento(
   company_id: string,
   digitos: string,
+  exceto_id?: string,
 ): Promise<ClienteDuplicado['duplicado'] | null> {
+  return (await buscarClienteComOMesmoDocumento(company_id, digitos, exceto_id)).duplicado;
+}
+
+/**
+ * A mesma busca, sem engolir o erro do banco (revisão de 17/09/2026). Na troca
+ * de documento pela edição do cadastro ela é a ÚNICA trava contra CPF/CNPJ
+ * repetido — o índice de `cnpj_digits` da 041 não é UNIQUE —, e um timeout
+ * nesta leitura lido como "ninguém tem" gravava duas lojas da mesma empresa com
+ * o mesmo documento, com a troca indo para a fila do Control.
+ */
+export async function buscarClienteComOMesmoDocumento(
+  company_id: string,
+  digitos: string,
+  exceto_id?: string,
+): Promise<{ duplicado: ClienteDuplicado['duplicado'] | null; error: { message: string } | null }> {
   // A detecção vem ANTES de montar a consulta: é uma leitura à parte no banco,
   // e a ordem das leituras é o contrato que o teste (e o fake) enxergam.
   const temDigitos = await detectarCadastroReal();
@@ -137,12 +163,14 @@ async function clienteComOMesmoDocumento(
     .select('id, name, erp_id, rep_id')
     .eq('company_id', company_id)
     .limit(1);
+  if (exceto_id) consulta = consulta.neq('id', exceto_id);
   consulta = temDigitos
     ? consulta.eq('cnpj_digits', digitos)
     : consulta.in('cnpj', [digitos, formatarDocumento(digitos)]);
-  const { data } = await consulta;
-  const achado = (data ?? [])[0] as ClienteDuplicado['duplicado'] | undefined;
-  return achado ?? null;
+  const { data, error } = await consulta;
+  if (error) return { duplicado: null, error: { message: error.message } };
+  const achado = (Array.isArray(data) ? data : [])[0] as ClienteDuplicado['duplicado'] | undefined;
+  return { duplicado: achado ?? null, error: null };
 }
 
 /**
@@ -303,6 +331,21 @@ async function clienteDaCarteira<T>(
   escopo: EscopoDaCarteira,
   colunas: string,
 ): Promise<T | null> {
+  const { data } = await lerClienteDaCarteira<T>(company_id, customer_id, escopo, colunas);
+  return data;
+}
+
+/**
+ * A mesma busca, sem engolir o erro do banco. Para quem GRAVA depois de ler
+ * (a edição do cadastro): "o banco não respondeu" não pode virar "cliente não
+ * encontrado na sua carteira".
+ */
+export async function lerClienteDaCarteira<T>(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+  colunas: string,
+): Promise<{ data: T | null; error: { message: string } | null }> {
   let consulta = supabase
     .from('customers')
     .select(colunas)
@@ -315,8 +358,8 @@ async function clienteDaCarteira<T>(
       : consulta.eq('rep_id', escopo.rep_id);
   }
 
-  const { data } = await consulta.maybeSingle();
-  return (data as T | null) ?? null;
+  const { data, error } = await consulta.maybeSingle();
+  return { data: (data as T | null) ?? null, error: error ? { message: error.message } : null };
 }
 
 /** Histórico suficiente para a ficha sem varrer anos de pedido. */
@@ -403,14 +446,34 @@ export async function obterCliente(
   customer_id: string,
   escopo: EscopoDaCarteira,
 ): Promise<CustomerDetail | null> {
-  const lido = await clienteDaCarteira<
+  return (await lerFichaDoCliente(company_id, customer_id, escopo)).data;
+}
+
+/**
+ * A ficha, sem engolir o erro do banco na leitura do cliente (revisão de
+ * 17/09/2026). É a regra de `lerClienteDaCarteira` para quem precisa dela
+ * depois de gravar (ou de tentar): na edição do cadastro, a releitura que
+ * falhava no meio de um 409 virava 404 "Cliente não encontrado na sua carteira"
+ * — o representante lia que o cliente tinha saído da carteira dele, com o
+ * cliente ainda lá e nada gravado.
+ *
+ * `error` só da leitura do cliente; o resto da ficha (pedidos, dono,
+ * alterações) segue degradando como sempre.
+ */
+export async function lerFichaDoCliente(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+): Promise<{ data: CustomerDetail | null; error: { message: string } | null }> {
+  const { data: lido, error } = await lerClienteDaCarteira<
     Omit<CustomerDetail, 'pedidos'> & {
       varejo_marcado_por?: string | null;
       rep_id?: string | null;
       rep_erp_id?: string | null;
     }
   >(company_id, customer_id, escopo, await colunasDoDetalhe());
-  if (!lido) return null;
+  if (error) return { data: null, error };
+  if (!lido) return { data: null, error: null };
 
   // Quem marcou o varejo, pelo nome: a ficha diz "marcado pela Simone" — sem
   // isso o gerente vê o cliente fora da régua e não sabe a quem perguntar.
@@ -444,7 +507,12 @@ export async function obterCliente(
 
   const dono = await donoDoCliente(company_id, rep_id ?? null, rep_erp_id ?? null);
 
-  return { ...cliente, dono, pedidos };
+  // As edições do cadastro (051): as pendentes para o Control e o histórico
+  // recente. Sem a 051 (ou com a leitura falhando) o campo não vem — a ficha
+  // abre como antes.
+  const alteracoes = await lerAlteracoesDoCliente(company_id, customer_id);
+
+  return { data: { ...cliente, dono, pedidos, ...(alteracoes ? { alteracoes } : {}) }, error: null };
 }
 
 export type MarcaDeInatividade =
@@ -524,9 +592,10 @@ export type TrocaDeTabela =
   | { ok: false; motivo: 'cliente_nao_encontrado' | 'erro' };
 
 /**
- * Troca a tabela de preço de um cliente. É a única edição de cadastro que o app
- * permite — e a mais cara de errar: muda o preço de tudo que a loja comprar
- * dali para frente, inclusive pelo login próprio dela.
+ * Troca a tabela de preço de um cliente. Tem rota própria, fora da edição do
+ * cadastro (customers.edicao.service.ts), por ser a mais cara de errar: muda o
+ * preço de tudo que a loja comprar dali para frente, inclusive pelo login
+ * próprio dela.
  *
  * Quem chama JÁ precisa ter validado que `price_table_id` está no conjunto de
  * quem pediu. Aqui vale a outra metade: o cliente é da carteira dele?

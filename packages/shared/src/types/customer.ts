@@ -277,9 +277,187 @@ export interface CustomerDetail {
    * instalado no celular pode estar falando com ela.
    */
   dono?: DonoDoCliente;
+  /**
+   * As edições do cadastro feitas pelo app (migração 051): TODAS as que ainda
+   * esperam alguém atualizar no Control e as 10 mais recentes das demais
+   * (resolvidas, ou feitas quando o cliente ainda não estava no Control). Das
+   * mais novas para as mais antigas. Ausente = banco sem a 051 (ou API antiga).
+   */
+  alteracoes?: AlteracaoDoCliente[];
   /** Do mais recente para o mais antigo. */
   pedidos: PedidoDoCliente[];
 }
+
+// ─── Edição do cadastro (migração 051) ────────────────────────────────────────
+//
+// "Não tem como alterar esses dados nem sendo admin lá dentro. Quero poder
+// mudar sim, e quando mudar lá tem que mudar no ERP do Fábio também." (Yan,
+// 17/09/2026). Os helpers que normalizam e validam moram em
+// cadastro/edicao.ts — a tela e a API usam os MESMOS.
+
+/**
+ * O que a edição do cadastro pode mudar. Fora daqui, de propósito: `erp_id`
+ * (quem muda é o Control), bloqueio e limite (são do Control), carteira
+ * (`rep_id`/`rep_erp_id`), tabela (rota própria), varejo, inatividade e o
+ * retrato de compras. `address` também não: a linha única é sempre
+ * recalculada pelo servidor a partir das peças.
+ */
+export type CampoEditavelDoCliente =
+  | 'name'
+  | 'trade_name'
+  | 'cnpj'
+  | 'inscricao_estadual'
+  | 'whatsapp'
+  | 'email'
+  | 'observacoes'
+  | 'cep'
+  | 'logradouro'
+  | 'numero'
+  | 'complemento'
+  | 'bairro'
+  | 'cidade'
+  | 'uf';
+
+/** As peças do endereço (migração 041). Mudar qualquer uma recalcula `address`. */
+export type PecaDoEnderecoDoCliente = 'cep' | 'logradouro' | 'numero' | 'complemento' | 'bairro' | 'cidade' | 'uf';
+
+/** Um campo como aparece no histórico: os editáveis e a linha `address` recalculada. */
+export type CampoDoHistoricoDoCadastro = CampoEditavelDoCliente | 'address';
+
+/** Valores de campos do cadastro. `null` = vazio; chave ausente = não mexe. */
+export type ValoresDoCadastro = { [K in CampoEditavelDoCliente]?: string | null | undefined };
+
+/**
+ * PATCH /customers/:id/cadastro — edição PARCIAL.
+ *
+ * `novo` leva só o que mudou. `vistos` leva, para CADA chave de `novo`, o valor
+ * que a pessoa tinha na tela ao começar a editar: se o banco já não está com
+ * ele (outra pessoa salvou no meio), a gravação é recusada com 409
+ * MUDOU_DE_NOVO em vez de apagar a edição do outro.
+ */
+export interface EditarCadastroDoClienteRequest {
+  novo: ValoresDoCadastro;
+  vistos: ValoresDoCadastro;
+}
+
+/** Mensagem de erro por campo, em português, pronta para ir embaixo do campo. */
+export type ErrosDaEdicaoDoCadastro = { [K in CampoEditavelDoCliente]?: string };
+
+/** Um campo que mudou: valores normalizados (documento e CEP só em dígitos). */
+export interface MudancaDeCampoDoCadastro {
+  antes: string | null;
+  depois: string | null;
+  /**
+   * Só na linha `address` (revisão de 17/09/2026): antes da edição a linha já
+   * dizia outra coisa que as peças (ver `linhaForaDasPecas`), então a troca da
+   * linha não é explicada pelas peças que mudaram e o cartão a mostra.
+   */
+  linha_fora_das_pecas?: true;
+}
+
+export type CamposAlteradosDoCadastro = { [K in CampoDoHistoricoDoCadastro]?: MudancaDeCampoDoCadastro };
+
+/** Por onde o Control ficou em dia: alguém confirmou no app, ou o próprio Control devolveu o valor pela API. */
+export type ViaDaAtualizacaoNoControl = 'app' | 'api';
+
+/** Uma edição do cadastro (uma linha de `customer_changes`, migração 051). */
+export interface AlteracaoDoCliente {
+  id: string;
+  customer_id: string;
+  /** Quem editou. Nulo se o login foi apagado — o nome fica em `alterado_por_nome`. */
+  alterado_por: string | null;
+  alterado_por_nome: string | null;
+  alterado_em: string;
+  campos: CamposAlteradosDoCadastro;
+  /**
+   * O cliente JÁ estava no Control (tinha `erp_id`) quando foi editado: a
+   * mudança precisa chegar lá. `false` = cliente nascido no app ainda não
+   * incluído — o financeiro vai incluí-lo com os dados de hoje.
+   */
+  erp_pendente: boolean;
+  /** Quando o Control ficou em dia com esta edição. Nulo = ainda não. */
+  erp_atualizado_em: string | null;
+  erp_atualizado_por: string | null;
+  erp_atualizado_por_nome: string | null;
+  erp_atualizado_via: ViaDaAtualizacaoNoControl | null;
+}
+
+/** GET /customers/alteracoes-pendentes — a fila de quem atualiza o Control. */
+export interface ClienteComAlteracaoPendente {
+  customer_id: string;
+  name: string;
+  erp_id: string | null;
+  rep_erp_id: string | null;
+  /** Quantas edições deste cliente esperam o Control. */
+  pendentes: number;
+  /** A edição pendente mais antiga. */
+  desde: string;
+  /** A edição pendente mais recente. */
+  ultima_em: string;
+}
+
+/**
+ * A resposta 200 de GET /customers/alteracoes-pendentes. Sem a 051: `data`
+ * vazio e `migracao_pendente: true` — a tela esconde o cartão em vez de
+ * mostrar "nenhum cadastro alterado", que seria mentira.
+ */
+export interface AlteracoesPendentesResponse {
+  data: ClienteComAlteracaoPendente[];
+  migracao_pendente: boolean;
+}
+
+/** Em quantos aparelhos o aviso chegou, financeiro e admin separados. */
+export interface AvisadosDaAlteracao {
+  financeiro: number;
+  admin: number;
+}
+
+/**
+ * A resposta 200 do PATCH /customers/:id/cadastro.
+ *
+ * Sem mudança real (tudo igual ao banco): só `data` e `sem_mudanca: true` —
+ * nada foi gravado. Com mudança: a ficha nova, a alteração registrada e o
+ * aviso ao financeiro (`avisados` nulo quando não houve push — cliente fora do
+ * Control, Control que puxa sozinho pela API — ou quando o envio não terminou
+ * dentro do tempo).
+ */
+export type EditarCadastroDoClienteResponse =
+  | { data: CustomerDetail; sem_mudanca: true }
+  | {
+      data: CustomerDetail;
+      sem_mudanca?: false;
+      alteracao: AlteracaoDoCliente;
+      erp_pendente: boolean;
+      /** O canal de cadastro da empresa é a API: o Control puxa a mudança sozinho, sem push. */
+      control_puxa_pela_api: boolean;
+      avisados: AvisadosDaAlteracao | null;
+    };
+
+/** POST /customers/:id/alteracoes/confirmar — "Já atualizei no Control", com os ids que a pessoa VIU. */
+export interface ConfirmarAlteracoesDoClienteRequest {
+  ids: string[];
+}
+
+export interface AlteracoesConfirmadas {
+  /** Os ids que de fato foram marcados agora (os já resolvidos ou de outro cliente ficam de fora). */
+  confirmadas: string[];
+  /**
+   * A lista da ficha, já atualizada (mesma regra de `CustomerDetail.alteracoes`).
+   * `null` = a confirmação gravou, mas a releitura falhou: recarregue a ficha.
+   */
+  alteracoes: AlteracaoDoCliente[] | null;
+}
+
+/** O nome do campo no contrato da API de Parceiro (GET/POST /partner/v1/clientes). */
+export type NomeNoContratoDoParceiro =
+  | 'razao_social'
+  | 'nome_fantasia'
+  | 'cnpj_cpf'
+  | 'inscricao_estadual'
+  | 'whatsapp'
+  | 'email'
+  | 'observacoes'
+  | 'endereco';
 
 /**
  * Os dois representantes que importam na ficha.

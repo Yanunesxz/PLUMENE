@@ -45,12 +45,37 @@
  * mudança: reenviar o mesmo cadastro com outro DATA_UPDATE é `sem_mudanca`
  * (senão o Control, recarimbando ao gravar o que puxou, entraria num
  * pingue-pongue sem fim). As regras do eco moram em partner.eco.ts.
+ *
+ * A EDIÇÃO DO CADASTRO FEITA NO APP (051, 17/09/2026) não é apagada pelo
+ * Control: enquanto ela está pendente (ainda não chegou lá), a coluna que o
+ * Control mandar com outro valor fica com o valor do app e volta em `avisos`;
+ * quando ele manda o mesmo valor, a edição é dada por resolvida pela API. As
+ * pendências são lidas em lote, depois dos clientes e antes da primeira
+ * gravação — e relidas depois dela, para a edição que caiu entre as duas
+ * gravações da tela (passo 3b). Sem a 051, tudo como antes. As regras moram em
+ * partner.edicaoNoApp.ts.
  */
-import { apenasDigitos, codigoCanonico, codigoMiolo, linhaDeEndereco } from '@csb/shared';
+import {
+  CAMPO_DO_CONTRATO_DO_PARCEIRO,
+  apenasDigitos,
+  camposNoContratoDoParceiro,
+  codigoCanonico,
+  codigoMiolo,
+  linhaDeEndereco,
+} from '@csb/shared';
+import type { AlteracaoDoCliente, NomeNoContratoDoParceiro } from '@csb/shared';
 import { supabase } from '../../config/supabase.js';
-import { buscarTudoOuFalhar, emLotes } from '../../lib/paginacao.js';
+import { buscarPelaChaveOuFalhar, buscarTudoOuFalhar, depoisDaChave, emLotes } from '../../lib/paginacao.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
+import {
+  alteradoNoApp,
+  colocarNaFilaDoControl,
+  lerAlteracoesForaDaFilaEmLote,
+  lerAlteracoesPendentesEmLote,
+  resolverAlteracoesPelaApi,
+} from '../customers/customers.alteracoes.service.js';
 import { podeCarimbar, ultimaMaoFoiDoControl } from './partner.eco.js';
+import { colunasQueOLoteApagou, conferirEdicoesDoApp } from './partner.edicaoNoApp.js';
 
 // ─── Tipos do corpo que o parceiro envia ─────────────────────────────────────
 
@@ -156,6 +181,20 @@ export interface ClienteAlterado {
   atualizado_em: string;
   /** Quando o Control mandou pela última vez (049). Ausente sem a migração. */
   atualizado_pelo_control_em?: string | null;
+  /**
+   * Edição do cadastro feita no app que ainda não chegou ao Control (051): a
+   * mais recente e os campos pendentes, com os nomes deste contrato. `null` =
+   * nada pendente (ou a 051 ainda não rodou). Aditivo: sai sempre.
+   */
+  alterado_no_app: AlteradoNoApp | null;
+}
+
+/** O `alterado_no_app` de um cliente no GET /clientes. */
+export interface AlteradoNoApp {
+  /** Quando foi a edição pendente mais recente. */
+  em: string;
+  /** Os campos com edição pendente, na ordem do contrato (o endereço é um só: `endereco`). */
+  campos: NomeNoContratoDoParceiro[];
 }
 
 /** Um representante como o app o tem, no formato do POST /representantes. */
@@ -443,6 +482,213 @@ async function tabelasDePreco(company_id: string): Promise<Array<{ id: string; e
   return (Array.isArray(data) ? data : []) as Array<{ id: string; erp_code: string | null }>;
 }
 
+/**
+ * O motivo de `ignorados` do registro cujo cadastro mudou no app entre a
+ * leitura do lote e a gravação (compare-and-set do passo 3). Contrato
+ * publicado (docs/API-PARCEIRO.md e api-parceiro.html): texto exato.
+ */
+export const MOTIVO_MUDOU_NO_APP_DURANTE_O_ENVIO = 'cadastro alterado no app durante o envio — reenvie';
+
+/**
+ * Os documentos ANTIGOS dos clientes cujo CPF/CNPJ foi trocado no app e ainda
+ * não chegou ao Control (051), por miolo do código: o passo 1b de
+ * `receberClientes`.
+ *
+ * Só olha os registros cujo código acha UM cadastro no app com documento
+ * diferente do que veio — é só aí que o casamento pelo documento pode achar a
+ * loja errada — e lê as pendências só desses, numa consulta por lote. Sem
+ * candidato, nem sonda a 051. Sem a 051, mapa vazio (tudo como antes). Falha
+ * na leitura LANÇA, antes de qualquer gravação.
+ *
+ * Serve também o POST /partner/v1/retrato (revisão de 17/09/2026), que casa o
+ * cliente pelo mesmo caminho (documento primeiro) e manda o documento em
+ * `cnpj` — `chaveDoDocumento` diz qual chave do registro ler.
+ */
+export async function documentosAntigosPendentes<L extends { id: string; cnpj: string | null }>(
+  company_id: string,
+  clientes: readonly unknown[],
+  porMiolo: ReadonlyMap<string, L>,
+  mioloComDoisCadastros: ReadonlySet<string>,
+  chaveDoDocumento = 'cnpj_cpf',
+): Promise<Map<string, { cliente: L; antigos: Set<string> }>> {
+  const candidatos = new Map<string, L>();
+  for (const raw of clientes) {
+    if (!ehObjeto(raw)) continue;
+    const miolo = codigoMiolo(textoSimples(raw['codigo']));
+    const documento = digitosDoDocumento(raw[chaveDoDocumento]);
+    if (!miolo || !documento || mioloComDoisCadastros.has(miolo)) continue;
+    const cliente = porMiolo.get(miolo);
+    if (cliente && digitosDoDocumento(cliente.cnpj) !== documento) candidatos.set(miolo, cliente);
+  }
+  const trocados = new Map<string, { cliente: L; antigos: Set<string> }>();
+  if (candidatos.size === 0) return trocados;
+  const pendentes = await lerAlteracoesPendentesEmLote(
+    company_id,
+    [...candidatos.values()].map((c) => c.id),
+  );
+  if (!pendentes) return trocados;
+  for (const [miolo, cliente] of candidatos) {
+    const antigos = new Set<string>();
+    for (const a of pendentes.get(cliente.id) ?? []) {
+      const antigo = digitosDoDocumento(a.campos.cnpj?.antes);
+      if (antigo) antigos.add(antigo);
+    }
+    if (antigos.size > 0) trocados.set(miolo, { cliente, antigos });
+  }
+  return trocados;
+}
+
+/**
+ * Os clientes do app SEM CÓDIGO cujo CPF/CNPJ foi corrigido aqui, por documento
+ * ANTIGO — o que o Control ainda tem (051, revisão de 17/09/2026).
+ *
+ * O buraco que isto fecha: o cliente nasce no app sem código, o Control o puxa
+ * no GET (`novo_no_control`) e leva horas para devolver o código; nesse meio o
+ * financeiro corrige o documento aqui — é o que a tela convida a fazer, porque
+ * ela diz "ainda sem código no Control". Quando o código enfim chega no POST,
+ * ele vem com o documento ANTIGO: o casamento pelo documento não acha nada (o
+ * app tem o novo) e o casamento pelo código também não (o cliente ainda não tem
+ * código). O registro virava INSERT calado — duas lojas no app, a nova com o
+ * código, a carteira, o bloqueio e o limite, e a original (com os pedidos e o
+ * documento certo) saindo de novo no GET como nova, para o Control criar um
+ * segundo cadastro do lado dele.
+ *
+ * Achado por aqui, o cliente é ADOTADO como qualquer outro: aprende o código, o
+ * documento do app é mantido (o passo 2c tira a coluna e avisa) e a correção
+ * entra na fila do Control. A edição de cliente sem código nasce FORA da fila
+ * (`erp_pendente = false`, ela iria junto na inclusão), então aqui se olham
+ * TODAS as trocas de documento — pendentes ou não.
+ *
+ * Só custa uma consulta quando algum registro do lote traz documento e um
+ * código que o app ainda não tem; sem isso, nem sonda a 051. Falha na leitura
+ * LANÇA, antes de gravar. O mesmo documento antigo em dois clientes sem código
+ * não escolhe nenhum: adivinhar fundiria duas lojas.
+ *
+ * O documento que HOJE é de outro cadastro também é candidato (revisão de
+ * 17/09/2026). Era justamente o caso comum — a correção tira do cliente um
+ * CNPJ que era de outra loja, e essa loja se cadastra depois com ele —, e o
+ * corte "só documento sem dono" mandava o registro para a outra loja: ela
+ * ganhava o código, a razão social, a carteira, o bloqueio e o limite do
+ * cliente certo, que seguia sem código. Quem decide entre os dois é
+ * `clientePeloDocumentoAntigo`.
+ */
+export async function clientesSemCodigoComDocumentoCorrigido<
+  L extends { id: string; erp_id: string | null; cnpj: string | null },
+>(
+  company_id: string,
+  clientes: readonly unknown[],
+  existentes: readonly L[],
+  porMiolo: ReadonlyMap<string, L>,
+  mioloComDoisCadastros: ReadonlySet<string>,
+  chaveDoDocumento = 'cnpj_cpf',
+): Promise<Map<string, L>> {
+  const achados = new Map<string, L>();
+
+  // Os documentos dos registros cujo CÓDIGO o app ainda não tem: só eles podem
+  // ser o documento ANTIGO de um cliente sem código. O documento que o app tem
+  // hoje noutro cadastro entra também (ver acima).
+  const semDono = new Set<string>();
+  for (const raw of clientes) {
+    if (!ehObjeto(raw)) continue;
+    const documento = digitosDoDocumento(raw[chaveDoDocumento]);
+    if (!documento) continue;
+    const miolo = codigoMiolo(textoSimples(raw['codigo']));
+    if (miolo && (porMiolo.has(miolo) || mioloComDoisCadastros.has(miolo))) continue;
+    semDono.add(documento);
+  }
+  if (semDono.size === 0) return achados;
+
+  const semCodigo = new Map<string, L>();
+  for (const c of existentes) if (!codigoMiolo(c.erp_id)) semCodigo.set(c.id, c);
+  if (semCodigo.size === 0) return achados;
+  if (!(await detectarOuFalhar('customer_changes', 'id'))) return achados;
+
+  const ambiguos = new Set<string>();
+  for (const lote of emLotes([...semDono])) {
+    const linhas = await buscarTudoOuFalhar<{ customer_id: string; campos: unknown }>((de, ate) =>
+      supabase
+        .from('customer_changes')
+        .select('id, customer_id, campos')
+        .eq('company_id', company_id)
+        // O `antes` do histórico é o valor NORMALIZADO (só dígitos), como o
+        // documento do lote: o filtro por caminho do jsonb casa direto.
+        .in('campos->cnpj->>antes', lote)
+        .order('id')
+        .range(de, ate),
+    );
+    for (const l of linhas) {
+      const campos = ehObjeto(l.campos) ? l.campos : {};
+      const cnpj = ehObjeto(campos['cnpj']) ? campos['cnpj'] : {};
+      const antigo = digitosDoDocumento(cnpj['antes']);
+      if (!antigo || !semDono.has(antigo)) continue;
+      const cliente = semCodigo.get(l.customer_id);
+      if (!cliente) continue;
+      const jaAchado = achados.get(antigo);
+      if (jaAchado && jaAchado.id !== cliente.id) ambiguos.add(antigo);
+      else achados.set(antigo, cliente);
+    }
+  }
+  for (const documento of ambiguos) achados.delete(documento);
+  return achados;
+}
+
+/**
+ * O motivo de `ignorados` do registro que não dá para casar sem adivinhar: o
+ * documento dele é o ANTIGO de um cliente sem código e o de hoje de outro
+ * cadastro sem código (revisão de 17/09/2026). Contrato publicado: texto exato.
+ */
+export const MOTIVO_DOCUMENTO_ANTIGO_AMBIGUO =
+  'CNPJ corrigido no app num cliente sem código e hoje de outro cadastro sem código — confira qual dos dois é este cliente';
+
+/** A razão social para comparar: sem acento, sem pontuação, sem espaço, maiúscula. */
+const nomeComparavel = (v: unknown): string =>
+  typeof v === 'string'
+    ? v
+        .normalize('NFD')
+        .replace(/[̀-ͯ]/g, '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]+/g, '')
+    : '';
+
+/**
+ * O registro cujo código o app ainda não tem traz o documento ANTIGO de um
+ * cliente sem código (`corrigido`, achado por
+ * `clientesSemCodigoComDocumentoCorrigido`): é dele? (revisão de 17/09/2026)
+ *
+ *   • ninguém mais tem o documento hoje → é do corrigido (como sempre foi);
+ *   • quem tem o documento hoje tem OUTRO código → não é este registro (o
+ *     código dele o app nem tem): é do corrigido — é o "comum" dos docs, a
+ *     correção que tirou do cliente o CNPJ de uma loja já no Control;
+ *   • quem tem o documento hoje também está SEM código → os dois podem ser o
+ *     cliente que o Control puxou. A razão social desempata (o Control criou o
+ *     cadastro com a do cliente que puxou): bate só com a do corrigido, é dele;
+ *     bate só com a de quem tem o documento, `null` — o casamento de sempre,
+ *     pelo documento. Sem como decidir, `'ambiguo'`: nem um nem outro, e o
+ *     registro volta em `ignorados` — adivinhar gravaria o código, a carteira,
+ *     o bloqueio e o limite de uma loja na outra.
+ *
+ * `null` também quando não há corrigido: o caminho de sempre.
+ */
+export function clientePeloDocumentoAntigo<L extends { id: string; erp_id: string | null }>(
+  corrigido: L | undefined,
+  donosDeHoje: readonly L[],
+  razaoSocial: string | null,
+  nomeDe: (c: L) => unknown,
+): { cliente: L } | 'ambiguo' | null {
+  if (!corrigido) return null;
+  const outros = donosDeHoje.filter((c) => c.id !== corrigido.id);
+  const semCodigo = outros.filter((c) => !codigoMiolo(c.erp_id));
+  if (semCodigo.length === 0) return { cliente: corrigido };
+  const nome = nomeComparavel(razaoSocial);
+  if (nome) {
+    const doCorrigido = nomeComparavel(nomeDe(corrigido)) === nome;
+    const deQuemTem = semCodigo.some((c) => nomeComparavel(nomeDe(c)) === nome);
+    if (doCorrigido && !deQuemTem) return { cliente: corrigido };
+    if (!doCorrigido && deQuemTem) return null;
+  }
+  return 'ambiguo';
+}
+
 /** Todos os clientes da empresa, paginados e ordenados por id (o PostgREST corta em 1.000 sem avisar). */
 async function clientesDaEmpresa(company_id: string, colunas: string): Promise<LinhaCliente[]> {
   return buscarTudoOuFalhar<LinhaCliente>((de, ate) =>
@@ -479,11 +725,14 @@ export async function receberClientes(
   // e a CS já tem mais de 2.600 clientes. Sem paginar, todo cliente da página
   // 2 em diante ficava fora deste mapa — e a carga o CRIARIA de novo.
   // Com a 049, `updated_at` junto do carimbo: é o que diz se o app mexeu
-  // depois da última mão do Control (e aí o carimbo não é regravado).
+  // depois da última mão do Control (e aí o carimbo não é regravado). E sempre
+  // (a coluna existe desde a 001): o cliente adotado pelo CNPJ é gravado com o
+  // `updated_at` lido na condição (051, revisão de 17/09/2026 — ver o passo 3).
   const colunas = [
     COLUNAS_DO_CLIENTE,
+    'updated_at',
     cadastroReal ? COLUNAS_DA_041 : null,
-    com049 ? `${COLUNAS_DA_049}, updated_at` : null,
+    com049 ? COLUNAS_DA_049 : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -501,8 +750,38 @@ export async function receberClientes(
     if (d) porCnpj.set(d, [...(porCnpj.get(d) ?? []), c]);
   }
 
+  // ── 1b. CPF/CNPJ trocado no app e ainda pendente (051, revisão de 17/09/2026).
+  // O financeiro corrigiu no app o documento de um cliente que o Control ainda
+  // tem com o antigo — muitas vezes justamente porque o antigo era o de OUTRA
+  // loja. Casando primeiro pelo documento, o registro acharia essa outra loja:
+  // era recusado ("CNPJ já é do cliente de código X") ou, com a outra loja sem
+  // código, a adotava — e o bloqueio, o limite e a carteira do cliente certo
+  // deixavam de chegar até o Control trocar o documento. O cliente cujo CÓDIGO
+  // veio no registro e cuja troca pendente tem esse documento como `antes` é o
+  // cliente certo: para ele, vale o código. Lê só as pendências desses
+  // candidatos, em lote, antes de qualquer gravação.
+  const documentosTrocadosNoApp = await documentosAntigosPendentes(company_id, clientes, porMiolo, mioloComDoisCadastros);
+  // E o mesmo cliente ANTES de o código voltar: sem código, o documento
+  // corrigido no app deixava o registro do Control sem cadastro nenhum para
+  // casar — e ele virava um segundo cadastro, calado (17/09/2026).
+  const semCodigoComDocumentoCorrigido = await clientesSemCodigoComDocumentoCorrigido(
+    company_id,
+    clientes,
+    existentes,
+    porMiolo,
+    mioloComDoisCadastros,
+  );
+
   // ── 2. Decide, registro a registro, o que gravar.
   const paraInserir: Array<{ codigo: string; linha: Record<string, unknown> }> = [];
+  /** Os registros que casaram com um cadastro: o patch sai depois de ler as edições do app (2b). */
+  const casados: Array<{
+    codigo: string;
+    raw: Record<string, unknown>;
+    existente: LinhaCliente;
+    pedido: Record<string, unknown>;
+    adotado: boolean;
+  }> = [];
   const paraAtualizar: Array<{
     codigo: string;
     id: string;
@@ -510,6 +789,21 @@ export async function receberClientes(
     adotado: boolean;
     /** Grava o carimbo do Control nesta gravação (049, ver partner.eco.ts). */
     carimbar: boolean;
+    /** O valor lido das colunas que o app edita e o patch muda (compare-and-set, 051). */
+    antes: Record<string, unknown>;
+    /** Edições de quando o cliente não tinha código a pôr na fila do Control, se gravar (2c). */
+    paraAFilaDoControl: string[];
+    /**
+     * Cliente adotado pelo CNPJ, com a 051: o `updated_at` lido (vai na condição
+     * do UPDATE) e o que a reconferência depois de gravar precisa (passo 3a).
+     */
+    adocao: {
+      lidoEm: unknown;
+      raw: Record<string, unknown>;
+      existente: LinhaCliente;
+      /** As edições fora da fila que o 2c já leu deste cliente. */
+      vistas: Set<string>;
+    } | null;
   }> = [];
   const vistosNoLote = new Set<string>();
   const cnpjsNoLote = new Set<string>();
@@ -569,7 +863,28 @@ export async function receberClientes(
     // tem código nenhum (com aviso); senão o registro é recusado — escolher às
     // cegas fundiria duas lojas.
     let existente: LinhaCliente | undefined;
-    if (documento) {
+    const peloCodigoComDocumentoTrocado = documento ? documentosTrocadosNoApp.get(miolo) : undefined;
+    // O documento antigo de um cliente que o app corrigiu ANTES de ter código
+    // (ver 1b) vem antes do casamento pelo documento — mesmo que outro cadastro
+    // tenha esse documento hoje (17/09/2026). Só para código que o app não tem.
+    const peloDocumentoAntigo =
+      documento && !porMiolo.has(miolo) && !mioloComDoisCadastros.has(miolo)
+        ? clientePeloDocumentoAntigo(
+            semCodigoComDocumentoCorrigido.get(documento),
+            porCnpj.get(documento) ?? [],
+            nome,
+            (c) => c['name'],
+          )
+        : null;
+    if (peloCodigoComDocumentoTrocado?.antigos.has(documento!)) {
+      // O documento antigo de um cliente que o app corrigiu (ver 1b): casa pelo código.
+      existente = peloCodigoComDocumentoTrocado.cliente;
+    } else if (peloDocumentoAntigo === 'ambiguo') {
+      ignorados.push({ codigo, motivo: MOTIVO_DOCUMENTO_ANTIGO_AMBIGUO });
+      continue;
+    } else if (peloDocumentoAntigo) {
+      existente = peloDocumentoAntigo.cliente;
+    } else if (documento) {
       const candidatos = porCnpj.get(documento) ?? [];
       if (candidatos.length === 1) existente = candidatos[0];
       else if (candidatos.length > 1) {
@@ -590,6 +905,10 @@ export async function receberClientes(
       }
       existente = porMiolo.get(miolo);
     }
+    // (O cliente que nasceu no app, teve o CPF/CNPJ corrigido aqui e só agora
+    // recebe o código — o registro vem com o documento ANTIGO — já foi achado
+    // acima, por `clientePeloDocumentoAntigo`: adotado em vez de virar um
+    // cadastro duplicado, 17/09/2026.)
     const mioloGravado = existente ? codigoMiolo(existente.erp_id) : null;
     // O CNPJ achou um cadastro que JÁ TEM OUTRO código: não é este cliente para
     // o app. Aplicar o registro trocaria nome, representante (a carteira, que o
@@ -684,22 +1003,7 @@ export async function receberClientes(
     if (endereco.pedacosSem041) camposQuePrecisamDa041 = true;
 
     if (existente) {
-      const patch: Record<string, unknown> = {};
-      for (const [coluna, valor] of Object.entries(pedido)) {
-        if (!mesmoValor(existente[coluna], valor)) patch[coluna] = valor;
-      }
-      // O `erp_id` de quem já tem código nunca é reescrito — só casa. Quem é
-      // achado pelo CNPJ sem código aprende o do Control.
-      if (adotado) patch['erp_id'] = codigoCanonico(codigo);
-      if (Object.keys(patch).length === 0) {
-        semMudanca++;
-        continue;
-      }
-      if (com049 && 'pendencia_financeira' in patch) patch['pendencia_financeira_em'] = agora;
-      // `updated_at` e o carimbo entram na hora de gravar (passo 3), com o
-      // momento daquela gravação — não o do começo do lote.
-      const carimbar = com049 && podeCarimbar(existente['updated_at'], existente['erp_updated_at']);
-      paraAtualizar.push({ codigo, id: existente.id, patch, adotado, carimbar });
+      casados.push({ codigo, raw, existente, pedido, adotado });
     } else {
       // Cliente novo não tem nada a preservar: a linha vai completa, com as
       // mesmas chaves em todas (o insert em lote do PostgREST grava NULL — e
@@ -733,6 +1037,127 @@ export async function receberClientes(
       if (com049 && linha['pendencia_financeira'] != null) linha['pendencia_financeira_em'] = agora;
       paraInserir.push({ codigo, linha });
     }
+  }
+
+  // ── 2b. As edições do cadastro feitas no app que ainda não chegaram ao
+  // Control (051). Uma leitura por lote de clientes casados — nunca uma por
+  // cliente —, DEPOIS da leitura dos clientes (a edição que cair entre as duas
+  // é vista aqui, se a tela já gravou o histórico; se ainda não, o 3b a pega)
+  // e antes da primeira gravação: se ela falhar, lança (500) sem
+  // ter gravado nada. Tratar a falha como "nada pendente" deixaria o lote
+  // sobrescrever a edição do app. `null` = sem a 051: tudo como antes.
+  const pendentesDoApp =
+    casados.length > 0
+      ? await lerAlteracoesPendentesEmLote(
+          company_id,
+          casados.map((c) => c.existente.id),
+        )
+      : null;
+  // ── 2c. O resto do histórico de dois tipos de cliente casado (revisão de
+  // 17/09/2026), numa leitura em lote, também antes de gravar:
+  //   • o que tem edição pendente: uma edição MAIS NOVA da mesma coluna, já
+  //     resolvida, é o valor atual do app — o Control que aplicou só a mais
+  //     nova levava aviso falso para sempre, ou gravava o `depois` vencido da
+  //     mais velha por cima (partner.edicaoNoApp.ts);
+  //   • o adotado pelo CNPJ: a edição feita quando ele não tinha código nasce
+  //     fora da fila ("vai para lá com os dados de hoje, pela fila de incluir").
+  //     Mas o Control puxa o cliente novo no GET e só devolve o código no POST
+  //     do ciclo seguinte — a correção do representante nesse meio chegava
+  //     aqui com o valor antigo do Control, que gravava por cima, carimbava e
+  //     tirava o cliente do GET: a edição sumia nos dois lados, sem aviso. Ela
+  //     é conferida como pendente: igual, nada a fazer; diferente, fica o valor
+  //     do app, o lote avisa e ela entra na fila do Control (passo 3).
+  const foraDaFila =
+    pendentesDoApp !== null
+      ? await lerAlteracoesForaDaFilaEmLote(
+          company_id,
+          casados
+            .filter((c) => c.adotado || (pendentesDoApp.get(c.existente.id)?.length ?? 0) > 0)
+            .map((c) => c.existente.id),
+        )
+      : new Map<string, AlteracaoDoCliente[]>();
+  const mantidosNoApp: Array<{ codigo: string; campos: NomeNoContratoDoParceiro[] }> = [];
+  const edicoesAlcancadas: string[] = [];
+
+  for (const { codigo, raw, existente, pedido, adotado } of casados) {
+    let edicaoDoAppPendente = false;
+    /** As edições de quando o cliente não tinha código que o Control mostrou não ter. */
+    let semCodigoParaAFila: string[] = [];
+    if (pendentesDoApp) {
+      const pendentes = pendentesDoApp.get(existente.id) ?? [];
+      const outras = foraDaFila.get(existente.id) ?? [];
+      const semCodigo = new Set(
+        adotado ? outras.filter((a) => !a.erp_pendente && !a.erp_atualizado_em).map((a) => a.id) : [],
+      );
+      const conferencia = conferirEdicoesDoApp(raw, pedido, existente, [
+        ...pendentes,
+        ...outras.map((a) => (semCodigo.has(a.id) ? { ...a, erp_pendente: true } : a)),
+      ]);
+      if (conferencia.mantidos.length > 0) mantidosNoApp.push({ codigo, campos: conferencia.mantidos });
+      // A de quando não tinha código e que o Control já tem continua fora da fila (nunca entrou).
+      edicoesAlcancadas.push(...conferencia.alcancadas.filter((id) => !semCodigo.has(id)));
+      // As outras entram na fila — TODAS as que o registro não deu por
+      // alcançadas, e não só as de coluna que ele trouxe diferente (revisão de
+      // 17/09/2026). A adoção é a única janela: depois dela o cliente tem código,
+      // e a edição de quando não tinha nunca mais é conferida. O registro que não
+      // trazia a coluna (o contrato deixa mandar só parte) deixava a correção
+      // fora da fila; o envio seguinte, com o valor antigo do Control, gravava
+      // por cima, sem aviso, sem pendência e sem `alterado_no_app`. Na fila, ela
+      // é protegida como as outras e fecha sozinha no primeiro envio que trouxer
+      // o mesmo valor.
+      const alcancadas = new Set(conferencia.alcancadas);
+      semCodigoParaAFila = [...semCodigo].filter((id) => !alcancadas.has(id));
+      edicaoDoAppPendente = conferencia.aindaPendente;
+    }
+
+    const patch: Record<string, unknown> = {};
+    for (const [coluna, valor] of Object.entries(pedido)) {
+      if (!mesmoValor(existente[coluna], valor)) patch[coluna] = valor;
+    }
+    // O `erp_id` de quem já tem código nunca é reescrito — só casa. Quem é
+    // achado pelo CNPJ sem código aprende o do Control.
+    if (adotado) patch['erp_id'] = codigoCanonico(codigo);
+    if (Object.keys(patch).length === 0) {
+      semMudanca++;
+      continue;
+    }
+    if (com049 && 'pendencia_financeira' in patch) patch['pendencia_financeira_em'] = agora;
+    // `updated_at` e o carimbo entram na hora de gravar (passo 3), com o
+    // momento daquela gravação — não o do começo do lote. Com edição do app
+    // ainda pendente, a última mão que importa é a do app: carimbar agora
+    // esconderia o cliente do GET ?desde= antes de o Control ter a edição.
+    const carimbar =
+      com049 && !edicaoDoAppPendente && podeCarimbar(existente['updated_at'], existente['erp_updated_at']);
+    // As colunas que a tela de edição do cadastro também grava vão com o valor
+    // lido na condição do UPDATE (ver o passo 3). Só com a 051: sem ela não há
+    // edição do cadastro no app a proteger, e a gravação fica como sempre foi.
+    const antes: Record<string, unknown> = {};
+    if (pendentesDoApp) {
+      for (const coluna of Object.keys(patch)) {
+        if (Object.prototype.hasOwnProperty.call(CAMPO_DO_CONTRATO_DO_PARCEIRO, coluna)) {
+          antes[coluna] = existente[coluna] ?? null;
+        }
+      }
+    }
+    const adocao =
+      adotado && pendentesDoApp
+        ? {
+            lidoEm: existente['updated_at'],
+            raw,
+            existente,
+            vistas: new Set((foraDaFila.get(existente.id) ?? []).map((a) => a.id)),
+          }
+        : null;
+    paraAtualizar.push({
+      codigo,
+      id: existente.id,
+      patch,
+      adotado,
+      carimbar,
+      antes,
+      paraAFilaDoControl: semCodigoParaAFila,
+      adocao,
+    });
   }
 
   // Conferência da carteira (só avisos, antes de gravar): o cliente é da
@@ -786,6 +1211,13 @@ export async function receberClientes(
 
   let atualizados = 0;
   let adotadosPorCnpj = 0;
+  const paraAFilaDoControl: string[] = [];
+  /** Um UPDATE do lote que gravou: o valor lido das colunas do app e o que foi gravado. */
+  type Gravado = { codigo: string; id: string; lidas: Record<string, unknown>; gravadas: Record<string, unknown> };
+  /** Os UPDATEs que gravaram coluna que a tela de edição também grava — a reconferência do 3b. */
+  const gravadosComColunaDoApp: Gravado[] = [];
+  /** Os adotados pelo CNPJ que gravaram — a reconferência do 3a. */
+  const adotadosGravados: Array<Gravado & { adocao: NonNullable<(typeof paraAtualizar)[number]['adocao']> }> = [];
   for (const u of paraAtualizar) {
     // O momento desta gravação, tomado logo antes dela: é o carimbo que a
     // trigger da 013 vai ultrapassar só pela folga (partner.eco.ts). Com o
@@ -793,20 +1225,210 @@ export async function receberClientes(
     const momento = new Date().toISOString();
     u.patch['updated_at'] = momento;
     if (u.carimbar) u.patch['erp_updated_at'] = momento;
-    const { error } = await supabase
-      .from('customers')
-      .update(u.patch)
-      .eq('id', u.id)
-      .eq('company_id', company_id);
+    // Compare-and-set nas colunas que o app também edita (revisão de
+    // 17/09/2026). As pendências foram lidas no passo 2b, mas os UPDATEs saem
+    // um a um: num lote longo, a pessoa pode salvar a ficha DEPOIS dessa
+    // leitura e ANTES do UPDATE deste cliente. A edição dela passa (o banco
+    // ainda tinha o valor antigo) e grava a pendência — e um UPDATE sem
+    // condição apagaria, calado, a edição, deixando a pendência apontar para
+    // um valor que não está em lugar nenhum. Com o valor lido na condição, o
+    // cliente que mudou no meio não é gravado e volta para o Control reenviar:
+    // no próximo envio a conferência já vê a edição.
+    const conferidas = Object.entries(u.antes);
+    let consulta = supabase.from('customers').update(u.patch).eq('id', u.id).eq('company_id', company_id);
+    for (const [coluna, valor] of conferidas) {
+      consulta = valor == null ? consulta.is(coluna, null) : consulta.eq(coluna, valor);
+    }
+    // O ADOTADO pelo CNPJ vai também com o `updated_at` lido na condição
+    // (revisão de 17/09/2026). A edição feita enquanto ele não tinha código nasce
+    // fora da fila, e só o 2c a confere — com o que já estava gravado na leitura.
+    // A correção que o representante salva DEPOIS dela e antes deste UPDATE não
+    // entra no patch (o Control mandou o mesmo valor que o lote leu): o UPDATE
+    // passava sem condição, gravava o código (e, com a 049, o carimbo, que tirava
+    // o cliente do GET ?desde=), e o envio seguinte — cliente já com código, que
+    // o 2c não olha mais — gravava o valor antigo por cima, sem aviso. Qualquer
+    // gravação do app depois da leitura faz o registro voltar para reenviar; no
+    // reenvio, o 2c já vê a edição.
+    const comCondicao = conferidas.length > 0 || u.adocao !== null;
+    if (u.adocao) {
+      const lidoEm = u.adocao.lidoEm;
+      consulta = lidoEm == null ? consulta.is('updated_at', null) : consulta.eq('updated_at', lidoEm);
+    }
+    const { data: gravadas, error } = comCondicao ? await consulta.select('id') : await consulta;
     if (error) {
       ignorados.push({ codigo: u.codigo, motivo: `falha ao gravar: ${error.message}` });
       continue;
     }
+    // 0 linhas = a condição não bateu: o cadastro mudou depois da leitura.
+    if (comCondicao && Array.isArray(gravadas) && gravadas.length === 0) {
+      ignorados.push({ codigo: u.codigo, motivo: MOTIVO_MUDOU_NO_APP_DURANTE_O_ENVIO });
+      continue;
+    }
     atualizados++;
     if (u.adotado) adotadosPorCnpj++;
+    const gravado: Gravado = { codigo: u.codigo, id: u.id, lidas: u.antes, gravadas: u.patch };
+    if (conferidas.length > 0) gravadosComColunaDoApp.push(gravado);
+    if (u.adocao) adotadosGravados.push({ ...gravado, adocao: u.adocao });
+    paraAFilaDoControl.push(...u.paraAFilaDoControl);
+  }
+
+  /**
+   * Devolve ao valor lido as colunas que o lote gravou por cima de uma edição do
+   * app que ele não tinha visto, com a condição inversa (só onde ainda está o que
+   * o lote gravou), e põe os campos no aviso. Sem resposta, ou com o cadastro já
+   * mudado de novo, só o log.
+   */
+  const devolverAoValorDoApp = async (g: Gravado, apagadas: ReturnType<typeof colunasQueOLoteApagou>) => {
+    const devolver: Record<string, unknown> = { updated_at: new Date().toISOString() };
+    for (const c of apagadas) devolver[c] = g.lidas[c] ?? null;
+    let consulta = supabase.from('customers').update(devolver).eq('id', g.id).eq('company_id', company_id);
+    for (const c of apagadas) {
+      const gravado = g.gravadas[c];
+      consulta = gravado == null ? consulta.is(c, null) : consulta.eq(c, gravado);
+    }
+    const { data: devolvidas, error: erroAoDevolver } = await consulta.select('id');
+    if (erroAoDevolver || !Array.isArray(devolvidas) || devolvidas.length === 0) {
+      // Sem resposta, ou o cadastro já mudou de novo (outra edição por cima): o
+      // que está lá não é mais o que o lote gravou. Só o log.
+      console.error(
+        `[parceiro] cliente ${g.codigo}: a edição do app gravada durante o envio não foi devolvida (${
+          erroAoDevolver?.message ?? 'o cadastro já tinha mudado'
+        }); colunas: ${apagadas.join(', ')}`,
+      );
+      return;
+    }
+    const campos = camposNoContratoDoParceiro(apagadas);
+    const jaAvisado = mantidosNoApp.find((m) => m.codigo === g.codigo);
+    if (jaAvisado) jaAvisado.campos = [...new Set([...jaAvisado.campos, ...campos])];
+    else mantidosNoApp.push({ codigo: g.codigo, campos });
+  };
+
+  // ── 3a. O adotado pelo CNPJ e a edição feita sem código que chegou DEPOIS da
+  // leitura do 2c (revisão de 17/09/2026). O 3b abaixo só relê edições
+  // PENDENTES — e a de cliente sem código nasce fora da fila. A tela grava o
+  // cliente e só depois o histórico: o lote que leu o cliente nesse meio viu a
+  // correção sem histórico, o compare-and-set passou (a condição era o próprio
+  // valor novo) e o valor antigo do Control ficava, com a edição fora da fila
+  // para sempre — nem aviso, nem pendência. Relê, em lote, as edições fora da
+  // fila dos adotados que gravaram, e as que o 2c não viu seguem a regra dele:
+  // o que o Control já tem fica fora da fila; o resto entra, e a coluna que o
+  // lote gravou por cima volta ao valor do app, com o aviso de sempre.
+  if (adotadosGravados.length > 0) {
+    let depoisDeAdotar: Map<string, AlteracaoDoCliente[]> | null = null;
+    try {
+      depoisDeAdotar = await lerAlteracoesForaDaFilaEmLote(
+        company_id,
+        adotadosGravados.map((g) => g.id),
+      );
+    } catch (e) {
+      // Os clientes já foram gravados: não derruba o lote (como o 3b).
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[parceiro] não deu para reconferir as edições dos clientes adotados pelo CNPJ depois de gravar: ${msg}`);
+    }
+    for (const g of adotadosGravados) {
+      const novas = (depoisDeAdotar?.get(g.id) ?? [])
+        .filter((a) => !g.adocao.vistas.has(a.id) && !a.erp_pendente && !a.erp_atualizado_em)
+        .map((a) => ({ ...a, erp_pendente: true }));
+      if (novas.length === 0) continue;
+      const conferencia = conferirEdicoesDoApp(g.adocao.raw, {}, g.adocao.existente, novas);
+      const alcancadas = new Set(conferencia.alcancadas);
+      paraAFilaDoControl.push(...novas.filter((a) => !alcancadas.has(a.id)).map((a) => a.id));
+      const apagadas = colunasQueOLoteApagou(novas, g.lidas, g.gravadas);
+      if (apagadas.length > 0) await devolverAoValorDoApp(g, apagadas);
+    }
+  }
+
+  // A edição de quando o cliente não tinha código, que o Control acabou de
+  // mostrar não ter (2c), entra na fila — só agora, com o cliente gravado com o
+  // código: antes disso, uma pendência num cliente fora do Control. Daqui em
+  // diante é uma edição pendente como as outras: protegida nos próximos envios,
+  // no alterado_no_app do GET e no cartão do financeiro. Falhar aqui não derruba
+  // o lote (os clientes já foram gravados, com o valor do app), mas o próximo
+  // envio já não a protege — o aviso diz isso ao Control.
+  let edicoesForaDaFila = false;
+  if (paraAFilaDoControl.length > 0) {
+    try {
+      await colocarNaFilaDoControl(company_id, paraAFilaDoControl);
+    } catch (e) {
+      edicoesForaDaFila = true;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[parceiro] edições do cadastro de clientes adotados pelo CNPJ não entraram na fila do Control: ${msg}`);
+    }
+  }
+
+  // ── 3b. A edição do app que caiu entre as DUAS gravações dela (revisão de
+  // 17/09/2026). A tela grava o cliente e só depois a linha do histórico: o
+  // lote que leu o cliente e as pendências nesse meio viu o valor novo do app
+  // sem pendência — e o compare-and-set acima passou, porque a condição era o
+  // próprio valor novo. A edição sumia calada, e o aviso "mantido o valor do
+  // app" dos envios seguintes mentia para sempre. Relê as pendências dos
+  // clientes gravados (em lote, como o 2b): a edição que o lote não tinha visto
+  // e cujo `depois` é o valor que ele trocou volta ao cadastro, com a condição
+  // inversa (só onde ainda está o que o lote gravou), e entra no aviso.
+  if (pendentesDoApp && gravadosComColunaDoApp.length > 0) {
+    const vistasNoLote = new Set<string>(paraAFilaDoControl);
+    for (const lista of pendentesDoApp.values()) for (const a of lista) vistasNoLote.add(a.id);
+    let depoisDeGravar: Map<string, AlteracaoDoCliente[]> | null = null;
+    try {
+      depoisDeGravar = await lerAlteracoesPendentesEmLote(
+        company_id,
+        gravadosComColunaDoApp.map((g) => g.id),
+      );
+    } catch (e) {
+      // Os clientes já foram gravados: não derruba o lote. É preciso outra falha
+      // (a edição cair justo no meio) para isto importar — fica no log.
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[parceiro] não deu para reconferir as edições do cadastro depois de gravar o lote: ${msg}`);
+    }
+    for (const g of gravadosComColunaDoApp) {
+      const naoVistas = (depoisDeGravar?.get(g.id) ?? []).filter((a) => !vistasNoLote.has(a.id));
+      const apagadas = colunasQueOLoteApagou(naoVistas, g.lidas, g.gravadas);
+      if (apagadas.length > 0) await devolverAoValorDoApp(g, apagadas);
+    }
+  }
+
+  // As edições do app que o Control alcançou (mandou o mesmo valor) saem da
+  // fila do financeiro, marcadas como atualizadas pela API. Independe de o
+  // registro ter gravado outra coluna: o valor do app já está no cadastro e o
+  // Control acabou de mostrar que tem o mesmo. Falhar aqui não derruba o lote
+  // (os clientes já foram gravados): as edições continuam pendentes — o lado
+  // seguro — e são conferidas de novo no próximo envio.
+  let edicoesNaoMarcadas = false;
+  if (edicoesAlcancadas.length > 0) {
+    try {
+      await resolverAlteracoesPelaApi(company_id, edicoesAlcancadas);
+    } catch (e) {
+      edicoesNaoMarcadas = true;
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`[parceiro] edições do cadastro alcançadas pelo Control não foram marcadas: ${msg}`);
+    }
   }
 
   // ── 4. Avisos do lote.
+  if (mantidosNoApp.length > 0) {
+    // Um aviso por cliente, com os campos: é o Control que precisa corrigir o
+    // cadastro dele. A lista é cortada como os códigos dos outros avisos.
+    for (const m of mantidosNoApp.slice(0, CODIGOS_POR_AVISO)) {
+      avisos.push(
+        `Cliente ${m.codigo}: ${m.campos.join(', ')} alterados no app ainda não aplicados no Control — mantido o valor do app.`,
+      );
+    }
+    if (mantidosNoApp.length > CODIGOS_POR_AVISO) {
+      avisos.push(
+        `E mais ${mantidosNoApp.length - CODIGOS_POR_AVISO} cliente(s) com campos alterados no app ainda não aplicados no Control — mantido o valor do app (veja alterado_no_app no GET /clientes).`,
+      );
+    }
+  }
+  if (edicoesNaoMarcadas) {
+    avisos.push(
+      'Não deu para registrar no app as edições de cadastro que o Control já tem — elas continuam pendentes e são conferidas de novo no próximo envio.',
+    );
+  }
+  if (edicoesForaDaFila) {
+    avisos.push(
+      'Não deu para registrar no app que o Control ainda não tem campos editados no app antes de o cliente ter código — o valor do app foi mantido neste envio; puxe o GET /clientes antes de reenviar esses clientes.',
+    );
+  }
   if (algumaTabelaVeio && tabelaPorMiolo.size === 0) {
     avisos.push(
       'Nenhuma tabela de preço tem código do ERP preenchido — a tabela dos clientes não foi mexida. Preencha o erp_code das tabelas para o vínculo funcionar.',
@@ -1075,6 +1697,10 @@ export async function receberRepresentantes(
 // pouco depois do carimbo). Sem a 049 não há como saber, e a lista traz tudo
 // que mudou desde `desde` — inclusive o que o Control acabou de mandar;
 // inofensivo, só maior.
+//
+// Com a 051, cada cliente diz em `alterado_no_app` quais campos o app editou
+// e o Control ainda não tem — e o cliente com edição pendente nunca é tirado
+// da lista pelo anti-eco.
 
 /**
  * Os clientes que mudaram no app desde `desde` (ou todos, sem `desde`),
@@ -1099,17 +1725,59 @@ export async function listarClientesAlterados(
   ]
     .filter(Boolean)
     .join(', ');
-  const linhas = await buscarTudoOuFalhar<LinhaCliente & { updated_at: string }>((de, ate) => {
+  // Paginado pela CHAVE (updated_at, id), não pela posição: um cliente gravado
+  // de novo durante a leitura empurrava outro para uma página já lida — e esse
+  // não saía nunca (revisão de 17/09/2026, ver `buscarPelaChaveOuFalhar`).
+  const linhas = await buscarPelaChaveOuFalhar<LinhaCliente & { updated_at: string }>((ultima, limite) => {
     let query = supabase.from('customers').select(colunas).eq('company_id', company_id);
     if (desde) query = query.gte('updated_at', desde);
-    return query.order('updated_at', { ascending: true }).order('id', { ascending: true }).range(de, ate);
+    if (ultima) query = query.or(depoisDaChave(ultima));
+    return query.order('updated_at', { ascending: true }).order('id', { ascending: true }).limit(limite);
   });
+
+  // As edições do cadastro que ainda não chegaram ao Control (051): todas as
+  // pendentes da empresa numa leitura paginada (a fila é pequena; a lista de
+  // clientes pode ter milhares). Falhar LANÇA (500), como uma página de
+  // clientes: sem ela o Control não saberia o que o app editou. `null` = sem
+  // a 051 — `alterado_no_app` sai null.
+  const pendentesDoApp = linhas.length > 0 || desde ? await lerAlteracoesPendentesEmLote(company_id) : null;
+
+  // O cliente com edição pendente sai em TODA puxada até o Control ter a
+  // edição (revisão de 17/09/2026) — é o que o contrato promete. Pelo
+  // `updated_at` ele saía uma vez só: se o Control lesse e não aplicasse (ou
+  // reenviasse o valor antigo, que o POST não grava e portanto não mexe no
+  // `updated_at`), o `desde` seguinte já o deixava de fora e a edição sumia do
+  // caminho automático. Os que não vieram pelo `desde` são lidos por id, em lote.
+  if (desde && pendentesDoApp && pendentesDoApp.size > 0) {
+    const naLista = new Set(linhas.map((l) => l.id));
+    const faltando = [...pendentesDoApp.keys()].filter((id) => !naLista.has(id));
+    for (const lote of emLotes(faltando)) {
+      linhas.push(
+        ...(await buscarTudoOuFalhar<LinhaCliente & { updated_at: string }>((de, ate) =>
+          supabase
+            .from('customers')
+            .select(colunas)
+            .eq('company_id', company_id)
+            .in('id', lote)
+            .order('id', { ascending: true })
+            .range(de, ate),
+        )),
+      );
+    }
+    if (faltando.length > 0) {
+      const instante = (v: string) => Date.parse(v) || 0;
+      linhas.sort((a, b) => instante(a.updated_at) - instante(b.updated_at) || a.id.localeCompare(b.id));
+    }
+  }
 
   const registros: ClienteAlterado[] = [];
   for (const c of linhas) {
-    // A última mão foi a do Control? Então ele já tem isto.
+    const doApp = alteradoNoApp(pendentesDoApp?.get(c.id));
+    // A última mão foi a do Control? Então ele já tem isto — a não ser que haja
+    // edição do app esperando por ele: a edição feita nos segundos de folga
+    // depois de uma gravação do Control (partner.eco.ts) não pode sumir do GET.
     const carimboDoControl = typeof c['erp_updated_at'] === 'string' ? c['erp_updated_at'] : null;
-    if (com049 && ultimaMaoFoiDoControl(c.updated_at, carimboDoControl)) continue;
+    if (com049 && !doApp && ultimaMaoFoiDoControl(c.updated_at, carimboDoControl)) continue;
 
     const texto = (coluna: string): string | null => {
       const v = c[coluna];
@@ -1143,6 +1811,7 @@ export async function listarClientesAlterados(
       whatsapp: texto('whatsapp'),
       email: texto('email'),
       atualizado_em: c.updated_at,
+      alterado_no_app: doApp,
     };
     if (cadastroReal) {
       registro.inscricao_estadual = texto('inscricao_estadual');
@@ -1184,7 +1853,8 @@ export async function listarRepresentantesAlterados(
   ]
     .filter(Boolean)
     .join(', ');
-  const linhas = await buscarTudoOuFalhar<LinhaLogin>((de, ate) => {
+  // Pela chave, como os clientes (ver `buscarPelaChaveOuFalhar`).
+  const linhas = await buscarPelaChaveOuFalhar<LinhaLogin>((ultima, limite) => {
     let query = supabase
       .from('users')
       .select(colunas)
@@ -1192,8 +1862,9 @@ export async function listarRepresentantesAlterados(
       .eq('role', 'rep')
       .not('erp_rep_id', 'is', null);
     if (desde && temUpdatedAt) query = query.gte('updated_at', desde);
+    if (ultima) query = temUpdatedAt ? query.or(depoisDaChave(ultima)) : query.gt('id', ultima.id);
     if (temUpdatedAt) query = query.order('updated_at', { ascending: true });
-    return query.order('id', { ascending: true }).range(de, ate);
+    return query.order('id', { ascending: true }).limit(limite);
   });
 
   const registros: RepresentanteAlterado[] = [];

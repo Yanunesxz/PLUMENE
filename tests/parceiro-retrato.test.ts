@@ -193,6 +193,192 @@ describe('receberRetrato', () => {
     expect(outro.fake.gravacoes).toEqual([]);
   });
 
+  it('CPF/CNPJ corrigido no app e ainda pendente: o retrato com o documento antigo casa pelo CÓDIGO, não pela outra loja (051)', async () => {
+    // Revisão de 17/09/2026: o financeiro tirou do cliente 00123 o CNPJ que era
+    // da outra loja. Até o Control trocar lá, o retrato chega com o antigo — e,
+    // casando pelo documento, a pendência e os títulos iam para a outra loja.
+    const ANTIGO = '00000000000191';
+    const NOVO = '00000000000272';
+    const trocaPendente = {
+      id: 'alt-1',
+      customer_id: 'cli-1',
+      alterado_por: 'u-fin',
+      alterado_por_nome: 'FINANCEIRO TESTE',
+      alterado_em: '2026-09-17T10:00:00.000Z',
+      campos: { cnpj: { antes: ANTIGO, depois: NOVO } },
+      erp_pendente: true,
+      erp_atualizado_em: null,
+      erp_atualizado_por: null,
+      erp_atualizado_por_nome: null,
+      erp_atualizado_via: null,
+    };
+    const registro = {
+      codigo: '123',
+      cnpj: '00.000.000/0001-91',
+      pendencia_financeira: 5000,
+      titulos_vencidos: 3,
+      referencia: '2026-09-17T06:00:00-03:00',
+    };
+    for (const outraLojaTemCodigo of [true, false]) {
+      vi.resetModules();
+      const clientes = [
+        { ...LOJA, id: 'cli-1', erp_id: '00123', cnpj: NOVO },
+        { ...LOJA, id: 'cli-2', erp_id: outraLojaTemCodigo ? '05555' : null, cnpj: ANTIGO },
+      ];
+      const { service, fake } = await carregar({
+        customers: [{ data: clientes, error: null }, OK],
+        customer_changes: { data: [trocaPendente], error: null },
+      });
+
+      const r = await service.receberRetrato(EMPRESA, [registro]);
+
+      expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+      const ids = fake.filtrosDe('customers', 'eq').map((f) => f.args);
+      expect(ids).toContainEqual(['id', 'cli-1']);
+      expect(ids).not.toContainEqual(['id', 'cli-2']);
+      expect(valoresDe(fake.ultimaGravacao('customers', 'update'))).toMatchObject({
+        pendencia_financeira: 5000,
+        titulos_vencidos: 3,
+      });
+      // Só as pendências do candidato, numa leitura.
+      expect(fake.filtrosDe('customer_changes', 'in').map((f) => f.args)).toEqual([['customer_id', ['cli-1']]]);
+    }
+
+    // Sem troca pendente no app, o CNPJ decide como sempre.
+    vi.resetModules();
+    const semTroca = await carregar({
+      customers: [
+        {
+          data: [
+            { ...LOJA, id: 'cli-1', erp_id: '00123', cnpj: NOVO },
+            { ...LOJA, id: 'cli-2', erp_id: null, cnpj: ANTIGO },
+          ],
+          error: null,
+        },
+        OK,
+      ],
+      customer_changes: { data: [], error: null },
+    });
+    await semTroca.service.receberRetrato(EMPRESA, [registro]);
+    expect(semTroca.fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['id', 'cli-2']);
+  });
+
+  it('CPF/CNPJ corrigido no app quando o cliente ainda não tinha código: o retrato com o documento antigo acha o cliente (051)', async () => {
+    // Revisão de 17/09/2026. A loja nasceu no app, o Control a criou lá e só
+    // depois devolveu o código; no meio, o documento foi corrigido aqui. Sem
+    // código, a edição nasce FORA da fila — e o retrato com o documento antigo
+    // caía em "cliente não encontrado nesta empresa": a pendência financeira
+    // dessa loja não chegava a ninguém.
+    const ANTIGO = '00000000000191';
+    const NOVO = '00000000000272';
+    const { service, fake } = await carregar({
+      customers: [{ data: [{ ...LOJA, id: 'cli-1', erp_id: null, cnpj: NOVO }], error: null }, OK],
+      customer_changes: {
+        data: [
+          {
+            id: 'alt-1',
+            customer_id: 'cli-1',
+            alterado_por: 'u-fin',
+            alterado_por_nome: 'FINANCEIRO TESTE',
+            alterado_em: '2026-09-17T10:00:00.000Z',
+            campos: { cnpj: { antes: ANTIGO, depois: NOVO } },
+            erp_pendente: false,
+            erp_atualizado_em: null,
+            erp_atualizado_por: null,
+            erp_atualizado_por_nome: null,
+            erp_atualizado_via: null,
+          },
+        ],
+        error: null,
+      },
+    });
+
+    const r = await service.receberRetrato(EMPRESA, [
+      {
+        codigo: '999',
+        cnpj: '00.000.000/0001-91',
+        pendencia_financeira: 5000,
+        titulos_vencidos: 3,
+        referencia: '2026-09-17T06:00:00-03:00',
+      },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['id', 'cli-1']);
+    expect(valoresDe(fake.ultimaGravacao('customers', 'update'))).toMatchObject({
+      pendencia_financeira: 5000,
+      titulos_vencidos: 3,
+    });
+  });
+
+  it('documento antigo de um cliente sem código que HOJE é de outra loja: a pendência não vai para a outra loja (revisão de 17/09/2026)', async () => {
+    // A loja X foi corrigida de A para B antes de o código voltar; a loja Y se
+    // cadastrou depois com A. O retrato do 500 com A casava pelo documento: a
+    // pendência financeira de X ia para Y.
+    const ANTIGO = '00000000000191';
+    const NOVO = '00000000000272';
+    const troca = {
+      id: 'alt-1',
+      customer_id: 'cli-x',
+      alterado_por: 'u-fin',
+      alterado_por_nome: 'FINANCEIRO TESTE',
+      alterado_em: '2026-09-17T10:00:00.000Z',
+      campos: { cnpj: { antes: ANTIGO, depois: NOVO } },
+      erp_pendente: false,
+      erp_atualizado_em: null,
+      erp_atualizado_por: null,
+      erp_atualizado_por_nome: null,
+      erp_atualizado_via: null,
+    };
+    const registro = { codigo: '500', cnpj: ANTIGO, pendencia_financeira: 5000, titulos_vencidos: 3, referencia: '2026-09-17T06:00:00-03:00' };
+
+    // Y sem código: o retrato não traz a razão social — não dá para decidir, e nada é gravado.
+    const semCodigo = await carregar({
+      customers: [
+        {
+          data: [
+            { ...LOJA, id: 'cli-x', erp_id: null, cnpj: NOVO },
+            { ...LOJA, id: 'cli-y', erp_id: null, cnpj: ANTIGO },
+          ],
+          error: null,
+        },
+        OK,
+      ],
+      customer_changes: { data: [troca], error: null },
+    });
+    const r = await semCodigo.service.receberRetrato(EMPRESA, [registro]);
+    expect(r).toMatchObject({ atualizados: 0 });
+    expect(r.ignorados).toEqual([
+      {
+        cliente: ANTIGO,
+        motivo: 'CNPJ corrigido no app num cliente sem código e hoje de outro cadastro sem código — confira qual dos dois é este cliente',
+      },
+    ]);
+    expect(semCodigo.fake.gravacoes).toEqual([]);
+
+    // Y com OUTRO código: o 500 não é dela — é de X.
+    vi.resetModules();
+    const comCodigo = await carregar({
+      customers: [
+        {
+          data: [
+            { ...LOJA, id: 'cli-x', erp_id: null, cnpj: NOVO },
+            { ...LOJA, id: 'cli-y', erp_id: '00700', cnpj: ANTIGO },
+          ],
+          error: null,
+        },
+        OK,
+      ],
+      customer_changes: { data: [troca], error: null },
+    });
+    const r2 = await comCodigo.service.receberRetrato(EMPRESA, [registro]);
+    expect(r2).toMatchObject({ atualizados: 1, ignorados: [] });
+    const ids = comCodigo.fake.filtrosDe('customers', 'eq').map((f) => f.args);
+    expect(ids).toContainEqual(['id', 'cli-x']);
+    expect(ids).not.toContainEqual(['id', 'cli-y']);
+    expect(valoresDe(comCodigo.fake.ultimaGravacao('customers', 'update'))).toMatchObject({ pendencia_financeira: 5000 });
+  });
+
   it.each<[string, Record<string, unknown>, string]>([
     ['sem referência', { cnpj: '00000000000191', total_comprado: 1 }, '"referencia" é obrigatória (momento com fuso, ex.: 2026-09-16T06:00:00-03:00)'],
     ['referência sem fuso', { cnpj: '00000000000191', referencia: '2026-09-16T06:00:00' }, '"referencia" precisa de fuso (Z ou -03:00)'],

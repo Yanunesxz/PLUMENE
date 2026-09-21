@@ -39,11 +39,17 @@ import { Link } from 'react-router-dom';
 import { valorDaVenda } from '@csb/shared';
 import type { TarefaDoRep } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
-import { formatBRL } from '../../lib/utils.js';
+import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
 import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
 import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
+import { CadastrosAlteradosParaOControl } from '../../components/comercial/CadastrosAlteradosParaOControl.js';
 import { useMinhaMeta } from '../../hooks/useMinhaMeta.js';
+import {
+  podeConfirmarAlteracaoNoControl,
+  type AlteracoesPendentesResponse,
+  type ClienteComAlteracaoPendente,
+} from '@csb/shared';
 
 // Suporte por WhatsApp — o número vem da configuração da marca (na Corpo
 // Sensual é o gerente comercial, que controla senhas e acessos).
@@ -150,6 +156,28 @@ export function PaginaMinhaArea() {
     }
   };
 
+  // ─── Cadastros alterados para atualizar no Control (051) ──────────────────
+  // "Quando mudar lá tem que mudar no ERP do Fábio também" (Yan, 17/09/2026).
+  // Só para quem mexe no Control. Só online: é uma fila que muda a cada edição,
+  // e mostrar a de ontem faria alguém digitar no Control o que já foi feito.
+  // Falhando a leitura, o cartão só não aparece — a ficha de cada cliente
+  // continua mostrando o que falta.
+  const veCadastrosAlterados = podeConfirmarAlteracaoNoControl(user?.role);
+  const [cadastrosAlterados, setCadastrosAlterados] = useState<ClienteComAlteracaoPendente[]>([]);
+  useEffect(() => {
+    if (!token || !veCadastrosAlterados || !isOnline) return;
+    let valendo = true;
+    api
+      .get<AlteracoesPendentesResponse>('/customers/alteracoes-pendentes', token)
+      .then((r) => {
+        if (valendo) setCadastrosAlterados(r.migracao_pendente ? [] : r.data);
+      })
+      .catch(() => {});
+    return () => {
+      valendo = false;
+    };
+  }, [token, veCadastrosAlterados, isOnline]);
+
   useEffect(() => {
     if (!token) return;
     api.get<ApiResponse<Order[]>>('/orders', token).then((r) => db.orders.bulkPut(r.data)).catch(() => {});
@@ -210,6 +238,8 @@ export function PaginaMinhaArea() {
     () => (customers ?? []).filter((c) => !c.erp_id && c.rep_id).length,
     [customers],
   );
+  const mostraParaIncluir = (user?.role === 'financeiro' || user?.role === 'admin') && clientesSemCodigo > 0;
+  const mostraAlterados = veCadastrosAlterados && cadastrosAlterados.length > 0;
   const firstName = user?.name?.trim().split(' ')[0] ?? '';
   const mesAtual = new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
@@ -391,18 +421,32 @@ export function PaginaMinhaArea() {
       {/* A fila da Larissa: cliente cadastrado pelo app ainda sem o número do
           Control. Ela inclui lá e volta pra atrelar — o toque abre a lista já
           filtrada. Só pra quem inclui (financeiro; admin como válvula). */}
-      {(user?.role === 'financeiro' || user?.role === 'admin') && clientesSemCodigo > 0 && (
-        <Link
-          to="/customers?erp=sem"
-          className="block rounded-xl border border-primary/30 bg-primary-soft p-4 transition-colors hover:border-primary/60"
+      {/* Ao lado, a outra fila de quem mexe no Control: cliente que JÁ está lá
+          e teve o cadastro alterado no app (051). Some com a fila vazia. */}
+      {(mostraParaIncluir || mostraAlterados) && (
+        <div
+          className={cn(
+            'grid items-start gap-3',
+            mostraParaIncluir && mostraAlterados && 'lg:grid-cols-2',
+          )}
         >
-          <p className="text-sm font-semibold text-primary-soft-foreground">
-            {clientesSemCodigo} cliente{clientesSemCodigo > 1 ? 's' : ''} para incluir no Control
-          </p>
-          <p className="mt-0.5 text-xs text-primary-soft-foreground/80">
-            Cadastrados pelo app, ainda sem código do ERP. Toque para ver e atrelar os números.
-          </p>
-        </Link>
+          {mostraParaIncluir && (
+            <Link
+              to="/customers?erp=sem"
+              className="block rounded-xl border border-primary/30 bg-primary-soft p-4 transition-colors hover:border-primary/60"
+            >
+              <p className="text-sm font-semibold text-primary-soft-foreground">
+                {clientesSemCodigo} cliente{clientesSemCodigo > 1 ? 's' : ''} para incluir no Control
+              </p>
+              <p className="mt-0.5 text-xs text-primary-soft-foreground/80">
+                Cadastrados pelo app, ainda sem código do ERP. Toque para ver e atrelar os números.
+              </p>
+            </Link>
+          )}
+          {mostraAlterados && (
+            <CadastrosAlteradosParaOControl clientes={cadastrosAlterados} />
+          )}
+        </div>
       )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.

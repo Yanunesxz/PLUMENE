@@ -1108,7 +1108,12 @@ Content-Type: application/json
 
 Exige o canal de retrato ligado para a API. Uma vez por dia é o suficiente. O
 cliente é achado **primeiro pelo CNPJ** (com ou sem pontuação), depois pelo
-`codigo`; informe pelo menos um dos dois.
+`codigo`; informe pelo menos um dos dois. A exceção é o CPF/CNPJ corrigido no
+app e ainda não trocado no seu ERP: o retrato com o documento antigo casa pelo
+`codigo` (mande os dois), mesmo que outro cadastro do app tenha esse documento
+(com o cliente ainda sem código no app e o documento hoje noutro cadastro sem
+código, o retrato não tem como decidir e volta em `ignorados` — ver "Cliente
+editado no app").
 
 | Campo | Precisa? | Observação |
 |---|---|---|
@@ -1123,8 +1128,9 @@ Um valor ilegível ou negativo recusa **o registro inteiro** (motivo fixo).
 Retrato igual ao guardado conta em `sem_mudanca`. Resposta:
 `{ ok, recebidos, atualizados, sem_mudanca, ignorados: [{ cliente, motivo }], avisos, servidor_hora }`.
 Motivos: `registro inválido`, `informe "cnpj" ou "codigo"`, `CNPJ com mais de
-um cadastro no app`, `código com mais de um cadastro no app`, `cliente não
-encontrado nesta empresa`, `cliente repetido no lote`, `referência mais antiga
+um cadastro no app`, `código com mais de um cadastro no app`, `CNPJ corrigido
+no app num cliente sem código e hoje de outro cadastro sem código — confira
+qual dos dois é este cliente`, `cliente não encontrado nesta empresa`, `cliente repetido no lote`, `referência mais antiga
 que o retrato guardado`, `falha ao gravar: …`, e os de valor: `"referencia" é
 obrigatória (momento com fuso, …)`, `"referencia" não é uma data ISO`,
 `"referencia" precisa de fuso (Z ou -03:00)`, `"ultima_compra" precisa ser
@@ -1373,6 +1379,13 @@ ligado para a API (`409 CANAL_FECHADO`).
   como `sem_mudanca`.
 - **`avisos` é uma lista de textos** (nos cadastros), um por assunto, com os
   códigos envolvidos.
+- **A edição do cadastro feita no app não é apagada** (a partir de
+  17/09/2026). Razão social, nome fantasia, CNPJ/CPF, inscrição estadual,
+  WhatsApp, e-mail, observações e endereço também podem ser editados no app;
+  enquanto a edição não chega ao seu ERP, o cliente sai no
+  `GET /clientes?desde=` com `alterado_no_app`, e o `POST /clientes` **não
+  sobrescreve** esses campos com outro valor — ver "Cliente editado no app"
+  abaixo.
 
 ## POST /partner/v1/clientes
 
@@ -1454,13 +1467,88 @@ com mais de um cadastro no app`, `CNPJ com mais de um cadastro no app`,
 `cadastro já atualizado por outro registro do lote`, `CNPJ já é do cliente de
 código X no app` (o CNPJ achou um cadastro que já tem **outro** código: nada é
 gravado — nem nome, nem representante, nem tabela; confira o cadastro
-duplicado no ERP) ou `falha ao gravar: …`.
+duplicado no ERP), `cadastro alterado no app durante o envio — reenvie` (alguém
+salvou a ficha desse cliente no app enquanto o lote era gravado: nada do
+registro foi gravado, para não apagar a edição; reenvie na próxima rodada, e a
+edição já vem conferida — ver "Cliente editado no app"; vale também para o
+cliente sem código que o registro adotaria pelo CNPJ), `CNPJ corrigido no app
+num cliente sem código e hoje de outro cadastro sem código — confira qual dos
+dois é este cliente` (ver "Cliente editado no app": nada é gravado em nenhum
+dos dois) ou `falha ao gravar: …`.
 `avisos` traz, em texto, o que passou mas merece conferência: tabelas de preço
 não encontradas (ou nenhuma tabela com código do ERP, ou código usado por mais
 de uma tabela), clientes casados pelo CNPJ, código de representante sem
 login no app ou gravado numa grafia diferente da do login, valores de
 `bloqueado`, `limite_credito` ou `pendencia_financeira` não entendidos,
-`data_update` sem fuso e campos que a instalação ainda não guarda.
+`data_update` sem fuso, campos que a instalação ainda não guarda e campos
+editados no app que o seu ERP ainda não tem (abaixo).
+
+### Cliente editado no app — a edição não é apagada
+
+O escritório e o representante podem corrigir no app o cadastro de um cliente
+que **já tem código** no seu ERP: `razao_social`, `nome_fantasia`, `cnpj_cpf`,
+`inscricao_estadual`, `whatsapp`, `email`, `observacoes` e `endereco`. Até o seu
+ERP ter o mesmo valor, a edição fica **pendente** no app (o financeiro vê a
+fila) e o cliente sai no `GET /clientes?desde=` com `alterado_no_app` dizendo
+quais campos.
+
+No `POST /clientes`, para cada campo com edição pendente que vier no registro:
+
+- **mesmo valor do app** → a edição chegou ao seu ERP: o app a dá por
+  atualizada sozinho (sai da fila do financeiro). A comparação ignora
+  pontuação no CNPJ/CPF e no CEP, maiúscula na UF, espaços em volta e o tipo de
+  quebra de linha (`\r\n` = `\n`); `""` (o CHAR nulo do Firebird) conta como
+  campo **vazio** no seu ERP. O valor do app é o **atual** — o da edição mais
+  recente do campo —, mesmo quando uma edição mais nova já foi dada por
+  atualizada e uma mais antiga ainda espera outro campo;
+- **valor diferente** → o campo **não é gravado** (o app mantém o que a pessoa
+  editou) e volta um aviso por cliente:
+  `Cliente 01234: whatsapp, endereco alterados no app ainda não aplicados no Control — mantido o valor do app.`
+  (até 20 clientes por resposta; o resto num aviso "E mais N cliente(s)…").
+  O que fazer: aplicar no seu ERP o valor que o `GET /clientes` traz para esse
+  cliente e reenviar;
+- **campo ausente** → nada a conferir; a edição continua pendente.
+
+O **endereço é um grupo**: as peças (e a linha pronta) chegam juntas. Um pedaço
+diferente do app — editado ou não — deixa o endereço inteiro de fora; a edição
+só é dada por atualizada quando cada pedaço editado no app vem no objeto com o
+mesmo valor (ou a linha pronta vem igual à do app). Os outros campos do mesmo
+registro (representante, tabela, bloqueio, pendência…) seguem as regras de
+sempre. Uma edição com vários campos só sai da fila quando **todos** chegaram.
+
+**Cliente sem código casado pelo CNPJ.** O cliente que nasceu no app pode ser
+corrigido no app depois de o seu ERP já o ter puxado (`novo_no_control`) e
+antes de o código voltar no `POST /clientes`. Na adoção pelo CNPJ, essas
+correções são conferidas como as pendentes: campo igual, nada a fazer; campo
+**diferente** não é gravado, volta o aviso de sempre e a correção passa a sair
+em `alterado_no_app` (e na fila do financeiro) até o seu ERP ter o mesmo valor.
+Campo **ausente** do registro da adoção também: a adoção é a única conferência
+dessas correções, então a que o registro não mostrou que o seu ERP tem passa a
+sair em `alterado_no_app` e fecha sozinha no primeiro envio com o mesmo valor.
+
+**CPF/CNPJ trocado no app.** Enquanto `cnpj_cpf` está em `alterado_no_app`, o
+registro que ainda vem com o documento **antigo** casa pelo `codigo` — mesmo que
+outro cadastro do app tenha esse documento (é comum: a troca corrige um CNPJ que
+era de outra loja) — e o documento do app é mantido, com o aviso de sempre. E a
+`chave` desse cliente no `GET /clientes` e no `GET /pedidos` **já é o documento
+novo**: para achar o cadastro no seu ERP, case pelo `codigo`, não pela `chave`.
+
+Vale também quando a troca aconteceu **antes de o código voltar** (o cliente
+ainda estava sem código no app): o registro que traz o código com o documento
+**antigo** adota esse cadastro — nunca cria um segundo — e a correção passa a
+sair em `alterado_no_app`, mesmo que outro cadastro do app tenha hoje esse
+documento com outro código. Se quem tem o documento hoje também está **sem
+código**, os dois podem ser o cliente que o seu ERP puxou: a `razao_social` do
+registro decide (igual à de um só dos dois); sem como decidir, o registro volta
+em `ignorados` (`CNPJ corrigido no app num cliente sem código e hoje de outro
+cadastro sem código — confira qual dos dois é este cliente`) e nada é gravado.
+O mesmo no `POST /retrato`: o retrato com o documento antigo acha o cliente em
+vez de "cliente não encontrado nesta empresa" — e, como o retrato não traz a
+razão social, com o documento hoje noutro cadastro sem código ele volta com esse
+motivo.
+
+Numa instalação sem a migração 051 nada disto existe: o `POST /clientes` grava
+como sempre gravou.
 
 ## POST /partner/v1/representantes
 
@@ -1516,16 +1604,36 @@ registro como veio — mais estes campos só de leitura:
 | `pendencia_financeira`, `titulos_vencidos` | O que o próprio Control mandou por último |
 | `atualizado_em` | Quando mudou no app |
 | `atualizado_pelo_control_em` | Quando o Control mandou pela última vez |
+| `alterado_no_app` | `{ "em": ISO, "campos": [...] }` ou `null`. O cadastro foi **editado no app** e o seu ERP ainda não tem a edição: `campos` usa os nomes deste contrato (`razao_social`, `nome_fantasia`, `cnpj_cpf`, `inscricao_estadual`, `whatsapp`, `email`, `observacoes`, `endereco`) e `em` é a edição mais recente. Aplique os valores deste registro nesses campos. `null` = nada pendente (ou a instalação ainda sem a migração 051). Sai sempre — campo novo, aditivo |
+
+**Edição do app pendente sai até chegar ao seu ERP.** O cliente com
+`alterado_no_app` sai em **toda** puxada — mesmo com um `desde` depois da
+edição, e mesmo que nada mais tenha mudado nele — enquanto o `POST /clientes`
+não trouxer o mesmo valor (ver "Cliente editado no app"). O `POST` não a apaga,
+e ela deixa de aparecer assim que o valor igual chega (ou o financeiro confirma
+que atualizou à mão).
 
 **O que o próprio Control gravou por último não volta** — nem pelo
 `POST /clientes`, nem pelo `POST /retrato`: o app guarda o momento de cada
 gravação sua e só devolve o cliente que mudou depois dela (com alguns segundos
 de folga, porque o banco carimba a alteração com a própria hora). Se o app
 mexeu num cliente e você ainda não puxou, uma gravação sua nesse meio tempo
-**não** esconde a mudança do app: ela continua saindo aqui. O eco é raro; se
-algum voltar, reenviar é `sem_mudanca`. Numa instalação sem a migração 049 a
-lista traz também o que o Control acabou de mandar, com aviso. Resposta:
+**não** esconde a mudança do app: ela continua saindo aqui — e o cliente com
+`alterado_no_app` sai mesmo que a sua gravação tenha sido segundos antes da
+edição. O eco é raro; se algum voltar, reenviar é `sem_mudanca`. Numa
+instalação sem a migração 049 a lista traz também o que o Control acabou de
+mandar, com aviso. Resposta:
 `{ total, servidor_hora, clientes: [...], avisos: [...] }`.
+
+**`servidor_hora` é a hora do app ANTES da consulta, menos 2 minutos de folga**
+(desde 17/09/2026; antes era tomada depois dela). Use-a como o `desde` da
+próxima puxada: uma mudança gravada enquanto a lista era lida — ainda que
+confirmada pelo banco com alguns instantes de atraso — sai na puxada seguinte.
+O preço é o que mudou nos últimos 2 minutos sair de novo na puxada seguinte, o
+que é inofensivo (reenviar é `sem_mudanca`). A lista é paginada pela ordem
+(`atualizado_em`, cliente), e não pela posição: um cliente gravado de novo
+durante a leitura pode sair duas vezes, mas não empurra outro para fora. Vale
+igual para o `GET /representantes`.
 
 **Exemplo** — um cliente que o representante cadastrou no app hoje:
 
@@ -1557,7 +1665,8 @@ GET /partner/v1/clientes?desde=2026-09-16T13:00:00-03:00
       "pendencia_financeira": null,
       "titulos_vencidos": null,
       "atualizado_em": "2026-09-16T15:40:12.000+00:00",
-      "atualizado_pelo_control_em": null
+      "atualizado_pelo_control_em": null,
+      "alterado_no_app": null
     }
   ],
   "avisos": []
@@ -1567,6 +1676,26 @@ GET /partner/v1/clientes?desde=2026-09-16T13:00:00-03:00
 O seu ERP cria o cadastro, gera o código (ex.: `01235`) e devolve
 `POST /clientes { "clientes": [ { "codigo": "01235", "razao_social": "LOJA NOVA TESTE LTDA", "cnpj_cpf": "00.000.000/0002-00", ... } ] }`
 — o cadastro do app é casado pelo CNPJ e aprende o código.
+
+**Exemplo** — um cliente que já está no seu ERP e teve o WhatsApp e o endereço
+corrigidos no app (só os campos que importam aqui):
+
+```json
+{
+  "codigo": "01234",
+  "chave": "00000000000100",
+  "novo_no_control": false,
+  "razao_social": "CLIENTE TESTE LTDA",
+  "whatsapp": "00900000009",
+  "endereco": { "logradouro": "Avenida Teste", "numero": "300", "complemento": null,
+                "bairro": "Centro", "cidade": "Cidade Teste", "uf": "MG", "cep": "00000000" },
+  "atualizado_em": "2026-09-17T14:10:00.000+00:00",
+  "alterado_no_app": { "em": "2026-09-17T14:10:00.000+00:00", "campos": ["whatsapp", "endereco"] }
+}
+```
+
+O seu ERP grava o WhatsApp e o endereço e, no próximo `POST /clientes` desse
+cliente com os mesmos valores, a edição sai da fila do app.
 
 ## GET /partner/v1/representantes?desde= — o que mudou no app
 
@@ -1611,7 +1740,11 @@ gravação que não é recusa do banco).
   nada volta no `GET`.
 - Na mesma rodada, puxe `GET /clientes?desde=` e `GET /representantes?desde=`
   com a hora da rodada anterior (`servidor_hora` da resposta) e crie no ERP os
-  `novo_no_control`.
+  `novo_no_control`. Nos clientes com `alterado_no_app`, aplique no ERP os
+  campos listados — o próximo envio com o mesmo valor fecha a pendência no app.
+- Aviso `alterados no app ainda não aplicados no Control — mantido o valor do
+  app` quer dizer que o seu ERP mandou o valor antigo de um campo que alguém
+  corrigiu no app: o campo não foi gravado; atualize o ERP com o valor do app.
 - Leia a resposta: `ignorados` e `avisos` mostram o que precisa de ajuste no
   cadastro do ERP.
 - Mande as tabelas de preço por `POST /tabelas-preco` antes dos clientes, senão
@@ -1631,6 +1764,8 @@ o outro lado recebe cópia, nunca inventa.
 | Dado | Dono (quem cria) | O outro lado |
 |---|---|---|
 | Código do cliente | **ERP** | O app recebe por `POST /clientes` e guarda como `codigo_erp`. Cliente que nasce no app sai em `GET /clientes?desde=` com `novo_no_control: true`; o ERP cria e devolve o código, casando pelo **CNPJ** (a chave entre os sistemas) |
+| Cadastro do cliente (razão social, nome fantasia, WhatsApp, e-mail, inscrição estadual, observações, endereço) | **ERP e app** — a edição do app pendente prevalece até o ERP devolver o mesmo valor (ou o financeiro confirmar que atualizou); sem edição pendente, vale o que o ERP mandar | Chega por `POST /clientes`. Desde 17/09/2026 também é **editado no app** (admin, financeiro, gerente e o representante na própria carteira); a edição sai em `GET /clientes?desde=` com `alterado_no_app` e o `POST /clientes` não a sobrescreve até trazer o mesmo valor — aí ela é dada por atualizada |
+| CPF/CNPJ do cliente | **ERP e app** (no app, só o escritório) | Chave entre os sistemas. No app, só admin e financeiro trocam; a troca segue a mesma regra da linha acima (`cnpj_cpf` em `alterado_no_app`). O cliente com o documento antigo no ERP continua casando pelo código — mesmo que outro cadastro do app tenha esse documento. Enquanto a troca está pendente, a `chave` no `GET /clientes` e no `GET /pedidos` já é o documento novo: case pelo `codigo` |
 | Código do representante | **ERP** | Chega em cada cliente (`representante`), mostra o cliente ao rep com o mesmo código no login e sai no pedido como `representante_erp`. `POST /representantes` só atualiza nome, razão social e ativo de quem já tem login **e** já tem esse código gravado no app |
 | Tabela de preço (código, descrição, coluna, ativo) | **ERP** | Chega por `POST /tabelas-preco`. O app guarda o vínculo no cliente e, em cada pedido, a tabela que o precificou; o pedido sai com a tabela dele |
 | Condição de pagamento (código, descrição, ativo, valor mínimo) | **ERP** | Chega por `POST /condicoes-pagamento`; rep e loja só escolhem |
@@ -1660,6 +1795,12 @@ O que o app guarda de cada cliente (alimentado pelo ERP via `POST /clientes`):
 | Pendência financeira | `pendencia_financeira`, `titulos_vencidos` | O que o financeiro vê antes de decidir o pedido; vem pelo `POST /clientes` ou pelo `POST /retrato` |
 | Limite de crédito | `limite_credito` | Informativo |
 | WhatsApp / e-mail | `whatsapp`, `email` | Contato e o botão "Enviar pedido para o cliente"; saem no pedido em `cliente.whatsapp` e `cliente.email` |
+
+Razão social, nome fantasia, CNPJ/CPF, inscrição estadual, observações,
+endereço, WhatsApp e e-mail também são editáveis no app (17/09/2026): a edição
+volta ao ERP pelo `GET /clientes?desde=` (`alterado_no_app`) e não é apagada
+pelo `POST /clientes` — ver "Cliente editado no app". Código, representante,
+tabela, bloqueio, limite e pendência continuam só do ERP.
 
 ## Representante
 
@@ -1752,7 +1893,8 @@ fila pendente.
 ```
 ERP  → POST /tabelas-preco, /condicoes-pagamento, /produtos, /precos, /estoque   (o catálogo)
 ERP  → POST /clientes, /representantes     (códigos, carteira, tabela, bloqueio, pendência)
-ERP  → GET  /clientes?desde=               (cliente novo no app → cria lá e devolve o código)
+ERP  → GET  /clientes?desde=               (cliente novo no app → cria lá e devolve o código;
+                                            cadastro corrigido no app → alterado_no_app)
 rep  → monta o pedido no app               (itens, cores, desconto, condição)
 fin. → aceita e clica "Lançar no Control"  (pedido entra na fila da API; a tela espera)
 ERP  → GET /pedidos                        (lê tudo acima; cliente.chave = CNPJ)
@@ -1806,6 +1948,20 @@ casamento primeiro pelo CNPJ, `motivo_bloqueio`, `pendencia_financeira`,
 `titulos_vencidos`, `data_update` e o `email` do representante guardado como
 e-mail do Control; `aprovados_solicitados_ao_control` na conciliação; os cinco
 canais no `/status`; e a série do número passa a ser a da marca (`CS`/`PL`).
+
+**As mudanças de 17/09/2026 são aditivas** (nada renomeado nem removido): o
+campo `alterado_no_app` em cada cliente do `GET /clientes?desde=`; no
+`POST /clientes`, o campo com edição do app pendente e valor diferente deixa
+de ser gravado (com aviso) e o valor igual fecha a pendência; o registro cujo
+cliente foi salvo no app durante o envio volta em `ignorados` (`cadastro
+alterado no app durante o envio — reenvie`); com `cnpj_cpf` pendente, o
+documento antigo casa pelo `codigo` (e o registro que não dá para casar sem
+adivinhar volta em `ignorados`, `CNPJ corrigido no app num cliente sem código e
+hoje de outro cadastro sem código — confira qual dos dois é este cliente`); e o `servidor_hora` dos `GET /clientes` e
+`/representantes` passa a ser tomado antes da consulta, menos 2 minutos de
+folga, com a lista paginada pela ordem e não pela posição (o `desde` da próxima
+puxada não pula uma mudança gravada durante a leitura; o que mudou nesses 2
+minutos sai de novo, o que é inofensivo).
 
 ## Dúvidas / suporte
 

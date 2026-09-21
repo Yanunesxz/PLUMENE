@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { apenasDigitos, documento, cepValido, ufValida } from '@csb/shared';
+import { apenasDigitos, documento, cepValido, ufValida, CAMPOS_EDITAVEIS_DO_CLIENTE } from '@csb/shared';
+import type { CampoEditavelDoCliente } from '@csb/shared';
 
 /** Vazio ou null passam; se veio algo, `check` decide. Campos opcionais com formato. */
 const opcionalCom = (check: (v: string) => boolean, msg: string, max = 200) =>
@@ -71,3 +72,59 @@ export const excluirClienteSchema = z.object({
 
 /** O `:id` das rotas de exclusão. Id que não é UUID não é cliente de ninguém. */
 export const idDeClienteSchema = z.string().uuid();
+
+/**
+ * PATCH /customers/:id/cadastro — edição PARCIAL do cadastro (051).
+ *
+ * O schema só confere a FORMA: chaves conhecidas, texto ou null, e um valor
+ * visto para cada campo novo. A régua de cada campo (a mesma do cadastro novo)
+ * roda no service, com `validarEdicaoDoCadastro` de @csb/shared — ela precisa
+ * do cliente atual para saber se o endereço resultante fica completo.
+ *
+ * Chave fora da lista (erp_id, address, blocked, rep_id…) é recusada: o que
+ * não se edita por aqui não pode passar calado.
+ */
+const valorDoCampo = z.string().max(5000, 'Texto grande demais').nullable().optional();
+
+/**
+ * O valor VISTO não tem teto (revisão de 17/09/2026). Ele é o que está no banco,
+ * e o banco aceita mais que a régua: o POST /partner/v1/clientes grava a
+ * observação do tamanho que o Control mandar (coluna TEXT). Com o mesmo teto
+ * de 5.000 do valor novo, uma observação longa vinda do Control não podia ser
+ * encurtada nem apagada pelo app — o 400 saía antes de qualquer conta. O corpo
+ * inteiro continua limitado pelo bodyLimit do Fastify.
+ */
+const valorVisto = z.string().nullable().optional();
+
+const valoresDoCadastro = (valor: typeof valorVisto) =>
+  z
+    .object(
+      Object.fromEntries(CAMPOS_EDITAVEIS_DO_CLIENTE.map((c) => [c, valor])) as Record<
+        CampoEditavelDoCliente,
+        typeof valor
+      >,
+    )
+    .strict('Este campo não se edita por aqui (código do ERP, bloqueio, carteira e tabela têm caminho próprio)');
+
+export const editarCadastroDoClienteSchema = z
+  .object({ novo: valoresDoCadastro(valorDoCampo), vistos: valoresDoCadastro(valorVisto) })
+  .superRefine((corpo, ctx) => {
+    for (const campo of CAMPOS_EDITAVEIS_DO_CLIENTE) {
+      if (corpo.novo[campo] === undefined) continue;
+      if (corpo.vistos[campo] === undefined) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['vistos', campo],
+          message: 'Faltou o valor que estava na tela — recarregue a ficha e tente de novo',
+        });
+      }
+    }
+  });
+
+/** POST /customers/:id/alteracoes/confirmar — os ids que a pessoa VIU no cartão. */
+export const confirmarAlteracoesDoClienteSchema = z.object({
+  ids: z
+    .array(z.string().uuid('Alteração inválida'))
+    .min(1, 'Nenhuma alteração para confirmar')
+    .max(50, 'No máximo 50 alterações de uma vez'),
+});

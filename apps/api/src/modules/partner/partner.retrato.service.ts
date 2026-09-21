@@ -11,7 +11,9 @@
  * Regras (as mesmas mãos dos outros POSTs, com duas particularidades):
  *
  *   • o cliente é achado PRIMEIRO pelo CNPJ (só dígitos) e DEPOIS pelo código
- *     do ERP (miolo) — a chave entre os sistemas é o CNPJ;
+ *     do ERP (miolo) — a chave entre os sistemas é o CNPJ. A exceção (051,
+ *     17/09/2026) é o documento ANTIGO de um cliente cujo CPF/CNPJ foi
+ *     corrigido no app e ainda não chegou ao Control: esse casa pelo código;
  *   • `referencia` é obrigatória e COM fuso: é de quando é o retrato. Fica em
  *     customers.retrato_referencia_em, para a tela dizer "retrato de 16/09" e
  *     um retrato velho nunca enganar. Retrato mais antigo que o guardado é
@@ -35,6 +37,12 @@ import { supabase } from '../../config/supabase.js';
 import { detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { buscarTudoOuFalhar } from '../../lib/paginacao.js';
 import { podeCarimbar } from './partner.eco.js';
+import {
+  MOTIVO_DOCUMENTO_ANTIGO_AMBIGUO,
+  clientePeloDocumentoAntigo,
+  clientesSemCodigoComDocumentoCorrigido,
+  documentosAntigosPendentes,
+} from './partner.sync.service.js';
 
 export interface RetratoParceiro {
   /** Código do cliente no ERP. Um dos dois (com `cnpj`) é obrigatório. */
@@ -222,6 +230,35 @@ export async function receberRetrato(company_id: string, lista: readonly unknown
     else porMiolo.set(m, c);
   }
 
+  // ── 1b. CPF/CNPJ trocado no app e ainda pendente (051, revisão de 17/09/2026).
+  // O mesmo desvio do POST /clientes: o financeiro corrigiu no app o documento
+  // de um cliente que o Control ainda manda com o antigo — muitas vezes o de
+  // OUTRA loja. Casando pelo documento, a pendência financeira e os títulos
+  // vencidos do cliente iam parar nessa outra loja (e a carteira e o aviso do
+  // financeiro mostravam a dívida no lugar errado) até o Control trocar o
+  // documento. O cliente cujo CÓDIGO veio e cuja troca pendente tem esse
+  // documento como `antes` é o certo: para ele, vale o código. Lê só as
+  // pendências desses candidatos, em lote, antes de qualquer gravação.
+  const documentosTrocadosNoApp = await documentosAntigosPendentes(
+    company_id,
+    lista,
+    porMiolo,
+    mioloComDoisCadastros,
+    'cnpj',
+  );
+  // E o cliente que ainda NÃO tinha código quando o documento foi corrigido
+  // aqui: o registro do Control chega com o documento antigo e não acha
+  // cadastro nenhum — caía em "cliente não encontrado nesta empresa" e a
+  // pendência financeira dele não chegava a ninguém (17/09/2026).
+  const semCodigoComDocumentoCorrigido = await clientesSemCodigoComDocumentoCorrigido(
+    company_id,
+    lista,
+    existentes,
+    porMiolo,
+    mioloComDoisCadastros,
+    'cnpj',
+  );
+
   // ── 2. Registro a registro.
   const alvosNoLote = new Set<string>();
   let atualizados = 0;
@@ -247,9 +284,28 @@ export async function receberRetrato(company_id: string, lista: readonly unknown
     }
     const referencia = String(raw['referencia']).trim();
 
-    // O cliente: primeiro pelo CNPJ, depois pelo código.
+    // O cliente: primeiro pelo CNPJ, depois pelo código — menos o documento
+    // antigo de um cliente que o app corrigiu (ver 1b), que casa pelo código.
     let cliente: LinhaCliente | undefined;
-    if (documento) {
+    const trocadoNoApp = documento ? documentosTrocadosNoApp.get(codigoMiolo(codigo) ?? '') : undefined;
+    // E o documento antigo de um cliente corrigido quando ainda não tinha código:
+    // antes do casamento pelo documento, mesmo que outro cadastro o tenha hoje
+    // (17/09/2026) — a pendência financeira de um ia parar no outro. O retrato
+    // não traz a razão social: com o documento de hoje noutro cadastro sem
+    // código, não há como decidir e o registro volta em `ignorados`.
+    const mioloDoRegistro = codigoMiolo(codigo);
+    const peloDocumentoAntigo =
+      documento && !(mioloDoRegistro && (porMiolo.has(mioloDoRegistro) || mioloComDoisCadastros.has(mioloDoRegistro)))
+        ? clientePeloDocumentoAntigo(semCodigoComDocumentoCorrigido.get(documento), porCnpj.get(documento) ?? [], null, () => null)
+        : null;
+    if (documento && trocadoNoApp?.antigos.has(documento)) {
+      cliente = trocadoNoApp.cliente;
+    } else if (peloDocumentoAntigo === 'ambiguo') {
+      ignorados.push({ cliente: referenciaDoCliente, motivo: MOTIVO_DOCUMENTO_ANTIGO_AMBIGUO });
+      continue;
+    } else if (peloDocumentoAntigo) {
+      cliente = peloDocumentoAntigo.cliente;
+    } else if (documento) {
       const candidatos = porCnpj.get(documento) ?? [];
       if (candidatos.length === 1) cliente = candidatos[0];
       else if (candidatos.length > 1) {
@@ -269,6 +325,8 @@ export async function receberRetrato(company_id: string, lista: readonly unknown
       }
       cliente = miolo ? porMiolo.get(miolo) : undefined;
     }
+    // (O documento antigo de um cliente que ainda não tinha código quando foi
+    // corrigido no app já foi achado acima: é ele, não um cliente que não existe.)
     if (!cliente) {
       ignorados.push({ cliente: referenciaDoCliente, motivo: 'cliente não encontrado nesta empresa' });
       continue;
