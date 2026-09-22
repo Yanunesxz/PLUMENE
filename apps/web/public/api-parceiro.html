@@ -3172,7 +3172,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><td><code>quantidade</code></td><td class="t-mut">inteiro</td><td>Quantidade de peças.</td></tr>
             <tr><td><code>preco_unitario</code></td><td class="t-mut">número</td><td>Preço unitário de tabela, <b>sem</b> o desconto.</td></tr>
             <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do item (quantidade × preço de tabela).</td></tr>
-            <tr><td><code>observacao</code></td><td class="t-mut">texto</td><td><b>A(s) cor(es) que o cliente escolheu</b> para a referência, pelo <b>número da bolinha do catálogo impresso</b> (ex.: <code>"Cor 2"</code>, <code>"3M Cor 2 / 2G Cor 1"</code>, <code>"Variadas"</code>, <code>"Cor única"</code>). <code>null</code> = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha.</td></tr>
+            <tr><td><code>observacao</code></td><td class="t-mut">texto</td><td><b>A(s) cor(es) que o cliente escolheu</b> para a referência, pelo <b>número da bolinha do catálogo impresso</b> (ex.: <code>"Cor 2"</code>, <code>"3M Cor 2 / 2G Cor 1"</code>, cor sortida e cor única vão pelo nome: <code>"Variadas"</code>, <code>"Cor única"</code>). <code>null</code> = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha.</td></tr>
           </tbody>
         </table>
       </div>
@@ -3294,8 +3294,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         bolinha numerada <code>01</code> sai <code>"Cor 1"</code>, a
         <code>02</code> sai <code>"Cor 2"</code>, a <code>10</code> sai
         <code>"Cor 10"</code> (sem o zero à esquerda), a bolinha
-        <b>VARIADAS</b> sai <code>"Variadas"</code> e a bolinha <b>ÚNICA</b> sem
-        número (peça de uma cor só) sai <code>"Cor única"</code>. Com cores diferentes por
+        <b>sortida</b> e a da peça de uma cor só saem pelo <b>nome do catálogo</b> (<code>"Variadas"</code>, <code>"Cores variadas"</code>, <code>"Cor única"</code>): ali não há cor para escolher. Com cores diferentes por
         tamanho, o formato é tamanho + cor, separados por <code> / </code>:
         <code>"3M Cor 2 / 2G Cor 1"</code> (3 peças M na cor 2, 2 peças G na cor 1).
         É o número que o estoque confere no catálogo — no app o representante e a
@@ -3969,7 +3968,7 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         novo, renomeado ou removido): o texto de <code>itens[].observacao</code>
         passa a trazer a cor pelo número da bolinha do catálogo impresso —
         <code>"Cor 1"</code>, <code>"3M Cor 2 / 2G Cor 1"</code>,
-        <code>"Variadas"</code>, <code>"Cor única"</code> — no lugar do nome
+        — no lugar do nome (cor sortida e cor única seguem pelo nome)
         (<code>"azul"</code>), igual à coluna OBSERVAÇÃO da planilha. Cor sem
         número no cadastro da peça continua saindo pelo nome. O campo
         <code>cor</code> continua <code>"00001"</code>. E <code>observacoes</code>

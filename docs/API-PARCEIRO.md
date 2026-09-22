@@ -538,7 +538,7 @@ Só o cliente **sem CNPJ** trava, porque sem documento não há como casar.
 | `quantidade` | inteiro | Quantidade de peças |
 | `preco_unitario` | número | Preço unitário de tabela, **sem** o desconto |
 | `valor_total` | número | Total do item (quantidade × preço de tabela) |
-| `observacao` | texto ou null | **A(s) cor(es) que o cliente escolheu** para a referência, pelo **número da bolinha do catálogo impresso** (ex.: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`, `"Cor única"`). `null` = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha |
+| `observacao` | texto ou null | **A(s) cor(es) que o cliente escolheu** para a referência, pelo **número da bolinha do catálogo impresso** (ex.: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`; cor sortida e cor única vão pelo nome: `"Variadas"`, `"Cor única"`). `null` = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha |
 
 **Sobre a cor:** a operação é por *cores sortidas* — o item vai agregado por
 (produto × tamanho) e a coluna COR recebe **sempre** `"00001"`. Quando o cliente
@@ -550,8 +550,7 @@ campo novo, sem mudar o que já existe.
 
 **O texto da cor é o do catálogo impresso** (desde 22/09/2026): a bolinha
 numerada `01` sai `"Cor 1"`, a `02` sai `"Cor 2"`, a `10` sai `"Cor 10"` (sem o
-zero à esquerda), a bolinha **VARIADAS** sai `"Variadas"` e a bolinha **ÚNICA**
-sem número (peça de uma cor só) sai `"Cor única"`. Quando a referência
+zero à esquerda), a bolinha **sortida** e a da peça de uma cor só saem pelo **nome do catálogo** (`"Variadas"`, `"Cores variadas"`, `"Cor única"`): ali não há cor para escolher, e o número não diria nada ao estoque. Quando a referência
 tem cores diferentes por tamanho, o formato é tamanho + cor, separados por
 ` / `: `"3M Cor 2 / 2G Cor 1"` (3 peças M na cor 2, 2 peças G na cor 1). É o
 número que o estoque confere no catálogo — no app o representante e a loja
@@ -1908,7 +1907,7 @@ pedido. Pedido sem condição sai com `condicao_pagamento: null`, sem pendência
 | Referência | `produto` | A referência que o ERP conhece |
 | Tamanho | `tamanho` | P, M, G, GG, EG... — nas PLUS a numeração (48...) |
 | Cor | `cor` | Sempre `"00001"` (sortido) — a grade do ERP é por tamanho |
-| Cor escolhida | `observacao` | O texto da separação, com o número da bolinha do catálogo: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`, `"Cor única"`, ou `null` se sortido. Sem número no cadastro da peça, o nome da cor |
+| Cor escolhida | `observacao` | O texto da separação, com o número da bolinha do catálogo: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`; cor sortida e cor única pelo nome (`"Variadas"`, `"Cor única"`); `null` se sortido. Sem número no cadastro da peça, o nome da cor |
 | Quantidade | `quantidade` | Peças |
 | Preço | `preco_unitario` | De tabela, sem desconto |
 | Total do item | `valor_total` | quantidade × preço de tabela |
@@ -2017,8 +2016,7 @@ nunca traz `whatsapp` — a troca do WhatsApp no app não precisa ir ao seu ERP.
 
 **A outra mudança de 22/09/2026 — a cor pelo número do catálogo, só de conteúdo** (nenhum campo novo, renomeado ou
 removido): o texto de `itens[].observacao` passa a trazer a cor pelo número da
-bolinha do catálogo impresso — `"Cor 1"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`,
-`"Cor única"` — no lugar do nome (`"azul"`), igual à coluna OBSERVAÇÃO da
+bolinha do catálogo impresso — `"Cor 1"`, `"3M Cor 2 / 2G Cor 1"` — no lugar do nome (cor sortida e cor única seguem pelo nome) (`"azul"`), igual à coluna OBSERVAÇÃO da
 planilha. Cor sem número no cadastro da peça continua saindo pelo nome. O campo
 `cor` continua `"00001"`. E `observacoes` deixa de trazer a cor anotada para
 uma peça que saiu do pedido.

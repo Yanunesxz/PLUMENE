@@ -63,19 +63,22 @@ describe('rotuloDaBolinha — como a bolinha aparece no catálogo impresso', () 
     expect(rotuloDaBolinha({ codigo: '10', variadas: false })).toBe('Cor 10');
   });
 
-  it('a bolinha VARIADAS é "Variadas" — com o código "VAR" ou com número', () => {
-    // Na CS, 138 bolinhas VARIADAS têm o código "VAR" e 20 têm número ("04").
-    // O catálogo imprime VARIADAS nelas: é o que o estoque procura.
-    expect(rotuloDaBolinha({ codigo: 'VAR', variadas: true })).toBe('Variadas');
-    expect(rotuloDaBolinha({ codigo: '04', variadas: true })).toBe('Variadas');
+  it('a bolinha SORTIDA não vira número — mesmo com número no cadastro', () => {
+    // Yan, 22/09/2026: "as cores sortidas continuam com nome". Na CS, 138
+    // bolinhas VARIADAS têm o código "VAR" e 20 têm número ("04"): nas duas o
+    // Control recebe o NOME cadastrado ("Variadas", "Cores variadas"), que é o
+    // que o catálogo imprime — quem chama devolve o nome quando isto é null.
+    expect(rotuloDaBolinha({ codigo: 'VAR', variadas: true, nome: 'Variadas' })).toBeNull();
+    expect(rotuloDaBolinha({ codigo: '04', variadas: true, nome: 'Variadas' })).toBeNull();
   });
 
-  it('a bolinha COR ÚNICA sem número ("VAR" sem o selo VARIADAS) é "Cor única"', () => {
-    // As 9 peças da CS 0981, 0990, 1007, 1008, 1009, 1020, 1021, 1023 e 1024:
-    // uma bolinha só, com ÚNICA escrito DENTRO dela no catálogo (selo 'unica'
-    // no cores-extraidas.json) e sem número embaixo. O extrair.py dá "VAR" a
-    // toda bolinha-selo; o selo VARIADAS liga `variadas`, o ÚNICA não.
-    expect(rotuloDaBolinha({ codigo: 'VAR', variadas: false })).toBe('Cor única');
+  it('a bolinha COR ÚNICA não vira "Cor 1" — vai pelo nome', () => {
+    // Yan, 22/09/2026: onde não há duas cores para escolher, o número não diz
+    // nada. Na CS são 20 bolinhas "Cor única" com o código '01' (19 peças só
+    // têm ela) e as 9 de bolinha-selo sem número (0981, 0990, 1007…).
+    expect(rotuloDaBolinha({ codigo: '01', variadas: false, nome: 'Cor única' })).toBeNull();
+    expect(rotuloDaBolinha({ codigo: 'VAR', variadas: false, nome: 'Cores variadas' })).toBeNull();
+    expect(rotuloDaBolinha({ codigo: '01', variadas: false, nome: 'ÚNICA' })).toBeNull();
   });
 
   it('código sem número de verdade não vira "Cor": quem chama fica com o nome', () => {
@@ -89,8 +92,9 @@ describe('corParaOControl — o nome da nota vira o número da bolinha da peça'
   it('casa o nome gravado com a bolinha da peça', () => {
     expect(corParaOControl('rosa', FICHA_0015)).toBe('Cor 1');
     expect(corParaOControl('pink', FICHA_0015)).toBe('Cor 3');
+    // Sortida vai pelo NOME cadastrado, cada peça com o seu.
     expect(corParaOControl('Variadas', FICHA_0015)).toBe('Variadas');
-    expect(corParaOControl('Cores variadas', FICHA_0020)).toBe('Variadas');
+    expect(corParaOControl('Cores variadas', FICHA_0020)).toBe('Cores variadas');
   });
 
   it('não liga para maiúscula, acento nem espaço', () => {
@@ -125,12 +129,14 @@ describe('corParaOControl — o nome da nota vira o número da bolinha da peça'
     expect(corParaOControl('lisa', ficha)).toBe('lisa');
   });
 
-  it('a peça COR ÚNICA que o banco chama "Cores variadas" vai ao Control como "Cor única"', () => {
-    // O nome "Cores variadas" dessas 9 peças é um ERRO dos dados (o
-    // cores.mjs testa a bolinha-selo sozinha antes do selo ÚNICA); o catálogo
-    // imprime ÚNICA. O estoque não pode ler "variadas" numa peça de uma cor só.
-    const ficha: CorDaFicha[] = [{ codigo: 'VAR', nome: 'Cores variadas', variadas: false }];
-    expect(corParaOControl('Cores variadas', ficha)).toBe('Cor única');
+  it('a peça de uma cor só vai pelo nome, nunca "Cor 1"', () => {
+    // As 19 peças "Cor única" com código '01' (1036-1041, 0304-0309, 0107…) e
+    // as 9 de bolinha-selo sem número: o Control recebe o nome do cadastro, o
+    // mesmo que o app mostra (Yan, 22/09/2026).
+    const unicaNumerada: CorDaFicha[] = [{ codigo: '01', nome: 'Cor única', variadas: false }];
+    expect(corParaOControl('Cor única', unicaNumerada)).toBe('Cor única');
+    const selo: CorDaFicha[] = [{ codigo: 'VAR', nome: 'Cores variadas', variadas: false }];
+    expect(corParaOControl('Cores variadas', selo)).toBe('Cores variadas');
   });
 });
 
@@ -168,6 +174,21 @@ describe('coresSemNumeroParaOControl — o que foi pelo NOME, e por quê', () =>
   it('tudo numerado: lista vazia', () => {
     const fichas = new Map([['0015', FICHA_0015]]);
     expect(coresSemNumeroParaOControl('0015 3M pink\n0015 2G Rosa', skus, fichas)).toEqual([]);
+  });
+
+  it('cor SORTIDA e cor ÚNICA não são aviso: o nome delas é a resposta certa', () => {
+    // Yan, 22/09/2026 — "as cores sortidas continuam com nome". Se entrassem
+    // na lista, quem exporta receberia um aviso em quase todo pedido (na CS,
+    // 781 das 1.344 referências com cor são sortidas) e pararia de ler os
+    // avisos que importam.
+    const fichas = new Map<string, CorDaFicha[]>([
+      ['0015', FICHA_0015],
+      ['0020', FICHA_0020],
+      ['1036', [{ codigo: '01', nome: 'Cor única', variadas: false }]],
+    ]);
+    const skusComUnica = new Set(['0015', '0020', '1036']);
+    const notas = '0015 4GG Variadas\n0020 2M Cores variadas\n1036 3P Cor única';
+    expect(coresSemNumeroParaOControl(notas, skusComUnica, fichas)).toEqual([]);
   });
 });
 
@@ -227,10 +248,10 @@ describe('coresPorSkuParaOControl — o resumo por referência que vai ao Contro
     expect(resumo.get('0015')).toBe('3M Cor 2 / 2G Cor 1');
   });
 
-  it('a bolinha VARIADAS sai "Variadas" — também a da peça que o app chama "Cores variadas"', () => {
+  it('a bolinha SORTIDA sai pelo nome do cadastro, como o app mostra', () => {
     const resumo = coresPorSkuParaOControl('0015 4GG Variadas\n0020 2M Cores variadas', skus, fichas);
     expect(resumo.get('0015')).toBe('Variadas');
-    expect(resumo.get('0020')).toBe('Variadas');
+    expect(resumo.get('0020')).toBe('Cores variadas');
   });
 
   it('referência sem ficha e cor sem casamento ficam com o nome, sem apagar nada', () => {
@@ -391,10 +412,10 @@ describe('a planilha do Control sai com "Cor N" na coluna OBSERVAÇÃO', () => {
   it('cada referência leva o número da bolinha; várias cores no formato de hoje', async () => {
     const { xml, avisos } = await exportar(PEDIDO, TODAS_AS_FICHAS);
     expect(celula(xml, 'B13')).toBe('3M Cor 3 / 2G Cor 1');
-    expect(celula(xml, 'B14')).toBe('Variadas');
+    expect(celula(xml, 'B14')).toBe('Cores variadas'); // sortida vai pelo nome
     // O rodapé continua só com o recado do rep: a cor mora na linha.
     expect(celula(xml, 'A45')).toBe('PÁGINA 01. ENTREGAR SEXTA');
-    expect(xml).not.toMatch(/<t[^>]*>[^<]*(pink|Rosa|Cores variadas)/);
+    expect(xml).not.toMatch(/<t[^>]*>[^<]*(pink|Rosa)/);
     // Tudo numerado: nada para o operador conferir.
     expect(avisos).toEqual([]);
   });
@@ -424,7 +445,7 @@ describe('a planilha do Control sai com "Cor N" na coluna OBSERVAÇÃO', () => {
     expect(celula(xml, 'A45')).toBe('PÁGINA 01. ENTREGAR SEXTA');
     expect(avisos).toEqual([
       'Pedido 14700: 0020 sem tamanho no pedido — não entrou na planilha.',
-      expect.stringMatching(/^Pedido 14700: a 0020 não está na planilha — a cor anotada para ela \(Variadas\)/),
+      expect.stringMatching(/^Pedido 14700: a 0020 não está na planilha — a cor anotada para ela \(Cores variadas\)/),
     ]);
   });
 

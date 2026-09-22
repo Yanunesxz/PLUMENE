@@ -122,6 +122,9 @@ function avisoDaCorPeloNome(numero: string, cor: CorPeloNome): string {
     sem_casamento: 'essa cor não está na ficha de cores da peça (foi renomeada?). Confira o número no catálogo',
     ambigua: 'duas bolinhas da peça têm esse nome. Confira o número no catálogo',
     sem_numero: 'a bolinha dessa cor não tem número no cadastro. Confira no catálogo',
+    // Não chega aqui: sortida e cor única vão pelo nome de propósito, e
+    // `coresSemNumeroParaOControl` não as devolve (22/09/2026).
+    nome_do_catalogo: 'é o nome que o catálogo mostra nessa bolinha',
   }[cor.motivo];
   return `Pedido ${numero}: a cor da ${cor.sku} saiu pelo nome ("${cor.nome}"), não pelo número — ${porque} antes de subir no Control.`;
 }

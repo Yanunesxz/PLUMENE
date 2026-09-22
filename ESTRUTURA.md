@@ -56,8 +56,8 @@ packages/shared/src/
 │   │                       valida, sugere o próximo
 │   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido):
 │   │                       as notas gravam o NOME ("0015 3M pink") e o app mostra o nome;
-│   │                       coresPorSkuParaOControl troca pelo número da bolinha ("Cor 3",
-│   │                       "Variadas", "Cor única") na planilha e na API de Parceiro
+│   │                       coresPorSkuParaOControl troca pelo número da bolinha ("Cor 3"; cor
+│   │                       sortida e cor única seguem pelo nome) na planilha e na API
 │   │                       (22/09/2026); coresSemNumeroParaOControl diz o que caiu no nome
 │   │                       (a planilha avisa); observacaoGeralParaOControl = o rodapé /
 │   │                       `observacoes` sem linha de cor, nem a de peça que saiu do pedido
