@@ -172,3 +172,23 @@ export async function buscarPorIds<T>(
 
   return tudo;
 }
+
+/**
+ * Igual a `buscarPorIds`, mas uma página que falha LANÇA em vez de devolver o
+ * que juntou até ali — o `buscarTudoOuFalhar` dos lotes de ids.
+ *
+ * Para o dado que, faltando, estraga alguma coisa em silêncio: as fichas de
+ * cores do catálogo (22/09/2026). Engolido, o erro virava "200 com `colors:
+ * []`", o app gravava isso por cima do cache bom e a planilha do Control
+ * mandava o NOME da cor no lugar do número da bolinha.
+ */
+export async function buscarPorIdsOuFalhar<T>(
+  ids: string[],
+  consulta: (lote: string[], de: number, ate: number) => PromiseLike<{ data: unknown; error: unknown }>,
+): Promise<T[]> {
+  const tudo: T[] = [];
+  for (const lote of emLotes(ids)) {
+    tudo.push(...(await buscarTudoOuFalhar<T>((de, ate) => consulta(lote, de, ate))));
+  }
+  return tudo;
+}

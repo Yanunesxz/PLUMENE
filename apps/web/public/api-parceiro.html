@@ -1381,7 +1381,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       <span class="k">"itens"</span>: [
         { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"G"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
           <span class="k">"quantidade"</span>: <span class="n">3</span>, <span class="k">"preco_unitario"</span>: <span class="n">42.90</span>, <span class="k">"valor_total"</span>: <span class="n">128.70</span>,
-          <span class="k">"observacao"</span>: <span class="s">"azul"</span> },
+          <span class="k">"observacao"</span>: <span class="s">"Cor 2"</span> },
         { <span class="k">"produto"</span>: <span class="s">"REF100"</span>, <span class="k">"tamanho"</span>: <span class="s">"GG"</span>, <span class="k">"cor"</span>: <span class="s">"00001"</span>,
           <span class="k">"quantidade"</span>: <span class="n">2</span>, <span class="k">"preco_unitario"</span>: <span class="n">55.00</span>, <span class="k">"valor_total"</span>: <span class="n">110.00</span>,
           <span class="k">"observacao"</span>: <span class="n">null</span> }
@@ -3136,7 +3136,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><td><code>criado_em</code></td><td class="t-mut">data</td><td>Quando o representante fechou o pedido.</td></tr>
             <tr><td><code>atualizado_em</code></td><td class="t-mut">data</td><td>Última alteração. É o campo usado pelo filtro <code>desde</code>.</td></tr>
             <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do pedido, <b>já com o desconto aplicado</b>.</td></tr>
-            <tr><td><code>observacoes</code></td><td class="t-mut">texto</td><td>Só o que o representante digitou (remessa, boleto, recado). A cor escolhida sai por item, em <code>itens[].observacao</code>.</td></tr>
+            <tr><td><code>observacoes</code></td><td class="t-mut">texto</td><td>Só o que o representante digitou (remessa, boleto, recado). A cor escolhida sai por item, em <code>itens[].observacao</code>; a cor anotada para peça que saiu do pedido não sai.</td></tr>
             <tr><td><code>pedido_erp</code></td><td class="t-mut">texto</td><td><b>O número do pedido no seu ERP</b> (ex.: <code>CS17379</code>), na forma normalizada. Vem <code>null</code> na fila; é preenchido pela sua confirmação (ou pela conciliação, no passivo).</td></tr>
             <tr><td><code>cliente.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código do cliente no seu ERP.</b></td></tr>
             <tr><td><code>cliente.cnpj</code></td><td class="t-mut">texto</td><td>CNPJ ou CPF, para dupla conferência.</td></tr>
@@ -3172,7 +3172,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><td><code>quantidade</code></td><td class="t-mut">inteiro</td><td>Quantidade de peças.</td></tr>
             <tr><td><code>preco_unitario</code></td><td class="t-mut">número</td><td>Preço unitário de tabela, <b>sem</b> o desconto.</td></tr>
             <tr><td><code>valor_total</code></td><td class="t-mut">número</td><td>Total do item (quantidade × preço de tabela).</td></tr>
-            <tr><td><code>observacao</code></td><td class="t-mut">texto</td><td><b>A(s) cor(es) que o cliente escolheu</b> para a referência (ex.: <code>"azul"</code>, <code>"3M azul / 2G rosa"</code>). <code>null</code> = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha.</td></tr>
+            <tr><td><code>observacao</code></td><td class="t-mut">texto</td><td><b>A(s) cor(es) que o cliente escolheu</b> para a referência, pelo <b>número da bolinha do catálogo impresso</b> (ex.: <code>"Cor 2"</code>, <code>"3M Cor 2 / 2G Cor 1"</code>, <code>"Variadas"</code>, <code>"Cor única"</code>). <code>null</code> = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha.</td></tr>
           </tbody>
         </table>
       </div>
@@ -3286,8 +3286,33 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         fixo de sortido <code>"00001"</code> e o pedido é uma linha por tamanho.
         Quando o cliente escolhe a cor no catálogo,
         a escolha não muda a linha: ela vem escrita em <code>observacao</code> do
-        item (ex.: <code>"azul"</code>) — o mesmo texto da coluna OBSERVAÇÃO da
+        item (ex.: <code>"Cor 2"</code>) — o mesmo texto da coluna OBSERVAÇÃO da
         planilha, que a separação já conhece.
+      </p>
+      <p>
+        <b>O texto da cor é o do catálogo impresso</b> (desde 22/09/2026): a
+        bolinha numerada <code>01</code> sai <code>"Cor 1"</code>, a
+        <code>02</code> sai <code>"Cor 2"</code>, a <code>10</code> sai
+        <code>"Cor 10"</code> (sem o zero à esquerda), a bolinha
+        <b>VARIADAS</b> sai <code>"Variadas"</code> e a bolinha <b>ÚNICA</b> sem
+        número (peça de uma cor só) sai <code>"Cor única"</code>. Com cores diferentes por
+        tamanho, o formato é tamanho + cor, separados por <code> / </code>:
+        <code>"3M Cor 2 / 2G Cor 1"</code> (3 peças M na cor 2, 2 peças G na cor 1).
+        É o número que o estoque confere no catálogo — no app o representante e a
+        loja continuam vendo o <b>nome</b> da cor. Se a cor escolhida não tiver
+        número no cadastro da peça (cor renomeada depois do pedido, peça sem as
+        bolinhas cadastradas), sai o <b>nome</b>, como antes (ex.:
+        <code>"azul"</code>) — nunca um número inventado. Trate o texto como livre:
+        é para a separação ler.
+      </p>
+      <p>
+        <b><code>observacoes</code> não traz cor nenhuma</b> (desde 22/09/2026):
+        nem a das peças do pedido (ela vai por item) nem a anotada para uma peça
+        que <b>saiu</b> do pedido depois de fechado (tirada na triagem). Antes,
+        essa anotação sobrava no texto geral com o nome da cor, como se a peça
+        ainda fosse. O recado do representante continua inteiro, mesmo quando
+        cita uma referência ("Ref. 0848 mandar a cor Marrom…", "0020 2 peças a
+        mais se tiver").
       </p>
       <p>
         <b>Nesta versão não existe código de cor real em <code>cor</code>:</b> o
@@ -3938,6 +3963,17 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         apaga nada. O <code>alterado_no_app</code> do
         <code>GET /clientes</code> nunca traz <code>whatsapp</code> — a troca do
         WhatsApp no app não precisa ir ao seu ERP.
+      </p>
+      <p>
+        <b>A outra mudança de 22 de setembro de 2026 — a cor pelo número do catálogo, só de conteúdo</b> (nenhum campo
+        novo, renomeado ou removido): o texto de <code>itens[].observacao</code>
+        passa a trazer a cor pelo número da bolinha do catálogo impresso —
+        <code>"Cor 1"</code>, <code>"3M Cor 2 / 2G Cor 1"</code>,
+        <code>"Variadas"</code>, <code>"Cor única"</code> — no lugar do nome
+        (<code>"azul"</code>), igual à coluna OBSERVAÇÃO da planilha. Cor sem
+        número no cadastro da peça continua saindo pelo nome. O campo
+        <code>cor</code> continua <code>"00001"</code>. E <code>observacoes</code>
+        deixa de trazer a cor anotada para uma peça que saiu do pedido.
       </p>
     </section>
   </main>

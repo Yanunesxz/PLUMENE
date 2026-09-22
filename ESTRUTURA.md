@@ -54,7 +54,13 @@ packages/shared/src/
 ├── pedidos/              → regras do pedido que a API e a tela precisam contar IGUAL
 │   ├── numeroErp.ts      → o número do Control ("CS17379"; série da marca, CS/PL): normaliza,
 │   │                       valida, sugere o próximo
-│   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido)
+│   ├── observacaoCores.ts → as cores escolhidas dentro das observações (o item sai sortido):
+│   │                       as notas gravam o NOME ("0015 3M pink") e o app mostra o nome;
+│   │                       coresPorSkuParaOControl troca pelo número da bolinha ("Cor 3",
+│   │                       "Variadas", "Cor única") na planilha e na API de Parceiro
+│   │                       (22/09/2026); coresSemNumeroParaOControl diz o que caiu no nome
+│   │                       (a planilha avisa); observacaoGeralParaOControl = o rodapé /
+│   │                       `observacoes` sem linha de cor, nem a de peça que saiu do pedido
 │   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
 │   ├── valorMinimo.ts    → o pedido mínimo da condição (049, payment_conditions.valor_minimo):
 │   │                       avisoDeValorMinimo — só AVISA, nem a tela nem o servidor bloqueiam
@@ -197,11 +203,13 @@ apps/api/src/
 │   ├── canais.ts         → lerCanais(company_id) / exigirCanal / corpoCanalFechado: o canal oficial
 │   │                       de cada fluxo com o Control (companies.canal_*, 048). Sem a 048 = padrões
 │   │                       de hoje (manual/carga); banco sem resposta LANÇA; memória de 30 s
-│   ├── paginacao.ts      → buscarTudo / buscarTudoOuFalhar / buscarPorIds / emLotes: o
-│   │                       PostgREST corta em 1.000 linhas EM SILÊNCIO; listagem que pode
-│   │                       passar disso pagina aqui. buscarTudo ENGOLE erro de página (serve
-│   │                       às telas); buscarTudoOuFalhar LANÇA — é a das rotas do parceiro,
-│   │                       onde lista pela metade vira "o resto não existe" no ERP
+│   ├── paginacao.ts      → buscarTudo / buscarTudoOuFalhar / buscarPorIds /
+│   │                       buscarPorIdsOuFalhar / emLotes: o PostgREST corta em 1.000 linhas
+│   │                       EM SILÊNCIO; listagem que pode passar disso pagina aqui. buscarTudo
+│   │                       ENGOLE erro de página (serve às telas); buscarTudoOuFalhar LANÇA — é
+│   │                       a das rotas do parceiro, onde lista pela metade vira "o resto não
+│   │                       existe" no ERP; buscarPorIdsOuFalhar é a das fichas de cores do
+│   │                       GET /products (erro virava `colors: []` por cima do cache do app)
 │   ├── validation.ts     → parseBody(schema zod, body, reply): o 400 padronizado
 │   ├── email.ts          → e-mail de confirmação do pedido (Gmail; sem env vira no-op)
 │   └── tokens.ts         → tokens dos links de convite/vitrine (só o SHA-256 vai ao banco)

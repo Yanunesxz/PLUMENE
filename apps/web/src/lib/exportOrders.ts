@@ -1,9 +1,13 @@
 import { zipSync } from 'fflate';
 import { montarLinhas, dividirEmFolhas, type ItemParaPlanilha } from './planilha/linhas.js';
 import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.js';
-import { semLinhasDeCor, coresPorSku } from '@csb/shared';
+import {
+  coresPorSkuParaOControl,
+  coresSemNumeroParaOControl,
+  observacaoGeralParaOControl,
+} from '@csb/shared';
 import type { NumeroDaTabela } from './planilha/tabela.js';
-import type { OrderWithItems } from '@csb/shared';
+import type { CorDaFicha, CorPeloNome, OrderWithItems } from '@csb/shared';
 
 export type { ClienteDaFolha };
 
@@ -43,6 +47,15 @@ export interface ContextoDaExportacao {
    * linha — o campo que a fábrica lê na separação. Ausente = coluna em branco.
    */
   corDoProduto?: Map<string, string | null>;
+  /**
+   * product_id → a ficha de cores da peça (as bolinhas do catálogo impresso,
+   * `ProductWithPrice.colors`). É por ela que a cor escolhida sai NUMERADA na
+   * coluna OBSERVAÇÃO — "Cor 2", "3M Cor 2 / 2G Cor 1", "Variadas" — do jeito
+   * que o estoque confere no catálogo (pedido do Yan, 22/09/2026). Ausente,
+   * ou peça sem ficha, ou nome sem casamento: sai o nome, como antes — e o
+   * resultado leva um aviso por cor que foi pelo nome.
+   */
+  coresDoProduto?: Map<string, readonly CorDaFicha[] | undefined>;
 }
 
 export interface ResultadoDaExportacao {
@@ -81,6 +94,36 @@ async function carregarModelo(tabela: NumeroDaTabela): Promise<Uint8Array> {
 
 function nomeDoPedido(pedido: OrderWithItems): string {
   return String(pedido.order_number ?? pedido.id.slice(0, 8));
+}
+
+/**
+ * referência → a ficha de cores da peça, de TODO o catálogo em cache (não só
+ * das peças que entraram na planilha): a cor anotada de uma peça que ficou de
+ * fora também é avisada pelo número.
+ */
+function fichasPorSku(contexto: ContextoDaExportacao): Map<string, readonly CorDaFicha[]> {
+  const fichas = new Map<string, readonly CorDaFicha[]>();
+  if (!contexto.coresDoProduto) return fichas;
+  for (const [produto, sku] of contexto.skuDoProduto) {
+    const ficha = contexto.coresDoProduto.get(produto);
+    if (ficha && ficha.length > 0) fichas.set(sku, ficha);
+  }
+  return fichas;
+}
+
+/**
+ * A cor que foi pelo NOME na coluna OBSERVAÇÃO — o operador precisa saber
+ * antes de subir: o estoque confere pelo número da bolinha (Yan, 22/09/2026).
+ */
+function avisoDaCorPeloNome(numero: string, cor: CorPeloNome): string {
+  const porque = {
+    sem_ficha:
+      'o catálogo baixado está sem a ficha de cores da peça. Recarregue o catálogo (abra o Catálogo) e exporte de novo; se continuar, confira o número no catálogo',
+    sem_casamento: 'essa cor não está na ficha de cores da peça (foi renomeada?). Confira o número no catálogo',
+    ambigua: 'duas bolinhas da peça têm esse nome. Confira o número no catálogo',
+    sem_numero: 'a bolinha dessa cor não tem número no cadastro. Confira no catálogo',
+  }[cor.motivo];
+  return `Pedido ${numero}: a cor da ${cor.sku} saiu pelo nome ("${cor.nome}"), não pelo número — ${porque} antes de subir no Control.`;
 }
 
 interface ArquivoGerado {
@@ -130,15 +173,29 @@ async function gerarArquivosDoPedido(
   // A OBSERVAÇÃO da linha, na ordem do que se sabe sobre a cor:
   //   1. a cor escolhida nas bolinhas do catálogo — só existe nas NOTAS do
   //      pedido (o item vai sortido pro ERP; as linhas "0706 6M azul" são a
-  //      única memória da escolha);
-  //   2. a cor do cadastro do produto (peça que é um produto por cor);
+  //      única memória da escolha). Aqui ela sai com o NÚMERO da bolinha
+  //      ("Cor 2"), não com o nome: "na hora de subir pro Control tem que ser
+  //      Cor 1, Cor 2, do jeito que está no catálogo" (Yan, 22/09/2026). O app
+  //      continua mostrando o nome; sem casamento na ficha da peça, vai o nome;
+  //   2. a cor do cadastro do produto (peça que é um produto por cor — essa
+  //      não tem bolinha numerada, vai o nome);
   //   3. "Variado" — sortida de verdade, para a separação nunca ficar sem
   //      resposta. Só quando o chamador forneceu o mapa de cores.
   const skusDoPedido = new Set(itens.map((i) => i.sku));
-  const corDasNotas = coresPorSku(pedido.notes, skusDoPedido);
+  const fichaPorSku = fichasPorSku(contexto);
+  const corDasNotas = coresPorSkuParaOControl(pedido.notes, skusDoPedido, fichaPorSku);
   if (contexto.corDoProduto) {
     for (const item of itens) {
       item.observacao = corDasNotas.get(item.sku) ?? item.observacao ?? 'Variado';
+    }
+    // A cor que caiu no NOME continua indo (número não se inventa), mas nunca
+    // em silêncio: a planilha é feita com as fichas do catálogo EM CACHE, e um
+    // catálogo baixado sem elas mandaria o nome em todas as referências. A API
+    // de Parceiro não corre esse risco: lá a leitura que falha derruba a
+    // resposta (500), porque "um soluço que mandasse o nome no lugar do número
+    // ficaria gravado" no Control.
+    for (const cor of coresSemNumeroParaOControl(pedido.notes, skusDoPedido, fichaPorSku)) {
+      avisos.push(avisoDaCorPeloNome(numero, cor));
     }
   }
 
@@ -171,7 +228,22 @@ async function gerarArquivosDoPedido(
   // O rodapé fica com o que o REPRESENTANTE digitou (remessas, boletos…). As
   // linhas de cor que o app anexou às notas saem daqui: a cor agora vive na
   // coluna OBSERVAÇÃO de cada linha, e dobrada confundiria a separação.
-  const notasDoRep = semLinhasDeCor(pedido.notes, skusDoPedido);
+  // Saem também as linhas de cor de peça que NÃO está nesta planilha (tirada
+  // do pedido no "editar peças", ou que ficou de fora acima): iam ao estoque
+  // com o NOME da cor de uma peça que nem vai. Cada uma vira um aviso, com a
+  // cor já pelo número — se a peça tiver de ir, o operador lança à mão.
+  const geral = observacaoGeralParaOControl(pedido.notes, skusDoPedido);
+  const notasDoRep = geral.texto;
+  const foraDaPlanilha = new Map<string, string[]>();
+  for (const { sku, linha } of geral.linhasDeOutrasPecas) {
+    foraDaPlanilha.set(sku, [...(foraDaPlanilha.get(sku) ?? []), linha]);
+  }
+  for (const [sku, anotadas] of foraDaPlanilha) {
+    const cor = coresPorSkuParaOControl(anotadas.join('\n'), new Set([sku]), fichaPorSku).get(sku);
+    avisos.push(
+      `Pedido ${numero}: a ${sku} não está na planilha — a cor anotada para ela (${cor ?? anotadas.join(' / ')}) ficou fora do rodapé. Se a peça tiver de ir, lance à mão no Control.`,
+    );
+  }
 
   return folhas.map((folha, indice) => {
     // O rodapé marca a página ("PÁGINA 01.") e leva os recados do rep. Só na
