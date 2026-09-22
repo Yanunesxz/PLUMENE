@@ -231,13 +231,26 @@ function chaveDoNome(nome: string): string {
  * `null` quando a bolinha não tem número de verdade (código vazio, "00",
  * lixo): quem chama fica com o nome — número não se inventa.
  */
-export function rotuloDaBolinha(cor: Pick<CatalogColor, 'codigo' | 'variadas'>): string | null {
-  if (cor.variadas) return 'Variadas';
+export function rotuloDaBolinha(
+  cor: Pick<CatalogColor, 'codigo' | 'variadas'> & { nome?: string | null },
+): string | null {
+  // Só a bolinha que é ESCOLHA numerada vira "Cor N". Cor única e cores
+  // sortidas vão pelo NOME, como no app — Yan, 22/09/2026: "aí elas continuam
+  // como nome sortido, as cores sortidas continuam com nome". Faz sentido para
+  // quem separa: onde não há duas cores para escolher, o número não diz nada,
+  // e "Variadas"/"Cor única" é o que está impresso no catálogo.
+  if (cor.variadas) return null;
+  if (ehCorUnica(cor.nome)) return null;
   const codigo = (cor.codigo ?? '').trim();
-  if (codigo.toUpperCase() === 'VAR') return 'Cor única';
   if (!/^\d+$/.test(codigo)) return null;
   const numero = Number.parseInt(codigo, 10);
   return numero > 0 ? `Cor ${numero}` : null;
+}
+
+/** A bolinha de peça que só tem uma cor ("Cor única", "única"). */
+function ehCorUnica(nome: string | null | undefined): boolean {
+  const chave = chaveDoNome(nome ?? '');
+  return chave === 'cor unica' || chave === 'unica' || chave === 'cor unico';
 }
 
 /**
@@ -247,9 +260,17 @@ export function rotuloDaBolinha(cor: Pick<CatalogColor, 'codigo' | 'variadas'>):
  *   • `sem_casamento` — o nome da nota não bate com nenhuma bolinha da peça
  *                       (cor renomeada depois do pedido);
  *   • `ambigua`       — duas bolinhas da peça com o mesmo nome;
- *   • `sem_numero`    — a bolinha casou, mas não tem número de verdade.
+ *   • `sem_numero`    — a bolinha casou, mas não tem número de verdade;
+ *   • `nome_do_catalogo` — NÃO é queda: a bolinha é sortida ("Variadas") ou de
+ *                       cor única, e o catálogo mostra o nome, não um número
+ *                       (22/09/2026). Quem avisa a pessoa ignora este motivo.
  */
-export type MotivoDaCorPeloNome = 'sem_ficha' | 'sem_casamento' | 'ambigua' | 'sem_numero';
+export type MotivoDaCorPeloNome =
+  | 'sem_ficha'
+  | 'sem_casamento'
+  | 'ambigua'
+  | 'sem_numero'
+  | 'nome_do_catalogo';
 
 /** Uma cor das notas que foi ao Control pelo nome — para avisar quem sobe o pedido. */
 export interface CorPeloNome {
@@ -268,8 +289,13 @@ function casarNaFicha(
   const casadas = ficha.filter((c) => c.nome != null && chaveDoNome(c.nome) === chave);
   if (casadas.length === 0) return { motivo: 'sem_casamento' };
   if (casadas.length > 1) return { motivo: 'ambigua' };
-  const rotulo = rotuloDaBolinha(casadas[0]!);
-  return rotulo ? { rotulo } : { motivo: 'sem_numero' };
+  const bolinha = casadas[0]!;
+  const rotulo = rotuloDaBolinha(bolinha);
+  if (rotulo) return { rotulo };
+  // Sortida ou cor única: o nome É a resposta certa (22/09/2026) — não é queda,
+  // então a planilha não avisa nada sobre estas.
+  if (bolinha.variadas || ehCorUnica(bolinha.nome)) return { motivo: 'nome_do_catalogo' };
+  return { motivo: 'sem_numero' };
 }
 
 /**
@@ -344,7 +370,7 @@ export function coresSemNumeroParaOControl(
   for (const [sku, linhas] of linhasDeCorPorSku(texto, skusDoPedido)) {
     for (const { cor: nome } of linhas) {
       const casamento = casarNaFicha(nome, fichaPorSku.get(sku));
-      if ('rotulo' in casamento) continue;
+      if ('rotulo' in casamento || casamento.motivo === 'nome_do_catalogo') continue;
       const chave = `${sku}|${chaveDoNome(nome)}`;
       if (vistas.has(chave)) continue;
       vistas.add(chave);

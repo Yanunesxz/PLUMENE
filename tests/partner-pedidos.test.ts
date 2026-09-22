@@ -760,7 +760,11 @@ describe('a cor vai ao Control pelo número da bolinha do catálogo', () => {
 
     const [p] = await getPartnerOrders(EMPRESA, {});
 
-    expect(p!.itens.map((i) => i.observacao)).toEqual(['3M Cor 3 / 2G Cor 1', '3M Cor 3 / 2G Cor 1', 'Variadas']);
+    expect(p!.itens.map((i) => i.observacao)).toEqual([
+      '3M Cor 3 / 2G Cor 1',
+      '3M Cor 3 / 2G Cor 1',
+      'Cores variadas', // sortida vai pelo nome do cadastro
+    ]);
     expect(p!.itens.map((i) => i.cor)).toEqual(['00001', '00001', '00001']);
     // O recado do rep continua separado, sem as linhas de cor.
     expect(p!.observacoes).toBe('entregar sexta');
@@ -869,10 +873,9 @@ describe('a cor vai ao Control pelo número da bolinha do catálogo', () => {
     expect(p!.observacoes).toBe(recados);
   });
 
-  it('a peça COR ÚNICA sem número (bolinha "VAR" sem o selo VARIADAS) vai "Cor única", não "Cores variadas"', async () => {
-    // As 9 peças da CS (0981, 0990, 1007…): o catálogo imprime ÚNICA dentro
-    // da bolinha, e o banco as chama "Cores variadas" por um erro do
-    // cores.mjs. O estoque não pode ler "variadas" numa peça de uma cor só.
+  it('a peça de UMA COR SÓ vai pelo nome do cadastro, nunca "Cor 1"', async () => {
+    // As 9 peças da CS (0981, 0990, 1007…) têm uma bolinha-selo sem número.
+    // Yan (22/09/2026): onde não há escolha de cor, vai o nome, como no app.
     const ITEM_0990 = {
       ...ITEM,
       product_id: 'p990',
@@ -892,7 +895,7 @@ describe('a cor vai ao Control pelo número da bolinha do catálogo', () => {
 
     const [p] = await getPartnerOrders(EMPRESA, {});
 
-    expect(p!.itens[0]!.observacao).toBe('Cor única');
+    expect(p!.itens[0]!.observacao).toBe('Cores variadas');
   });
 
   it('passa das 1.000 bolinhas do PostgREST: a ficha da segunda página também vira "Cor N"', async () => {
