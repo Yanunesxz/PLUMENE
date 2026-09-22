@@ -54,21 +54,35 @@
  * gravação — e relidas depois dela, para a edição que caiu entre as duas
  * gravações da tela (passo 3b). Sem a 051, tudo como antes. As regras moram em
  * partner.edicaoNoApp.ts.
+ *
+ * O WHATSAPP É DO APP (22/09/2026, Yan: "numero uma coisa numero de wtss
+ * outro"). No cliente EXISTENTE com WhatsApp preenchido, o `whatsapp` que o
+ * Control mandar é ignorado — sem aviso: é regra, não conflito. Vazio (ou
+ * nulo), é preenchido; cliente novo recebe o do Control. Vale com e sem a 051.
+ * Revisão do mesmo dia: o WhatsApp que não é telefone (um nome, resto de carga
+ * antiga) conta como vazio; o vazio que o APP deixou (o representante apagou —
+ * está no histórico da 051) continua vazio; e o `whatsapp` vazio do Control
+ * nunca apaga nada. Ver o passo 2 e o 2d.
  */
 import {
+  CAMPOS_SO_DO_APP,
   CAMPO_DO_CONTRATO_DO_PARCEIRO,
+  algumCampoVaiParaOControl,
   apenasDigitos,
+  campoSoDoAppPreenchido,
   camposNoContratoDoParceiro,
   codigoCanonico,
   codigoMiolo,
   linhaDeEndereco,
+  normalizarCampoDoCadastro,
 } from '@csb/shared';
-import type { AlteracaoDoCliente, NomeNoContratoDoParceiro } from '@csb/shared';
+import type { AlteracaoDoCliente, CampoSoDoApp, NomeNoContratoDoParceiro } from '@csb/shared';
 import { supabase } from '../../config/supabase.js';
 import { buscarPelaChaveOuFalhar, buscarTudoOuFalhar, depoisDaChave, emLotes } from '../../lib/paginacao.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
 import {
   alteradoNoApp,
+  camposSoDoAppEditadosEmLote,
   colocarNaFilaDoControl,
   lerAlteracoesForaDaFilaEmLote,
   lerAlteracoesPendentesEmLote,
@@ -792,7 +806,7 @@ export async function receberClientes(
     /** O valor lido das colunas que o app edita e o patch muda (compare-and-set, 051). */
     antes: Record<string, unknown>;
     /** Edições de quando o cliente não tinha código a pôr na fila do Control, se gravar (2c). */
-    paraAFilaDoControl: string[];
+    paraAFilaDoControl: AlteracaoDoCliente[];
     /**
      * Cliente adotado pelo CNPJ, com a 051: o `updated_at` lido (vai na condição
      * do UPDATE) e o que a reconferência depois de gravar precisa (passo 3a).
@@ -1003,6 +1017,23 @@ export async function receberClientes(
     if (endereco.pedacosSem041) camposQuePrecisamDa041 = true;
 
     if (existente) {
+      // Os campos só do app (o WhatsApp, 22/09/2026) que o cliente já tem
+      // preenchidos não são tocados pelo Control: o telefone de lá é outra
+      // coisa. Sem aviso — é a regra, não um conflito. Vazio, o do Control
+      // preenche. Vale com e sem a 051 (não depende de edição pendente).
+      //
+      // Revisão do mesmo dia: "preenchido" é ter um telefone — o nome que a
+      // carga de carteira gravou no lugar do número conta como vazio, e o
+      // número do Control o troca (`campoSoDoAppPreenchido`). E o `whatsapp`
+      // vazio do Control nunca apaga nada: preencher com nada não é preencher
+      // (e o lixo fica para o conserto, que o acha pelo valor). O vazio que o
+      // app deixou de propósito é conferido no 2d, com o histórico.
+      for (const campo of CAMPOS_SO_DO_APP) {
+        if (!(campo in pedido)) continue;
+        if (campoSoDoAppPreenchido(campo, existente[campo]) || normalizarCampoDoCadastro(campo, pedido[campo]) === null) {
+          delete pedido[campo];
+        }
+      }
       casados.push({ codigo, raw, existente, pedido, adotado });
     } else {
       // Cliente novo não tem nada a preservar: a linha vai completa, com as
@@ -1076,18 +1107,47 @@ export async function receberClientes(
             .map((c) => c.existente.id),
         )
       : new Map<string, AlteracaoDoCliente[]>();
+  // ── 2d. O campo só do app que o APP esvaziou (revisão de 22/09/2026). O
+  // passo 2 deixa o Control preencher o WhatsApp vazio — mas vazio porque o
+  // representante apagou (a régua aceita "ou deixe em branco", e o diálogo
+  // diz "Fica só no app") não é "nunca teve": sem isto, o telefone do Control
+  // voltava no envio seguinte, sem aviso nem linha no histórico, e o "Enviar
+  // pedido para o cliente" ia para o fixo de lá. A edição mista (WhatsApp
+  // limpo e e-mail) também. Com o campo editado alguma vez no histórico (051),
+  // quem decide o valor é o app: o do Control sai do pedido. Uma leitura em
+  // lote, só dos casados que o lote ia preencher, antes de gravar (se falhar,
+  // lança). Sem a 051 não há histórico: fica a regra do passo 2.
+  const aPreencher = casados.filter((c) => CAMPOS_SO_DO_APP.some((campo) => campo in c.pedido));
+  const editadosNoApp =
+    pendentesDoApp !== null && aPreencher.length > 0
+      ? await camposSoDoAppEditadosEmLote(
+          company_id,
+          aPreencher.map((c) => c.existente.id),
+        )
+      : new Map<string, Set<CampoSoDoApp>>();
+  for (const { existente, pedido } of aPreencher) {
+    const editados = editadosNoApp.get(existente.id);
+    if (!editados) continue;
+    for (const campo of CAMPOS_SO_DO_APP) if (editados.has(campo)) delete pedido[campo];
+  }
   const mantidosNoApp: Array<{ codigo: string; campos: NomeNoContratoDoParceiro[] }> = [];
   const edicoesAlcancadas: string[] = [];
 
   for (const { codigo, raw, existente, pedido, adotado } of casados) {
     let edicaoDoAppPendente = false;
     /** As edições de quando o cliente não tinha código que o Control mostrou não ter. */
-    let semCodigoParaAFila: string[] = [];
+    let semCodigoParaAFila: AlteracaoDoCliente[] = [];
     if (pendentesDoApp) {
       const pendentes = pendentesDoApp.get(existente.id) ?? [];
       const outras = foraDaFila.get(existente.id) ?? [];
+      // Só a edição com campo que vai para o Control (22/09/2026): a só de
+      // WhatsApp, feita sem código, continua fora da fila — o WhatsApp é do app.
       const semCodigo = new Set(
-        adotado ? outras.filter((a) => !a.erp_pendente && !a.erp_atualizado_em).map((a) => a.id) : [],
+        adotado
+          ? outras
+              .filter((a) => !a.erp_pendente && !a.erp_atualizado_em && algumCampoVaiParaOControl(Object.keys(a.campos)))
+              .map((a) => a.id)
+          : [],
       );
       const conferencia = conferirEdicoesDoApp(raw, pedido, existente, [
         ...pendentes,
@@ -1106,7 +1166,7 @@ export async function receberClientes(
       // é protegida como as outras e fecha sozinha no primeiro envio que trouxer
       // o mesmo valor.
       const alcancadas = new Set(conferencia.alcancadas);
-      semCodigoParaAFila = [...semCodigo].filter((id) => !alcancadas.has(id));
+      semCodigoParaAFila = outras.filter((a) => semCodigo.has(a.id) && !alcancadas.has(a.id));
       edicaoDoAppPendente = conferencia.aindaPendente;
     }
 
@@ -1211,7 +1271,7 @@ export async function receberClientes(
 
   let atualizados = 0;
   let adotadosPorCnpj = 0;
-  const paraAFilaDoControl: string[] = [];
+  const paraAFilaDoControl: AlteracaoDoCliente[] = [];
   /** Um UPDATE do lote que gravou: o valor lido das colunas do app e o que foi gravado. */
   type Gravado = { codigo: string; id: string; lidas: Record<string, unknown>; gravadas: Record<string, unknown> };
   /** Os UPDATEs que gravaram coluna que a tela de edição também grava — a reconferência do 3b. */
@@ -1326,13 +1386,21 @@ export async function receberClientes(
       console.error(`[parceiro] não deu para reconferir as edições dos clientes adotados pelo CNPJ depois de gravar: ${msg}`);
     }
     for (const g of adotadosGravados) {
+      // Só as com campo que vai para o Control (22/09/2026): a só de WhatsApp
+      // continua fora da fila, como no 2c.
       const novas = (depoisDeAdotar?.get(g.id) ?? [])
-        .filter((a) => !g.adocao.vistas.has(a.id) && !a.erp_pendente && !a.erp_atualizado_em)
+        .filter(
+          (a) =>
+            !g.adocao.vistas.has(a.id) &&
+            !a.erp_pendente &&
+            !a.erp_atualizado_em &&
+            algumCampoVaiParaOControl(Object.keys(a.campos)),
+        )
         .map((a) => ({ ...a, erp_pendente: true }));
       if (novas.length === 0) continue;
       const conferencia = conferirEdicoesDoApp(g.adocao.raw, {}, g.adocao.existente, novas);
       const alcancadas = new Set(conferencia.alcancadas);
-      paraAFilaDoControl.push(...novas.filter((a) => !alcancadas.has(a.id)).map((a) => a.id));
+      paraAFilaDoControl.push(...novas.filter((a) => !alcancadas.has(a.id)));
       const apagadas = colunasQueOLoteApagou(novas, g.lidas, g.gravadas);
       if (apagadas.length > 0) await devolverAoValorDoApp(g, apagadas);
     }
@@ -1366,7 +1434,7 @@ export async function receberClientes(
   // e cujo `depois` é o valor que ele trocou volta ao cadastro, com a condição
   // inversa (só onde ainda está o que o lote gravou), e entra no aviso.
   if (pendentesDoApp && gravadosComColunaDoApp.length > 0) {
-    const vistasNoLote = new Set<string>(paraAFilaDoControl);
+    const vistasNoLote = new Set<string>(paraAFilaDoControl.map((a) => a.id));
     for (const lista of pendentesDoApp.values()) for (const a of lista) vistasNoLote.add(a.id);
     let depoisDeGravar: Map<string, AlteracaoDoCliente[]> | null = null;
     try {

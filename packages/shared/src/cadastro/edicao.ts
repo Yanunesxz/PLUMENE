@@ -74,7 +74,83 @@ export const ehCampoEditavelDoCliente = (v: unknown): v is CampoEditavelDoClient
 export const ehPecaDoEndereco = (v: unknown): v is PecaDoEnderecoDoCliente =>
   typeof v === 'string' && (PECAS_DO_ENDERECO_DO_CLIENTE as readonly string[]).includes(v);
 
-/** O rótulo em português de cada campo — o formulário, o cartão "Para atualizar no Control" e o push. */
+// ─── O que é só do app ───────────────────────────────────────────────────────
+
+/**
+ * CAMPOS SÓ DO APP — editados aqui e que o Control NÃO precisa receber.
+ *
+ * Pedido do Yan (22/09/2026): "que eu possa alterar o wtss do cliente sem ter
+ * que subir pro control, numero uma coisa numero de wtss outro". O WhatsApp do
+ * cliente é dado do app (é por ele que o pedido vai para o cliente); o telefone
+ * que o Control tem é outra coisa. Por isso, para estes campos:
+ *   • a edição grava o histórico, mas NÃO fica pendente para o Control (nem
+ *     push para o financeiro, nem cartão "Para atualizar no Control", nem fila
+ *     da Minha Área, nem `alterado_no_app` no GET /partner/v1/clientes);
+ *   • o POST /partner/v1/clientes (e a carga por código) só PREENCHE o campo
+ *     vazio: o que o Control mandar não sobrescreve o que o app já tem. E
+ *     "vazio" é o que o app nunca mexeu (revisão de 22/09/2026): o WhatsApp
+ *     que o app apagou de propósito continua vazio — senão o telefone do
+ *     Control voltava no envio seguinte, contrariando o "Fica só no app" do
+ *     diálogo. O WhatsApp que não é telefone (resto de carga antiga) conta
+ *     como vazio: ver `campoSoDoAppPreenchido`;
+ *   • o `whatsapp` vazio que o Control mandar nunca apaga nada — preencher
+ *     com nada não é preencher.
+ *
+ * Mora aqui porque a tela e a API precisam concordar no que "vai para o
+ * Control" — uma pendência sempre tem pelo menos um campo que vai.
+ */
+export const CAMPOS_SO_DO_APP = ['whatsapp'] as const satisfies readonly CampoEditavelDoCliente[];
+
+/** Um campo só do app (hoje, o WhatsApp). */
+export type CampoSoDoApp = (typeof CAMPOS_SO_DO_APP)[number];
+
+/**
+ * Com menos dígitos que isto, o WhatsApp gravado não é telefone — é a régua
+ * `ehTelefone` do conserto (_tools/consertar-whatsapp-com-nome.mjs).
+ */
+export const DIGITOS_MINIMOS_DO_WHATSAPP = 8;
+
+/**
+ * O app já tem um valor DE VERDADE neste campo só do app? É o que decide, no
+ * POST /partner/v1/clientes e na carga por código, se o que o Control mandar é
+ * ignorado (tem) ou pode preencher (não tem).
+ *
+ * WhatsApp que não é telefone conta como VAZIO (revisão de 22/09/2026). Na CS,
+ * 11 clientes com código têm um NOME no lugar do número — a carga de carteira
+ * gravava o "Contato zap" do Curva ABC até 16/09/2026, e o conserto ainda não
+ * rodou. O app nunca grava um valor assim (a edição exige 10 ou 11 dígitos):
+ * isso só pode ser resto de carga antiga. Contado como "preenchido", o lixo
+ * ficava para sempre e o número válido do Control era descartado em todo envio.
+ *
+ * Não diz se o app APAGOU o campo de propósito — isso está no histórico
+ * (`customer_changes`), e quem lê o banco é que confere (22/09/2026).
+ */
+export function campoSoDoAppPreenchido(campo: CampoSoDoApp, valor: unknown): boolean {
+  const texto = normalizarCampoDoCadastro(campo, valor);
+  if (texto === null) return false;
+  if (campo === 'whatsapp') return apenasDigitos(texto).length >= DIGITOS_MINIMOS_DO_WHATSAPP;
+  return true;
+}
+
+/**
+ * O campo (coluna do app ou chave do histórico) precisa chegar ao Control?
+ * `false` só para os campos só do app; a linha `address` e as peças do endereço
+ * vão (22/09/2026).
+ */
+export function vaiParaOControl(campo: string): boolean {
+  return !(CAMPOS_SO_DO_APP as readonly string[]).includes(campo);
+}
+
+/**
+ * Alguma das colunas (as chaves de `campos` de uma edição) precisa chegar ao
+ * Control? Uma edição só de campos do app nunca é pendência (22/09/2026).
+ */
+export function algumCampoVaiParaOControl(colunas: Iterable<string>): boolean {
+  for (const c of colunas) if (vaiParaOControl(c)) return true;
+  return false;
+}
+
+/** O rótulo em português de cada campo — o formulário, o cartão "Para atualizar no Control", o histórico e o push. */
 export const ROTULO_DO_CAMPO_DO_CADASTRO: Record<CampoDoHistoricoDoCadastro, string> = {
   name: 'Razão social',
   trade_name: 'Nome fantasia',

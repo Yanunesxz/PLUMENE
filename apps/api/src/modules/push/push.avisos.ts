@@ -11,7 +11,7 @@
  *   pedido faturado               → o REPRESENTANTE dono
  *   cadastro de cliente alterado  → FINANCEIRO e admin (atualizar no Control)
  */
-import { rotulosDosCamposAlterados } from '@csb/shared';
+import { rotulosDosCamposAlterados, vaiParaOControl } from '@csb/shared';
 import { enviarParaUsuarios, enviarParaPapeis, type AvisoPush } from './push.service.js';
 
 /** O que os avisos precisam saber de um pedido. */
@@ -249,7 +249,9 @@ export async function avisarCadastroAlteradoNoControl(
   quemEditou: string,
 ): Promise<{ financeiro: number; admin: number } | null> {
   const noControl = cliente.erp_id ? ` (cód. ${cliente.erp_id} no Control)` : '';
-  const oQue = rotulosDosCamposAlterados(colunas);
+  // O WhatsApp de uma edição mista não entra na frase (22/09/2026): é só do
+  // app, e o push diz o que atualizar no Control.
+  const oQue = rotulosDosCamposAlterados(colunas.filter(vaiParaOControl));
   const aviso: AvisoPush = {
     title: 'Cadastro alterado — atualize no Control',
     body: oQue.length

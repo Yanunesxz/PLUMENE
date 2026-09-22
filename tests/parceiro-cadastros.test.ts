@@ -355,7 +355,10 @@ describe('clientes', () => {
     expect(fake.ultimaGravacao('customers', 'update')).toBeUndefined();
   });
 
-  it('null explícito LIMPA: WhatsApp, tabela, endereço inteiro e bloqueio', async () => {
+  it('null explícito LIMPA: e-mail, tabela, endereço inteiro e bloqueio — o WhatsApp do app, não (22/09/2026)', async () => {
+    // Até 22/09/2026 o exemplo de contato era o WhatsApp. Ele virou dado só do
+    // app ("numero uma coisa numero de wtss outro", Yan): o null do Control não
+    // o limpa mais. A regra genérica do null segue provada pelo e-mail.
     const { service, fake } = await carregar({
       price_tables: { data: [{ id: 't-16', erp_code: '00016' }], error: null },
       customers: [{ data: [CLIENTE_CHEIO], error: null }, OK],
@@ -366,6 +369,7 @@ describe('clientes', () => {
         codigo: '02225',
         razao_social: 'CLIENTE TESTE',
         whatsapp: null,
+        email: null,
         tabela_preco: null,
         endereco: null,
         bloqueado: null,
@@ -376,7 +380,7 @@ describe('clientes', () => {
 
     const patch = valoresDe(fake.ultimaGravacao('customers', 'update'));
     expect(patch).toMatchObject({
-      whatsapp: null,
+      email: null,
       price_table_id: null,
       address: null,
       cep: null,
@@ -393,7 +397,9 @@ describe('clientes', () => {
     expect('complemento' in patch).toBe(false);
     // Nem o que não veio.
     expect('trade_name' in patch).toBe(false);
-    expect('email' in patch).toBe(false);
+    expect('inscricao_estadual' in patch).toBe(false);
+    // O WhatsApp preenchido no app fica: o null do Control é ignorado, sem aviso.
+    expect('whatsapp' in patch).toBe(false);
   });
 
   it('bloqueado ausente não desbloqueia; "N" desbloqueia', async () => {

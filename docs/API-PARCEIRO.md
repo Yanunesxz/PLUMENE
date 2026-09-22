@@ -1,6 +1,6 @@
 # API de Parceiro — Integração de Pedidos (v1)
 
-> **Atualizado 16 set 2026.** Contrato da fase 0 da integração com o Control,
+> **Atualizado 22 set 2026.** Contrato da fase 0 da integração com o Control,
 > com as decisões de 16/09: a fila é o que o financeiro **solicitou** ao
 > Control; o **CNPJ** é a chave do cliente entre os sistemas (cliente sem código
 > deixa de ser pendência — o Control cria e devolve o código); um pedido tem
@@ -10,7 +10,9 @@
 > `?desde=`); "sincronizar agora" pela tela; exclusão avisada pelo Control; e a
 > série do número é a da marca (`CS` / `PL`). Tudo isso entrou **antes da
 > primeira chave ser emitida** e é correção da v1, não versão nova (ver
-> "Estabilidade da v1", no fim).
+> "Estabilidade da v1", no fim). Em 22/09, o WhatsApp do cliente passou a ser
+> dado do app: o `POST /clientes` só preenche quem está sem, e o
+> `alterado_no_app` nunca traz `whatsapp`.
 >
 > **Link para enviar ao parceiro:** https://setorx-web-web.vercel.app/api-parceiro
 > (site da Corpo Sensual). O site da PLUMENE serve a mesma página no mesmo
@@ -1381,11 +1383,21 @@ ligado para a API (`409 CANAL_FECHADO`).
   códigos envolvidos.
 - **A edição do cadastro feita no app não é apagada** (a partir de
   17/09/2026). Razão social, nome fantasia, CNPJ/CPF, inscrição estadual,
-  WhatsApp, e-mail, observações e endereço também podem ser editados no app;
+  e-mail, observações e endereço também podem ser editados no app;
   enquanto a edição não chega ao seu ERP, o cliente sai no
   `GET /clientes?desde=` com `alterado_no_app`, e o `POST /clientes` **não
   sobrescreve** esses campos com outro valor — ver "Cliente editado no app"
   abaixo.
+- **O WhatsApp é do app** (a partir de 22/09/2026). O WhatsApp do cliente é
+  dado só do app — o telefone do seu ERP é outra coisa. O `POST /clientes` só
+  **preenche o WhatsApp de quem está sem**: no cliente que já tem WhatsApp no
+  app, o `whatsapp` que você mandar é ignorado, sem aviso (é a regra, não um
+  conflito). "Sem" é o cliente novo, o que está com o WhatsApp vazio ou com
+  algo que não é telefone (menos de 8 dígitos — um nome gravado por carga
+  antiga) — mas não o que ficou vazio porque alguém **apagou o WhatsApp no
+  app**: esse continua vazio. E `whatsapp` vazio (`null` ou `""`) nunca apaga
+  nada. O `alterado_no_app` **nunca traz `whatsapp`** — a troca do WhatsApp no
+  app não é algo que o seu ERP precise aplicar.
 
 ## POST /partner/v1/clientes
 
@@ -1407,7 +1419,7 @@ Corpo: `{ "clientes": [ ... ] }`, `{ "dados": [ ... ] }` ou a lista pura.
 | `pendencia_financeira` | número ou texto | Não | R$ em aberto (`1500.5` ou `"1.500,50"`). `null` limpa; negativo ou ilegível não mexe e dá aviso |
 | `titulos_vencidos` | inteiro | Não | Quantos títulos vencidos. `null` limpa |
 | `limite_credito` | número ou texto | Não | `1500.5` ou `"1.500,50"`. `null` limpa; negativo ou ilegível não mexe e dá aviso |
-| `whatsapp` | texto | Não | Com DDD. `null` limpa |
+| `whatsapp` | texto | Não | Com DDD. **Só preenche quem está sem** (22/09/2026): cliente novo recebe o seu; cliente que já existe com o WhatsApp vazio no app — ou com algo que não é telefone, menos de 8 dígitos — também; cliente que já tem WhatsApp no app fica com o dele — o seu é ignorado, sem aviso. O WhatsApp que alguém **apagou no app** continua vazio (o seu não volta por cima), e `null` ou `""` nunca apaga nada. O WhatsApp é dado do app |
 | `email` | texto | Não | `null` limpa |
 | `data_update` | data ISO | Não | Quando o cadastro mudou no ERP (`DATA_UPDATE`), **com fuso**. Informativo: é conferido (sem fuso volta em `avisos`), mas **não é gravado e não conta como mudança** — o mesmo cadastro com outro `data_update` é `sem_mudanca`. O carimbo que evita o eco no `GET /clientes?desde=` é o momento em que o app gravou o registro |
 
@@ -1487,10 +1499,17 @@ editados no app que o seu ERP ainda não tem (abaixo).
 
 O escritório e o representante podem corrigir no app o cadastro de um cliente
 que **já tem código** no seu ERP: `razao_social`, `nome_fantasia`, `cnpj_cpf`,
-`inscricao_estadual`, `whatsapp`, `email`, `observacoes` e `endereco`. Até o seu
+`inscricao_estadual`, `email`, `observacoes` e `endereco`. Até o seu
 ERP ter o mesmo valor, a edição fica **pendente** no app (o financeiro vê a
 fila) e o cliente sai no `GET /clientes?desde=` com `alterado_no_app` dizendo
 quais campos.
+
+**O WhatsApp fica de fora de tudo isto** (22/09/2026): ele também é editado no
+app, mas é dado **só do app** — o telefone do seu ERP é outra coisa. A troca do
+WhatsApp não fica pendente, não sai em `alterado_no_app` (nem numa edição que
+mexeu no WhatsApp e no e-mail: aí sai só `email`) e não gera aviso no
+`POST /clientes`. O que vale para o `whatsapp` que você manda é a regra da
+tabela acima: só preenche quem está sem.
 
 No `POST /clientes`, para cada campo com edição pendente que vier no registro:
 
@@ -1503,7 +1522,7 @@ No `POST /clientes`, para cada campo com edição pendente que vier no registro:
   atualizada e uma mais antiga ainda espera outro campo;
 - **valor diferente** → o campo **não é gravado** (o app mantém o que a pessoa
   editou) e volta um aviso por cliente:
-  `Cliente 01234: whatsapp, endereco alterados no app ainda não aplicados no Control — mantido o valor do app.`
+  `Cliente 01234: email, endereco alterados no app ainda não aplicados no Control — mantido o valor do app.`
   (até 20 clientes por resposta; o resto num aviso "E mais N cliente(s)…").
   O que fazer: aplicar no seu ERP o valor que o `GET /clientes` traz para esse
   cliente e reenviar;
@@ -1587,7 +1606,7 @@ GET /partner/v1/clientes?desde=2026-09-16T13:00:00-03:00
 ```
 
 A outra mão: o que o representante ou o escritório mudou no cadastro do
-cliente **dentro do app** (cliente novo, WhatsApp, endereço, tabela trocada),
+cliente **dentro do app** (cliente novo, endereço, e-mail, tabela trocada),
 para o seu ERP espelhar. `desde` é opcional e precisa de fuso (sem fuso,
 `400 INVALID_DESDE`; fuso positivo vai na URL como `%2B`). Sem `desde`, vem
 tudo. Exige o canal de cadastro ligado para a API.
@@ -1600,11 +1619,11 @@ registro como veio — mais estes campos só de leitura:
 | `codigo` | O código no Control; **`null` = nasceu no app** e ainda não tem código |
 | `chave` | O CNPJ/CPF só com dígitos (a chave entre os sistemas) |
 | `novo_no_control` | `true` = crie o cadastro no seu ERP e devolva o código pelo `POST /clientes` (casando pelo CNPJ) |
-| `bloqueado`, `motivo_bloqueio`, `limite_credito`, `whatsapp`, `email`, `endereco`, `inscricao_estadual`, `observacoes`, `representante`, `tabela_preco` | Como no POST (`bloqueado` sai `"S"`/`"N"`; `tabela_preco` é o código da tabela no ERP) |
+| `bloqueado`, `motivo_bloqueio`, `limite_credito`, `whatsapp`, `email`, `endereco`, `inscricao_estadual`, `observacoes`, `representante`, `tabela_preco` | Como no POST (`bloqueado` sai `"S"`/`"N"`; `tabela_preco` é o código da tabela no ERP). O `whatsapp` é o do app, só para leitura (22/09/2026): não precisa ir para o telefone do seu ERP |
 | `pendencia_financeira`, `titulos_vencidos` | O que o próprio Control mandou por último |
 | `atualizado_em` | Quando mudou no app |
 | `atualizado_pelo_control_em` | Quando o Control mandou pela última vez |
-| `alterado_no_app` | `{ "em": ISO, "campos": [...] }` ou `null`. O cadastro foi **editado no app** e o seu ERP ainda não tem a edição: `campos` usa os nomes deste contrato (`razao_social`, `nome_fantasia`, `cnpj_cpf`, `inscricao_estadual`, `whatsapp`, `email`, `observacoes`, `endereco`) e `em` é a edição mais recente. Aplique os valores deste registro nesses campos. `null` = nada pendente (ou a instalação ainda sem a migração 051). Sai sempre — campo novo, aditivo |
+| `alterado_no_app` | `{ "em": ISO, "campos": [...] }` ou `null`. O cadastro foi **editado no app** e o seu ERP ainda não tem a edição: `campos` usa os nomes deste contrato (`razao_social`, `nome_fantasia`, `cnpj_cpf`, `inscricao_estadual`, `email`, `observacoes`, `endereco`) e `em` é a edição mais recente. Aplique os valores deste registro nesses campos. **Nunca traz `whatsapp`** (22/09/2026: o WhatsApp é dado só do app). `null` = nada pendente (ou a instalação ainda sem a migração 051). Sai sempre — campo novo, aditivo |
 
 **Edição do app pendente sai até chegar ao seu ERP.** O cliente com
 `alterado_no_app` sai em **toda** puxada — mesmo com um `desde` depois da
@@ -1677,7 +1696,7 @@ O seu ERP cria o cadastro, gera o código (ex.: `01235`) e devolve
 `POST /clientes { "clientes": [ { "codigo": "01235", "razao_social": "LOJA NOVA TESTE LTDA", "cnpj_cpf": "00.000.000/0002-00", ... } ] }`
 — o cadastro do app é casado pelo CNPJ e aprende o código.
 
-**Exemplo** — um cliente que já está no seu ERP e teve o WhatsApp e o endereço
+**Exemplo** — um cliente que já está no seu ERP e teve o e-mail e o endereço
 corrigidos no app (só os campos que importam aqui):
 
 ```json
@@ -1686,16 +1705,18 @@ corrigidos no app (só os campos que importam aqui):
   "chave": "00000000000100",
   "novo_no_control": false,
   "razao_social": "CLIENTE TESTE LTDA",
-  "whatsapp": "00900000009",
+  "email": "cliente@teste.invalid",
   "endereco": { "logradouro": "Avenida Teste", "numero": "300", "complemento": null,
                 "bairro": "Centro", "cidade": "Cidade Teste", "uf": "MG", "cep": "00000000" },
   "atualizado_em": "2026-09-17T14:10:00.000+00:00",
-  "alterado_no_app": { "em": "2026-09-17T14:10:00.000+00:00", "campos": ["whatsapp", "endereco"] }
+  "alterado_no_app": { "em": "2026-09-17T14:10:00.000+00:00", "campos": ["email", "endereco"] }
 }
 ```
 
-O seu ERP grava o WhatsApp e o endereço e, no próximo `POST /clientes` desse
-cliente com os mesmos valores, a edição sai da fila do app.
+O seu ERP grava o e-mail e o endereço e, no próximo `POST /clientes` desse
+cliente com os mesmos valores, a edição sai da fila do app. (Se o representante
+tivesse trocado também o WhatsApp nessa edição, `campos` continuaria sendo
+`["email", "endereco"]`: o WhatsApp é do app.)
 
 ## GET /partner/v1/representantes?desde= — o que mudou no app
 
@@ -1764,7 +1785,8 @@ o outro lado recebe cópia, nunca inventa.
 | Dado | Dono (quem cria) | O outro lado |
 |---|---|---|
 | Código do cliente | **ERP** | O app recebe por `POST /clientes` e guarda como `codigo_erp`. Cliente que nasce no app sai em `GET /clientes?desde=` com `novo_no_control: true`; o ERP cria e devolve o código, casando pelo **CNPJ** (a chave entre os sistemas) |
-| Cadastro do cliente (razão social, nome fantasia, WhatsApp, e-mail, inscrição estadual, observações, endereço) | **ERP e app** — a edição do app pendente prevalece até o ERP devolver o mesmo valor (ou o financeiro confirmar que atualizou); sem edição pendente, vale o que o ERP mandar | Chega por `POST /clientes`. Desde 17/09/2026 também é **editado no app** (admin, financeiro, gerente e o representante na própria carteira); a edição sai em `GET /clientes?desde=` com `alterado_no_app` e o `POST /clientes` não a sobrescreve até trazer o mesmo valor — aí ela é dada por atualizada |
+| Cadastro do cliente (razão social, nome fantasia, e-mail, inscrição estadual, observações, endereço) | **ERP e app** — a edição do app pendente prevalece até o ERP devolver o mesmo valor (ou o financeiro confirmar que atualizou); sem edição pendente, vale o que o ERP mandar | Chega por `POST /clientes`. Desde 17/09/2026 também é **editado no app** (admin, financeiro, gerente e o representante na própria carteira); a edição sai em `GET /clientes?desde=` com `alterado_no_app` e o `POST /clientes` não a sobrescreve até trazer o mesmo valor — aí ela é dada por atualizada |
+| WhatsApp do cliente | **App** (desde 22/09/2026) — o telefone do ERP é outra coisa | Editado só no app, sem ir ao ERP: nunca sai em `alterado_no_app`. O `POST /clientes` só preenche o WhatsApp de quem está sem (cliente novo, ou existente com o WhatsApp vazio ou sem telefone de verdade — menos de 8 dígitos); no cliente que já tem, o `whatsapp` do ERP é ignorado, sem aviso, e o que alguém apagou no app continua vazio. Sai no `GET /clientes` e no pedido (`cliente.whatsapp`) só para leitura |
 | CPF/CNPJ do cliente | **ERP e app** (no app, só o escritório) | Chave entre os sistemas. No app, só admin e financeiro trocam; a troca segue a mesma regra da linha acima (`cnpj_cpf` em `alterado_no_app`). O cliente com o documento antigo no ERP continua casando pelo código — mesmo que outro cadastro do app tenha esse documento. Enquanto a troca está pendente, a `chave` no `GET /clientes` e no `GET /pedidos` já é o documento novo: case pelo `codigo` |
 | Código do representante | **ERP** | Chega em cada cliente (`representante`), mostra o cliente ao rep com o mesmo código no login e sai no pedido como `representante_erp`. `POST /representantes` só atualiza nome, razão social e ativo de quem já tem login **e** já tem esse código gravado no app |
 | Tabela de preço (código, descrição, coluna, ativo) | **ERP** | Chega por `POST /tabelas-preco`. O app guarda o vínculo no cliente e, em cada pedido, a tabela que o precificou; o pedido sai com a tabela dele |
@@ -1794,12 +1816,14 @@ O que o app guarda de cada cliente (alimentado pelo ERP via `POST /clientes`):
 | Bloqueado | `bloqueado`, `motivo_bloqueio` | `"S"` = selo "Bloqueado" no cadastro e aviso ao financeiro; **não trava o pedido do representante** |
 | Pendência financeira | `pendencia_financeira`, `titulos_vencidos` | O que o financeiro vê antes de decidir o pedido; vem pelo `POST /clientes` ou pelo `POST /retrato` |
 | Limite de crédito | `limite_credito` | Informativo |
-| WhatsApp / e-mail | `whatsapp`, `email` | Contato e o botão "Enviar pedido para o cliente"; saem no pedido em `cliente.whatsapp` e `cliente.email` |
+| WhatsApp / e-mail | `whatsapp`, `email` | Contato e o botão "Enviar pedido para o cliente"; saem no pedido em `cliente.whatsapp` e `cliente.email`. O WhatsApp é do app (22/09/2026): o `POST /clientes` só o preenche quando o cliente está sem |
 
 Razão social, nome fantasia, CNPJ/CPF, inscrição estadual, observações,
-endereço, WhatsApp e e-mail também são editáveis no app (17/09/2026): a edição
+endereço e e-mail também são editáveis no app (17/09/2026): a edição
 volta ao ERP pelo `GET /clientes?desde=` (`alterado_no_app`) e não é apagada
-pelo `POST /clientes` — ver "Cliente editado no app". Código, representante,
+pelo `POST /clientes` — ver "Cliente editado no app". O WhatsApp também é
+editado no app, mas é dado só do app (22/09/2026): não volta ao ERP e o
+`POST /clientes` só o preenche quando está vazio. Código, representante,
 tabela, bloqueio, limite e pendência continuam só do ERP.
 
 ## Representante
@@ -1847,7 +1871,8 @@ pedido. Pedido sem condição sai com `condicao_pagamento: null`, sem pendência
 | Número no app | `numero` | App | O número que rep e cliente enxergam (ex.: 10231) |
 | **Número no ERP** | `pedido_erp` | **ERP** | Ex.: `CS17379`, sempre na forma normalizada. Nasce na importação, volta pela confirmação e aparece no app para todo mundo |
 | Situação | `situacao` | App | Ver "Situações do pedido" abaixo |
-| Cliente | `cliente.*` | ERP | Código, CNPJ, razão social, fantasia, endereço, inscrição estadual, WhatsApp, e-mail |
+| Cliente | `cliente.*` | ERP e app | Código, CNPJ, razão social, fantasia, endereço, inscrição estadual, e-mail — o código é do ERP; o cadastro também é editado no app (ver "Quem é dono de cada dado") |
+| WhatsApp do cliente | `cliente.whatsapp` | App | Desde 22/09/2026 o WhatsApp é dado só do app — o telefone do ERP é outra coisa. Sai no pedido só para leitura |
 | Representante | `representante_erp` | ERP | Código do rep gravado no cliente |
 | Tabela de preço | `tabela_preco.*` | ERP | Código + coluna da **tabela que precificou o pedido**. Pedido sem tabela gravada usa a do cadastro do cliente; tabela gravada sem código do ERP sai `null` e vira pendência — **nunca** cai para outra tabela |
 | Condição de pagamento | `condicao_pagamento.*` | ERP (código) | Escolhida no app entre as condições do Control; `null` se não escolhida |
@@ -1962,6 +1987,14 @@ hoje de outro cadastro sem código — confira qual dos dois é este cliente`); 
 folga, com a lista paginada pela ordem e não pela posição (o `desde` da próxima
 puxada não pula uma mudança gravada durante a leitura; o que mudou nesses 2
 minutos sai de novo, o que é inofensivo).
+
+**A mudança de 22/09/2026 — o WhatsApp é do app** (nada renomeado nem
+removido): no `POST /clientes`, o `whatsapp` só preenche o cliente que está sem
+(novo, ou existente com o WhatsApp vazio no app, ou com algo que não é telefone
+— menos de 8 dígitos); no cliente que já tem, o valor mandado é ignorado, sem
+aviso. O WhatsApp que alguém apagou no app continua vazio, e o `whatsapp` vazio
+(`null` ou `""`) nunca apaga nada. O `alterado_no_app` do `GET /clientes`
+nunca traz `whatsapp` — a troca do WhatsApp no app não precisa ir ao seu ERP.
 
 ## Dúvidas / suporte
 

@@ -4,7 +4,9 @@ import path from 'node:path';
 import { camposQueVieram, linhaForaDasPecas, montarEdicaoDoCadastro } from '@csb/shared';
 import type { AlteracaoDoCliente, CustomerDetail, EditarCadastroDoClienteResponse } from '@csb/shared';
 import {
+  AJUDA_DO_WHATSAPP_SO_NO_APP,
   AVISO_DA_EDICAO_SEM_REGISTRO_PARA_O_CONTROL,
+  MARCA_SO_NO_APP,
   alteracaoPendente,
   autoriaDaAlteracao,
   avisoDaConfirmacao,
@@ -26,6 +28,7 @@ import {
   formularioDoCliente,
   fraseDoRodapeComErroNoCampo,
   linhasDaAlteracao,
+  linhasParaOControl,
   marcarConfirmadasNaFicha,
   mensagemDoErroDaConfirmacao,
   mensagemDoErroDaEdicao,
@@ -89,7 +92,9 @@ function alteracao(extra: Partial<AlteracaoDoCliente> = {}): AlteracaoDoCliente 
     alterado_por: 'u1',
     alterado_por_nome: 'Pessoa Teste',
     alterado_em: '2026-09-17T14:30:00.000Z',
-    campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } },
+    // Era o WhatsApp até 22/09/2026 — hoje só do app, nunca pendência. O cartão,
+    // a baixa e as frases são provados com um campo que vai ao Control.
+    campos: { email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' } },
     erp_pendente: true,
     erp_atualizado_em: null,
     erp_atualizado_por: null,
@@ -489,77 +494,92 @@ describe('503 GRAVACAO_NAO_CONFIRMADA com a edição já aplicada (revisão de 1
   // fica alterado e a mudança não entra na fila do Control — sem cartão, sem
   // push, sem item na Minha área. Dizer só "os campos já estão com o que está
   // no cadastro agora" fazia a pessoa fechar o diálogo achando que deu certo.
+  //
+  // O campo de exemplo era o WhatsApp até 22/09/2026, quando ele virou dado só
+  // do app (nunca entra na lista do Control): as mesmas asserções seguem com o
+  // nome fantasia, e o WhatsApp tem o teste dele no fim deste bloco.
   const erro503 = () => erroDaApi('GRAVACAO_NAO_CONFIRMADA', { error: 'O banco não confirmou se o cadastro foi salvo.' });
-  const novo = { whatsapp: '32988880000' };
+  const novo = { trade_name: 'FANTASIA NOVA' };
 
   it('a ficha relida está com o valor enviado e sem pendência dele: a edição ficou SEM registro para o Control', () => {
-    const relida = cliente({ whatsapp: '32988880000', alteracoes: [] });
+    const relida = cliente({ trade_name: 'FANTASIA NOVA', alteracoes: [] });
     expect(edicaoSemRegistroParaOControl(erro503(), novo, relida)).toBe(true);
     // Sem o campo `alteracoes` (a leitura degradou) a conclusão é a mesma: o
     // 503 só sai por caminhos que não chegam a gravar o histórico.
-    expect(edicaoSemRegistroParaOControl(erro503(), novo, cliente({ whatsapp: '32988880000' }))).toBe(true);
+    expect(edicaoSemRegistroParaOControl(erro503(), novo, cliente({ trade_name: 'FANTASIA NOVA' }))).toBe(true);
     expect(AVISO_DA_EDICAO_SEM_REGISTRO_PARA_O_CONTROL).toMatch(/Control/);
     expect(AVISO_DA_EDICAO_SEM_REGISTRO_PARA_O_CONTROL).toMatch(/suporte/);
   });
 
   it('não acusa quando há pendência do campo, quando o cadastro está como estava, nem fora do 503', () => {
-    const comPendencia = cliente({ whatsapp: '32988880000', alteracoes: [alteracao()] });
+    const comPendencia = cliente({
+      trade_name: 'FANTASIA NOVA',
+      alteracoes: [alteracao({ campos: { trade_name: { antes: 'Loja Fictícia', depois: 'FANTASIA NOVA' } } })],
+    });
     expect(edicaoSemRegistroParaOControl(erro503(), novo, comPendencia)).toBe(false);
     // A pendência de OUTRO campo não explica esta edição.
     const deOutroCampo = cliente({
-      whatsapp: '32988880000',
+      trade_name: 'FANTASIA NOVA',
       alteracoes: [alteracao({ campos: { email: { antes: null, depois: 'a@b.invalid' } } })],
     });
     expect(edicaoSemRegistroParaOControl(erro503(), novo, deOutroCampo)).toBe(true);
     // O cadastro continua como estava: não gravou.
     expect(edicaoSemRegistroParaOControl(erro503(), novo, cliente({ alteracoes: [] }))).toBe(false);
     // Falha de rede pura pode ter gravado COM histórico — aí o cartão aparece sozinho.
-    expect(edicaoSemRegistroParaOControl(new TypeError('Failed to fetch'), novo, cliente({ whatsapp: '32988880000' }))).toBe(
+    expect(edicaoSemRegistroParaOControl(new TypeError('Failed to fetch'), novo, cliente({ trade_name: 'FANTASIA NOVA' }))).toBe(
       false,
     );
-    expect(edicaoSemRegistroParaOControl(erroDaApi('MUDOU_DE_NOVO', {}), novo, cliente({ whatsapp: '32988880000' }))).toBe(
+    expect(edicaoSemRegistroParaOControl(erroDaApi('MUDOU_DE_NOVO', {}), novo, cliente({ trade_name: 'FANTASIA NOVA' }))).toBe(
       false,
     );
     expect(edicaoSemRegistroParaOControl(erro503(), {}, cliente({ alteracoes: [] }))).toBe(false);
   });
 
   it('pendência ANTIGA do mesmo campo com outro `depois` não é o registro desta edição: acusa (revisão de 17/09/2026)', () => {
-    // Segunda: WhatsApp 32999990000 → 32988880000, esperando o financeiro. Hoje:
-    // → 32977770000, e o 503. O 503 nunca grava histórico: a pendência de
-    // segunda não explica o 32977770000 — contada só pela chave, ela escondia o
-    // aviso, e o cartão seguia mandando pôr 32988880000 no Control.
-    const antiga = alteracao({ campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } } });
-    const relida = cliente({ whatsapp: '32977770000', alteracoes: [antiga] });
-    expect(edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32977770000' }, relida)).toBe(true);
+    // Segunda: nome fantasia Loja Fictícia → FANTASIA NOVA, esperando o financeiro. Hoje:
+    // → FANTASIA DE HOJE, e o 503. O 503 nunca grava histórico: a pendência de
+    // segunda não explica o FANTASIA DE HOJE — contada só pela chave, ela escondia o
+    // aviso, e o cartão seguia mandando pôr FANTASIA NOVA no Control.
+    const antiga = alteracao({ campos: { trade_name: { antes: 'Loja Fictícia', depois: 'FANTASIA NOVA' } } });
+    const relida = cliente({ trade_name: 'FANTASIA DE HOJE', alteracoes: [antiga] });
+    expect(edicaoSemRegistroParaOControl(erro503(), { trade_name: 'FANTASIA DE HOJE' }, relida)).toBe(true);
     // A pendência que leva AO valor enviado continua valendo como registro (com máscara/espaço também).
-    const mesma = alteracao({ campos: { whatsapp: { antes: '32988880000', depois: '32977770000' } } });
+    const mesma = alteracao({ campos: { trade_name: { antes: 'FANTASIA NOVA', depois: 'FANTASIA DE HOJE' } } });
     expect(
-      edicaoSemRegistroParaOControl(erro503(), { whatsapp: ' 32977770000 ' }, cliente({ whatsapp: '32977770000', alteracoes: [antiga, mesma] })),
+      edicaoSemRegistroParaOControl(erro503(), { trade_name: ' FANTASIA DE HOJE ' }, cliente({ trade_name: 'FANTASIA DE HOJE', alteracoes: [antiga, mesma] })),
     ).toBe(false);
     // Já resolvida não é registro de nada que esteja esperando o Control.
     const resolvida = alteracao({
-      campos: { whatsapp: { antes: '32988880000', depois: '32977770000' } },
+      campos: { trade_name: { antes: 'FANTASIA NOVA', depois: 'FANTASIA DE HOJE' } },
       erp_atualizado_em: '2026-09-17T15:00:00.000Z',
       erp_atualizado_via: 'app',
     });
-    expect(edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32977770000' }, cliente({ whatsapp: '32977770000', alteracoes: [resolvida] }))).toBe(
+    expect(edicaoSemRegistroParaOControl(erro503(), { trade_name: 'FANTASIA DE HOJE' }, cliente({ trade_name: 'FANTASIA DE HOJE', alteracoes: [resolvida] }))).toBe(
       true,
     );
   });
 
   it('gravou, e outra mão trocou OUTRO campo do mesmo envio antes da releitura: o campo que ficou com o valor mandado é acusado', () => {
-    // O UPDATE é um compare-and-set de todas as colunas juntas: o WhatsApp com o
+    // O UPDATE é um compare-and-set de todas as colunas juntas: o nome fantasia com o
     // valor mandado prova que a edição gravou — o e-mail num terceiro valor não
-    // desmente isso. Exigir TODOS os campos deixava o WhatsApp sem registro calado.
-    const misturada = cliente({ whatsapp: '32988880000', email: 'terceiro@exemplo.invalid', alteracoes: [] });
+    // desmente isso. Exigir TODOS os campos deixava o nome fantasia sem registro calado.
+    const misturada = cliente({ trade_name: 'FANTASIA NOVA', email: 'terceiro@exemplo.invalid', alteracoes: [] });
     expect(
-      edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32988880000', email: 'novo@exemplo.invalid' }, misturada),
+      edicaoSemRegistroParaOControl(erro503(), { trade_name: 'FANTASIA NOVA', email: 'novo@exemplo.invalid' }, misturada),
     ).toBe(true);
     // Nenhum campo com o valor mandado: não gravou (ou outra mão desfez tudo) — nada a acusar.
-    const nenhum = cliente({ whatsapp: '32999990000', email: 'terceiro@exemplo.invalid', alteracoes: [] });
-    expect(edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32988880000', email: 'novo@exemplo.invalid' }, nenhum)).toBe(
+    const nenhum = cliente({ trade_name: 'Loja Fictícia', email: 'terceiro@exemplo.invalid', alteracoes: [] });
+    expect(edicaoSemRegistroParaOControl(erro503(), { trade_name: 'FANTASIA NOVA', email: 'novo@exemplo.invalid' }, nenhum)).toBe(
       false,
     );
+  });
+
+  it('só o WhatsApp (22/09/2026): ele nunca entra na lista do Control — gravado sem registro, não é a mudança que "não entrou na lista"', () => {
+    const relida = cliente({ whatsapp: '32988880000', alteracoes: [] });
+    expect(edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32988880000' }, relida)).toBe(false);
+    // Na mista, o campo que vai ao Control ainda acusa.
+    const mista = cliente({ whatsapp: '32988880000', trade_name: 'FANTASIA NOVA', alteracoes: [] });
+    expect(edicaoSemRegistroParaOControl(erro503(), { whatsapp: '32988880000', trade_name: 'FANTASIA NOVA' }, mista)).toBe(true);
   });
 
   it('o diálogo avisa depois de reler, em vez de deixar só a frase da releitura', () => {
@@ -799,34 +819,35 @@ describe('o cartão "Para atualizar no Control"', () => {
 
   // ─── O campo que uma edição mais nova já trocou (revisão de 17/09/2026) ────
   //
-  // E1 (10:00): WhatsApp A→B e e-mail X→Y. E2 (10:05): WhatsApp B→C. O app
+  // E1 (10:00): nome fantasia A→B e e-mail X→Y. E2 (10:05): nome fantasia B→C. O app
   // está com C. O cartão é "a lista do que digitar": mostrar o B de E1 como
   // valor a pôr no Control fazia o financeiro digitar um valor vencido — e a
   // baixa de E1 soltava a coluna para o próximo envio do Control gravar B por
-  // cima do C do app, sem aviso.
-  const A = '32999990000';
-  const B = '32988880000';
-  const C = '32977770000';
+  // cima do C do app, sem aviso. (O campo era o WhatsApp até 22/09/2026, quando
+  // ele virou dado só do app e saiu do cartão — a regra segue com o nome fantasia.)
+  const A = 'FANTASIA A';
+  const B = 'FANTASIA B';
+  const C = 'FANTASIA C';
   const e1 = (extra: Partial<AlteracaoDoCliente> = {}) =>
     alteracao({
       id: 'e1',
       alterado_em: '2026-09-17T10:00:00.000Z',
-      campos: { whatsapp: { antes: A, depois: B }, email: { antes: 'x@exemplo.invalid', depois: 'y@exemplo.invalid' } },
+      campos: { trade_name: { antes: A, depois: B }, email: { antes: 'x@exemplo.invalid', depois: 'y@exemplo.invalid' } },
       ...extra,
     });
   const e2 = (extra: Partial<AlteracaoDoCliente> = {}) =>
-    alteracao({ id: 'e2', alterado_em: '2026-09-17T10:05:00.000Z', campos: { whatsapp: { antes: B, depois: C } }, ...extra });
+    alteracao({ id: 'e2', alterado_em: '2026-09-17T10:05:00.000Z', campos: { trade_name: { antes: B, depois: C } }, ...extra });
 
   it('a edição mais nova do mesmo campo já RESOLVIDA pelo Control: a linha da pendente sai superada, com o valor que vale', () => {
     const resolvida = e2({ erp_atualizado_em: '2026-09-17T10:30:00.000Z', erp_atualizado_via: 'api' });
     const todas = [resolvida, e1()]; // como a API manda: das mais novas para as mais antigas
     expect(pendentesNaOrdemDeDigitar(todas).map((a) => a.id)).toEqual(['e1']);
 
-    const [whatsapp, email] = linhasDaAlteracao(e1(), todas);
-    expect(whatsapp).toMatchObject({ campo: 'whatsapp', antes: A, depois: B, superada: { depois: C, em: '2026-09-17T10:05:00.000Z' } });
+    const [fantasia, email] = linhasDaAlteracao(e1(), todas);
+    expect(fantasia).toMatchObject({ campo: 'trade_name', antes: A, depois: B, superada: { depois: C, em: '2026-09-17T10:05:00.000Z' } });
     expect(email).toMatchObject({ campo: 'email', depois: 'y@exemplo.invalid' });
     expect(email!.superada).toBeUndefined();
-    expect(notaDaLinhaSuperada(whatsapp!, () => '17/09/2026 07:05')).toBe(
+    expect(notaDaLinhaSuperada(fantasia!, () => '17/09/2026 07:05')).toBe(
       `Mudou de novo em 17/09/2026 07:05: no Control vale ${C}, não ${B}.`,
     );
     expect(notaDaLinhaSuperada(email!)).toBeNull();
@@ -836,7 +857,7 @@ describe('o cartão "Para atualizar no Control"', () => {
     const todas = [e2(), e1()];
     const cartao = pendentesNaOrdemDeDigitar(todas);
     expect(cartao.map((a) => a.id)).toEqual(['e1', 'e2']);
-    expect(linhasDaAlteracao(cartao[0]!, todas).find((l) => l.campo === 'whatsapp')!.superada?.depois).toBe(C);
+    expect(linhasDaAlteracao(cartao[0]!, todas).find((l) => l.campo === 'trade_name')!.superada?.depois).toBe(C);
     // A mais nova não é superada por ninguém.
     expect(linhasDaAlteracao(cartao[1]!, todas).every((l) => l.superada === undefined)).toBe(true);
     // A mesma hora: o id desempata, como na API.
@@ -845,7 +866,7 @@ describe('o cartão "Para atualizar no Control"', () => {
   });
 
   it('a mais nova levou o campo de VOLTA ao mesmo valor: nada a marcar; sem a lista, nada muda', () => {
-    const volta = alteracao({ id: 'e3', alterado_em: '2026-09-17T11:00:00.000Z', campos: { whatsapp: { antes: C, depois: B } } });
+    const volta = alteracao({ id: 'e3', alterado_em: '2026-09-17T11:00:00.000Z', campos: { trade_name: { antes: C, depois: B } } });
     const todas = [volta, e2(), e1()];
     expect(linhasDaAlteracao(e1(), todas).every((l) => l.superada === undefined)).toBe(true);
     // Sem a lista (o histórico recolhido), as linhas são as de sempre.
@@ -856,7 +877,10 @@ describe('o cartão "Para atualizar no Control"', () => {
     const cartao = lerDoRepo('apps/web/src/components/comercial/AlteracoesParaOControl.tsx');
     expect(cartao).toMatch(/const pendentes = useMemo\(\(\) => pendentesNaOrdemDeDigitar\(alteracoes\), \[alteracoes\]\);/);
     expect(cartao).toMatch(/<CamposDaAlteracao alteracao=\{a\} todas=\{alteracoes\}/);
-    expect(cartao).toMatch(/linhasDaAlteracao\(alteracao, todas\)/);
+    // Desde 22/09/2026 o cartão usa `linhasParaOControl` (as de
+    // `linhasDaAlteracao` com a lista inteira, sem o WhatsApp); o histórico, as
+    // de sempre.
+    expect(cartao).toMatch(/todas \? linhasParaOControl\(alteracao, todas\) : linhasDaAlteracao\(alteracao\)/);
     expect(cartao).toMatch(/const nota = notaDaLinhaSuperada\(l\);/);
     // A baixa continua sendo só do que está na tela.
     expect(cartao).toMatch(/onConfirmar\(pendentes\.map\(\(a\) => a\.id\)\)/);
@@ -906,5 +930,124 @@ describe('Já atualizei no Control', () => {
     expect(avisoDaConfirmacao(1, 0, [resolvida])).toMatch(/já estava em dia/);
     expect(avisoDaConfirmacao(1, 1, [resolvida, alteracao({ id: 'nova' })])).toMatch(/Chegou alteração nova/);
     expect(avisoDaConfirmacao(1, 1, null)).toBe('Marcado como atualizado no Control.');
+  });
+});
+
+// ─── O WhatsApp é só do app (22/09/2026) ─────────────────────────────────────
+//
+// Pedido do Yan: "que eu possa alterar o wtss do cliente sem ter que subir pro
+// control, numero uma coisa numero de wtss outro".
+
+describe('o WhatsApp é só do app (22/09/2026)', () => {
+  const soWhatsapp = (extra: Partial<AlteracaoDoCliente> = {}) =>
+    alteracao({ id: 'w1', campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } }, ...extra });
+  const mista = (extra: Partial<AlteracaoDoCliente> = {}) =>
+    alteracao({
+      id: 'm1',
+      campos: {
+        whatsapp: { antes: '32999990000', depois: '32988880000' },
+        email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' },
+      },
+      ...extra,
+    });
+
+  it('o aviso depois de salvar só o WhatsApp num cliente com código: salvou, e fica só no app — sem financeiro, sem Control', () => {
+    const resposta = {
+      data: cliente({ whatsapp: '32988880000' }),
+      alteracao: soWhatsapp({ erp_pendente: false }),
+      erp_pendente: false,
+      control_puxa_pela_api: false,
+      avisados: null,
+    } as EditarCadastroDoClienteResponse;
+
+    for (const papel of ['rep', 'financeiro', 'admin', null] as const) {
+      const frase = avisoDoCadastroSalvo(resposta, papel);
+      expect(frase).toBe('Cadastro salvo. O WhatsApp fica só no app — não precisa atualizar no Control.');
+      expect(frase).not.toMatch(/financeiro/);
+      expect(frase).not.toMatch(/lista para atualizar/);
+      expect(frase).not.toMatch(/ainda não está no Control/);
+    }
+    // O 500 SALVO_SEM_RELER_A_FICHA traz a alteração no corpo: a mesma frase.
+    const e = erroDaApi('SALVO_SEM_RELER_A_FICHA', {
+      error: 'O cadastro foi salvo, mas não deu para recarregar a ficha.',
+      alteracao: soWhatsapp({ erp_pendente: false }),
+      erp_pendente: false,
+      control_puxa_pela_api: false,
+      avisados: null,
+    });
+    expect(edicaoGravadaApesarDoErro(e, 'rep')?.mensagem).toBe(
+      'Cadastro salvo. O WhatsApp fica só no app — não precisa atualizar no Control.',
+    );
+  });
+
+  it('o aviso da edição mista segue o de sempre (o financeiro foi avisado pelo outro campo); sem a alteração na resposta, também', () => {
+    const mistaSalva = {
+      data: cliente(),
+      alteracao: mista(),
+      erp_pendente: true,
+      control_puxa_pela_api: false,
+      avisados: { financeiro: 1, admin: 0 },
+    } as EditarCadastroDoClienteResponse;
+    expect(avisoDoCadastroSalvo(mistaSalva)).toBe('Cadastro salvo. O financeiro foi avisado para atualizar no Control.');
+    // Resposta sem `alteracao` (API anterior): nada a supor — a frase de sempre.
+    expect(avisoDoCadastroSalvo({ erp_pendente: false })).toBe('Cadastro salvo. Cliente ainda não está no Control.');
+  });
+
+  it('a linha curta embaixo do WhatsApp no diálogo', () => {
+    expect(AJUDA_DO_WHATSAPP_SO_NO_APP).toBe('Fica só no app — não precisa atualizar no Control.');
+    const dialogo = lerDoRepo('apps/web/src/components/comercial/EditarCadastroDoCliente.tsx');
+    const campo = dialogo.indexOf("id={idDo('whatsapp')}");
+    expect(campo).toBeGreaterThan(-1);
+    const fimDoCampo = dialogo.indexOf('</Campo>', campo);
+    const trecho = dialogo.slice(campo, fimDoCampo);
+    expect(trecho).toMatch(/ajuda=\{AJUDA_DO_WHATSAPP_SO_NO_APP\}/);
+    // Ligada ao campo para o leitor de tela (aria-describedby).
+    expect(trecho).toMatch(/ligar\('whatsapp', \{ ajuda: true \}\)/);
+  });
+
+  it('pendência: a só de WhatsApp (gravada pendente antes da regra) não é; a mista é — e vai para o histórico, não para o cartão', () => {
+    expect(alteracaoPendente(soWhatsapp())).toBe(false);
+    expect(alteracaoPendente(mista())).toBe(true);
+    const { pendentes, resolvidas } = separarAlteracoes([soWhatsapp(), mista()]);
+    expect(pendentes.map((a) => a.id)).toEqual(['m1']);
+    expect(resolvidas.map((a) => a.id)).toEqual(['w1']);
+    expect(pendentesNaOrdemDeDigitar([soWhatsapp(), mista()]).map((a) => a.id)).toEqual(['m1']);
+    // A frase da baixa não conta a só de WhatsApp como "alteração nova".
+    expect(avisoDaConfirmacao(1, 1, [soWhatsapp()])).toBe('Marcado como atualizado no Control.');
+  });
+
+  it('o cartão da mista mostra só o e-mail; o histórico mostra o WhatsApp marcado "só no app"', () => {
+    expect(linhasParaOControl(mista(), [mista()]).map((l) => l.campo)).toEqual(['email']);
+    const historicoDaMista = linhasDaAlteracao(mista());
+    expect(historicoDaMista.map((l) => [l.campo, l.soNoApp ?? false])).toEqual([
+      ['whatsapp', true],
+      ['email', false],
+    ]);
+    expect(MARCA_SO_NO_APP).toBe('só no app');
+    const cartao = lerDoRepo('apps/web/src/components/comercial/AlteracoesParaOControl.tsx');
+    expect(cartao).toMatch(/\{l\.soNoApp && \(/);
+    expect(cartao).toMatch(/\{MARCA_SO_NO_APP\}/);
+  });
+
+  it('a situação da edição só de WhatsApp no histórico: fica só no app (e não "ainda não estava no Control")', () => {
+    const f = () => '22/09/2026 10:00';
+    for (const a of [soWhatsapp({ erp_pendente: false }), soWhatsapp()]) {
+      expect(situacaoDaAlteracao(a, f)).toBe('Fica só no app — não vai para o Control');
+    }
+    // Revisão de 22/09/2026: a linha só de WhatsApp gravada pendente entre
+    // 21/09 e 22/09 e que alguém JÁ RESOLVEU conserva a baixa — quem deu e
+    // quando. Dizer "não vai para o Control" apagava isso da ficha.
+    const resolvida = { erp_atualizado_em: '2026-09-21T15:00:00Z', erp_atualizado_por_nome: 'Financeiro Ficticio' };
+    expect(situacaoDaAlteracao(soWhatsapp({ ...resolvida, erp_atualizado_via: 'app' }), f)).toBe(
+      'Atualizado no Control por Financeiro Ficticio em 22/09/2026 10:00',
+    );
+    expect(situacaoDaAlteracao(soWhatsapp({ ...resolvida, erp_atualizado_por_nome: null, erp_atualizado_via: 'api' }), f)).toBe(
+      'Atualizado pelo Control automaticamente em 22/09/2026 10:00',
+    );
+    // A mista segue a régua de sempre.
+    expect(situacaoDaAlteracao(mista(), f)).toBe('Esperando atualizar no Control');
+    expect(situacaoDaAlteracao(mista({ erp_atualizado_em: '2026-09-22T13:00:00Z', erp_atualizado_via: 'api' }), f)).toBe(
+      'Atualizado pelo Control automaticamente em 22/09/2026 10:00',
+    );
   });
 });

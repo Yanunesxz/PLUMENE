@@ -11,6 +11,7 @@ import { Textarea } from '../interface/Textarea.js';
 import { Spinner } from '../interface/Spinner.js';
 import { cn } from '../../lib/utils.js';
 import {
+  AJUDA_DO_WHATSAPP_SO_NO_APP,
   AVISO_DA_EDICAO_SEM_REGISTRO_PARA_O_CONTROL,
   avisoDaReleituraDepoisDoErro,
   avisoDoCadastroMudadoPorFora,
@@ -568,9 +569,17 @@ export function EditarCadastroDoCliente({ cliente, onSalvo, onRecarregado, onGra
                   Contato
                 </legend>
                 <div className="grid gap-3 sm:grid-cols-2">
-                  <Campo id={idDo('whatsapp')} rotulo={ROTULO_DO_CAMPO_DO_CADASTRO.whatsapp} erro={erros.whatsapp}>
+                  {/* O WhatsApp é só do app (22/09/2026, Yan: "numero uma coisa
+                      numero de wtss outro"): trocar aqui não vai para a lista do
+                      Control — a linha embaixo diz isso a quem edita. */}
+                  <Campo
+                    id={idDo('whatsapp')}
+                    rotulo={ROTULO_DO_CAMPO_DO_CADASTRO.whatsapp}
+                    erro={erros.whatsapp}
+                    ajuda={AJUDA_DO_WHATSAPP_SO_NO_APP}
+                  >
                     <Input
-                      {...ligar('whatsapp')}
+                      {...ligar('whatsapp', { ajuda: true })}
                       maxLength={30}
                       placeholder="(00) 00000-0000"
                       inputMode="tel"

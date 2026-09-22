@@ -4,8 +4,10 @@ import { Button } from '../interface/Button.js';
 import { Spinner } from '../interface/Spinner.js';
 import { cn } from '../../lib/utils.js';
 import {
+  MARCA_SO_NO_APP,
   autoriaDaAlteracao,
   linhasDaAlteracao,
+  linhasParaOControl,
   notaDaLinhaSuperada,
   pendentesNaOrdemDeDigitar,
   separarAlteracoes,
@@ -48,6 +50,10 @@ interface Props {
  * app já não tinha.
  *
  * Abaixo, recolhido, o histórico das alterações já resolvidas.
+ *
+ * O WhatsApp é só do app (22/09/2026, Yan: "numero uma coisa numero de wtss
+ * outro"): nunca é linha do cartão — o Control não o recebe. No histórico ele
+ * aparece como os outros campos, marcado "só no app".
  */
 export function AlteracoesParaOControl({ alteracoes, erpId, podeConfirmar, online, ocupado, erro, onConfirmar }: Props) {
   const [historicoAberto, setHistoricoAberto] = useState(false);
@@ -155,7 +161,9 @@ export function AlteracoesParaOControl({ alteracoes, erpId, podeConfirmar, onlin
 /**
  * "Rótulo: antes → depois", um por campo. Com `todas` (o cartão das pendentes),
  * o campo que uma edição mais nova já trocou sai riscado, com a nota do valor
- * que vale — nunca como mais uma coisa a digitar.
+ * que vale — nunca como mais uma coisa a digitar — e o campo só do app não
+ * aparece (22/09/2026). Sem `todas` (o histórico), todos os campos, e o só do
+ * app com a marca "só no app".
  */
 function CamposDaAlteracao({
   alteracao,
@@ -166,9 +174,10 @@ function CamposDaAlteracao({
   todas?: readonly AlteracaoDoCliente[];
   className: string;
 }) {
+  const linhas = todas ? linhasParaOControl(alteracao, todas) : linhasDaAlteracao(alteracao);
   return (
     <dl className={cn('mt-1 space-y-1 text-sm', className)}>
-      {linhasDaAlteracao(alteracao, todas).map((l) => {
+      {linhas.map((l) => {
         const nota = notaDaLinhaSuperada(l);
         return (
           <div key={l.campo} className="break-words">
@@ -178,6 +187,11 @@ function CamposDaAlteracao({
               <span aria-hidden> → </span>
               <span className="sr-only"> para </span>
               <span className={nota ? 'line-through opacity-70' : 'font-semibold'}>{l.depois}</span>
+              {l.soNoApp && (
+                <span className="ml-1.5 whitespace-nowrap rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
+                  {MARCA_SO_NO_APP}
+                </span>
+              )}
             </dd>
             {nota && <dd className="text-xs font-medium">{nota}</dd>}
           </div>

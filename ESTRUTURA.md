@@ -233,6 +233,9 @@ apps/api/src/
 │   │                       recalculado, histórico em customer_changes (se falhar, desfaz o
 │   │                       cliente). Com erp_id fica pendente e avisa financeiro+admin por push
 │   │                       (canal de cadastro != 'api'). Sem a 051: 503 MIGRACAO_PENDENTE.
+│   │                       WhatsApp é só do app (22/09/2026, CAMPOS_SO_DO_APP no shared): a edição
+│   │                       só dele grava o histórico mas nunca fica pendente (sem push, sem fila,
+│   │                       fora do alterado_no_app); na mista, pendente pelo outro campo.
 │   │                       customers.alteracoes.service.ts → a ficha (`alteracoes` no GET
 │   │                       /customers/:id), GET /customers/alteracoes-pendentes (financeiro/admin/
 │   │                       gerente; a fila da Minha área), POST /customers/:id/alteracoes/confirmar
@@ -324,7 +327,10 @@ apps/api/src/
 │   │                       "mantido o valor do app"); o mesmo valor resolve a edição com via 'api';
 │   │                       endereço confere como grupo; o valor do app é o `depois` da edição
 │   │                       pendente mais recente. Pendências lidas em lote (uma ida por lote de
-│   │                       clientes casados); sem a 051, nada muda
+│   │                       clientes casados); sem a 051, nada muda. O WhatsApp não é conferido
+│   │                       (22/09/2026): o POST só o preenche no cliente que está sem — sem
+│   │                       telefone (< 8 dígitos conta como vazio) e sem edição dele no histórico
+│   │                       (o que o app apagou fica vazio); `whatsapp` vazio nunca apaga nada
 │   │                       partner.catalogo.{controller,service}.ts → decisão 6: o Control manda
 │   │                       tabelas, condições, produtos/tamanhos, preços e estoque e sobrescreve;
 │   │                       name/description do CRM NUNCA regravados (descrição vai em erp_description)

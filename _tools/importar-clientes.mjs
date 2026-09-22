@@ -12,6 +12,10 @@
  *   • atribui o representante pelo CÓDIGO; se o rep existe no app, grava o código
  *     canônico DELE (senão o carteira, que casa exato, não acha);
  *   • monta o endereço numa linha só;
+ *   • o WhatsApp do Excel só PREENCHE o vazio: o do app não é trocado
+ *     (22/09/2026 — é dado só do app; ver importar-clientes-regras.mjs). O
+ *     nome gravado no lugar do número conta como vazio; o que o app apagou
+ *     de propósito (histórico da 051) continua vazio;
  *   • NUNCA apaga, e NUNCA toca em cliente sem código (os criados no app).
  *
  * Uso:
@@ -24,6 +28,7 @@ import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { clientesComWhatsappEditadoNoApp, linhaParaClienteExistente } from './importar-clientes-regras.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const ENV = path.join(RAIZ, 'apps/api/.env');
@@ -141,6 +146,37 @@ async function baixarTudo(tabela, select, filtro = '') {
   return linhas;
 }
 
+/**
+ * Os clientes cujo WhatsApp o app já editou (revisão de 22/09/2026): o vazio
+ * que o representante deixou de propósito não é preenchido pelo Excel. Lê só
+ * as linhas do histórico (051) que mexeram no WhatsApp, paginadas pelo id.
+ * Sem a tabela (a 051 não rodou neste banco), não há edição no app: conjunto
+ * vazio, com aviso. Qualquer outro erro PARA a carga — tratar como "ninguém
+ * editou" devolveria o telefone do Control por cima do que o app apagou.
+ */
+async function lerWhatsappsEditadosNoApp() {
+  const linhas = [];
+  for (let de = 0; ; de += 1000) {
+    const { data, error } = await sb
+      .from('customer_changes')
+      .select('id, customer_id, campos')
+      .eq('company_id', EMPRESA)
+      .not('campos->whatsapp', 'is', null)
+      .order('id', { ascending: true })
+      .range(de, de + 999);
+    if (error) {
+      if (error.code === 'PGRST205' || error.code === '42P01') {
+        console.log('(sem a migração 051 neste banco: nenhuma edição de WhatsApp no app a respeitar)');
+        return new Set();
+      }
+      throw new Error(`customer_changes: ${error.message}`);
+    }
+    linhas.push(...data);
+    if (data.length < 1000) break;
+  }
+  return clientesComWhatsappEditadoNoApp(linhas);
+}
+
 // ─── Programa ─────────────────────────────────────────────────────────────────
 (async () => {
   console.log(`\nArquivo: ${arquivo}`);
@@ -160,10 +196,14 @@ async function baixarTudo(tabela, select, filtro = '') {
   const dados = linhas.slice(linhaHeader + 1).filter((l) => l && l.some((v) => txt(v) != null));
 
   // Mapas do que já existe no app
-  const [custExist, reps] = await Promise.all([
-    baixarTudo('customers', 'id, erp_id, cnpj', true),
+  const [custExist, reps, whatsappsEditadosNoApp] = await Promise.all([
+    // `whatsapp` junto (22/09/2026): o do app não é trocado pelo do Excel.
+    baixarTudo('customers', 'id, erp_id, cnpj, whatsapp', true),
     baixarTudo('users', 'erp_rep_id, name, role', true),
+    // E o histórico (revisão de 22/09/2026): o WhatsApp que o app apagou fica vazio.
+    lerWhatsappsEditadosNoApp(),
   ]);
+  const existentePorId = new Map(custExist.map((c) => [c.id, c]));
   const idPorMiolo = new Map();
   // Clientes SEM código, indexados por CNPJ (dígitos): vieram das cargas de
   // carteira (Curva ABC, sem código). Quando a linha com código chegar, é
@@ -229,8 +269,14 @@ async function baixarTudo(tabela, select, filtro = '') {
         problemas.adotadosPorCnpj = (problemas.adotadosPorCnpj ?? 0) + 1;
       }
     }
-    if (existeId) paraAtualizar.push({ id: existeId, ...linha });
-    else paraCriar.push(linha);
+    if (existeId) {
+      const patch = linhaParaClienteExistente(linha, existentePorId.get(existeId), whatsappsEditadosNoApp);
+      // Só conta o WhatsApp do Excel que tinha número (o vazio nunca entra).
+      if (!('whatsapp' in patch) && txt(linha.whatsapp) != null) {
+        problemas.whatsappDoApp = (problemas.whatsappDoApp ?? 0) + 1;
+      }
+      paraAtualizar.push({ id: existeId, ...patch });
+    } else paraCriar.push(linha);
   }
 
   // ── PRÉVIA ──
@@ -242,6 +288,9 @@ async function baixarTudo(tabela, select, filtro = '') {
   console.log(`  → ignorar sem razão:     ${problemas.semRazao}`);
   if (problemas.adotadosPorCnpj) {
     console.log(`  → adotados pelo CNPJ:    ${problemas.adotadosPorCnpj} (existiam sem código; agora ganham o código do Control)`);
+  }
+  if (problemas.whatsappDoApp) {
+    console.log(`  → WhatsApp mantido:      ${problemas.whatsappDoApp} (o app já tem, ou o apagou de propósito; o do Excel não troca — é só do app)`);
   }
   console.log(`Representantes casados:     ${repPorMiolo.size} no app`);
   if (repsNaoAchados.size) {

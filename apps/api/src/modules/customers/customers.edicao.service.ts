@@ -3,6 +3,7 @@ import { supabase } from '../../config/supabase.js';
 import { detectarComCerteza } from '../../lib/detectarColuna.js';
 import {
   CAMPOS_QUE_PRECISAM_DA_041,
+  algumCampoVaiParaOControl,
   camposQueVieram,
   ehPecaDoEndereco,
   linhaDoEnderecoEditado,
@@ -364,8 +365,17 @@ export async function editarCadastroDoCliente(
   // sempre que o registro não mostrar o mesmo valor — outro valor ou o campo
   // ausente (17/09/2026); a edição que cair durante o lote também (o 3a de
   // `receberClientes`).
+  //
+  // E só se ALGUM campo mudado vai para o Control (22/09/2026, Yan: "que eu
+  // possa alterar o wtss do cliente sem ter que subir pro control"). O WhatsApp
+  // é só do app: a edição só dele grava o histórico (a ficha mostra "só no
+  // app"), mas não fica pendente — sem push ao financeiro, sem cartão, sem fila.
+  // Na edição mista (WhatsApp e e-mail, p.ex.) a linha fica pendente pelo
+  // e-mail, e o WhatsApp continua no histórico dela — quem lê a pendência (o
+  // cartão, a fila, o `alterado_no_app`) é que deixa o WhatsApp de fora.
   const erpCru = linha['erp_id'];
   const erp_id = typeof erpCru === 'string' && erpCru.trim() !== '' ? erpCru.trim() : null;
+  const erp_pendente = erp_id !== null && algumCampoVaiParaOControl(Object.keys(historico));
   // O id nasce aqui, e não no banco (17/09/2026): se a resposta do insert se
   // perder, é por ele que se descobre se a linha ficou — e se apaga a que ficou.
   const idDaAlteracao = randomUUID();
@@ -379,7 +389,7 @@ export async function editarCadastroDoCliente(
       alterado_por_nome: quem.nome,
       alterado_em: agora,
       campos: historico,
-      erp_pendente: erp_id !== null,
+      erp_pendente,
     })
     .select(COLUNAS_DA_ALTERACAO)
     .single();

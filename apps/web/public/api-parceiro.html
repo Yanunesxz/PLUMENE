@@ -601,7 +601,7 @@
       <span class="sep">/</span>
       <span>versão 1</span>
       <span class="sep">/</span>
-      <span>atualizado 16 set 2026</span>
+      <span>atualizado 22 set 2026</span>
     </p>
     <h1>Integração de pedidos<br>para o seu ERP</h1>
     <p class="lede">
@@ -2085,12 +2085,24 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             por assunto, com os códigos envolvidos.</li>
         <li><b>A edição do cadastro feita no app não é apagada</b> (a partir de
             17/09/2026). Razão social, nome fantasia, CNPJ/CPF, inscrição
-            estadual, WhatsApp, e-mail, observações e endereço também podem ser
+            estadual, e-mail, observações e endereço também podem ser
             editados no app; enquanto a edição não chega ao seu ERP, o cliente sai
             no <code>GET /clientes?desde=</code> com <code>alterado_no_app</code>,
             e o <code>POST /clientes</code> <b>não sobrescreve</b> esses campos com
             outro valor — ver <a href="#editado-no-app">Cliente editado no app</a>
             abaixo.</li>
+        <li><b>O WhatsApp é do app</b> (a partir de 22/09/2026). O WhatsApp do
+            cliente é dado só do app — o telefone do seu ERP é outra coisa. O
+            <code>POST /clientes</code> só <b>preenche o WhatsApp de quem está
+            sem</b>: no cliente que já tem WhatsApp no app, o <code>whatsapp</code>
+            que você mandar é ignorado, sem aviso (é a regra, não um conflito).
+            "Sem" é o cliente novo, o que está com o WhatsApp vazio ou com algo que
+            não é telefone (menos de 8 dígitos — um nome gravado por carga antiga)
+            — mas não o que ficou vazio porque alguém <b>apagou o WhatsApp no
+            app</b>: esse continua vazio. E <code>whatsapp</code> vazio
+            (<code>null</code> ou <code>""</code>) nunca apaga nada. O
+            <code>alterado_no_app</code> <b>nunca traz <code>whatsapp</code></b> — a
+            troca do WhatsApp no app não é algo que o seu ERP precise aplicar.</li>
         <li>Máximo de 1000 registros por requisição
             (<span class="st er">400</span> <code>BATCH_TOO_LARGE</code> acima
             disso). Nada é apagado por esta via. As quatro rotas de cadastro (os
@@ -2260,9 +2272,21 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                       ilegível não mexe e dá aviso.</td>
                 </tr>
                 <tr>
-                  <td><code>whatsapp</code>, <code>email</code></td>
+                  <td><code>whatsapp</code></td>
                   <td>não</td>
-                  <td>Contato. WhatsApp com DDD. <code>null</code> limpa.</td>
+                  <td>Com DDD. <b>Só preenche quem está sem</b> (22/09/2026): cliente
+                      novo recebe o seu; cliente que já existe com o WhatsApp vazio no
+                      app — ou com algo que não é telefone, menos de 8 dígitos —
+                      também; cliente que já tem WhatsApp no app fica com o dele — o
+                      seu é ignorado, sem aviso. O WhatsApp que alguém <b>apagou no
+                      app</b> continua vazio (o seu não volta por cima), e
+                      <code>null</code> ou <code>""</code> nunca apaga nada. O
+                      WhatsApp é dado do app.</td>
+                </tr>
+                <tr>
+                  <td><code>email</code></td>
+                  <td>não</td>
+                  <td>Contato. <code>null</code> limpa.</td>
                 </tr>
               </tbody>
             </table>
@@ -2328,11 +2352,20 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
               um cliente que <b>já tem código</b> no seu ERP:
               <code>razao_social</code>, <code>nome_fantasia</code>,
               <code>cnpj_cpf</code>, <code>inscricao_estadual</code>,
-              <code>whatsapp</code>, <code>email</code>, <code>observacoes</code> e
+              <code>email</code>, <code>observacoes</code> e
               <code>endereco</code>. Até o seu ERP ter o mesmo valor, a edição fica
               <b>pendente</b> no app (o financeiro vê a fila) e o cliente sai no
               <code>GET /clientes?desde=</code> com <code>alterado_no_app</code>
               dizendo quais campos.
+            </p>
+            <p>
+              <b>O WhatsApp fica de fora de tudo isto</b> (22/09/2026): ele também é
+              editado no app, mas é dado <b>só do app</b> — o telefone do seu ERP é
+              outra coisa. A troca do WhatsApp não fica pendente, não sai em
+              <code>alterado_no_app</code> (nem numa edição que mexeu no WhatsApp e
+              no e-mail: aí sai só <code>email</code>) e não gera aviso no
+              <code>POST /clientes</code>. O que vale para o <code>whatsapp</code>
+              que você manda é a regra da tabela acima: só preenche quem está sem.
             </p>
             <p>No <code>POST /clientes</code>, para cada campo com edição pendente que vier no registro:</p>
             <ul>
@@ -2347,7 +2380,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
                   ainda espera outro campo;</li>
               <li><b>valor diferente</b> → o campo <b>não é gravado</b> (o app
                   mantém o que a pessoa editou) e volta um aviso por cliente:
-                  <code>Cliente 01234: whatsapp, endereco alterados no app ainda não
+                  <code>Cliente 01234: email, endereco alterados no app ainda não
                   aplicados no Control — mantido o valor do app.</code> (até 20
                   clientes por resposta; o resto num aviso "E mais N
                   cliente(s)…"). O que fazer: aplicar no seu ERP o valor que o
@@ -2889,7 +2922,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         <div class="ep-body">
           <p>
             A outra mão: o que o representante ou o escritório mudou no cadastro
-            do cliente <b>dentro do app</b> (cliente novo, WhatsApp, endereço,
+            do cliente <b>dentro do app</b> (cliente novo, endereço, e-mail,
             tabela trocada), para o seu ERP espelhar. <code>desde</code> é
             opcional e precisa de fuso (sem fuso, <span class="st er">400</span>
             <code>INVALID_DESDE</code>; fuso positivo vai na URL como
@@ -2923,9 +2956,12 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             ainda não tem a edição. <code>campos</code> usa os nomes deste contrato
             (<code>razao_social</code>, <code>nome_fantasia</code>,
             <code>cnpj_cpf</code>, <code>inscricao_estadual</code>,
-            <code>whatsapp</code>, <code>email</code>, <code>observacoes</code>,
+            <code>email</code>, <code>observacoes</code>,
             <code>endereco</code>) e <code>em</code> é a edição mais recente.
-            Aplique os valores deste registro nesses campos. <code>null</code> =
+            Aplique os valores deste registro nesses campos. <b>Nunca traz
+            <code>whatsapp</code></b> (22/09/2026: o WhatsApp é dado só do app; o
+            <code>whatsapp</code> do registro é o do app, só para leitura).
+            <code>null</code> =
             nada pendente (ou a instalação ainda sem a migração 051). Sai sempre —
             campo novo, aditivo. O cliente com edição pendente sai em <b>toda</b>
             puxada — mesmo com um <code>desde</code> depois da edição, e mesmo que
@@ -2976,7 +3012,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
           </p>
           <div class="code">
             <div class="code-bar">
-              <span class="code-lbl">Um cliente que já está no seu ERP e teve o WhatsApp e o endereço corrigidos no app (só os campos que importam aqui)</span>
+              <span class="code-lbl">Um cliente que já está no seu ERP e teve o e-mail e o endereço corrigidos no app (só os campos que importam aqui)</span>
               <button class="copy" type="button">copiar</button>
             </div>
             <pre><code>{
@@ -2984,17 +3020,19 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
   <span class="k">"chave"</span>: <span class="s">"00000000000100"</span>,
   <span class="k">"novo_no_control"</span>: <span class="n">false</span>,
   <span class="k">"razao_social"</span>: <span class="s">"CLIENTE TESTE LTDA"</span>,
-  <span class="k">"whatsapp"</span>: <span class="s">"00900000009"</span>,
+  <span class="k">"email"</span>: <span class="s">"cliente@teste.invalid"</span>,
   <span class="k">"endereco"</span>: { <span class="k">"logradouro"</span>: <span class="s">"Avenida Teste"</span>, <span class="k">"numero"</span>: <span class="s">"300"</span>, <span class="k">"complemento"</span>: <span class="n">null</span>,
                 <span class="k">"bairro"</span>: <span class="s">"Centro"</span>, <span class="k">"cidade"</span>: <span class="s">"Cidade Teste"</span>, <span class="k">"uf"</span>: <span class="s">"MG"</span>, <span class="k">"cep"</span>: <span class="s">"00000000"</span> },
   <span class="k">"atualizado_em"</span>: <span class="s">"2026-09-17T14:10:00.000+00:00"</span>,
-  <span class="k">"alterado_no_app"</span>: { <span class="k">"em"</span>: <span class="s">"2026-09-17T14:10:00.000+00:00"</span>, <span class="k">"campos"</span>: [<span class="s">"whatsapp"</span>, <span class="s">"endereco"</span>] }
+  <span class="k">"alterado_no_app"</span>: { <span class="k">"em"</span>: <span class="s">"2026-09-17T14:10:00.000+00:00"</span>, <span class="k">"campos"</span>: [<span class="s">"email"</span>, <span class="s">"endereco"</span>] }
 }</code></pre>
           </div>
           <p class="t-mut">
-            O seu ERP grava o WhatsApp e o endereço e, no próximo
+            O seu ERP grava o e-mail e o endereço e, no próximo
             <code>POST /clientes</code> desse cliente com os mesmos valores, a
-            edição sai da fila do app.
+            edição sai da fila do app. (Se o representante tivesse trocado também
+            o WhatsApp nessa edição, <code>campos</code> continuaria sendo
+            <code>["email", "endereco"]</code>: o WhatsApp é do app.)
           </p>
         </div>
       </div>
@@ -3105,7 +3143,7 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><td><code>cliente.razao_social</code> / <code>cliente.nome_fantasia</code></td><td class="t-mut">texto</td><td>Nomes do cadastro.</td></tr>
             <tr><td><code>cliente.endereco</code></td><td class="t-mut">objeto</td><td><code>{ cep, logradouro, numero, complemento, bairro, cidade, uf }</code> — sempre com as sete chaves; cada uma sai <code>null</code> quando o cadastro não tem o dado. <code>cep</code> só com dígitos.</td></tr>
             <tr><td><code>cliente.inscricao_estadual</code></td><td class="t-mut">texto</td><td>Inscrição estadual do cadastro.</td></tr>
-            <tr><td><code>cliente.whatsapp</code> / <code>cliente.email</code></td><td class="t-mut">texto</td><td>Contato do cadastro.</td></tr>
+            <tr><td><code>cliente.whatsapp</code> / <code>cliente.email</code></td><td class="t-mut">texto</td><td>Contato do cadastro. O WhatsApp é do app (22/09/2026): sai só para leitura.</td></tr>
             <tr><td><code>representante_erp</code></td><td class="t-mut">texto</td><td><b>Código do representante no seu ERP.</b></td></tr>
             <tr><td><code>tabela_preco.codigo_erp</code></td><td class="t-mut">texto</td><td><b>Código da tabela de preço no seu ERP</b> — a tabela que <b>precificou este pedido</b>. Pedido sem tabela gravada usa a tabela do cadastro do cliente. Tabela sem código do ERP sai <code>null</code> e gera a pendência <code>pedido sem tabela de preço vinculada no ERP</code> (nunca cai para outra tabela).</td></tr>
             <tr><td><code>tabela_preco.coluna</code></td><td class="t-mut">inteiro</td><td>Coluna de preço dessa tabela, de 1 a 6 (<code>1</code> quando a tabela não tem coluna gravada).</td></tr>
@@ -3161,8 +3199,9 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             <tr><th>Dado</th><th>Dono</th><th>Como circula</th></tr>
           </thead>
           <tbody>
-            <tr><td>Código do cliente</td><td class="t-mut">ERP</td><td>O seu sistema envia por <code>POST /partner/v1/clientes</code> (código, razão social, CNPJ, representante, tabela, endereço, bloqueado, WhatsApp); o app guarda e devolve no pedido como <code>cliente.codigo_erp</code>.</td></tr>
-            <tr><td>Cadastro do cliente (razão social, nome fantasia, WhatsApp, e-mail, inscrição estadual, observações, endereço)</td><td class="t-mut">ERP e app — a edição do app pendente prevalece até o ERP devolver o mesmo valor (ou o financeiro confirmar que atualizou); sem edição pendente, vale o que o ERP mandar</td><td>Chega por <code>POST /clientes</code>. Desde 17/09/2026 também é <b>editado no app</b> (admin, financeiro, gerente e o representante na própria carteira); a edição sai em <code>GET /clientes?desde=</code> com <code>alterado_no_app</code> e o <code>POST /clientes</code> não a sobrescreve até trazer o mesmo valor — aí ela é dada por atualizada.</td></tr>
+            <tr><td>Código do cliente</td><td class="t-mut">ERP</td><td>O seu sistema envia por <code>POST /partner/v1/clientes</code> (código, razão social, CNPJ, representante, tabela, endereço, bloqueado); o app guarda e devolve no pedido como <code>cliente.codigo_erp</code>.</td></tr>
+            <tr><td>Cadastro do cliente (razão social, nome fantasia, e-mail, inscrição estadual, observações, endereço)</td><td class="t-mut">ERP e app — a edição do app pendente prevalece até o ERP devolver o mesmo valor (ou o financeiro confirmar que atualizou); sem edição pendente, vale o que o ERP mandar</td><td>Chega por <code>POST /clientes</code>. Desde 17/09/2026 também é <b>editado no app</b> (admin, financeiro, gerente e o representante na própria carteira); a edição sai em <code>GET /clientes?desde=</code> com <code>alterado_no_app</code> e o <code>POST /clientes</code> não a sobrescreve até trazer o mesmo valor — aí ela é dada por atualizada.</td></tr>
+            <tr><td>WhatsApp do cliente</td><td class="t-mut">App (desde 22/09/2026) — o telefone do ERP é outra coisa</td><td>Editado só no app, sem ir ao ERP: nunca sai em <code>alterado_no_app</code>. O <code>POST /clientes</code> só preenche o WhatsApp de quem está sem (cliente novo, ou existente com o WhatsApp vazio ou sem telefone de verdade — menos de 8 dígitos); no cliente que já tem, o <code>whatsapp</code> do ERP é ignorado, sem aviso, e o que alguém apagou no app continua vazio. Sai no <code>GET /clientes</code> e no pedido (<code>cliente.whatsapp</code>) só para leitura.</td></tr>
             <tr><td>CPF/CNPJ do cliente</td><td class="t-mut">ERP e app (no app, só o escritório)</td><td>Chave entre os sistemas. No app, só admin e financeiro trocam; a troca segue a mesma regra da linha acima (<code>cnpj_cpf</code> em <code>alterado_no_app</code>). O cliente com o documento antigo no ERP continua casando pelo código — mesmo que outro cadastro do app tenha esse documento. Enquanto a troca está pendente, a <code>chave</code> no <code>GET /clientes</code> e no <code>GET /pedidos</code> já é o documento novo: case pelo <code>codigo</code>.</td></tr>
             <tr><td>Código do representante</td><td class="t-mut">ERP</td><td>Chega em cada cliente (<code>representante</code> do <code>POST /partner/v1/clientes</code>), mostra o cliente ao representante com o mesmo código no login e sai no pedido como <code>representante_erp</code>. <code>POST /partner/v1/representantes</code> só atualiza nome, razão social e ativo de quem já tem login <b>e</b> já tem esse código gravado no app.</td></tr>
             <tr><td>Tabela de preço</td><td class="t-mut">ERP</td><td>Chega por <code>POST /tabelas-preco</code> (código, descrição, coluna 1–6, ativo). O app guarda o vínculo no cliente e, em cada pedido, a tabela que o precificou; o pedido sai com a tabela dele.</td></tr>
@@ -3888,12 +3927,24 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         pula uma mudança gravada durante a leitura; o que mudou nesses 2 minutos
         sai de novo, o que é inofensivo).
       </p>
+      <p>
+        <b>A mudança de 22 de setembro de 2026 — o WhatsApp é do app</b> (nada
+        renomeado nem removido): no <code>POST /clientes</code>, o
+        <code>whatsapp</code> só preenche o cliente que está sem (novo, ou
+        existente com o WhatsApp vazio no app, ou com algo que não é telefone —
+        menos de 8 dígitos); no cliente que já tem, o valor mandado é ignorado,
+        sem aviso. O WhatsApp que alguém apagou no app continua vazio, e o
+        <code>whatsapp</code> vazio (<code>null</code> ou <code>""</code>) nunca
+        apaga nada. O <code>alterado_no_app</code> do
+        <code>GET /clientes</code> nunca traz <code>whatsapp</code> — a troca do
+        WhatsApp no app não precisa ir ao seu ERP.
+      </p>
     </section>
   </main>
 </div>
 
 <footer>
-  <span>API de Parceiro · versão 1 · atualizado 17 set 2026 · documento público, sem chaves de acesso</span>
+  <span>API de Parceiro · versão 1 · atualizado 22 set 2026 · documento público, sem chaves de acesso</span>
   <span class="mono">setorxweb-production.up.railway.app · csbapi-production.up.railway.app</span>
 </footer>
 
