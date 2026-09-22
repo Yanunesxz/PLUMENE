@@ -188,6 +188,15 @@ describe('os 3 degraus', () => {
     expect(lista.find((a) => a.id === 'cliente-expira-loja')?.nivel).toBe('atencao');
   });
 
+  it('cliente INATIVO (não compra mais) também não recebe o aviso de esfriar', () => {
+    const lista = montarAlertas(
+      entradas({
+        clientes: [{ id: 'fechou', nome: 'Loja que Fechou', ultimaCompraEm: diasAtras(178), inativo: true }],
+      }),
+    );
+    expect(lista.some((a) => a.id === 'cliente-expira-fechou')).toBe(false);
+  });
+
   it('link da vitrine que expira HOJE sem pedido é atenção', () => {
     const lista = montarAlertas(
       entradas({

@@ -49,6 +49,9 @@ import {
   podeTrocarTabelaDoCliente,
   podeEditarCadastroDoCliente,
   podeConfirmarAlteracaoNoControl,
+  MOTIVOS_DE_INATIVO,
+  rotuloDoMotivo,
+  motivoExigeNota,
 } from '@csb/shared';
 import type {
   AlteracaoDoCliente,
@@ -168,6 +171,66 @@ export function PaginaCliente() {
       });
     } finally {
       setSalvandoVarejo(false);
+    }
+  };
+
+  // ─── Cliente INATIVO (migração 052) — não compra mais, sai da régua ────────
+  // "Colocar que o cliente é inativo deixa ele como não precisar reativar ou
+  // esfriado; são clientes que não compram mais; o motivo precisa ser
+  // selecionado" (Yan, 22/09/2026). Mesmos papéis do porquê do esfriado; o
+  // CRM espelha como "Perdido manual". Controle interno: nada vai ao Control.
+  const [marcandoInativo, setMarcandoInativo] = useState(false);
+  const [motivoInativo, setMotivoInativo] = useState('');
+  const [notaInativo, setNotaInativo] = useState('');
+  const [salvandoInativo, setSalvandoInativo] = useState(false);
+  const podeMarcarInativo = podeExplicar;
+
+  const salvarInativo = async (inativo: boolean) => {
+    if (!token || !id || salvandoInativo) return;
+    if (inativo && (!motivoInativo || (motivoExigeNota(motivoInativo) && !notaInativo.trim()))) return;
+    setSalvandoInativo(true);
+    try {
+      const res = await api.patch<
+        ApiResponse<{ inativo: boolean; inativo_motivo: string | null; inativo_nota: string | null; inativo_marcado_em: string }>
+      >(
+        `/customers/${id}/inativo`,
+        inativo
+          ? { inativo: true, motivo: motivoInativo, ...(notaInativo.trim() ? { nota: notaInativo.trim() } : {}) }
+          : { inativo: false },
+        token,
+      );
+      setCliente((c) =>
+        c
+          ? {
+              ...c,
+              inativo: res.data.inativo,
+              inativo_motivo: res.data.inativo_motivo,
+              inativo_nota: res.data.inativo_nota,
+              inativo_marcado_em: res.data.inativo_marcado_em,
+              inativo_marcado_por_nome: user?.name ?? null,
+              inativo_origem: 'app',
+            }
+          : c,
+      );
+      // A lista, a Minha Área e os Alertas leem o cache do aparelho.
+      await db.customers
+        .update(id, { inativo: res.data.inativo, inativo_motivo: res.data.inativo_motivo })
+        .catch(() => {});
+      esquecerCache('/customers');
+      setMarcandoInativo(false);
+      setToast({
+        message: res.data.inativo
+          ? 'Cliente marcado como inativo — sai da régua e dos alertas.'
+          : 'Cliente reativado — volta para a régua da carteira.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível salvar.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoInativo(false);
     }
   };
 
@@ -485,6 +548,103 @@ export function PaginaCliente() {
                 : ''}
               {' — fora da cobrança de contato.'}
             </p>
+          )
+        )}
+
+        {/* Cliente inativo (052): quem não compra mais. Marcar exige motivo da
+            lista; desmarcar devolve à régua. Os demais papéis só leem. */}
+        {cliente.inativo ? (
+          <div className="mt-4 rounded-lg border border-border bg-sunken p-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">Cliente inativo</p>
+                <p className="text-xs text-muted-foreground">
+                  {rotuloDoMotivo(cliente.inativo_motivo) ?? 'Sem motivo registrado'}
+                  {cliente.inativo_nota ? ` — “${cliente.inativo_nota}”` : ''}
+                </p>
+                <p className="mt-1 text-[11px] text-subtle">
+                  Marcado
+                  {cliente.inativo_marcado_por_nome ? ` por ${cliente.inativo_marcado_por_nome}` : ''}
+                  {cliente.inativo_origem === 'crm' ? ' no CRM' : ''}
+                  {cliente.inativo_marcado_em
+                    ? ` em ${new Date(cliente.inativo_marcado_em).toLocaleDateString('pt-BR')}`
+                    : ''}
+                  . Fora da régua, dos alertas e do relatório.
+                </p>
+              </div>
+              {podeMarcarInativo && (
+                <Button variant="outline" size="sm" disabled={salvandoInativo} onClick={() => void salvarInativo(false)}>
+                  {salvandoInativo ? 'Salvando…' : 'Reativar'}
+                </Button>
+              )}
+            </div>
+          </div>
+        ) : (
+          podeMarcarInativo && (
+            <div className="mt-4 rounded-lg border border-border p-3">
+              {!marcandoInativo ? (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-foreground">Este cliente não compra mais?</p>
+                    <p className="text-xs text-muted-foreground">
+                      Marque como inativo: ele sai da régua, dos alertas e da cobrança de contato.
+                    </p>
+                  </div>
+                  <Button variant="outline" size="sm" onClick={() => setMarcandoInativo(true)}>
+                    Marcar inativo
+                  </Button>
+                </div>
+              ) : (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void salvarInativo(true);
+                  }}
+                  className="grid gap-3"
+                >
+                  <p className="text-sm font-medium text-foreground">Por que este cliente ficou inativo?</p>
+                  <div className="grid gap-2">
+                    {MOTIVOS_DE_INATIVO.map((m) => (
+                      <label key={m.chave} className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
+                        <input
+                          type="radio"
+                          name="motivo-inativo"
+                          value={m.chave}
+                          checked={motivoInativo === m.chave}
+                          onChange={() => setMotivoInativo(m.chave)}
+                          className="h-4 w-4"
+                        />
+                        {m.rotulo}
+                      </label>
+                    ))}
+                  </div>
+                  {motivoExigeNota(motivoInativo) && (
+                    <input
+                      value={notaInativo}
+                      onChange={(e) => setNotaInativo(e.target.value)}
+                      maxLength={300}
+                      placeholder="Qual é o outro motivo? (poucas palavras)"
+                      className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
+                      aria-label="Outro motivo"
+                    />
+                  )}
+                  <div className="flex justify-end gap-2">
+                    <Button type="button" variant="outline" size="sm" onClick={() => setMarcandoInativo(false)}>
+                      Cancelar
+                    </Button>
+                    <Button
+                      type="submit"
+                      size="sm"
+                      disabled={
+                        salvandoInativo || !motivoInativo || (motivoExigeNota(motivoInativo) && !notaInativo.trim())
+                      }
+                    >
+                      {salvandoInativo ? 'Salvando…' : 'Confirmar inativo'}
+                    </Button>
+                  </div>
+                </form>
+              )}
+            </div>
           )
         )}
 

@@ -37,6 +37,11 @@ export async function detectarVarejo(): Promise<boolean> {
   return detectar('customers', 'varejo');
 }
 
+/** O cliente inativo (migração 052). */
+export async function detectarInativo(): Promise<boolean> {
+  return detectar('customers', 'inativo');
+}
+
 /** Mesmo padrão para as colunas do controle de inatividade (migração 039). */
 async function detectarInatividade(): Promise<boolean> {
   return detectar('customers', 'inactivity_reason');
@@ -55,6 +60,7 @@ async function colunasDaLista(): Promise<string> {
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at, overdue_amount';
   if (await detectarInatividade()) colunas += ', inactivity_reason';
   if (await detectarVarejo()) colunas += ', varejo';
+  if (await detectarInativo()) colunas += ', inativo, inativo_motivo';
   return colunas;
 }
 
@@ -431,6 +437,9 @@ async function colunasDoDetalhe(): Promise<string> {
   if (await detectarHistoricoDeCompra()) colunas += ', last_purchase_at';
   if (await detectarInatividade()) colunas += ', inactivity_reason, inactivity_note, inactivity_updated_at';
   if (await detectarVarejo()) colunas += ', varejo, varejo_marcado_em, varejo_marcado_por';
+  if (await detectarInativo()) {
+    colunas += ', inativo, inativo_motivo, inativo_nota, inativo_marcado_em, inativo_marcado_por, inativo_origem';
+  }
   return colunas;
 }
 
@@ -468,6 +477,7 @@ export async function lerFichaDoCliente(
   const { data: lido, error } = await lerClienteDaCarteira<
     Omit<CustomerDetail, 'pedidos'> & {
       varejo_marcado_por?: string | null;
+      inativo_marcado_por?: string | null;
       rep_id?: string | null;
       rep_erp_id?: string | null;
     }
@@ -475,16 +485,16 @@ export async function lerFichaDoCliente(
   if (error) return { data: null, error };
   if (!lido) return { data: null, error: null };
 
-  // Quem marcou o varejo, pelo nome: a ficha diz "marcado pela Simone" — sem
-  // isso o gerente vê o cliente fora da régua e não sabe a quem perguntar.
-  const { varejo_marcado_por, rep_id, rep_erp_id, ...cliente } = lido;
-  if (varejo_marcado_por) {
-    const { data: quem } = await supabase
-      .from('users')
-      .select('name')
-      .eq('id', varejo_marcado_por)
-      .maybeSingle();
-    cliente.varejo_marcado_por_nome = (quem as { name: string } | null)?.name ?? null;
+  // Quem marcou o varejo e quem marcou o inativo, pelo nome: a ficha diz
+  // "marcado pela Simone" — sem isso o gerente vê o cliente fora da régua e
+  // não sabe a quem perguntar. Uma consulta só para os dois.
+  const { varejo_marcado_por, inativo_marcado_por, rep_id, rep_erp_id, ...cliente } = lido;
+  const idsDeQuemMarcou = [varejo_marcado_por, inativo_marcado_por].filter((x): x is string => !!x);
+  if (idsDeQuemMarcou.length) {
+    const { data: quem } = await supabase.from('users').select('id, name').in('id', idsDeQuemMarcou);
+    const nome = new Map(((quem ?? []) as { id: string; name: string }[]).map((u) => [u.id, u.name]));
+    if (varejo_marcado_por) cliente.varejo_marcado_por_nome = nome.get(varejo_marcado_por) ?? null;
+    if (inativo_marcado_por) cliente.inativo_marcado_por_nome = nome.get(inativo_marcado_por) ?? null;
   }
 
   const { data } = await supabase
@@ -585,6 +595,50 @@ export async function marcarVarejo(
     .eq('company_id', company_id);
 
   return error ? { ok: false, motivo: 'erro' } : { ok: true, varejo, marcado_em };
+}
+
+export type MarcaDeInativo =
+  | { ok: true; inativo: boolean; motivo: string | null; nota: string | null; marcado_em: string }
+  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'erro' };
+
+/**
+ * Marca (ou desmarca) o cliente como INATIVO — controle interno (migração 052).
+ *
+ * Marcar exige motivo da lista fechada (o controller valida a chave; `outro`
+ * exige nota). Desmarcar limpa tudo: o cliente volta para a régua. Grava
+ * `updated_at` de propósito — é por ele que o CRM percebe e espelha o
+ * "Perdido manual" do lado dele.
+ */
+export async function marcarInativo(
+  company_id: string,
+  customer_id: string,
+  escopo: EscopoDaCarteira,
+  quem: string,
+  body: { inativo: boolean; motivo?: string | undefined; nota?: string | undefined },
+): Promise<MarcaDeInativo> {
+  if (!(await detectarInativo())) return { ok: false, motivo: 'sem_migracao' };
+
+  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  const marcado_em = new Date().toISOString();
+  const motivo = body.inativo ? (body.motivo ?? null) : null;
+  const nota = body.inativo ? body.nota?.trim() || null : null;
+  const { error } = await supabase
+    .from('customers')
+    .update({
+      inativo: body.inativo,
+      inativo_motivo: motivo,
+      inativo_nota: nota,
+      inativo_marcado_por: quem,
+      inativo_marcado_em: marcado_em,
+      inativo_origem: 'app',
+      updated_at: marcado_em,
+    })
+    .eq('id', customer_id)
+    .eq('company_id', company_id);
+
+  return error ? { ok: false, motivo: 'erro' } : { ok: true, inativo: body.inativo, motivo, nota, marcado_em };
 }
 
 export type TrocaDeTabela =

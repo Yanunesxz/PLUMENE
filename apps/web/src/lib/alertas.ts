@@ -59,7 +59,14 @@ export interface EntradasDosAlertas {
    * A carteira: quem está a poucos dias de esfriar (o prazo da régua da
    * fábrica). `varejo` = a venda interna tirou o cliente da cobrança (047).
    */
-  clientes: Array<{ id: string; nome: string; ultimaCompraEm: string | null; varejo?: boolean }>;
+  clientes: Array<{
+    id: string;
+    nome: string;
+    ultimaCompraEm: string | null;
+    varejo?: boolean;
+    /** Inativo (052): não compra mais — não é para lembrar ninguém de visitar. */
+    inativo?: boolean;
+  }>;
   /** A régua da meta do mês. Nulo = sem faixas cadastradas, sem alerta. */
   meta: { enviado: number; faixas: Array<{ meta: number; bonus: number }> } | null;
   /** As tarefas/visitas que o escritório marcou para ele. */
@@ -206,7 +213,7 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
   for (const c of e.clientes) {
     // Cliente de varejo: a venda interna disse que ele não volta — lembrar que
     // "vai esfriar" é exatamente a cobrança que a marca existe para calar.
-    if (c.varejo || !c.ultimaCompraEm) continue;
+    if (c.varejo || c.inativo || !c.ultimaCompraEm) continue;
     const semComprar = diasDesde(c.ultimaCompraEm, e.agora);
     const faltam = prazoDeEsfriar - semComprar;
     if (faltam >= 1 && faltam <= 3) {

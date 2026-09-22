@@ -1534,6 +1534,28 @@ export async function registrarCompraDoCliente(
   if (!dia) return;
   try {
     if (!(await detectarUltimaCompra())) return;
+    // Cliente INATIVO (052) que voltou a comprar não é mais inativo: a compra
+    // faturada depois da marca devolve o cliente à régua sozinha — a mesma
+    // regra que o CRM aplica ao "Perdido manual", para os dois lados baterem.
+    if (await detectar('customers', 'inativo')) {
+      let volta = supabase
+        .from('customers')
+        .update({
+          inativo: false,
+          inativo_motivo: null,
+          inativo_nota: null,
+          inativo_marcado_em: new Date().toISOString(),
+          inativo_origem: 'app',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', customer_id)
+        .eq('inativo', true)
+        .lt('inativo_marcado_em', dia);
+      if (company_id) volta = volta.eq('company_id', company_id);
+      const { error: eVolta } = await volta;
+      if (eVolta) console.error(`[faturado] falha ao reativar o cliente ${customer_id}: ${eVolta.message}`);
+    }
+
     let consulta = supabase
       .from('customers')
       .update({ last_purchase_at: dia, updated_at: new Date().toISOString() })

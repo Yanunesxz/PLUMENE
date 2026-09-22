@@ -39,11 +39,14 @@ export async function relatorioDaCarteira(
   // Cliente de varejo (047) não é carteira a recuperar: a venda interna o tirou
   // da cobrança, e o relatório não pode devolvê-lo como "parado".
   const comVarejo = await detectar('customers', 'varejo');
+  // E o inativo (052): quem não compra mais não é carteira a recuperar.
+  const comInativo = await detectar('customers', 'inativo');
+  const extras = [comVarejo ? 'varejo' : null, comInativo ? 'inativo' : null].filter(Boolean).join(', ');
   const clientes: ClienteParaRelatorio[] = [];
   for (let from = 0; ; from += PAGE_SIZE) {
     let q = supabase
       .from('customers')
-      .select(comVarejo ? `${COLUNAS}, varejo` : COLUNAS)
+      .select(extras ? `${COLUNAS}, ${extras}` : COLUNAS)
       .eq('company_id', company_id)
       .range(from, from + PAGE_SIZE - 1);
     if (!escopo.irrestrito) {
@@ -56,9 +59,9 @@ export async function relatorioDaCarteira(
     // única leitura que esta rota faz fora do padrão da lista de clientes.
     if (error) return from === 0 ? { ok: false, reason: 'sem_migracao' } : { ok: false, reason: 'falha_ia' };
     clientes.push(
-      ...((data ?? []) as unknown as Array<ClienteParaRelatorio & { varejo?: boolean | null }>).filter(
-        (c) => c.varejo !== true,
-      ),
+      ...(
+        (data ?? []) as unknown as Array<ClienteParaRelatorio & { varejo?: boolean | null; inativo?: boolean | null }>
+      ).filter((c) => c.varejo !== true && c.inativo !== true),
     );
     if (!data || data.length < PAGE_SIZE) break;
   }

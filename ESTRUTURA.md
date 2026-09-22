@@ -170,7 +170,7 @@ apps/api/src/
 │       │                           com solicitacao_cancelada. Exige a 049 (para com mensagem se ela faltar). SQL para os
 │       │                           dois bancos em _tools/SQL-PARA-RODAR-050.sql. Depois dela, NÃO rerodar a 048 nem a
 │       │                           049
-│       └── 051_edicao_do_cadastro_do_cliente.sql → editar o cadastro do cliente no app (Yan, 17/09/2026: "quando mudar
+│       ├── 051_edicao_do_cadastro_do_cliente.sql → editar o cadastro do cliente no app (Yan, 17/09/2026: "quando mudar
 │                                   lá tem que mudar no ERP do Fábio também"): customer_changes (id, company_id FK CASCADE,
 │                                   customer_id FK CASCADE, alterado_por FK SET NULL, alterado_por_nome, alterado_em,
 │                                   campos JSONB = {coluna: {antes, depois}} normalizados, com address quando recalculado,
@@ -180,6 +180,7 @@ apps/api/src/
 │                                   Sem ela a edição NÃO acontece (503 MIGRACAO_PENDENTE) e a API de Parceiro segue como
 │                                   antes. Idempotente; SQL para os dois bancos em _tools/SQL-PARA-RODAR-051.sql (termina
 │                                   com o NOTIFY). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│       └── 052_cliente_inativo.sql → customers.inativo/inativo_motivo/inativo_nota/inativo_marcado_por/inativo_marcado_em/inativo_origem (a aba "Inativos": não compra mais, sai da régua; motivo de lista fechada com as chaves do CRM; controle interno, não vai ao Control)
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

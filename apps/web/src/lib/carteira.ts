@@ -30,7 +30,7 @@ export type { Frescor, ReguaDaCarteira };
  * esfriado, nem alerta. Fica fora de `Frescor` (shared) de propósito: aquele
  * tipo é a conta de dias, e as chaves dele estão em link salvo.
  */
-export type NivelDaCarteira = Frescor | 'varejo';
+export type NivelDaCarteira = Frescor | 'varejo' | 'inativo';
 
 const CHAVE_GUARDADA = 'csb.regua-da-carteira';
 
@@ -120,9 +120,14 @@ export function dataDaUltimaCompra(lastPurchaseAt: string | null | undefined): s
  * promessa ao Yan, "não ficar cobrando elas para entrar em contato de novo".
  */
 export function situacaoDoCliente(
-  cliente: { last_purchase_at?: string | null; varejo?: boolean | null },
+  cliente: { last_purchase_at?: string | null; varejo?: boolean | null; inativo?: boolean | null },
   comRegua: ReguaDaCarteira = regua,
 ): SituacaoDaCompra {
+  // Inativo (052) vem antes de tudo: não compra mais, não é para reativar.
+  if (cliente.inativo === true) {
+    const dias = diasSemComprar(cliente.last_purchase_at);
+    return { nivel: 'inativo', rotulo: 'Inativo — não compra mais', dias };
+  }
   if (cliente.varejo === true) {
     const dias = diasSemComprar(cliente.last_purchase_at);
     return { nivel: 'varejo', rotulo: 'Cliente varejo — sem cobrança de contato', dias };
@@ -142,6 +147,7 @@ export const NOME_DO_NIVEL: Record<NivelDaCarteira, string> = {
   parado: 'Esfriado',
   sem_registro: 'Sem registro',
   varejo: 'Varejo',
+  inativo: 'Inativo',
 };
 
 /** O mesmo nome no plural, para o chip que conta ("Esfriados (37)"). */
@@ -151,6 +157,7 @@ export const NOME_DO_NIVEL_PLURAL: Record<NivelDaCarteira, string> = {
   parado: 'Esfriados',
   sem_registro: 'Sem registro',
   varejo: 'Varejo',
+  inativo: 'Inativos',
 };
 
 /** Cor do selo, no vocabulário do Badge. Varejo é neutro: fora da régua, nem bom nem ruim. */
@@ -160,6 +167,7 @@ export const VARIANTE_DO_FRESCOR: Record<NivelDaCarteira, 'gray' | 'yellow' | 'g
   parado: 'red',
   sem_registro: 'gray',
   varejo: 'gray',
+  inativo: 'gray',
 };
 
 /** "90 a 180 dias sem comprar" — para explicar a faixa na tela do admin. */
