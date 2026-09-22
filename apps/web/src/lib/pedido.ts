@@ -325,3 +325,77 @@ export function linkDoWhatsApp(numero: string | null | undefined, texto?: string
       : digitos;
   return `https://wa.me/${completo}${mensagem}`;
 }
+
+/**
+ * O que o botão do WhatsApp vai fazer com este número — para a tela avisar
+ * ANTES do toque (Yan, 22/09/2026: "às vezes abre o privado, às vezes pede pra
+ * selecionar um cliente"):
+ *
+ *   • 'ok'         DDD + linha (10–11 dígitos), com ou sem o 55: abre a conversa;
+ *   • 'sem'        nada no cadastro: o WhatsApp pede para escolher o contato;
+ *   • 'incompleto' tem número, mas sem DDD ou com dígito faltando
+ *                  ("12360633", "12*3622275"): o WhatsApp diz que não existe.
+ */
+export function situacaoDoWhatsapp(numero: string | null | undefined): 'ok' | 'sem' | 'incompleto' {
+  const digitos = (numero ?? '').replace(/\D/g, '');
+  if (!digitos) return 'sem';
+  if (digitos.length === 10 || digitos.length === 11) return 'ok';
+  if ((digitos.length === 12 || digitos.length === 13) && digitos.startsWith('55')) return 'ok';
+  return 'incompleto';
+}
+
+/**
+ * A mensagem da cópia do pedido para o representante (22/09/2026): o
+ * escritório avisa quem vendeu, com o mesmo link público que o cliente recebe.
+ * Chama pelo primeiro nome ("WELINGTHON NATAL SOARES" → "Welingthon"); sem
+ * nome, só "Olá!".
+ */
+export function mensagemDaCopiaAoRepresentante(p: {
+  representante: string | null | undefined;
+  numero: string | number | null | undefined;
+  cliente: string;
+  marca: string;
+  link: string;
+}): string {
+  const primeiro = (p.representante ?? '').trim().split(/\s+/)[0] ?? '';
+  const nome = primeiro ? primeiro.charAt(0).toUpperCase() + primeiro.slice(1).toLowerCase() : '';
+  const numero = p.numero != null && String(p.numero).trim() !== '' ? ` #${String(p.numero).trim()}` : '';
+  return (
+    `Olá${nome ? `, ${nome}` : ''}! Segue a cópia do pedido${numero} de ${p.cliente} ` +
+    `(${p.marca}): ${p.link}`
+  );
+}
+
+/**
+ * Copia um texto para a área de transferência. `navigator.clipboard` só existe
+ * em página segura e o iPhone antigo às vezes recusa — aí vai pelo caminho
+ * velho (textarea + execCommand), que funciona em qualquer navegador. Devolve
+ * se deu certo, para a tela dizer "copiado" só quando copiou.
+ */
+export async function copiarTexto(texto: string): Promise<boolean> {
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(texto);
+      return true;
+    }
+  } catch {
+    // Recusou (permissão, página não segura): tenta o caminho velho abaixo.
+  }
+  if (typeof document === 'undefined') return false;
+  const campo = document.createElement('textarea');
+  campo.value = texto;
+  campo.setAttribute('readonly', '');
+  campo.style.position = 'fixed';
+  campo.style.opacity = '0';
+  document.body.appendChild(campo);
+  campo.select();
+  campo.setSelectionRange(0, texto.length);
+  let copiou = false;
+  try {
+    copiou = document.execCommand('copy');
+  } catch {
+    copiou = false;
+  }
+  document.body.removeChild(campo);
+  return copiou;
+}

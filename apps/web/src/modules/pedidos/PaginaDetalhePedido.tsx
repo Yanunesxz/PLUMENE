@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy, Send, Link2 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -21,6 +21,9 @@ import {
   seloDoPedido,
   compararReferencia,
   linkDoWhatsApp,
+  situacaoDoWhatsapp,
+  copiarTexto,
+  mensagemDaCopiaAoRepresentante,
   podeLancarNoErp,
   lancaPeloControl,
   faturaPeloControl,
@@ -154,6 +157,19 @@ export function PaginaDetalhePedido() {
   const [invoicing, setInvoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  // "Link copiado" no próprio botão por uns segundos: o toque não abre nada,
+  // então a pessoa precisa ver que funcionou.
+  const [linkCopiado, setLinkCopiado] = useState(false);
+  useEffect(() => {
+    if (!linkCopiado) return;
+    const t = setTimeout(() => setLinkCopiado(false), 2500);
+    return () => clearTimeout(t);
+  }, [linkCopiado]);
+  const copiarLinkDoPedido = async (link: string) => {
+    if (!link) return;
+    if (await copiarTexto(link)) setLinkCopiado(true);
+    else setToast({ message: `Não deu para copiar sozinho. O link é: ${link}`, type: 'error' });
+  };
 
   // A última recusa da API, com as palavras dela — o diálogo do lançamento
   // mostra o motivo real (número repetido, canal na API) em vez de um genérico.
@@ -863,9 +879,18 @@ export function PaginaDetalhePedido() {
 
   // Pedido de vitrine não tem cadastro: o contato é o que o visitante digitou
   // no fechamento. É por ele que o representante vai retornar.
+  // O número do cliente vem do CADASTRO, pela API (22/09/2026). A cópia da
+  // carteira no aparelho fica só para o pedido aberto do cache offline — com
+  // ela sozinha, o cliente que não estava no aparelho saía sem número e o
+  // WhatsApp pedia para escolher o contato ("depende do pedido", disse o Yan).
   const zapDoComprador = order?.customer_id
-    ? (custWhats.get(order.customer_id) ?? null)
+    ? order.customer_whatsapp !== undefined
+      ? order.customer_whatsapp
+      : (custWhats.get(order.customer_id) ?? null)
     : (order?.guest_whatsapp ?? null);
+  // A cópia vai para o rep quando quem olha NÃO é ele — o escritório (ou a
+  // venda interna num pedido de outro rep) avisando quem vendeu.
+  const enviaCopiaAoRep = !ehLoja && !!order?.rep_info && order.rep_id !== user?.id;
 
   const clearCart = useCartStore((s) => s.clear);
   const addToCart = useCartStore((s) => s.add);
@@ -1177,6 +1202,65 @@ export function PaginaDetalhePedido() {
                 <MessageCircle className="h-4 w-4" strokeWidth={2.5} />
                 Enviar pedido para o cliente
               </a>
+            )}
+            {!ehLoja && order.public_link && situacaoDoWhatsapp(zapDoComprador) !== 'ok' && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {situacaoDoWhatsapp(zapDoComprador) === 'sem'
+                  ? 'O cliente está sem WhatsApp no cadastro: o WhatsApp vai pedir para você escolher o contato.'
+                  : `O WhatsApp do cadastro (${zapDoComprador ?? ''}) está sem DDD ou incompleto: confira no cadastro do cliente.`}
+              </p>
+            )}
+
+            {/* A cópia para o representante e o link solto (Yan, 22/09/2026).
+                A cópia é para quem NÃO é o dono do pedido — o escritório
+                avisando o rep; o próprio rep já tem o pedido no app. */}
+            {!ehLoja && order.public_link && (
+              <div className={`mt-2 grid gap-2 ${enviaCopiaAoRep ? 'sm:grid-cols-2' : ''}`}>
+                {enviaCopiaAoRep && (
+                  <a
+                    href={linkDoWhatsApp(
+                      order.rep_info?.phone,
+                      mensagemDaCopiaAoRepresentante({
+                        representante: order.rep_info?.name,
+                        numero: order.order_number,
+                        cliente: nomeDoComprador(order, custName),
+                        marca: MARCA.nome,
+                        link: order.public_link,
+                      }),
+                    )}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-positive-soft hover:text-positive-soft-foreground"
+                  >
+                    <Send className="h-4 w-4" strokeWidth={2.5} />
+                    Enviar cópia ao representante
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => void copiarLinkDoPedido(order.public_link ?? '')}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-sunken"
+                >
+                  {linkCopiado ? (
+                    <Check className="h-4 w-4 text-positive-soft-foreground" strokeWidth={2.5} />
+                  ) : (
+                    <Link2 className="h-4 w-4" strokeWidth={2.5} />
+                  )}
+                  {linkCopiado ? 'Link copiado' : 'Copiar link do pedido'}
+                </button>
+              </div>
+            )}
+            {/* Só com o telefone de fato lido: a API antiga (ou a janela em que o
+                app publica antes dela) não manda o campo, e isso não é "sem telefone". */}
+            {enviaCopiaAoRep &&
+              order.public_link &&
+              order.rep_info?.phone !== undefined &&
+              situacaoDoWhatsapp(order.rep_info.phone) !== 'ok' && (
+              <p className="mt-1.5 text-xs text-muted-foreground">
+                {situacaoDoWhatsapp(order.rep_info?.phone) === 'sem'
+                  ? 'O representante está sem telefone no cadastro: o WhatsApp vai pedir para você escolher o contato.'
+                  : `O telefone do representante (${order.rep_info?.phone ?? ''}) está sem DDD ou incompleto: confira em Representantes.`}
+              </p>
             )}
 
             {/* Fazer o MESMO pedido de novo — pedido de reposição é rotina.
