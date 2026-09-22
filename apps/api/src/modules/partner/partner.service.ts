@@ -12,13 +12,14 @@
 import { supabase } from '../../config/supabase.js';
 import {
   coresPorSku,
+  coresPorSkuParaOControl,
   divergenciaComOErp,
-  semLinhasDeCor,
+  observacaoGeralParaOControl,
   normalizarNumeroErp,
   numeroErpValido,
   ORDER_STATUS_FLOW,
 } from '@csb/shared';
-import type { ItemDaFoto, OrderStatus, PedidoParaComparar } from '@csb/shared';
+import type { CorDaFicha, ItemDaFoto, OrderStatus, PedidoParaComparar } from '@csb/shared';
 import { registrarNoErp } from '../orders/erpSync.service.js';
 import { gravarOrigemDoNumero, registrarEventoErp } from '../orders/eventosErp.service.js';
 import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
@@ -34,7 +35,12 @@ export interface PartnerOrderItem {
   quantidade: number;
   preco_unitario: number;
   valor_total: number;
-  /** A(s) cor(es) que o cliente escolheu para esta referência — vazio = sortido. */
+  /**
+   * A(s) cor(es) que o cliente escolheu para esta referência, pelo NÚMERO da
+   * bolinha do catálogo ("Cor 2", "3M Cor 2 / 2G Cor 1", "Variadas") — desde
+   * 22/09/2026, igual à coluna OBSERVAÇÃO da planilha. Cor sem número na ficha
+   * da peça sai pelo nome. `null` = sortido.
+   */
   observacao: string | null;
 }
 
@@ -377,11 +383,74 @@ async function fotosDoControl(company_id: string, rows: OrderRow[]): Promise<Fot
   return fotos;
 }
 
+/** As referências do pedido como as notas podem escrevê-las: o SKU e o código do ERP. */
+function skusDoPedidoDe(row: OrderRow): Set<string> {
+  const skus = new Set<string>();
+  for (const it of row.items ?? []) {
+    if (it.product?.sku) skus.add(it.product.sku);
+    if (it.product?.erp_id) skus.add(it.product.erp_id);
+  }
+  return skus;
+}
+
+/** product_id → as bolinhas do catálogo da peça (product_colors, 019). */
+type FichasDeCores = Map<string, CorDaFicha[]>;
+
+/**
+ * As fichas de cores das peças que têm COR ESCOLHIDA nas notas dos pedidos —
+ * é por elas que o nome da nota ("pink") vira o número da bolinha ("Cor 3")
+ * no item (pedido do Yan, 22/09/2026: "na hora de subir pro Control tem que
+ * ser Cor 1, Cor 2, do jeito que está no catálogo").
+ *
+ * Uma consulta por lote de peças, nunca uma por item. Pedido sem linha de cor
+ * não pergunta nada ao banco. Banco sem a 019 (a tabela não existe): mapa
+ * vazio, e a cor sai pelo nome, como antes. Erro de banco SOBE (500), como no
+ * resto da fila: o Control grava o pedido uma vez só, e um soluço que
+ * mandasse o nome no lugar do número ficaria gravado lá.
+ */
+async function fichasDeCores(company_id: string, rows: OrderRow[]): Promise<FichasDeCores> {
+  const ids = new Set<string>();
+  for (const row of rows) {
+    const comCor = coresPorSku(row.notes, skusDoPedidoDe(row));
+    if (comCor.size === 0) continue;
+    for (const it of row.items ?? []) {
+      const sku = it.product?.sku;
+      const erp = it.product?.erp_id;
+      if (it.product_id && ((sku && comCor.has(sku)) || (erp && comCor.has(erp)))) ids.add(it.product_id);
+    }
+  }
+
+  const fichas: FichasDeCores = new Map();
+  if (ids.size === 0) return fichas;
+  if (!(await detectarOuFalhar('product_colors', 'codigo'))) return fichas;
+
+  for (const lote of emLotes([...ids])) {
+    const linhas = await buscarTudoOuFalhar<CorDaFicha & { product_id: string }>((de, ate) =>
+      supabase
+        .from('product_colors')
+        .select('product_id, codigo, nome, variadas')
+        .eq('company_id', company_id)
+        .in('product_id', lote)
+        // (product_id, codigo) é único (019): ordem estável entre as páginas.
+        .order('product_id')
+        .order('codigo')
+        .range(de, ate),
+    );
+    for (const l of linhas) {
+      const ficha = fichas.get(l.product_id) ?? [];
+      ficha.push({ codigo: l.codigo, nome: l.nome, variadas: l.variadas === true });
+      fichas.set(l.product_id, ficha);
+    }
+  }
+  return fichas;
+}
+
 function mapOrder(
   row: OrderRow,
   tableMap: MapaDeTabelas,
   fotos: FotosDoControl | null,
   exigeSolicitacao: boolean,
+  fichas: FichasDeCores,
 ): PartnerOrder {
   const pendencias: string[] = [];
   const customer = row.customer;
@@ -407,12 +476,18 @@ function mapOrder(
   // A cor escolhida pelo cliente vive nas linhas "0015 3M azul" das notas —
   // o item vai sortido para o ERP e a escolha viaja na observação, igual à
   // coluna OBSERVAÇÃO da planilha do Control (ver @csb/shared observacaoCores).
-  const skusDoPedido = new Set<string>();
+  // Para o Control ela sai pelo NÚMERO da bolinha ("Cor 2"), pela ficha de
+  // cores da peça (Yan, 22/09/2026); o app continua mostrando o nome. Cor sem
+  // casamento na ficha sai pelo nome, como antes.
+  const skusDoPedido = skusDoPedidoDe(row);
+  const fichaPorSku = new Map<string, CorDaFicha[]>();
   for (const it of row.items ?? []) {
-    if (it.product?.sku) skusDoPedido.add(it.product.sku);
-    if (it.product?.erp_id) skusDoPedido.add(it.product.erp_id);
+    const ficha = it.product_id ? fichas.get(it.product_id) : undefined;
+    if (!ficha) continue;
+    if (it.product?.sku) fichaPorSku.set(it.product.sku, ficha);
+    if (it.product?.erp_id) fichaPorSku.set(it.product.erp_id, ficha);
   }
-  const corDasNotas = coresPorSku(row.notes, skusDoPedido);
+  const corDasNotas = coresPorSkuParaOControl(row.notes, skusDoPedido, fichaPorSku);
 
   const itens: PartnerOrderItem[] = (row.items ?? []).map((it) => {
     let produto: string | null = null;
@@ -450,8 +525,11 @@ function mapOrder(
     criado_em: row.created_at,
     atualizado_em: row.updated_at,
     valor_total: row.total,
-    // Só o que o representante DIGITOU — as linhas de cor já saem por item.
-    observacoes: semLinhasDeCor(row.notes, skusDoPedido) || null,
+    // Só o que o representante DIGITOU — as linhas de cor já saem por item. E
+    // sem a linha de cor de peça que saiu do pedido ("editar peças" da
+    // triagem não mexe nas notas): ia ao Control com o NOME da cor de uma
+    // peça que nem está no pedido (22/09/2026: 142 linhas em 4 pedidos da CS).
+    observacoes: observacaoGeralParaOControl(row.notes, skusDoPedido).texto || null,
     pedido_erp: row.erp_order_id,
     solicitado_em: row.erp_requested_at ?? null,
     alterado_apos_importacao: alteradoAposImportacao(row, fotos),
@@ -570,8 +648,9 @@ export async function getPartnerOrders(
   const tableMap = await getPriceTableMap(company_id);
   // Na fila nenhum pedido tem número: só a reconciliação lê as fotos.
   const fotos = await fotosDoControl(company_id, linhas);
+  const fichas = await fichasDeCores(company_id, linhas);
   const exigeSolicitacao = Boolean(opts.incluirImportados) && colunas.solicitado;
-  return linhas.map((row) => mapOrder(row, tableMap, fotos, exigeSolicitacao));
+  return linhas.map((row) => mapOrder(row, tableMap, fotos, exigeSolicitacao, fichas));
 }
 
 export type ConfirmResult =

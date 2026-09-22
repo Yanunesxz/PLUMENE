@@ -458,7 +458,7 @@ seguinte.
       "itens": [
         { "produto": "REF100", "tamanho": "G", "cor": "00001",
           "quantidade": 3, "preco_unitario": 42.9, "valor_total": 128.7,
-          "observacao": "azul" },
+          "observacao": "Cor 2" },
         { "produto": "REF100", "tamanho": "GG", "cor": "00001",
           "quantidade": 2, "preco_unitario": 55.0, "valor_total": 110.0,
           "observacao": null }
@@ -479,7 +479,7 @@ seguinte.
 | `situacao` | texto | `approved` (aguardando importação) ou `sent_erp` (já enviado ao ERP; só aparece com `incluir=todos`) |
 | `criado_em` / `atualizado_em` | data ISO | Criação / última alteração |
 | `valor_total` | número | Total do pedido, **já com o desconto aplicado** |
-| `observacoes` | texto ou null | Só o que o representante DIGITOU (a cor escolhida sai por item, em `itens[].observacao`) |
+| `observacoes` | texto ou null | Só o que o representante DIGITOU (a cor escolhida sai por item, em `itens[].observacao`; a cor anotada para peça que saiu do pedido não sai) |
 | `pedido_erp` | texto ou null | Número no ERP, na forma normalizada (ex.: `CS17379`). Nulo na fila; preenchido pela sua confirmação ou conciliação |
 | `solicitado_em` | data ISO ou null | Quando o financeiro clicou em "Lançar no Control". Na fila vem sempre preenchido; `null` no passivo, no pedido lançado à mão e em instalação sem a migração 049 |
 | `alterado_apos_importacao` | booleano ou null | O pedido está diferente do que o Control conhece (peças, desconto, condição, observação)? `null` sem número (na fila é sempre `null`) ou sem a foto do lançamento — ver "Pedido editado depois da importação" |
@@ -538,7 +538,7 @@ Só o cliente **sem CNPJ** trava, porque sem documento não há como casar.
 | `quantidade` | inteiro | Quantidade de peças |
 | `preco_unitario` | número | Preço unitário de tabela, **sem** o desconto |
 | `valor_total` | número | Total do item (quantidade × preço de tabela) |
-| `observacao` | texto ou null | **A(s) cor(es) que o cliente escolheu** para a referência (ex.: `"azul"`, `"3M azul / 2G rosa"`). `null` = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha |
+| `observacao` | texto ou null | **A(s) cor(es) que o cliente escolheu** para a referência, pelo **número da bolinha do catálogo impresso** (ex.: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`, `"Cor única"`). `null` = sortido de verdade. É o mesmo texto da coluna OBSERVAÇÃO da planilha |
 
 **Sobre a cor:** a operação é por *cores sortidas* — o item vai agregado por
 (produto × tamanho) e a coluna COR recebe **sempre** `"00001"`. Quando o cliente
@@ -547,6 +547,25 @@ viaja em `observacao`, no texto que a separação lê. Nesta versão não existe
 código de cor real em `cor`; venda por cor com grade própria no ERP não faz
 parte do contrato v1 — se um dia entrar, será combinado antes e chegará como
 campo novo, sem mudar o que já existe.
+
+**O texto da cor é o do catálogo impresso** (desde 22/09/2026): a bolinha
+numerada `01` sai `"Cor 1"`, a `02` sai `"Cor 2"`, a `10` sai `"Cor 10"` (sem o
+zero à esquerda), a bolinha **VARIADAS** sai `"Variadas"` e a bolinha **ÚNICA**
+sem número (peça de uma cor só) sai `"Cor única"`. Quando a referência
+tem cores diferentes por tamanho, o formato é tamanho + cor, separados por
+` / `: `"3M Cor 2 / 2G Cor 1"` (3 peças M na cor 2, 2 peças G na cor 1). É o
+número que o estoque confere no catálogo — no app o representante e a loja
+continuam vendo o **nome** da cor. Se a cor escolhida não tiver número no
+cadastro da peça (cor renomeada depois do pedido, peça sem as bolinhas
+cadastradas), sai o **nome** da cor, como antes (ex.: `"azul"`) — nunca um
+número inventado. Trate o texto como livre: é para a separação ler.
+
+**`observacoes` não traz cor nenhuma** (desde 22/09/2026): nem a das peças do
+pedido (ela vai por item) nem a anotada para uma peça que **saiu** do pedido
+depois de fechado (tirada na triagem). Antes, essa anotação sobrava no texto
+geral com o nome da cor, como se a peça ainda fosse. O recado do representante
+continua inteiro, mesmo quando cita uma referência ("Ref. 0848 mandar a cor
+Marrom…", "0020 2 peças a mais se tiver").
 
 **Campos que dependem de recurso do banco:** `numero`, `condicao_pagamento`,
 `desconto_percentual`, `faturado`, `faturado_em`, `valor_faturado`, os pedaços
@@ -1878,7 +1897,7 @@ pedido. Pedido sem condição sai com `condicao_pagamento: null`, sem pendência
 | Condição de pagamento | `condicao_pagamento.*` | ERP (código) | Escolhida no app entre as condições do Control; `null` se não escolhida |
 | Desconto | `desconto_percentual` | App | Pontos percentuais (10 = 10%). Preços dos itens SEM desconto; `valor_total` COM. Igual à planilha (AB46) |
 | Total | `valor_total` | App | Com o desconto aplicado |
-| Observações gerais | `observacoes` | App | Só o que o rep digitou (remessa, boleto, recado) |
+| Observações gerais | `observacoes` | App | Só o que o rep digitou (remessa, boleto, recado) — sem linha de cor |
 | Datas | `criado_em`, `atualizado_em` | App | ISO 8601 |
 | Faturamento | `faturado`, `faturado_em`, `valor_faturado` | ERP | O carimbo — ver abaixo |
 
@@ -1889,7 +1908,7 @@ pedido. Pedido sem condição sai com `condicao_pagamento: null`, sem pendência
 | Referência | `produto` | A referência que o ERP conhece |
 | Tamanho | `tamanho` | P, M, G, GG, EG... — nas PLUS a numeração (48...) |
 | Cor | `cor` | Sempre `"00001"` (sortido) — a grade do ERP é por tamanho |
-| Cor escolhida | `observacao` | O texto da separação: `"azul"`, `"3M azul / 2G rosa"`, ou `null` se sortido |
+| Cor escolhida | `observacao` | O texto da separação, com o número da bolinha do catálogo: `"Cor 2"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`, `"Cor única"`, ou `null` se sortido. Sem número no cadastro da peça, o nome da cor |
 | Quantidade | `quantidade` | Peças |
 | Preço | `preco_unitario` | De tabela, sem desconto |
 | Total do item | `valor_total` | quantidade × preço de tabela |
@@ -1995,6 +2014,14 @@ removido): no `POST /clientes`, o `whatsapp` só preenche o cliente que está se
 aviso. O WhatsApp que alguém apagou no app continua vazio, e o `whatsapp` vazio
 (`null` ou `""`) nunca apaga nada. O `alterado_no_app` do `GET /clientes`
 nunca traz `whatsapp` — a troca do WhatsApp no app não precisa ir ao seu ERP.
+
+**A outra mudança de 22/09/2026 — a cor pelo número do catálogo, só de conteúdo** (nenhum campo novo, renomeado ou
+removido): o texto de `itens[].observacao` passa a trazer a cor pelo número da
+bolinha do catálogo impresso — `"Cor 1"`, `"3M Cor 2 / 2G Cor 1"`, `"Variadas"`,
+`"Cor única"` — no lugar do nome (`"azul"`), igual à coluna OBSERVAÇÃO da
+planilha. Cor sem número no cadastro da peça continua saindo pelo nome. O campo
+`cor` continua `"00001"`. E `observacoes` deixa de trazer a cor anotada para
+uma peça que saiu do pedido.
 
 ## Dúvidas / suporte
 

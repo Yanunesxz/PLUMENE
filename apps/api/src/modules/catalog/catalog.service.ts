@@ -1,6 +1,6 @@
 import { supabase } from '../../config/supabase.js';
-import { detectar } from '../../lib/detectarColuna.js';
-import { buscarPorIds, buscarTudo } from '../../lib/paginacao.js';
+import { detectar, detectarOuFalhar } from '../../lib/detectarColuna.js';
+import { buscarPorIds, buscarPorIdsOuFalhar, buscarTudo } from '../../lib/paginacao.js';
 import type { CatalogColor, CatalogVariant, ProductWithPrice } from '@csb/shared';
 
 /**
@@ -167,8 +167,15 @@ export async function getProducts(
   // Cores do catálogo impresso (migração 019). Paginado pelo mesmo motivo das
   // variantes: são ~3 cores para cada produto do catálogo.
   //
-  // A migração pode não estar aplicada — nesse caso o PostgREST recusa e o
-  // catálogo segue sem cor, em vez de abrir vazio.
+  // A migração pode não estar aplicada — sem a TABELA o catálogo segue sem
+  // cor, em vez de abrir vazio; sem as colunas da 020, segue sem o par.
+  //
+  // Mas erro do banco na leitura SOBE (500) — não vira `colors: []`. Até
+  // 22/09/2026 ele era engolido: o catálogo saía 200 sem as bolinhas, as telas
+  // gravavam isso POR CIMA do cache bom (bulkPut) e a planilha do Control, que
+  // lê as fichas desse cache, passava a mandar o NOME da cor no lugar do
+  // número ("Cor 2") sem ninguém perceber. Com o 500, toda tela que baixa o
+  // catálogo segue com o cache que já tem (todas têm o seu .catch).
   const coresPorProduto = new Map<string, CatalogColor[]>();
   type LinhaDeCor = {
     product_id: string;
@@ -183,20 +190,24 @@ export async function getProducts(
 
   // A segunda bolinha e o marcador de estampa são da 020. Se ela ainda não
   // rodou, o PostgREST recusa as colunas — e aí é melhor mostrar a cor sem o
-  // par do que sumir com a bolinha inteira.
+  // par do que sumir com a bolinha inteira. A pergunta é feita ANTES (a
+  // sonda guarda o "sim" para sempre): com o erro engolido pela paginação, o
+  // `.catch` que fazia esse papel nunca disparava.
   const COLUNAS = 'product_id, codigo, nome, hex, variadas, ordem';
-  const ler = (colunas: string) =>
-    buscarPorIds<LinhaDeCor>(productIds, (lote, de, ate) =>
+  if (await detectarOuFalhar('product_colors', 'codigo')) {
+    const com020 = await detectarOuFalhar('product_colors', 'hex_par');
+    const cores = await buscarPorIdsOuFalhar<LinhaDeCor>(productIds, (lote, de, ate) =>
       supabase
         .from('product_colors')
-        .select(colunas)
+        .select(com020 ? `${COLUNAS}, hex_par, estampa` : COLUNAS)
         .in('product_id', lote)
         .order('ordem')
+        // (product_id, codigo) é único (019): o desempate que deixa a página
+        // estável quando o lote passa das 1.000 linhas.
+        .order('product_id')
+        .order('codigo')
         .range(de, ate),
     );
-
-  try {
-    const cores = await ler(`${COLUNAS}, hex_par, estampa`).catch(() => ler(COLUNAS));
     for (const c of cores) {
       const arr = coresPorProduto.get(c.product_id) ?? [];
       arr.push({
@@ -209,8 +220,6 @@ export async function getProducts(
       });
       coresPorProduto.set(c.product_id, arr);
     }
-  } catch {
-    /* sem a 019 o catálogo continua funcionando, só sem bolinha de cor */
   }
 
   const priceMap = new Map<string, { price: number; price_larger: number | null }>();

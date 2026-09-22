@@ -35,6 +35,7 @@ import type {
   OrderWithItems,
   RepListItem,
   ProductWithPrice,
+  CorDaFicha,
 } from '@csb/shared';
 
 const ALL_REPS = '__all__';
@@ -231,6 +232,16 @@ export function PaginaPedidos() {
     return m;
   }, [products]);
 
+  // product_id → as bolinhas do catálogo da peça. A planilha troca o nome da
+  // cor escolhida pelo número da bolinha ("Cor 2") — "na hora de subir pro
+  // Control tem que ser Cor 1, Cor 2, do jeito que está no catálogo" (Yan,
+  // 22/09/2026). Vem do mesmo catálogo em cache que dá o SKU e o tamanho.
+  const coresDoProduto = useMemo(() => {
+    const m = new Map<string, CorDaFicha[]>();
+    for (const p of products ?? []) if (p.colors && p.colors.length > 0) m.set(p.id, p.colors);
+    return m;
+  }, [products]);
+
   // variant_id → tamanho. A planilha põe a quantidade na COLUNA do tamanho, então
   // sem isto o item não tem onde cair.
   const tamanhoDaVariante = useMemo(() => {
@@ -403,6 +414,7 @@ export function PaginaPedidos() {
         skuDoProduto: productSku,
         tamanhoDaVariante,
         corDoProduto,
+        coresDoProduto,
         tabelaDoPedido: (pedido) => {
           // A do próprio pedido primeiro (migração 025). É a única que não é
           // palpite: o cliente pode ter trocado de tabela depois, e o rep pode

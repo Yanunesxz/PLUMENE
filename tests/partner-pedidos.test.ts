@@ -715,6 +715,216 @@ describe('o pedido como o ERP recebe', () => {
   });
 });
 
+// ─── A cor pelo número do catálogo (22/09/2026) ──────────────────────────────
+
+/**
+ * Pedido do Yan (22/09/2026): no app a cor aparece pelo nome, "está ótimo";
+ * "na hora de subir pro Control tem que ser Cor 1, Cor 2, do jeito que está
+ * no catálogo" — o estoque confere pelo número da bolinha. As notas continuam
+ * com o nome; o item do feed troca o nome pelo número, pela ficha de cores da
+ * peça (product_colors). Sem casamento, o nome, como antes.
+ */
+describe('a cor vai ao Control pelo número da bolinha do catálogo', () => {
+  const ITEM_0015_M = { ...ITEM, product_id: 'p15' };
+  const ITEM_0015_G = { ...ITEM, product_id: 'p15', variant: { erp_sku: '0015|G', size: 'G' } };
+  const ITEM_0020_P = {
+    ...ITEM,
+    product_id: 'p20',
+    variant: { erp_sku: '0020|P', size: 'P' },
+    product: { erp_id: '0020', sku: '0020' },
+  };
+  const FICHAS = [
+    { product_id: 'p15', codigo: '01', nome: 'rosa', variadas: false },
+    { product_id: 'p15', codigo: '02', nome: 'azul marinho', variadas: false },
+    { product_id: 'p15', codigo: '03', nome: 'pink', variadas: false },
+    // A peça cuja única bolinha é a VARIADAS: "Cores variadas" no app.
+    { product_id: 'p20', codigo: 'VAR', nome: 'Cores variadas', variadas: true },
+  ];
+
+  it('a observação do item sai "Cor N" / "Variadas", várias cores no formato de hoje', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({
+              notes: 'entregar sexta\n\n0015 3M pink\n0015 2G Rosa\n0020 1P Cores variadas',
+              items: [ITEM_0015_M, ITEM_0015_G, ITEM_0020_P],
+            }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+      product_colors: { data: FICHAS, error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens.map((i) => i.observacao)).toEqual(['3M Cor 3 / 2G Cor 1', '3M Cor 3 / 2G Cor 1', 'Variadas']);
+    expect(p!.itens.map((i) => i.cor)).toEqual(['00001', '00001', '00001']);
+    // O recado do rep continua separado, sem as linhas de cor.
+    expect(p!.observacoes).toBe('entregar sexta');
+    // Uma consulta pelas peças do pedido, da empresa da chave — nunca uma por item.
+    expect(fake.filtrosDe('product_colors', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
+    const ins = fake.filtrosDe('product_colors', 'in').map((f) => f.args);
+    expect(ins).toEqual([['product_id', ['p15', 'p20']]]);
+  });
+
+  it('cor sem casamento na ficha (renomeada depois) e peça sem ficha saem pelo NOME', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            pedido({
+              notes: '0015 3M verde bandeira\n0020 1P azul',
+              items: [ITEM_0015_M, ITEM_0020_P],
+            }),
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+      // Só a 0015 tem ficha — e nela não existe "verde bandeira".
+      product_colors: { data: FICHAS.filter((f) => f.product_id === 'p15'), error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens.map((i) => i.observacao)).toEqual(['verde bandeira', 'azul']);
+  });
+
+  it('banco sem a 019 (sem product_colors): a cor sai pelo nome, como antes', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ notes: '0015 3M pink', items: [ITEM_0015_M] })], error: null }]),
+      price_tables: { data: [], error: null },
+      product_colors: {
+        data: null,
+        error: { message: "Could not find the table 'public.product_colors' in the schema cache", code: 'PGRST205' },
+      },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens[0]!.observacao).toBe('pink');
+  });
+
+  it('pedido sem linha de cor não consulta as fichas', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ notes: 'entregar sexta', items: [ITEM_0015_M] })], error: null }]),
+      price_tables: { data: [], error: null },
+      product_colors: { data: FICHAS, error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens[0]!.observacao).toBeNull();
+    expect(fake.filtrosDe('product_colors')).toHaveLength(0);
+  });
+
+  it('erro ao ler as fichas SOBE — o Control nunca grava o nome no lugar do número por um soluço', async () => {
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ notes: '0015 3M pink', items: [ITEM_0015_M] })], error: null }]),
+      price_tables: { data: [], error: null },
+      // A sonda da tabela responde; a página das fichas cai.
+      product_colors: emSequencia({ data: [], error: null }, { data: null, error: { message: 'caiu' } }),
+    });
+
+    await expect(getPartnerOrders(EMPRESA, {})).rejects.toThrow(/caiu/);
+  });
+
+  it('a linha de cor de peça que SAIU do pedido não vai em observacoes — nem pelo nome, nem numerada', async () => {
+    // O "editar peças" da triagem não mexe nas notas: a linha da peça tirada
+    // fica lá (no banco da CS, 142 linhas em 4 pedidos, como "1036 3P Cor
+    // única" no #14628). Ela ia ao Control com o NOME da cor de uma peça que
+    // nem está no pedido.
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [pedido({ notes: 'ENTREGAR SEXTA\n\n0015 3M pink\n0020 2G azul', items: [ITEM_0015_M] })],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+      product_colors: { data: FICHAS, error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens.map((i) => i.observacao)).toEqual(['Cor 3']);
+    expect(p!.observacoes).toBe('ENTREGAR SEXTA');
+  });
+
+  it('o recado do rep que cita referência continua em observacoes', async () => {
+    const recados = 'Ref. 0848 mandar a cor Marrom no lugar do Rosa Claro 1p 1m 1g 2gg.\n0020 2 peças a mais se tiver';
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        { data: [pedido({ notes: `${recados}\n\n0015 3M pink`, items: [ITEM_0015_M] })], error: null },
+      ]),
+      price_tables: { data: [], error: null },
+      product_colors: { data: FICHAS, error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.observacoes).toBe(recados);
+  });
+
+  it('a peça COR ÚNICA sem número (bolinha "VAR" sem o selo VARIADAS) vai "Cor única", não "Cores variadas"', async () => {
+    // As 9 peças da CS (0981, 0990, 1007…): o catálogo imprime ÚNICA dentro
+    // da bolinha, e o banco as chama "Cores variadas" por um erro do
+    // cores.mjs. O estoque não pode ler "variadas" numa peça de uma cor só.
+    const ITEM_0990 = {
+      ...ITEM,
+      product_id: 'p990',
+      variant: { erp_sku: '0990|M', size: 'M' },
+      product: { erp_id: '0990', sku: '0990' },
+    };
+    const { getPartnerOrders } = await carregar({
+      orders: filaDaListagem([
+        { data: [pedido({ notes: '0990 2M Cores variadas', items: [ITEM_0990] })], error: null },
+      ]),
+      price_tables: { data: [], error: null },
+      product_colors: {
+        data: [{ product_id: 'p990', codigo: 'VAR', nome: 'Cores variadas', variadas: false }],
+        error: null,
+      },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens[0]!.observacao).toBe('Cor única');
+  });
+
+  it('passa das 1.000 bolinhas do PostgREST: a ficha da segunda página também vira "Cor N"', async () => {
+    // Um lote de 300 peças com 4 a 6 bolinhas passa de 1.000 linhas. Sem o
+    // `.range`, a mesma consulta voltaria repetida (ou o laço não acabaria).
+    const cheia = Array.from({ length: LIMITE_POSTGREST }, (_, i) => ({
+      product_id: `p-outra-${Math.floor(i / 5)}`,
+      codigo: String((i % 5) + 1).padStart(2, '0'),
+      nome: `cor ${i}`,
+      variadas: false,
+    }));
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([{ data: [pedido({ notes: '0015 3M pink', items: [ITEM_0015_M] })], error: null }]),
+      price_tables: { data: [], error: null },
+      // A sonda da tabela; a página cheia; a página com a ficha da 0015.
+      product_colors: emSequencia(
+        { data: [], error: null },
+        { data: cheia, error: null },
+        { data: FICHAS.filter((f) => f.product_id === 'p15'), error: null },
+      ),
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.itens[0]!.observacao).toBe('Cor 3');
+    expect(fake.filtrosDe('product_colors', 'range').map((f) => f.args)).toEqual([
+      [0, LIMITE_POSTGREST - 1],
+      [LIMITE_POSTGREST, 2 * LIMITE_POSTGREST - 1],
+    ]);
+  });
+});
+
 // ─── Tabela do pedido e cadastro do cliente (fase 0) ─────────────────────────
 
 describe('a tabela de preço é a do PEDIDO, com a coluna da tabela', () => {
