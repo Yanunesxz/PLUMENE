@@ -183,7 +183,10 @@ export function PaginaCliente() {
   const [motivoInativo, setMotivoInativo] = useState('');
   const [notaInativo, setNotaInativo] = useState('');
   const [salvandoInativo, setSalvandoInativo] = useState(false);
-  const podeMarcarInativo = podeExplicar;
+  // Só aparece para cliente ESFRIADO (Yan, 22/09/2026: "só se o cliente estiver
+  // esfriado") — quem está ativo ou em atenção ainda é para visitar, não para
+  // encerrar. `podeReativar` não depende da régua.
+  const podeReativar = podeExplicar;
 
   const salvarInativo = async (inativo: boolean) => {
     if (!token || !id || salvandoInativo) return;
@@ -572,7 +575,7 @@ export function PaginaCliente() {
                   . Fora da régua, dos alertas e do relatório.
                 </p>
               </div>
-              {podeMarcarInativo && (
+              {podeReativar && (
                 <Button variant="outline" size="sm" disabled={salvandoInativo} onClick={() => void salvarInativo(false)}>
                   {salvandoInativo ? 'Salvando…' : 'Reativar'}
                 </Button>
@@ -580,7 +583,8 @@ export function PaginaCliente() {
             </div>
           </div>
         ) : (
-          podeMarcarInativo && (
+          podeReativar &&
+          situacao.nivel === 'parado' && (
             <div className="mt-4 rounded-lg border border-border p-3">
               {!marcandoInativo ? (
                 <div className="flex items-center justify-between gap-3">

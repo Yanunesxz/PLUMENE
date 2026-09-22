@@ -8,8 +8,17 @@ import type {
   PedidoDoCliente,
 } from '@csb/shared';
 import type { AuthRole } from '@csb/shared';
-import { documento, formatarDocumento, linhaDeEndereco, apenasDigitos, codigoMiolo } from '@csb/shared';
+import {
+  documento,
+  formatarDocumento,
+  linhaDeEndereco,
+  apenasDigitos,
+  codigoMiolo,
+  frescorPorDias,
+  diasSemComprar,
+} from '@csb/shared';
 import { lerAlteracoesDoCliente } from './customers.alteracoes.service.js';
+import { lerRegua } from '../company/carteira.service.js';
 
 // O PostgREST devolve no máximo 1000 linhas por requisição. Gerente/admin podem
 // ter milhares de clientes, então paginamos em blocos até pegar todos.
@@ -599,7 +608,7 @@ export async function marcarVarejo(
 
 export type MarcaDeInativo =
   | { ok: true; inativo: boolean; motivo: string | null; nota: string | null; marcado_em: string }
-  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'erro' };
+  | { ok: false; motivo: 'sem_migracao' | 'cliente_nao_encontrado' | 'nao_esfriado' | 'erro' };
 
 /**
  * Marca (ou desmarca) o cliente como INATIVO — controle interno (migração 052).
@@ -618,8 +627,21 @@ export async function marcarInativo(
 ): Promise<MarcaDeInativo> {
   if (!(await detectarInativo())) return { ok: false, motivo: 'sem_migracao' };
 
-  const cliente = await clienteDaCarteira<{ id: string }>(company_id, customer_id, escopo, 'id');
+  const cliente = await clienteDaCarteira<{ id: string; last_purchase_at: string | null }>(
+    company_id,
+    customer_id,
+    escopo,
+    'id, last_purchase_at',
+  );
   if (!cliente) return { ok: false, motivo: 'cliente_nao_encontrado' };
+
+  // Só cliente ESFRIADO vira inativo (Yan, 22/09/2026: "só se o cliente estiver
+  // esfriado"). A régua é a da fábrica (043). Reativar vale sempre.
+  if (body.inativo) {
+    const dias = diasSemComprar(cliente.last_purchase_at);
+    const faixa = dias === null ? 'sem_registro' : frescorPorDias(dias, await lerRegua(company_id));
+    if (faixa !== 'parado') return { ok: false, motivo: 'nao_esfriado' };
+  }
 
   const marcado_em = new Date().toISOString();
   const motivo = body.inativo ? (body.motivo ?? null) : null;

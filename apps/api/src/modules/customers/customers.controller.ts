@@ -346,6 +346,14 @@ export async function marcarInativoHandler(request: FastifyRequest, reply: Fasti
     });
     return;
   }
+  if (r.motivo === 'nao_esfriado') {
+    await reply.status(409).send({
+      error: 'Só cliente esfriado pode ser marcado como inativo',
+      code: 'CLIENTE_NAO_ESFRIADO',
+      statusCode: 409,
+    });
+    return;
+  }
   await reply.status(500).send({
     error: 'Não foi possível salvar o cliente inativo',
     code: 'UPDATE_FAILED',

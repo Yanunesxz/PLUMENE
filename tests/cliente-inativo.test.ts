@@ -41,6 +41,11 @@ async function subirApp(respostas: Record<string, unknown>) {
   return { app, fake };
 }
 
+// Cliente ESFRIADO (vermelho): só ele pode virar inativo (Yan, 22/09/2026).
+const ESFRIADO = { data: { id: 'c1', last_purchase_at: '2024-01-15' }, error: null };
+// Cliente que comprou há pouco: não é para encerrar, é para vender.
+const ATIVO = { data: { id: 'c1', last_purchase_at: new Date().toISOString().slice(0, 10) }, error: null };
+
 const marcar = (token: string, payload: unknown, id = 'c1') => ({
   method: 'PATCH' as const,
   url: `/customers/${id}/inativo`,
@@ -72,7 +77,7 @@ describe('a lista fechada de motivos', () => {
 // Sobe o app inteiro: a primeira requisição passa dos 5 s padrão sob carga.
 describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
   it('o representante marca cliente da própria carteira — com motivo, quem e quando', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const res = await app.inject(marcar(TOKEN_REP, { inativo: true, motivo: 'fechou-a-loja' }));
     await app.close();
 
@@ -93,8 +98,27 @@ describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
     expect(fake.filtrosDe('customers', 'eq').some((f) => f.args[0] === 'rep_id' && f.args[1] === 'rep-1')).toBe(true);
   });
 
+  it('cliente ATIVO não vira inativo: 409 e nada gravado — só o esfriado', async () => {
+    const { app, fake } = await subirApp({ customers: ATIVO });
+    const res = await app.inject(marcar(TOKEN_REP, { inativo: true, motivo: 'fechou-a-loja' }));
+    await app.close();
+
+    expect(res.statusCode).toBe(409);
+    expect((res.json() as { code: string }).code).toBe('CLIENTE_NAO_ESFRIADO');
+    expect(fake.ultimaGravacao('customers', 'update')).toBeUndefined();
+  });
+
+  it('reativar vale sempre, mesmo com compra recente', async () => {
+    const { app, fake } = await subirApp({ customers: ATIVO });
+    const res = await app.inject(marcar(TOKEN_REP, { inativo: false }));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    expect((fake.ultimaGravacao('customers', 'update')?.valores as Record<string, unknown>).inativo).toBe(false);
+  });
+
   it('motivo fora da lista ou texto livre é recusado (400), sem gravar', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const res = await app.inject(marcar(TOKEN_REP, { inativo: true, motivo: 'trocou de fornecedor' }));
     await app.close();
 
@@ -103,7 +127,7 @@ describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
   });
 
   it('marcar sem motivo é recusado; "outro" sem nota também', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const semMotivo = await app.inject(marcar(TOKEN_REP, { inativo: true }));
     const outroSemNota = await app.inject(marcar(TOKEN_REP, { inativo: true, motivo: 'outro' }));
     const outroComNota = await app.inject(marcar(TOKEN_REP, { inativo: true, motivo: 'outro', nota: 'virou papelaria' }));
@@ -117,7 +141,7 @@ describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
   });
 
   it('desmarcar limpa motivo e nota — o cliente volta para a régua', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const res = await app.inject(marcar(TOKEN_REP, { inativo: false }));
     await app.close();
 
@@ -127,7 +151,7 @@ describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
   });
 
   it('gerente marca em qualquer carteira (sem filtro de rep)', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const res = await app.inject(marcar(TOKEN_GERENTE, { inativo: true, motivo: 'mudou-de-segmento' }));
     await app.close();
 
@@ -136,7 +160,7 @@ describe('PATCH /customers/:id/inativo', { timeout: 20_000 }, () => {
   });
 
   it('financeiro só lê: 403 e nada gravado', async () => {
-    const { app, fake } = await subirApp({ customers: { data: { id: 'c1' }, error: null } });
+    const { app, fake } = await subirApp({ customers: ESFRIADO });
     const res = await app.inject(marcar(TOKEN_FINANCEIRO, { inativo: true, motivo: 'fechou-a-loja' }));
     await app.close();
 
