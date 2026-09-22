@@ -96,6 +96,13 @@ export interface Customer {
    */
   varejo?: boolean | null;
   /**
+   * Cliente INATIVO (migração 052): não compra mais — fechou, mudou de ramo,
+   * não quer a marca. Status definitivo, fora da régua inteira; o motivo é uma
+   * chave da lista fechada do CRM (MOTIVOS_DE_INATIVO). Controle interno.
+   */
+  inativo?: boolean | null;
+  inativo_motivo?: string | null;
+  /**
    * O que o Control passou a mandar (migração 049): quando mandou este
    * cadastro pela última vez; de quando é o retrato (última compra, total
    * comprado, vencido); e a pendência financeira — R$ em aberto, quando esse
@@ -145,6 +152,9 @@ export interface CustomerListItem
     // Varejo marcado pela venda interna: sem ele a lista voltaria a pintar de
     // vermelho — e a cobrar — o cliente de balcão que nunca vai voltar.
     | 'varejo'
+    // Inativo (052): a aba "Inativos" e o motivo no cartão saem daqui.
+    | 'inativo'
+    | 'inativo_motivo'
   > {
   /**
    * Quem CADASTROU no app. Custa um UUID por linha e separa as duas famílias
@@ -159,6 +169,14 @@ export interface CustomerListItem
 /** A venda interna marca (ou desmarca) o cliente como varejo. */
 export interface MarcarVarejoRequest {
   varejo: boolean;
+}
+
+/** Marca (ou desmarca) o cliente como inativo. Marcar exige o motivo. */
+export interface MarcarInativoRequest {
+  inativo: boolean;
+  motivo?: string;
+  /** Obrigatória quando o motivo é `outro`. */
+  nota?: string;
 }
 
 /** O rep (ou o relacionamento) explica o cliente vermelho. */
@@ -272,6 +290,13 @@ export interface CustomerDetail {
   varejo?: boolean | null;
   varejo_marcado_em?: string | null;
   varejo_marcado_por_nome?: string | null;
+  /** Cliente inativo (migração 052) — motivo, nota, quem e quando. */
+  inativo?: boolean | null;
+  inativo_motivo?: string | null;
+  inativo_nota?: string | null;
+  inativo_marcado_em?: string | null;
+  inativo_marcado_por_nome?: string | null;
+  inativo_origem?: 'app' | 'crm' | null;
   /**
    * De quem é o cliente. Opcional: a API anterior não mandava, e o app
    * instalado no celular pode estar falando com ela.

@@ -36,6 +36,7 @@ import {
   apenasDigitos,
   ufValida,
   UFS,
+  rotuloDoMotivo,
 } from '@csb/shared';
 import type { CustomerListItem, CreateCustomerRequest, ApiResponse } from '@csb/shared';
 
@@ -187,7 +188,8 @@ export function PaginaClientes() {
     frescorDaUrl === 'parado' ||
       frescorDaUrl === 'esfriando' ||
       frescorDaUrl === 'ativo' ||
-      frescorDaUrl === 'varejo'
+      frescorDaUrl === 'varejo' ||
+      frescorDaUrl === 'inativo'
       ? frescorDaUrl
       : 'all',
   );
@@ -207,7 +209,7 @@ export function PaginaClientes() {
       // nem em Esfriados — é o que para a cobrança de contato (047).
       situacao: situacaoDoCliente(c),
     }));
-    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0, varejo: 0 } as Record<
+    const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0, varejo: 0, inativo: 0 } as Record<
       NivelDaCarteira,
       number
     >;
@@ -256,6 +258,9 @@ export function PaginaClientes() {
     { valor: 'sem_registro', rotulo: 'Sem registro' },
     // Só aparece quando existe: carteira sem balcão não ganha um chip vazio.
     ...(contagem.varejo > 0 ? [{ valor: 'varejo' as const, rotulo: `Varejo (${contagem.varejo})` }] : []),
+    // A aba dos que não compram mais (052) — pedido do Yan de 22/09/2026.
+    // Sempre visível: é para onde a pessoa vai conferir quem já foi marcado.
+    { valor: 'inativo', rotulo: `Inativos${contagem.inativo ? ` (${contagem.inativo})` : ''}` },
   ];
 
   useEffect(() => {
@@ -681,9 +686,13 @@ export function PaginaClientes() {
                         situacao.nivel === 'esfriando' && 'text-warn-soft-foreground',
                         situacao.nivel === 'ativo' && 'text-positive-soft-foreground',
                         situacao.nivel === 'varejo' && 'text-muted-foreground',
+                        situacao.nivel === 'inativo' && 'text-muted-foreground',
                       )}
                     >
                       {situacao.rotulo}
+                      {situacao.nivel === 'inativo' && rotuloDoMotivo(customer.inativo_motivo)
+                        ? ` · ${rotuloDoMotivo(customer.inativo_motivo)}`
+                        : ''}
                       {customer.last_purchase_at
                         ? ` · ${dataDaUltimaCompra(customer.last_purchase_at) ?? ''}`
                         : ''}

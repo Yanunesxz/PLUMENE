@@ -1,6 +1,7 @@
 import {
   CAMPOS_EDITAVEIS_DO_CLIENTE,
   ROTULO_DO_CAMPO_DO_CADASTRO,
+  algumCampoVaiParaOControl,
   camposQueVieram,
   ehPecaDoEndereco,
   formatarCep,
@@ -8,6 +9,7 @@ import {
   formatarValorDoCadastro,
   mesmoValorDoCadastro,
   rotulosDosCamposAlterados,
+  vaiParaOControl,
   valoresEditaveisDoCliente,
 } from '@csb/shared';
 import type {
@@ -117,6 +119,26 @@ export interface ResultadoDoSalvar {
   erp_pendente?: boolean | undefined;
   control_puxa_pela_api?: boolean | undefined;
   avisados?: AvisadosDaAlteracao | null | undefined;
+  /** O que foi gravado no histórico — diz se a edição foi só de campos do app (22/09/2026). */
+  alteracao?: Pick<AlteracaoDoCliente, 'campos'> | null | undefined;
+}
+
+/**
+ * A frase da linha embaixo do WhatsApp no diálogo de edição (22/09/2026).
+ * Pedido do Yan: "que eu possa alterar o wtss do cliente sem ter que subir pro
+ * control, numero uma coisa numero de wtss outro".
+ */
+export const AJUDA_DO_WHATSAPP_SO_NO_APP = 'Fica só no app — não precisa atualizar no Control.';
+
+/**
+ * A edição mexeu só em campos que ficam no app (o WhatsApp, 22/09/2026)? Sem a
+ * alteração na resposta (API antiga), `false`: vale a frase de sempre.
+ */
+function soCamposDoApp(alteracao: Pick<AlteracaoDoCliente, 'campos'> | null | undefined): boolean {
+  // O corpo do 500 SALVO_SEM_RELER_A_FICHA chega sem tipo: `campos` torto não derruba a frase.
+  const campos: unknown = alteracao?.campos;
+  const colunas = typeof campos === 'object' && campos !== null ? Object.keys(campos) : [];
+  return colunas.length > 0 && !algumCampoVaiParaOControl(colunas);
 }
 
 /**
@@ -126,12 +148,21 @@ export interface ResultadoDoSalvar {
  * financeiro que edita não entra na conta do financeiro, e o zero não quer
  * dizer "ninguém do financeiro está com aviso ligado" (revisão de 17/09/2026:
  * o único financeiro da empresa lia isso de si mesmo, com o push ligado).
+ *
+ * Só o WhatsApp mudou (22/09/2026): ele fica no app — a frase não diz que o
+ * financeiro foi avisado nem que precisa atualizar no Control, e também não
+ * "ainda não está no Control" (o cliente pode estar lá; só o WhatsApp não vai).
  */
 export function avisoDoCadastroSalvo(
   r: ResultadoDoSalvar | EditarCadastroDoClienteResponse,
   papel?: AuthRole | null,
 ): string {
   if (r.sem_mudanca === true) return 'Nada mudou — o cadastro já estava assim.';
+  // Hoje o único campo só do app é o WhatsApp: se outro entrar em
+  // CAMPOS_SO_DO_APP, esta frase muda junto.
+  if (!r.erp_pendente && soCamposDoApp(r.alteracao)) {
+    return 'Cadastro salvo. O WhatsApp fica só no app — não precisa atualizar no Control.';
+  }
   if (!r.erp_pendente) return 'Cadastro salvo. Cliente ainda não está no Control.';
   if (r.control_puxa_pela_api) return 'Cadastro salvo. O Control recebe a mudança pela integração.';
   // Só "o financeiro foi avisado" quando um aparelho do FINANCEIRO recebeu
@@ -314,7 +345,12 @@ export const AVISO_DA_EDICAO_SEM_REGISTRO_PARA_O_CONTROL =
  *     no Control, e ninguém avisava o suporte;
  *   • o UPDATE é um compare-and-set de todas as colunas juntas, então UM campo
  *     com o valor mandado prova que a edição gravou. Exigir todos deixava sem
- *     aviso o WhatsApp novo quando outra mão trocava o e-mail antes da releitura.
+ *     aviso o e-mail novo quando outra mão trocava o nome fantasia antes da
+ *     releitura.
+ *
+ * Só contam os campos que vão para o Control (22/09/2026): o WhatsApp é só do
+ * app, nunca entra na lista para atualizar no Control — ele sem registro não é
+ * a mudança que "não entrou na lista".
  */
 export function edicaoSemRegistroParaOControl(
   err: unknown,
@@ -324,7 +360,7 @@ export function edicaoSemRegistroParaOControl(
   if (!(err instanceof Error) || (err as Error & { code?: string }).code !== 'GRAVACAO_NAO_CONFIRMADA') return false;
   const valores = valoresDoCliente(agora);
   const pendentes = (agora.alteracoes ?? []).filter(alteracaoPendente);
-  return camposQueVieram(novo).some((c) => {
+  return camposQueVieram(novo).filter(vaiParaOControl).some((c) => {
     if (!mesmoValorDoCadastro(c, valores[c], novo[c])) return false;
     const registrada = pendentes.some((a) => {
       const m = a.campos[c];
@@ -421,9 +457,17 @@ export function errosDoServidorNaEdicao(err: unknown): ErrosDaEdicaoDoCadastro {
 
 // ─── O cartão "Para atualizar no Control" ─────────────────────────────────────
 
-/** Esperando alguém atualizar no Control: o cliente já estava lá e ninguém deu baixa. */
-export function alteracaoPendente(a: Pick<AlteracaoDoCliente, 'erp_pendente' | 'erp_atualizado_em'>): boolean {
-  return a.erp_pendente && a.erp_atualizado_em === null;
+/**
+ * Esperando alguém atualizar no Control: o cliente já estava lá, ninguém deu
+ * baixa — e há campo que vai para o Control (22/09/2026). A linha só de
+ * WhatsApp gravada pendente antes da regra nova vai para o histórico, marcada
+ * "só no app", em vez de pedir ao financeiro o que o Control não recebe. É a
+ * mesma régua da API (`estaPendente`).
+ */
+export function alteracaoPendente(
+  a: Pick<AlteracaoDoCliente, 'erp_pendente' | 'erp_atualizado_em' | 'campos'>,
+): boolean {
+  return a.erp_pendente && a.erp_atualizado_em === null && algumCampoVaiParaOControl(Object.keys(a.campos));
 }
 
 /** As pendentes (o cartão) e as demais (o histórico), na ordem em que vieram — das mais novas para as mais antigas. */
@@ -448,7 +492,15 @@ export interface LinhaDaAlteracao {
    * vale agora, formatado; `em`, quando a mais nova foi feita.
    */
   superada?: { depois: string; em: string };
+  /**
+   * Campo só do app (o WhatsApp, 22/09/2026): aparece no histórico marcado "só
+   * no app" e nunca no cartão "Para atualizar no Control".
+   */
+  soNoApp?: true;
 }
+
+/** A marca da linha de um campo só do app no histórico. */
+export const MARCA_SO_NO_APP = 'só no app';
 
 const ORDEM_DO_HISTORICO: readonly CampoDoHistoricoDoCadastro[] = [...CAMPOS_EDITAVEIS_DO_CLIENTE, 'address'];
 
@@ -506,6 +558,7 @@ export function linhasDaAlteracao(
       antes: formatarValorDoCadastro(campo, m.antes),
       depois: formatarValorDoCadastro(campo, m.depois),
     };
+    if (!vaiParaOControl(campo)) linha.soNoApp = true;
     if (estas) {
       // A mais nova de todas as que mexeram neste campo depois desta.
       const ultima = todas
@@ -520,6 +573,19 @@ export function linhasDaAlteracao(
     linhas.push(linha);
   }
   return linhas;
+}
+
+/**
+ * As linhas do cartão "Para atualizar no Control": as de `linhasDaAlteracao`
+ * sem os campos só do app (22/09/2026). Numa edição mista (WhatsApp e e-mail)
+ * o cartão manda digitar só o e-mail; o WhatsApp aparece no histórico quando a
+ * edição for resolvida, marcado "só no app".
+ */
+export function linhasParaOControl(
+  a: Pick<AlteracaoDoCliente, 'campos'> & Partial<Pick<AlteracaoDoCliente, 'id' | 'alterado_em'>>,
+  todas: readonly AlteracaoDoCliente[] = [],
+): LinhaDaAlteracao[] {
+  return linhasDaAlteracao(a, todas).filter((l) => !l.soNoApp);
 }
 
 const dataCurta = (iso: string) =>
@@ -542,14 +608,26 @@ export function autoriaDaAlteracao(
   return `${a.alterado_por_nome?.trim() || 'Alguém'} · ${formatar(a.alterado_em)}`;
 }
 
-/** Como a alteração terminou, para o histórico. */
+/**
+ * Como a alteração terminou, para o histórico. A edição só de campos do app
+ * (o WhatsApp, 22/09/2026) nunca foi ao Control — dizer "feita quando o cliente
+ * ainda não estava no Control" num cliente com código seria mentira.
+ */
 export function situacaoDaAlteracao(
   a: Pick<
     AlteracaoDoCliente,
-    'erp_pendente' | 'erp_atualizado_em' | 'erp_atualizado_por_nome' | 'erp_atualizado_via'
+    'erp_pendente' | 'erp_atualizado_em' | 'erp_atualizado_por_nome' | 'erp_atualizado_via' | 'campos'
   >,
   formatar: (iso: string) => string = dataCurta,
 ): string {
+  const colunas = Object.keys(a.campos);
+  // Só a que ninguém resolveu (revisão de 22/09/2026). A linha só de WhatsApp
+  // gravada pendente entre 21/09 (a 051 no ar) e 22/09, e que o financeiro já
+  // confirmou no Control — ou o Control fechou pela API —, conserva a baixa:
+  // dizer que ela "não vai para o Control" apagava quem deu a baixa e quando.
+  if (colunas.length > 0 && !algumCampoVaiParaOControl(colunas) && !a.erp_atualizado_em) {
+    return 'Fica só no app — não vai para o Control';
+  }
   if (alteracaoPendente(a)) return 'Esperando atualizar no Control';
   if (!a.erp_pendente) return 'Feita quando o cliente ainda não estava no Control';
   const quando = a.erp_atualizado_em ? formatar(a.erp_atualizado_em) : '';

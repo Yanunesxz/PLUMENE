@@ -1,10 +1,17 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar, detectarComCerteza, detectarOuFalhar } from '../../lib/detectarColuna.js';
 import { buscarTudoOuFalhar, emLotes } from '../../lib/paginacao.js';
-import { ALTERACOES_RESOLVIDAS_NA_FICHA, camposNoContratoDoParceiro } from '@csb/shared';
+import {
+  ALTERACOES_RESOLVIDAS_NA_FICHA,
+  CAMPOS_SO_DO_APP,
+  algumCampoVaiParaOControl,
+  camposNoContratoDoParceiro,
+  vaiParaOControl,
+} from '@csb/shared';
 import type {
   AlteracaoDoCliente,
   CampoDoHistoricoDoCadastro,
+  CampoSoDoApp,
   CamposAlteradosDoCadastro,
   ClienteComAlteracaoPendente,
   MudancaDeCampoDoCadastro,
@@ -24,7 +31,12 @@ import type {
  *
  * Uma edição é PENDENTE enquanto `erp_pendente` (o cliente já estava no
  * Control quando foi editado — ou o Control, ao adotá-lo pelo CNPJ, mostrou não
- * ter a edição; ver `colocarNaFilaDoControl`) e `erp_atualizado_em` é nulo.
+ * ter a edição; ver `colocarNaFilaDoControl`) e `erp_atualizado_em` é nulo — e
+ * desde 22/09/2026 só se ela tem algum campo que vai para o Control. O WhatsApp
+ * é só do app ("numero uma coisa numero de wtss outro", Yan): a edição só dele
+ * nunca é pendência, e nas mistas ele fica de fora de tudo que diz o que o
+ * Control precisa receber (as colunas pendentes, o `alterado_no_app`, o
+ * "alcançou" do POST, a fila da Minha área).
  *
  * Aqui mora tudo que lê e marca as linhas — a ficha, a fila da Minha área, o
  * "Já atualizei no Control" e as duas funções em lote que a API de Parceiro usa
@@ -56,9 +68,18 @@ export async function sondarMigracao051(): Promise<'existe' | 'nao_existe' | 'na
   return detectarComCerteza('customer_changes', 'id');
 }
 
-/** A edição ainda espera o Control? */
-export function estaPendente(a: Pick<AlteracaoDoCliente, 'erp_pendente' | 'erp_atualizado_em'>): boolean {
-  return a.erp_pendente && !a.erp_atualizado_em;
+/**
+ * A edição ainda espera o Control?
+ *
+ * Exige algum campo que vá para o Control (22/09/2026). A edição nova só de
+ * WhatsApp já nasce com `erp_pendente = false`; a regra aqui cobre a linha
+ * gravada antes dela (WhatsApp pendente de 21/09/2026) — ela sai da fila, do
+ * cartão e do `alterado_no_app` sem ninguém precisar dar baixa no banco.
+ */
+export function estaPendente(
+  a: Pick<AlteracaoDoCliente, 'erp_pendente' | 'erp_atualizado_em' | 'campos'>,
+): boolean {
+  return a.erp_pendente && !a.erp_atualizado_em && algumCampoVaiParaOControl(Object.keys(a.campos));
 }
 
 const texto = (v: unknown): string | null => (typeof v === 'string' ? v : null);
@@ -175,10 +196,10 @@ export async function listarClientesComAlteracaoPendente(company_id: string): Pr
   if (migracao === 'nao_sei') return { ok: false, motivo: 'banco_indisponivel' };
 
   try {
-    const linhas = await buscarTudoOuFalhar<{ customer_id: string; alterado_em: string }>((de, ate) =>
+    const linhas = await buscarTudoOuFalhar<{ customer_id: string; alterado_em: string; campos: unknown }>((de, ate) =>
       supabase
         .from('customer_changes')
-        .select('id, customer_id, alterado_em')
+        .select('id, customer_id, alterado_em, campos')
         .eq('company_id', company_id)
         .eq('erp_pendente', true)
         .is('erp_atualizado_em', null)
@@ -189,6 +210,9 @@ export async function listarClientesComAlteracaoPendente(company_id: string): Pr
 
     const porCliente = new Map<string, { pendentes: number; desde: string; ultima_em: string }>();
     for (const l of linhas) {
+      // A linha só de WhatsApp gravada pendente antes de 22/09/2026 não entra: o
+      // WhatsApp é só do app, e a fila é do que o Control precisa receber.
+      if (!algumCampoVaiParaOControl(Object.keys(camposDaLinha(l.campos)))) continue;
       const atual = porCliente.get(l.customer_id);
       if (!atual) {
         porCliente.set(l.customer_id, { pendentes: 1, desde: l.alterado_em, ultima_em: l.alterado_em });
@@ -418,6 +442,10 @@ export async function lerAlteracoesPendentesEmLote(
   const porCliente = new Map<string, AlteracaoDoCliente[]>();
   for (const l of linhas) {
     const a = paraAlteracao(l);
+    // A linha só de WhatsApp gravada pendente antes de 22/09/2026 não é
+    // pendência (ver `estaPendente`): fora daqui, o GET não a puxa por id e o
+    // POST não a confere.
+    if (!estaPendente(a)) continue;
     porCliente.set(a.customer_id, [...(porCliente.get(a.customer_id) ?? []), a]);
   }
   for (const lista of porCliente.values()) {
@@ -475,15 +503,76 @@ export async function lerAlteracoesForaDaFilaEmLote(
 }
 
 /**
+ * Os campos só do app (o WhatsApp) que o app JÁ EDITOU alguma vez, por cliente,
+ * em lote — pendente ou não, com código ou sem (revisão de 22/09/2026).
+ *
+ * É o que diz ao POST /partner/v1/clientes que o WhatsApp vazio de um cliente
+ * foi uma decisão do app, e não um "nunca teve". O representante que apaga o
+ * WhatsApp (a régua aceita "ou deixe em branco", e o diálogo diz "Fica só no
+ * app") via o telefone do Control voltar no envio seguinte, uns 5 minutos
+ * depois — sem aviso e sem linha no histórico, e o "Enviar pedido para o
+ * cliente" ia para o fixo do Control. Com edição do campo no histórico, o app
+ * é quem decide o valor: vazio continua vazio.
+ *
+ * Só para os clientes que o lote ia preencher (poucos; nunca a empresa
+ * inteira). Sem a 051 ou sem clientes: mapa vazio. LANÇA quando o banco não
+ * responde, como as outras leituras do POST — é lida antes de qualquer
+ * gravação, e uma lista pela metade devolveria o telefone do Control.
+ */
+export async function camposSoDoAppEditadosEmLote(
+  company_id: string,
+  customer_ids: readonly string[],
+): Promise<Map<string, Set<CampoSoDoApp>>> {
+  const porCliente = new Map<string, Set<CampoSoDoApp>>();
+  const unicos = [...new Set(customer_ids)];
+  if (unicos.length === 0 || !(await detectarOuFalhar('customer_changes', 'id'))) return porCliente;
+
+  // Só as linhas que mexeram num campo do app (a chave em `campos`): o
+  // histórico de e-mail e endereço não precisa atravessar a rede.
+  const soAsDoApp = CAMPOS_SO_DO_APP.map((c) => `campos->${c}.not.is.null`).join(',');
+  for (const lote of emLotes(unicos)) {
+    const linhas = await buscarTudoOuFalhar<{ id: string; customer_id: string; campos: unknown }>((de, ate) =>
+      supabase
+        .from('customer_changes')
+        .select('id, customer_id, campos')
+        .eq('company_id', company_id)
+        .in('customer_id', lote)
+        .or(soAsDoApp)
+        .order('id', { ascending: true })
+        .range(de, ate),
+    );
+    for (const l of linhas) {
+      const campos = camposDaLinha(l.campos);
+      for (const campo of CAMPOS_SO_DO_APP) {
+        if (!Object.prototype.hasOwnProperty.call(campos, campo)) continue;
+        const doCliente = porCliente.get(l.customer_id) ?? new Set<CampoSoDoApp>();
+        doCliente.add(campo);
+        porCliente.set(l.customer_id, doCliente);
+      }
+    }
+  }
+  return porCliente;
+}
+
+/**
  * A edição feita quando o cliente ainda não tinha código, e que o Control — ao
  * adotar o cliente pelo CNPJ — mostrou não ter (revisão de 17/09/2026): passa
  * a esperar o Control como qualquer outra (`erp_pendente = true`).
  *
  * Só marca linhas desta empresa ainda fora da fila (sem pendência e sem baixa).
  * Devolve os ids marcados. LANÇA em erro do banco.
+ *
+ * Recebe as edições (e não só os ids) para conferir aqui mesmo que cada uma
+ * tem campo que vai para o Control (22/09/2026): a edição só de WhatsApp —
+ * dado só do app — nunca entra na fila, venha de onde vier o pedido.
  */
-export async function colocarNaFilaDoControl(company_id: string, ids: readonly string[]): Promise<string[]> {
-  const unicos = [...new Set(ids)];
+export async function colocarNaFilaDoControl(
+  company_id: string,
+  edicoes: ReadonlyArray<Pick<AlteracaoDoCliente, 'id' | 'campos'>>,
+): Promise<string[]> {
+  const unicos = [
+    ...new Set(edicoes.filter((e) => algumCampoVaiParaOControl(Object.keys(e.campos))).map((e) => e.id)),
+  ];
   const marcadas: string[] = [];
   for (const lote of emLotes(unicos, IDS_POR_LOTE)) {
     const { data, error } = await supabase
@@ -502,14 +591,15 @@ export async function colocarNaFilaDoControl(company_id: string, ids: readonly s
 
 /**
  * As colunas do app com edição pendente (as chaves de `campos`: `name`,
- * `whatsapp`, as peças do endereço, `address`…). Só as alterações pendentes
- * contam.
+ * `email`, as peças do endereço, `address`…). Só as alterações pendentes
+ * contam, e só as colunas que vão para o Control: o WhatsApp de uma edição
+ * mista fica de fora (22/09/2026 — é só do app).
  */
 export function colunasPendentes(alteracoes: readonly AlteracaoDoCliente[]): Set<CampoDoHistoricoDoCadastro> {
   const colunas = new Set<CampoDoHistoricoDoCadastro>();
   for (const a of alteracoes) {
     if (!estaPendente(a)) continue;
-    for (const c of Object.keys(a.campos)) colunas.add(c as CampoDoHistoricoDoCadastro);
+    for (const c of Object.keys(a.campos)) if (vaiParaOControl(c)) colunas.add(c as CampoDoHistoricoDoCadastro);
   }
   return colunas;
 }
@@ -517,7 +607,8 @@ export function colunasPendentes(alteracoes: readonly AlteracaoDoCliente[]): Set
 /**
  * O `alterado_no_app` de um cliente no GET /partner/v1/clientes: a edição
  * pendente mais recente e os campos pendentes com os NOMES DO CONTRATO
- * (razao_social, cnpj_cpf, endereco…). `null` = nada pendente.
+ * (razao_social, cnpj_cpf, endereco…). `null` = nada pendente. Nunca traz
+ * `whatsapp` (22/09/2026): o WhatsApp é só do app, o Control não o recebe.
  */
 export function alteradoNoApp(
   alteracoes: readonly AlteracaoDoCliente[] | undefined,
@@ -534,6 +625,10 @@ export function alteradoNoApp(
  * `colunasQueAlcancaram` usa os nomes das colunas do app (as chaves de
  * `campos`). O endereço é um grupo: quem confere o `endereco` do Control e vê
  * que bate deve pôr aqui as sete peças e `address`.
+ *
+ * Só contam as colunas que vão para o Control (22/09/2026): a edição mista de
+ * WhatsApp e e-mail está alcançada quando o e-mail chegou — o WhatsApp nunca
+ * vai chegar, porque o Control não o recebe.
  */
 export function alteracoesQueAlcancaram(
   alteracoes: readonly AlteracaoDoCliente[],
@@ -542,7 +637,7 @@ export function alteracoesQueAlcancaram(
   return alteracoes
     .filter((a) => estaPendente(a))
     .filter((a) => {
-      const colunas = Object.keys(a.campos);
+      const colunas = Object.keys(a.campos).filter(vaiParaOControl);
       return colunas.length > 0 && colunas.every((c) => colunasQueAlcancaram.has(c));
     })
     .map((a) => a.id);

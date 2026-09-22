@@ -77,7 +77,8 @@ function casaTermo(linha: Linha, termo: string): boolean {
   }
   const [coluna, op, ...resto] = termo.split('.');
   const valor = resto.join('.').replace(/^"(.*)"$/, '$1');
-  const v = linha[coluna!];
+  // O caminho de jsonb também no `or` (`campos->whatsapp.not.is.null`, 22/09/2026).
+  const v = valorDaColuna(linha, coluna!);
   if (op === 'is' && valor === 'null') return v == null;
   if (op === 'not' && valor === 'is.null') return v != null;
   if (v == null) return false;
@@ -141,6 +142,8 @@ interface Banco {
   antesDoUpdateDeCliente?: (c: ConsultaFeita) => void;
   /** Chamado depois de uma página de customers ser lida — a gravação no meio da leitura. */
   depoisDeLerClientes?: (c: ConsultaFeita) => void;
+  /** Presente, recebe cada leitura (select) de customer_changes — para contar as idas ao banco. */
+  leiturasDoHistorico?: ConsultaFeita[];
 }
 
 const ERRO: RespostaTabela = { data: null, error: { message: 'tempo esgotado' } };
@@ -172,6 +175,7 @@ function fakeDo(banco: Banco) {
     },
     customer_changes: (c) => {
       if (c.operacao === 'select') {
+        banco.leiturasDoHistorico?.push(c);
         if (banco.falhar?.leitura) return ERRO;
         return {
           data: ordenarEFatiar(
@@ -302,31 +306,33 @@ const valoresDe = (g: { valores: unknown } | undefined) => g?.valores as Record<
 const updatesDe = (fake: ReturnType<typeof fakeDo>, tabela: string) =>
   fake.gravacoes.filter((g) => g.tabela === tabela && g.operacao === 'update').map(valoresDe);
 
-/** O mesmo registro que o Control tem com o valor ANTIGO do WhatsApp. */
+/** O registro mínimo do Control para o cliente de sempre (código e razão social). */
 const REGISTRO = { codigo: '123', razao_social: 'LOJA TESTE LTDA' };
 
 // ─── POST /clientes ──────────────────────────────────────────────────────────
 
 describe('POST /clientes — a edição do app não é apagada pelo Control (051)', () => {
   it('coluna pendente com outro valor no Control fica com o valor do app e volta em avisos; a não pendente grava como sempre', async () => {
+    // O exemplo era o WhatsApp até 22/09/2026, quando ele virou dado só do app:
+    // a regra genérica da coluna pendente segue provada pelo e-mail.
     const banco: Banco = {
       clientes: [cliente()],
       alteracoes: [
-        alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('cli-1', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
       ],
     };
     const { service, fake } = await carregar(banco);
 
     const r = await service.receberClientes(EMPRESA, [
-      { ...REGISTRO, whatsapp: '00900000001', email: 'novo@teste.invalid' },
+      { ...REGISTRO, email: 'velho@teste.invalid', nome_fantasia: 'LOJA RENOMEADA' },
     ]);
 
     expect(r).toMatchObject({ atualizados: 1, sem_mudanca: 0, ignorados: [] });
     const [patch] = updatesDe(fake, 'customers');
-    expect(patch).toMatchObject({ email: 'novo@teste.invalid' });
-    expect('whatsapp' in patch!).toBe(false);
+    expect(patch).toMatchObject({ trade_name: 'LOJA RENOMEADA' });
+    expect('email' in patch!).toBe(false);
     expect(r.avisos).toContain(
-      'Cliente 123: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.',
+      'Cliente 123: email alterados no app ainda não aplicados no Control — mantido o valor do app.',
     );
     // A edição continua na fila do financeiro.
     expect(updatesDe(fake, 'customer_changes')).toEqual([]);
@@ -339,14 +345,14 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
   it('o Control devolve o mesmo valor: a edição é resolvida pela API (via api, sem pessoa) e nada é gravado no cliente', async () => {
     const outraEmpresa = alteracao(
       'cli-1',
-      { whatsapp: { antes: '1', depois: '00900000002' } },
+      { email: { antes: 'x@teste.invalid', depois: 'loja@teste.invalid' } },
       { company_id: 'empresa-2' },
     );
-    const deOutroCliente = alteracao('cli-9', { whatsapp: { antes: '1', depois: '00900000002' } });
+    const deOutroCliente = alteracao('cli-9', { email: { antes: 'x@teste.invalid', depois: 'loja@teste.invalid' } });
     const banco: Banco = {
       clientes: [cliente()],
       alteracoes: [
-        alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('cli-1', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
         alteracao(
           'cli-1',
           { cnpj: { antes: '00000000000272', depois: '00000000000191' } },
@@ -359,8 +365,8 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const { service, fake } = await carregar(banco);
 
     const r = await service.receberClientes(EMPRESA, [
-      // WhatsApp com espaços em volta: é o mesmo valor.
-      { ...REGISTRO, whatsapp: ' 00900000002 ', cnpj_cpf: '00000000000191' },
+      // E-mail com espaços em volta: é o mesmo valor.
+      { ...REGISTRO, email: ' loja@teste.invalid ', cnpj_cpf: '00000000000191' },
     ]);
 
     expect(r).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [], avisos: [] });
@@ -543,94 +549,95 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
   });
 
   it('a edição do app que cai entre a leitura das pendências e o UPDATE do lote não é apagada: o registro volta em ignorados', async () => {
-    // O banco com o WhatsApp A; o Control manda D. A leitura das pendências
+    // O banco com o e-mail A; o Control manda D. A leitura das pendências
     // não acha nada — e, enquanto o lote grava, o rep salva C na ficha.
-    const A = '00900000002';
-    const C = '00900000003';
-    const D = '00900000009';
+    // (O exemplo era o WhatsApp até 22/09/2026 — hoje só do app.)
+    const A = 'loja@teste.invalid';
+    const C = 'rep@teste.invalid';
+    const D = 'control@teste.invalid';
     let editou = false;
-    const banco: Banco = { clientes: [cliente({ whatsapp: A })], alteracoes: [] };
+    const banco: Banco = { clientes: [cliente({ email: A })], alteracoes: [] };
     banco.antesDoUpdateDeCliente = () => {
       if (editou) return;
       editou = true;
-      banco.clientes[0]!['whatsapp'] = C;
-      banco.alteracoes.push(alteracao('cli-1', { whatsapp: { antes: A, depois: C } }));
+      banco.clientes[0]!['email'] = C;
+      banco.alteracoes.push(alteracao('cli-1', { email: { antes: A, depois: C } }));
     };
     const { service, fake } = await carregar(banco);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: D }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, email: D }]);
 
     // Sem a condição, o UPDATE gravava D por cima de C, sem aviso, e a pendência
     // A→C apontava para um valor que não estava em lugar nenhum.
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
+    expect(banco.clientes[0]!['email']).toBe(C);
     expect(r).toMatchObject({ atualizados: 0 });
     expect(r.ignorados).toEqual([{ codigo: '123', motivo: 'cadastro alterado no app durante o envio — reenvie' }]);
-    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['whatsapp', A]);
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['email', A]);
     expect(banco.alteracoes[0]!['erp_atualizado_em']).toBeNull();
 
     // No reenvio, a conferência já vê a edição: mantém C e avisa.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: D }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, email: D }]);
+    expect(banco.clientes[0]!['email']).toBe(C);
     expect(r2.avisos).toContain(
-      'Cliente 123: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.',
+      'Cliente 123: email alterados no app ainda não aplicados no Control — mantido o valor do app.',
     );
   });
 
   it('a edição do app que cai entre as DUAS gravações dela (cliente já gravado, histórico ainda não) não é apagada: volta ao valor do app e avisa', async () => {
-    // Revisão de 17/09/2026. A tela grava o WhatsApp Y no cliente e só depois a
+    // Revisão de 17/09/2026. A tela grava o e-mail Y no cliente e só depois a
     // linha do histórico. O lote leu Y sem pendência nenhuma, e o compare-and-set
     // passava (a condição era o próprio Y): o Control gravava o X antigo por
     // cima, calado, e os envios seguintes avisavam "mantido o valor do app" com
-    // o app no X.
-    const X = '00900000001';
-    const Y = '00900000002';
+    // o app no X. (O exemplo era o WhatsApp até 22/09/2026 — hoje só do app.)
+    const X = 'velho@teste.invalid';
+    const Y = 'loja@teste.invalid';
     let historicoGravado = false;
-    const banco: Banco = { clientes: [cliente({ whatsapp: Y })], alteracoes: [] };
+    const banco: Banco = { clientes: [cliente({ email: Y })], alteracoes: [] };
     banco.antesDoUpdateDeCliente = () => {
       if (historicoGravado) return;
       historicoGravado = true; // o insert do histórico da tela chega depois da leitura das pendências
-      banco.alteracoes.push(alteracao('cli-1', { whatsapp: { antes: X, depois: Y } }));
+      banco.alteracoes.push(alteracao('cli-1', { email: { antes: X, depois: Y } }));
     };
     const { service, fake } = await carregar(banco);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: X, email: 'novo@teste.invalid' }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, email: X, nome_fantasia: 'LOJA RENOMEADA' }]);
 
-    expect(banco.clientes[0]!['whatsapp']).toBe(Y);
-    expect(banco.clientes[0]!['email']).toBe('novo@teste.invalid'); // a coluna sem edição do app fica como o Control mandou
+    expect(banco.clientes[0]!['email']).toBe(Y);
+    expect(banco.clientes[0]!['trade_name']).toBe('LOJA RENOMEADA'); // a coluna sem edição do app fica como o Control mandou
     expect(r.avisos).toContain(
-      'Cliente 123: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.',
+      'Cliente 123: email alterados no app ainda não aplicados no Control — mantido o valor do app.',
     );
     expect(banco.alteracoes[0]).toMatchObject({ erp_atualizado_em: null, erp_atualizado_via: null });
     // A volta só vale onde ainda está o que o lote gravou.
     const [, devolvido] = updatesDe(fake, 'customers');
-    expect(devolvido).toMatchObject({ whatsapp: Y });
-    expect('email' in devolvido!).toBe(false);
-    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['whatsapp', X]);
+    expect(devolvido).toMatchObject({ email: Y });
+    expect('trade_name' in devolvido!).toBe(false);
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['email', X]);
 
     // No reenvio, o aviso é verdade: o app está com Y.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: X, email: 'novo@teste.invalid' }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(Y);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, email: X, nome_fantasia: 'LOJA RENOMEADA' }]);
+    expect(banco.clientes[0]!['email']).toBe(Y);
     expect(r2.avisos).toContain(
-      'Cliente 123: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.',
+      'Cliente 123: email alterados no app ainda não aplicados no Control — mantido o valor do app.',
     );
   });
 
   it('a volta só vale onde ainda está o que o lote gravou: quem gravou por cima depois do lote fica', async () => {
-    const X = '00900000001';
-    const Y = '00900000002';
-    const Z = '00900000003';
+    const X = 'velho@teste.invalid';
+    const Y = 'loja@teste.invalid';
+    const Z = 'terceiro@teste.invalid';
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     let passo = 0;
-    const porCima: Banco = { clientes: [cliente({ whatsapp: Y })], alteracoes: [] };
+    const porCima: Banco = { clientes: [cliente({ email: Y })], alteracoes: [] };
     porCima.antesDoUpdateDeCliente = () => {
       passo++;
-      if (passo === 1) porCima.alteracoes.push(alteracao('cli-1', { whatsapp: { antes: X, depois: Y } }));
-      if (passo === 2) porCima.clientes[0]!['whatsapp'] = Z;
+      if (passo === 1) porCima.alteracoes.push(alteracao('cli-1', { email: { antes: X, depois: Y } }));
+      if (passo === 2) porCima.clientes[0]!['email'] = Z;
     };
     const b = await carregar(porCima);
-    await b.service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: X }]);
+    await b.service.receberClientes(EMPRESA, [{ ...REGISTRO, email: X }]);
     expect(updatesDe(b.fake, 'customers')).toHaveLength(2); // o lote e a tentativa de volta
-    expect(porCima.clientes[0]!['whatsapp']).toBe(Z);
+    expect(porCima.clientes[0]!['email']).toBe(Z);
     erro.mockRestore();
   });
 
@@ -648,9 +655,16 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     // `depois` diferente do que o lote leu: não foi esta edição que ele apagou.
     const outra = edicao({ email: { antes: 'a@teste.invalid', depois: 'c@teste.invalid' } });
     expect(colunasQueOLoteApagou([outra], lidas, gravadas)).toEqual([]);
-    // Coluna que o lote não gravou (ou gravou igual, só com outra grafia).
-    const whatsapp = edicao({ whatsapp: { antes: '1', depois: '2' } });
-    expect(colunasQueOLoteApagou([whatsapp], { whatsapp: '2' }, { whatsapp: ' 2 ' })).toEqual([]);
+    // Coluna que o lote não gravou (ou gravou igual, só com outra grafia). O
+    // exemplo era o WhatsApp até 22/09/2026; hoje é o nome fantasia.
+    const fantasia = edicao({ trade_name: { antes: '1', depois: '2' } });
+    expect(colunasQueOLoteApagou([fantasia], { trade_name: '2' }, { trade_name: ' 2 ' })).toEqual([]);
+    // …e com a grafia diferente de verdade, volta — a conta acima não é vazia à toa.
+    expect(colunasQueOLoteApagou([fantasia], { trade_name: '2' }, { trade_name: '3' })).toEqual(['trade_name']);
+    // O WhatsApp é só do app (22/09/2026): nunca volta por aqui, mesmo trocado
+    // pelo lote e com o `depois` igual ao lido (numa edição mista, pendente).
+    const mista = edicao({ whatsapp: { antes: null, depois: '2' }, email: { antes: 'x@teste.invalid', depois: 'y@teste.invalid' } });
+    expect(colunasQueOLoteApagou([mista], { whatsapp: '2' }, { whatsapp: '3' })).toEqual([]);
     // Já resolvida não conta.
     const resolvida = { ...edicao({ email: { antes: 'b@teste.invalid', depois: 'a@teste.invalid' } }), erp_atualizado_em: '2026-09-17T11:00:00Z' };
     expect(colunasQueOLoteApagou([resolvida], lidas, gravadas)).toEqual([]);
@@ -728,39 +742,43 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     expect(banco.alteracoes[0]).toMatchObject({ erp_atualizado_via: 'api' });
   });
 
+  // Daqui até a adoção pelo CNPJ, o exemplo de coluna protegida era o WhatsApp
+  // até 22/09/2026. Ele virou dado só do app (o Control não o recebe e não o
+  // sobrescreve): as mesmas regras seguem provadas pelo nome fantasia, com as
+  // mesmas asserções.
   it('o valor do app é o da edição pendente mais recente — a edição que cai no meio do lote não é dada por alcançada com o valor antigo', async () => {
-    // A leitura dos clientes ainda viu o WhatsApp antigo; a edição (gravada
+    // A leitura dos clientes ainda viu o nome fantasia antigo; a edição (gravada
     // logo depois) já está na leitura das pendências.
-    const velho = '00900000001';
+    const velho = 'FANTASIA A';
     const antes: Banco = {
-      clientes: [cliente({ whatsapp: velho })],
-      alteracoes: [alteracao('cli-1', { whatsapp: { antes: velho, depois: '00900000002' } })],
+      clientes: [cliente({ trade_name: velho })],
+      alteracoes: [alteracao('cli-1', { trade_name: { antes: velho, depois: 'FANTASIA B' } })],
     };
     const a = await carregar(antes);
-    const r = await a.service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: velho }]);
+    const r = await a.service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: velho }]);
     expect(antes.alteracoes[0]!['erp_atualizado_em']).toBeNull();
-    expect(r.avisos.some((t) => t.startsWith('Cliente 123: whatsapp'))).toBe(true);
+    expect(r.avisos.some((t) => t.startsWith('Cliente 123: nome_fantasia'))).toBe(true);
     expect(updatesDe(a.fake, 'customers')).toEqual([]);
 
     // Duas edições pendentes da mesma coluna: vale a última, e as duas resolvem.
     vi.resetModules();
     const duas: Banco = {
-      clientes: [cliente({ whatsapp: '00900000003' })],
+      clientes: [cliente({ trade_name: 'FANTASIA C' })],
       alteracoes: [
         alteracao(
           'cli-1',
-          { whatsapp: { antes: velho, depois: '00900000002' } },
+          { trade_name: { antes: velho, depois: 'FANTASIA B' } },
           { alterado_em: '2026-09-17T10:00:00.000Z' },
         ),
         alteracao(
           'cli-1',
-          { whatsapp: { antes: '00900000002', depois: '00900000003' } },
+          { trade_name: { antes: 'FANTASIA B', depois: 'FANTASIA C' } },
           { alterado_em: '2026-09-17T10:05:00.000Z' },
         ),
       ],
     };
     const b = await carregar(duas);
-    const r2 = await b.service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: '00900000003' }]);
+    const r2 = await b.service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: 'FANTASIA C' }]);
     expect(r2.avisos).toEqual([]);
     expect(duas.alteracoes.map((x) => x['erp_atualizado_via'])).toEqual(['api', 'api']);
   });
@@ -770,14 +788,14 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
       clientes: [cliente()],
       alteracoes: [
         alteracao('cli-1', {
-          whatsapp: { antes: '00900000001', depois: '00900000002' },
+          trade_name: { antes: 'FANTASIA A', depois: 'FANTASIA B' },
           email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' },
         }),
       ],
     };
     const { service } = await carregar(banco);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: '00900000002' }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: 'FANTASIA B' }]);
 
     expect(r.avisos).toEqual([]);
     expect(banco.alteracoes[0]!['erp_atualizado_em']).toBeNull();
@@ -785,20 +803,20 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
 
   // ─── O Control resolve edição por edição (revisão de 17/09/2026) ───────────
   //
-  // E1 (10:00) mexe no WhatsApp A→B e no e-mail X→Y; E2 (10:05), no WhatsApp
-  // B→C. O app está com C e Y. O Control aplica primeiro só o WhatsApp: E2 sai
-  // da fila e E1 fica. Contando só as pendentes, o "valor do app" do WhatsApp
+  // E1 (10:00) mexe no nome fantasia A→B e no e-mail X→Y; E2 (10:05), no nome fantasia
+  // B→C. O app está com C e Y. O Control aplica primeiro só o nome fantasia: E2 sai
+  // da fila e E1 fica. Contando só as pendentes, o "valor do app" do nome fantasia
   // voltava a ser o B vencido de E1.
-  const A = '00900000001';
-  const B = '00900000002';
-  const C = '00900000003';
+  const A = 'FANTASIA A';
+  const B = 'FANTASIA B';
+  const C = 'FANTASIA C';
   const X = 'velho@teste.invalid';
   const Y = 'loja@teste.invalid';
   const duasEdicoes = (): Banco => ({
-    clientes: [cliente({ whatsapp: C, email: Y })],
+    clientes: [cliente({ trade_name: C, email: Y })],
     alteracoes: [
-      alteracao('cli-1', { whatsapp: { antes: A, depois: B }, email: { antes: X, depois: Y } }, { id: 'e1', alterado_em: '2026-09-17T10:00:00.000Z' }),
-      alteracao('cli-1', { whatsapp: { antes: B, depois: C } }, { id: 'e2', alterado_em: '2026-09-17T10:05:00.000Z' }),
+      alteracao('cli-1', { trade_name: { antes: A, depois: B }, email: { antes: X, depois: Y } }, { id: 'e1', alterado_em: '2026-09-17T10:00:00.000Z' }),
+      alteracao('cli-1', { trade_name: { antes: B, depois: C } }, { id: 'e2', alterado_em: '2026-09-17T10:05:00.000Z' }),
     ],
   });
   const aviso = (campos: string) => `Cliente 123: ${campos} alterados no app ainda não aplicados no Control — mantido o valor do app.`;
@@ -807,18 +825,18 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const banco = duasEdicoes();
     const { service, fake } = await carregar(banco);
 
-    // Envio 1: o WhatsApp novo já está lá; o e-mail, ainda não.
-    const r1 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: C, email: X }]);
+    // Envio 1: o nome fantasia novo já está lá; o e-mail, ainda não.
+    const r1 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: C, email: X }]);
     expect(r1.avisos).toEqual([aviso('email')]);
     expect(banco.alteracoes.map((a) => a['erp_atualizado_via'])).toEqual([null, 'api']);
 
-    // Envio 2: igual ao app em tudo. Antes: "whatsapp alterados no app ainda
+    // Envio 2: igual ao app em tudo. Antes: "nome_fantasia alterados no app ainda
     // não aplicados" em todo envio, e E1 nunca fechava.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: C, email: Y }]);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: C, email: Y }]);
     expect(r2).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [], avisos: [] });
     expect(banco.alteracoes.map((a) => a['erp_atualizado_via'])).toEqual(['api', 'api']);
     expect(updatesDe(fake, 'customers')).toEqual([]);
-    expect(banco.clientes[0]).toMatchObject({ whatsapp: C, email: Y });
+    expect(banco.clientes[0]).toMatchObject({ trade_name: C, email: Y });
 
     // E o GET já não diz que há edição do app esperando o Control.
     const { registros } = await service.listarClientesAlterados(EMPRESA);
@@ -828,32 +846,32 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
   it('o Control manda o `depois` vencido da edição mais velha (o B que o cartão ainda mostra): NÃO grava por cima do C do app, avisa e ela segue pendente', async () => {
     const banco = duasEdicoes();
     const { service, fake } = await carregar(banco);
-    await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: C, email: X }]);
+    await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: C, email: X }]);
 
-    // Antes: {atualizados: 1, avisos: []}, E1 fechada e o WhatsApp do app virava B.
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: B, email: Y }]);
+    // Antes: {atualizados: 1, avisos: []}, E1 fechada e o nome fantasia do app virava B.
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: B, email: Y }]);
 
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
-    expect(r.avisos).toEqual([aviso('whatsapp')]);
-    expect(updatesDe(fake, 'customers').every((p) => !('whatsapp' in p))).toBe(true);
+    expect(banco.clientes[0]!['trade_name']).toBe(C);
+    expect(r.avisos).toEqual([aviso('nome_fantasia')]);
+    expect(updatesDe(fake, 'customers').every((p) => !('trade_name' in p))).toBe(true);
     expect(banco.alteracoes[0]).toMatchObject({ erp_atualizado_em: null, erp_atualizado_via: null });
     // A leitura das já resolvidas é uma consulta só, dos clientes com pendência, paginada.
     const foraDaFila = fake.filtrosDe('customer_changes', 'or').map((f) => f.args[0]);
     expect(foraDaFila).toEqual(['erp_pendente.eq.false,erp_atualizado_em.not.is.null', 'erp_pendente.eq.false,erp_atualizado_em.not.is.null']);
   });
 
-  it('coluna cuja ÚNICA edição já foi resolvida continua livre: o Control muda o telefone lá e o novo valor grava, sem aviso', async () => {
+  it('coluna cuja ÚNICA edição já foi resolvida continua livre: o Control muda o nome fantasia lá e o novo valor grava, sem aviso', async () => {
     // As já resolvidas entram na conferência só para dar o valor atual do app
     // (ver acima); quem protege a coluna é a edição PENDENTE. Sem essa
     // separação, a coluna de uma edição já fechada voltava a ser "protegida":
     // o valor novo do Control era descartado em silêncio, com aviso falso, e a
     // pendente do outro campo travava o carimbo em todo lote.
     const banco: Banco = {
-      clientes: [cliente({ whatsapp: C, email: Y })],
+      clientes: [cliente({ trade_name: C, email: Y })],
       alteracoes: [
         alteracao(
           'cli-1',
-          { whatsapp: { antes: B, depois: C } },
+          { trade_name: { antes: B, depois: C } },
           { id: 'resolvida', erp_atualizado_em: '2026-09-17T10:30:00.000Z', erp_atualizado_via: 'api' },
         ),
         alteracao('cli-1', { email: { antes: X, depois: Y } }, { id: 'pendente', alterado_em: '2026-09-17T10:05:00.000Z' }),
@@ -861,13 +879,13 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     };
     const { service, fake } = await carregar(banco);
 
-    // O telefone mudou no Control depois de a edição do app ter chegado lá.
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: '00900000009', email: Y }]);
+    // O nome fantasia mudou no Control depois de a edição do app ter chegado lá.
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: 'FANTASIA DO CONTROL', email: Y }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
     expect(r.avisos.filter((a) => a.startsWith('Cliente '))).toEqual([]);
-    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: '00900000009' });
-    expect(banco.clientes[0]!['whatsapp']).toBe('00900000009');
+    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ trade_name: 'FANTASIA DO CONTROL' });
+    expect(banco.clientes[0]!['trade_name']).toBe('FANTASIA DO CONTROL');
     // A pendente do e-mail, essa sim, fecha pelo eco do Control.
     expect(banco.alteracoes[1]).toMatchObject({ erp_atualizado_via: 'api' });
   });
@@ -889,47 +907,47 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
 
   // ─── O cliente sem código adotado pelo CNPJ (revisão de 17/09/2026) ────────
   //
-  // O rep cadastra a loja no app; o Control a puxa no GET (WhatsApp B) e a
-  // cria lá; o rep corrige o WhatsApp para C na ficha — sem código, a edição
+  // O rep cadastra a loja no app; o Control a puxa no GET (nome fantasia B) e a
+  // cria lá; o rep corrige o nome fantasia para C na ficha — sem código, a edição
   // nasce fora da fila; o POST do ciclo seguinte devolve o código com o B.
   const SEM_CODIGO = {
     erp_id: null,
-    whatsapp: C,
+    trade_name: C,
     updated_at: '2026-09-17T10:02:00.000Z',
     erp_updated_at: null,
   };
   const correcaoSemCodigo = () =>
-    alteracao('cli-1', { whatsapp: { antes: B, depois: C } }, { id: 'sem-codigo', erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' });
+    alteracao('cli-1', { trade_name: { antes: B, depois: C } }, { id: 'sem-codigo', erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' });
   const ADOCAO = { codigo: '999', razao_social: 'LOJA TESTE LTDA', cnpj_cpf: '00000000000191' };
 
   it('adotado pelo CNPJ com o valor antigo no Control: fica o valor do app, avisa, não carimba e a edição entra na fila do Control', async () => {
     const banco: Banco = { clientes: [cliente(SEM_CODIGO)], alteracoes: [correcaoSemCodigo()] };
     const { service, fake } = await carregar(banco, { com049: true });
 
-    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
 
-    // Antes: {atualizados: 1} só com o aviso da adoção, WhatsApp B, carimbo — e o
+    // Antes: {atualizados: 1} só com o aviso da adoção, nome fantasia B, carimbo — e o
     // GET seguinte sem o cliente: a correção sumia nos dois lados.
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(r.avisos).toContain('Cliente 999: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.');
+    expect(r.avisos).toContain('Cliente 999: nome_fantasia alterados no app ainda não aplicados no Control — mantido o valor do app.');
     expect(r.avisos.some((a) => a.includes('casados pelo CNPJ'))).toBe(true);
     const [patch] = updatesDe(fake, 'customers');
     expect(patch).toMatchObject({ erp_id: '00999' });
-    expect('whatsapp' in patch!).toBe(false);
+    expect('trade_name' in patch!).toBe(false);
     expect('erp_updated_at' in patch!).toBe(false);
-    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C });
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
 
     // O GET leva a correção ao Control, marcada como edição do app.
     const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-17T10:00:00.000Z');
     expect(registros).toHaveLength(1);
-    expect(registros[0]).toMatchObject({ codigo: '00999', whatsapp: C, alterado_no_app: { campos: ['whatsapp'] } });
+    expect(registros[0]).toMatchObject({ codigo: '00999', nome_fantasia: C, alterado_no_app: { campos: ['nome_fantasia'] } });
 
     // Daqui em diante é uma pendência como as outras: o B não grava; o C resolve.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
-    expect(r2.avisos).toContain('Cliente 999: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.');
-    await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: C }]);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
+    expect(banco.clientes[0]!['trade_name']).toBe(C);
+    expect(r2.avisos).toContain('Cliente 999: nome_fantasia alterados no app ainda não aplicados no Control — mantido o valor do app.');
+    await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: C }]);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_via: 'api' });
   });
 
@@ -937,7 +955,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const banco: Banco = { clientes: [cliente(SEM_CODIGO)], alteracoes: [correcaoSemCodigo()] };
     const { service, fake } = await carregar(banco, { com049: true });
 
-    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: C }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: C }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
     expect(r.avisos.filter((a) => a.startsWith('Cliente '))).toEqual([]);
@@ -953,42 +971,42 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const { service } = await carregar(banco, { com049: true });
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C });
     expect(r.avisos.some((a) => a.startsWith('Não deu para registrar no app que o Control ainda não tem'))).toBe(true);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: false });
     erro.mockRestore();
   });
 
-  const avisoDo999 = 'Cliente 999: whatsapp alterados no app ainda não aplicados no Control — mantido o valor do app.';
+  const avisoDo999 = 'Cliente 999: nome_fantasia alterados no app ainda não aplicados no Control — mantido o valor do app.';
 
   it('adotado pelo CNPJ com um registro que NÃO traz o campo corrigido: a correção entra na fila, e o envio seguinte com o valor antigo não grava por cima (revisão de 17/09/2026)', async () => {
     // O contrato deixa mandar só parte do registro ("campo que não veio não
     // mexe"), e o exemplo de adoção traz só código, razão social e CNPJ. Antes:
     // a correção ficava FORA da fila (só entrava a de coluna trazida diferente);
     // o cliente ganhava o código, o 2c nunca mais a olhava, e o envio completo
-    // seguinte gravava o WhatsApp antigo por cima — {atualizados: 1, avisos: []}.
+    // seguinte gravava o nome fantasia antigo por cima — {atualizados: 1, avisos: []}.
     const banco: Banco = { clientes: [cliente(SEM_CODIGO)], alteracoes: [correcaoSemCodigo()] };
     const { service, fake } = await carregar(banco, { com049: true });
 
     const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, email: 'x@teste.invalid' }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C, email: 'x@teste.invalid' });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C, email: 'x@teste.invalid' });
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
     expect('erp_updated_at' in updatesDe(fake, 'customers')[0]!).toBe(false);
     // O GET leva a correção ao Control, marcada como edição do app.
     const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-17T10:00:00.000Z');
-    expect(registros[0]).toMatchObject({ codigo: '00999', whatsapp: C, alterado_no_app: { campos: ['whatsapp'] } });
+    expect(registros[0]).toMatchObject({ codigo: '00999', nome_fantasia: C, alterado_no_app: { campos: ['nome_fantasia'] } });
 
     // O envio completo seguinte, com o valor antigo do Control: fica o do app, com aviso.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
+    expect(banco.clientes[0]!['trade_name']).toBe(C);
     expect(r2.avisos).toContain(avisoDo999);
     // E fecha sozinha no primeiro envio com o mesmo valor.
-    await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: C }]);
+    await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: C }]);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_via: 'api' });
   });
 
@@ -999,38 +1017,38 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     // seguinte — cliente já com código, fora do 2c — gravava B por cima do C.
     let editou = false;
     const banco: Banco = {
-      clientes: [cliente({ ...SEM_CODIGO, whatsapp: B, updated_at: '2026-09-17T10:00:00.000Z' })],
+      clientes: [cliente({ ...SEM_CODIGO, trade_name: B, updated_at: '2026-09-17T10:00:00.000Z' })],
       alteracoes: [],
     };
     banco.antesDoUpdateDeCliente = () => {
       if (editou) return;
       editou = true;
-      banco.clientes[0]!['whatsapp'] = C;
+      banco.clientes[0]!['trade_name'] = C;
       banco.clientes[0]!['updated_at'] = '2026-09-17T10:07:00.000Z';
       banco.alteracoes.push(
-        alteracao('cli-1', { whatsapp: { antes: B, depois: C } }, { id: 'no-meio', erp_pendente: false, alterado_em: '2026-09-17T10:07:00.000Z' }),
+        alteracao('cli-1', { trade_name: { antes: B, depois: C } }, { id: 'no-meio', erp_pendente: false, alterado_em: '2026-09-17T10:07:00.000Z' }),
       );
     };
     const { service, fake } = await carregar(banco, { com049: true });
 
-    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
 
     expect(r).toMatchObject({ atualizados: 0 });
     expect(r.ignorados).toEqual([{ codigo: '999', motivo: 'cadastro alterado no app durante o envio — reenvie' }]);
-    expect(banco.clientes[0]).toMatchObject({ erp_id: null, whatsapp: C, erp_updated_at: null });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: null, trade_name: C, erp_updated_at: null });
     expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['updated_at', '2026-09-17T10:00:00.000Z']);
     // O cliente continua saindo no GET — a última mão foi do app.
     const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-17T10:05:00.000Z');
     expect(registros).toHaveLength(1);
 
     // O reenvio já vê a correção: adota, fica o C, avisa e ela entra na fila.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
     expect(r2).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C });
     expect(r2.avisos).toContain(avisoDo999);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
-    const r3 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
+    const r3 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
+    expect(banco.clientes[0]!['trade_name']).toBe(C);
     expect(r3.avisos).toContain(avisoDo999);
   });
 
@@ -1040,31 +1058,31 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     // Control ficava. O 3b só relia edições PENDENTES — e a de cliente sem
     // código nasce fora da fila: a correção sumia dos dois lados, sem aviso.
     let historicoGravado = false;
-    const banco: Banco = { clientes: [cliente({ ...SEM_CODIGO, whatsapp: C })], alteracoes: [] };
+    const banco: Banco = { clientes: [cliente({ ...SEM_CODIGO, trade_name: C })], alteracoes: [] };
     banco.antesDoUpdateDeCliente = () => {
       if (historicoGravado) return;
       historicoGravado = true;
       banco.alteracoes.push(
-        alteracao('cli-1', { whatsapp: { antes: B, depois: C } }, { id: 'no-meio', erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' }),
+        alteracao('cli-1', { trade_name: { antes: B, depois: C } }, { id: 'no-meio', erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' }),
       );
     };
     const { service, fake } = await carregar(banco);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B, email: 'novo@teste.invalid' }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B, email: 'novo@teste.invalid' }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C, email: 'novo@teste.invalid' });
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C, email: 'novo@teste.invalid' });
     expect(r.avisos).toContain(avisoDo999);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
     // A volta só vale onde ainda está o que o lote gravou, e só na coluna da edição.
     const [, devolvido] = updatesDe(fake, 'customers');
-    expect(devolvido).toMatchObject({ whatsapp: C });
+    expect(devolvido).toMatchObject({ trade_name: C });
     expect('email' in devolvido!).toBe(false);
-    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['whatsapp', B]);
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['trade_name', B]);
 
     // O envio seguinte com o B: fica o C, com o aviso.
-    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: B }]);
-    expect(banco.clientes[0]!['whatsapp']).toBe(C);
+    const r2 = await service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: B }]);
+    expect(banco.clientes[0]!['trade_name']).toBe(C);
     expect(r2.avisos).toContain(avisoDo999);
   });
 
@@ -1072,26 +1090,26 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const tardia = (campos: Record<string, { antes: string | null; depois: string | null }>, id: string) =>
       alteracao('cli-1', campos, { id, erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' });
     // O Control já tem o C: nada a fazer.
-    const igual: Banco = { clientes: [cliente({ ...SEM_CODIGO, whatsapp: C })], alteracoes: [] };
+    const igual: Banco = { clientes: [cliente({ ...SEM_CODIGO, trade_name: C })], alteracoes: [] };
     igual.antesDoUpdateDeCliente = () => {
-      if (igual.alteracoes.length === 0) igual.alteracoes.push(tardia({ whatsapp: { antes: B, depois: C } }, 'ja-tem'));
+      if (igual.alteracoes.length === 0) igual.alteracoes.push(tardia({ trade_name: { antes: B, depois: C } }, 'ja-tem'));
     };
     const a = await carregar(igual);
-    const r = await a.service.receberClientes(EMPRESA, [{ ...ADOCAO, whatsapp: C, email: 'novo@teste.invalid' }]);
+    const r = await a.service.receberClientes(EMPRESA, [{ ...ADOCAO, nome_fantasia: C, email: 'novo@teste.invalid' }]);
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
     expect(r.avisos.filter((x: string) => x.startsWith('Cliente '))).toEqual([]);
     expect(igual.alteracoes[0]).toMatchObject({ erp_pendente: false, erp_atualizado_em: null });
 
     // O registro não traz o campo: entra na fila (a adoção é a única janela).
     vi.resetModules();
-    const ausente: Banco = { clientes: [cliente({ ...SEM_CODIGO, whatsapp: C })], alteracoes: [] };
+    const ausente: Banco = { clientes: [cliente({ ...SEM_CODIGO, trade_name: C })], alteracoes: [] };
     ausente.antesDoUpdateDeCliente = () => {
-      if (ausente.alteracoes.length === 0) ausente.alteracoes.push(tardia({ whatsapp: { antes: B, depois: C } }, 'sem-campo'));
+      if (ausente.alteracoes.length === 0) ausente.alteracoes.push(tardia({ trade_name: { antes: B, depois: C } }, 'sem-campo'));
     };
     const b = await carregar(ausente);
     const r2 = await b.service.receberClientes(EMPRESA, [{ ...ADOCAO, email: 'novo@teste.invalid' }]);
     expect(r2).toMatchObject({ atualizados: 1, ignorados: [] });
-    expect(ausente.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: C });
+    expect(ausente.clientes[0]).toMatchObject({ erp_id: '00999', trade_name: C });
     expect(ausente.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
   });
 
@@ -1107,7 +1125,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const A = '00000000000191';
     const DOCUMENTO_NOVO = '00000000000272';
     const banco: Banco = {
-      clientes: [cliente({ ...SEM_CODIGO, whatsapp: B, cnpj: DOCUMENTO_NOVO })],
+      clientes: [cliente({ ...SEM_CODIGO, trade_name: B, cnpj: DOCUMENTO_NOVO })],
       alteracoes: [
         alteracao('cli-1', { cnpj: { antes: A, depois: DOCUMENTO_NOVO } }, { id: 'sem-codigo', erp_pendente: false }),
       ],
@@ -1263,27 +1281,27 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     // A edição antiga, feita antes de o cliente ganhar código, já foi para o
     // Control "pela fila de incluir" — só a adoção a confere.
     const banco: Banco = {
-      clientes: [cliente({ whatsapp: C })],
+      clientes: [cliente({ trade_name: C })],
       alteracoes: [correcaoSemCodigo()],
     };
     const { service, fake } = await carregar(banco);
 
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: B }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: B }]);
 
     expect(r).toMatchObject({ atualizados: 1, avisos: [] });
-    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: B });
+    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ trade_name: B });
     expect(fake.filtrosDe('customer_changes', 'or')).toEqual([]);
   });
 
   it('cliente que JÁ tinha código, COM pendência de outro campo: a edição de quando não tinha código segue sem proteger a coluna', async () => {
     // Aqui as edições fora da fila SÃO lidas (o cliente tem pendência), e é o
     // `adotado` que decide: só na adoção pelo CNPJ elas valem como pendentes.
-    // Sem essa fronteira, o Control nunca mais conseguiria mudar o telefone
+    // Sem essa fronteira, o Control nunca mais conseguiria mudar o nome fantasia
     // deste cliente — a edição velha, resolvida "pela fila de incluir",
     // protegeria a coluna para sempre e voltaria para a fila do financeiro.
-    const D = '00900000004';
+    const D = 'FANTASIA D';
     const banco: Banco = {
-      clientes: [cliente({ whatsapp: C, email: Y })],
+      clientes: [cliente({ trade_name: C, email: Y })],
       alteracoes: [
         correcaoSemCodigo(),
         alteracao('cli-1', { email: { antes: X, depois: Y } }, { id: 'pendente', alterado_em: '2026-09-17T10:05:00.000Z' }),
@@ -1291,13 +1309,13 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     };
     const { service, fake } = await carregar(banco);
 
-    // O Control manda o telefone dele (D) e não manda o e-mail.
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: D }]);
+    // O Control manda o nome fantasia dele (D) e não manda o e-mail.
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, nome_fantasia: D }]);
 
     expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
     expect(r.avisos.filter((a) => a.startsWith('Cliente '))).toEqual([]);
-    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: D });
-    expect(banco.clientes[0]!['whatsapp']).toBe(D);
+    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ trade_name: D });
+    expect(banco.clientes[0]!['trade_name']).toBe(D);
     // A edição de quando não tinha código NÃO volta para a fila do financeiro…
     expect(updatesDe(fake, 'customer_changes')).toEqual([]);
     expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: false, erp_atualizado_em: null });
@@ -1316,9 +1334,10 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
         cliente({ id: 'em-dia', erp_id: '00002', cnpj: null, erp_updated_at: null }),
         cliente({ id: 'resolve', erp_id: '00003', cnpj: null, erp_updated_at: null }),
       ],
+      // A coluna protegida era o WhatsApp até 22/09/2026 (hoje só do app).
       alteracoes: [
-        alteracao('pendente', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
-        alteracao('resolve', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('pendente', { trade_name: { antes: 'FANTASIA VELHA', depois: 'LOJA TESTE' } }),
+        alteracao('resolve', { trade_name: { antes: 'FANTASIA VELHA', depois: 'LOJA TESTE' } }),
       ],
     };
     const { service, fake } = await carregar(banco, { com049: true });
@@ -1327,14 +1346,14 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
       {
         codigo: '1',
         razao_social: 'LOJA TESTE LTDA',
-        whatsapp: '00900000001',
+        nome_fantasia: 'FANTASIA VELHA',
         email: 'a@teste.invalid',
       },
       { codigo: '2', razao_social: 'LOJA TESTE LTDA', email: 'b@teste.invalid' },
       {
         codigo: '3',
         razao_social: 'LOJA TESTE LTDA',
-        whatsapp: '00900000002',
+        nome_fantasia: 'LOJA TESTE',
         email: 'c@teste.invalid',
       },
     ]);
@@ -1387,7 +1406,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const banco: Banco = {
       clientes: [cliente()],
       alteracoes: [
-        alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('cli-1', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
       ],
       falhar: { leitura: true },
     };
@@ -1395,7 +1414,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
 
     await expect(
       service.receberClientes(EMPRESA, [
-        { ...REGISTRO, whatsapp: '00900000001' },
+        { ...REGISTRO, email: 'velho@teste.invalid' },
         { codigo: '9', razao_social: 'NOVA' },
       ]),
     ).rejects.toThrow(/tempo esgotado/);
@@ -1405,8 +1424,9 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
   it('falha ao marcar as alcançadas não derruba o lote: os clientes gravam, aviso, e as edições seguem pendentes', async () => {
     const banco: Banco = {
       clientes: [cliente()],
+      // A coluna alcançada era o WhatsApp até 22/09/2026 (hoje só do app).
       alteracoes: [
-        alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('cli-1', { trade_name: { antes: 'FANTASIA VELHA', depois: 'LOJA TESTE' } }),
       ],
       falhar: { marcacao: true },
     };
@@ -1414,7 +1434,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     const erro = vi.spyOn(console, 'error').mockImplementation(() => undefined);
 
     const r = await service.receberClientes(EMPRESA, [
-      { ...REGISTRO, whatsapp: '00900000002', email: 'novo@teste.invalid' },
+      { ...REGISTRO, nome_fantasia: 'LOJA TESTE', email: 'novo@teste.invalid' },
     ]);
 
     expect(r.atualizados).toBe(1);
@@ -1430,8 +1450,9 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
     );
     const banco: Banco = {
       clientes,
+      // O campo mantido era o WhatsApp até 22/09/2026 (hoje só do app).
       alteracoes: clientes.map((c) =>
-        alteracao(String(c['id']), { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao(String(c['id']), { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
       ),
     };
     const { service } = await carregar(banco);
@@ -1441,7 +1462,7 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
       clientes.map((c) => ({
         codigo: c['erp_id'],
         razao_social: 'LOJA TESTE LTDA',
-        whatsapp: '00900000001',
+        email: 'velho@teste.invalid',
       })),
     );
 
@@ -1452,18 +1473,20 @@ describe('POST /clientes — a edição do app não é apagada pelo Control (051
   });
 
   it('SEM a 051: nada muda — o valor do Control grava, sem aviso, sem consultar customer_changes', async () => {
+    // O exemplo era o WhatsApp até 22/09/2026 — hoje o do app não é trocado
+    // nem sem a 051 (ver os testes do WhatsApp só do app, abaixo).
     const banco: Banco = {
       clientes: [cliente()],
       alteracoes: [
-        alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('cli-1', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
       ],
     };
     const { service, fake } = await carregar(banco, { com051: false });
 
-    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: '00900000001' }]);
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, email: 'velho@teste.invalid' }]);
 
     expect(r).toMatchObject({ atualizados: 1, avisos: [] });
-    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: '00900000001' });
+    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ email: 'velho@teste.invalid' });
     expect(fake.filtrosDe('customer_changes')).toEqual([]);
   });
 });
@@ -1477,10 +1500,12 @@ describe('GET /clientes — alterado_no_app (051)', () => {
         cliente({ id: 'c-1' }),
         cliente({ id: 'c-2', erp_id: '00124', cnpj: '00000000000272' }),
       ],
+      // O primeiro campo pendente era o WhatsApp até 22/09/2026 (hoje só do app,
+      // nunca no alterado_no_app — ver o teste do WhatsApp logo abaixo).
       alteracoes: [
         alteracao(
           'c-1',
-          { whatsapp: { antes: '1', depois: '00900000002' } },
+          { email: { antes: 'a@teste.invalid', depois: 'loja@teste.invalid' } },
           { alterado_em: '2026-09-17T10:00:00.000Z' },
         ),
         alteracao(
@@ -1506,7 +1531,7 @@ describe('GET /clientes — alterado_no_app (051)', () => {
     const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-17T00:00:00Z');
 
     expect(registros.map((r: { alterado_no_app: unknown }) => r.alterado_no_app)).toEqual([
-      { em: '2026-09-17T11:30:00.000Z', campos: ['razao_social', 'whatsapp', 'endereco'] },
+      { em: '2026-09-17T11:30:00.000Z', campos: ['razao_social', 'email', 'endereco'] },
       null,
     ]);
     // Uma leitura só, da empresa inteira, paginada — não uma por cliente.
@@ -1535,21 +1560,22 @@ describe('GET /clientes — alterado_no_app (051)', () => {
           updated_at: '2026-09-17T12:00:00.300Z',
         }),
       ],
-      alteracoes: [alteracao('editado', { whatsapp: { antes: '1', depois: '00900000002' } })],
+      // A edição era de WhatsApp até 22/09/2026 (hoje só do app).
+      alteracoes: [alteracao('editado', { email: { antes: 'a@teste.invalid', depois: 'loja@teste.invalid' } })],
     };
     const { service } = await carregar(banco, { com049: true });
 
     const { registros } = await service.listarClientesAlterados(EMPRESA, '2026-09-17T00:00:00Z');
 
     expect(registros.map((r: { codigo: string }) => r.codigo)).toEqual(['00001']);
-    expect(registros[0]).toMatchObject({ alterado_no_app: { campos: ['whatsapp'] } });
+    expect(registros[0]).toMatchObject({ alterado_no_app: { campos: ['email'] } });
   });
 
   it('SEM a 051: alterado_no_app sai null e customer_changes não é lida', async () => {
     const { service, fake } = await carregar(
       {
         clientes: [cliente()],
-        alteracoes: [alteracao('cli-1', { whatsapp: { antes: '1', depois: '2' } })],
+        alteracoes: [alteracao('cli-1', { email: { antes: 'a@teste.invalid', depois: 'loja@teste.invalid' } })],
       },
       { com051: false },
     );
@@ -1561,16 +1587,17 @@ describe('GET /clientes — alterado_no_app (051)', () => {
   });
 
   it('o cliente com edição pendente sai em TODA puxada até o Control ter a edição — mesmo com o desde depois do updated_at', async () => {
-    // 10:00: o rep trocou o WhatsApp de c-1 (pendente). A puxada das 10:01 já o
+    // 10:00: o rep trocou o e-mail de c-1 (pendente). A puxada das 10:01 já o
     // trouxe; o Control não aplicou e reenviou o valor antigo, que o POST não
     // grava — então o updated_at não anda. A puxada seguinte usa desde=10:01.
+    // (O exemplo era o WhatsApp até 22/09/2026 — hoje só do app.)
     const banco: Banco = {
       clientes: [
         cliente({ id: 'c-1', updated_at: '2026-09-17T10:00:00.000Z' }),
         cliente({ id: 'c-2', erp_id: '00124', cnpj: '00000000000272', updated_at: '2026-09-17T09:00:00.000Z' }),
       ],
       alteracoes: [
-        alteracao('c-1', { whatsapp: { antes: '00900000001', depois: '00900000002' } }),
+        alteracao('c-1', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }),
         // A resolvida não traz o cliente de volta.
         alteracao(
           'c-2',
@@ -1585,8 +1612,8 @@ describe('GET /clientes — alterado_no_app (051)', () => {
 
     expect(registros.map((r: { codigo: string }) => r.codigo)).toEqual(['00123']);
     expect(registros[0]).toMatchObject({
-      whatsapp: '00900000002',
-      alterado_no_app: { campos: ['whatsapp'] },
+      email: 'loja@teste.invalid',
+      alterado_no_app: { campos: ['email'] },
     });
   });
 
@@ -1629,6 +1656,359 @@ describe('GET /clientes — alterado_no_app (051)', () => {
     });
 
     await expect(service.listarClientesAlterados(EMPRESA)).rejects.toThrow(/tempo esgotado/);
+  });
+});
+
+// ─── O WhatsApp é só do app (22/09/2026) ─────────────────────────────────────
+//
+// Pedido do Yan: "que eu possa alterar o wtss do cliente sem ter que subir pro
+// control, numero uma coisa numero de wtss outro". O WhatsApp não vai ao
+// Control (nunca é pendência, nunca sai no alterado_no_app) e o Control não o
+// sobrescreve: no cliente existente com WhatsApp preenchido, o que ele mandar é
+// ignorado, sem aviso; vazio, é preenchido; cliente novo recebe o dele.
+
+describe('POST e GET /clientes — o WhatsApp é só do app (22/09/2026)', () => {
+  const DO_APP = '00900000002'; // o do cliente() de sempre
+  const DO_CONTROL = '00900000009';
+
+  it('cliente existente com WhatsApp preenchido: o do Control é ignorado, sem aviso — com e sem a 051', async () => {
+    for (const com051 of [true, false]) {
+      vi.resetModules();
+      const banco: Banco = { clientes: [cliente()], alteracoes: [] };
+      const { service, fake } = await carregar(banco, { com051 });
+
+      const r = await service.receberClientes(EMPRESA, [
+        { ...REGISTRO, whatsapp: DO_CONTROL, email: 'novo@teste.invalid' },
+      ]);
+
+      expect(r, `com051=${com051}`).toMatchObject({ atualizados: 1, ignorados: [], avisos: [] });
+      const [patch] = updatesDe(fake, 'customers');
+      expect(patch).toMatchObject({ email: 'novo@teste.invalid' });
+      expect('whatsapp' in patch!).toBe(false);
+      expect(banco.clientes[0]!['whatsapp']).toBe(DO_APP);
+
+      // Só o WhatsApp diferente: nada a gravar (nem o updated_at).
+      const r2 = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: DO_CONTROL }]);
+      expect(r2).toMatchObject({ atualizados: 0, sem_mudanca: 1, avisos: [] });
+      expect(updatesDe(fake, 'customers')).toHaveLength(1);
+    }
+  });
+
+  it('cliente adotado pelo CNPJ com WhatsApp preenchido: aprende o código, e o WhatsApp do app fica', async () => {
+    const banco: Banco = {
+      clientes: [cliente({ erp_id: null, whatsapp: DO_APP })],
+      alteracoes: [],
+    };
+    const { service, fake } = await carregar(banco);
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '999', razao_social: 'LOJA TESTE LTDA', cnpj_cpf: '00000000000191', whatsapp: DO_CONTROL },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+    const [patch] = updatesDe(fake, 'customers');
+    expect(patch).toMatchObject({ erp_id: '00999' });
+    expect('whatsapp' in patch!).toBe(false);
+    expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: DO_APP });
+    expect(r.avisos.filter((a) => a.startsWith('Cliente '))).toEqual([]);
+  });
+
+  it('cliente existente com WhatsApp vazio (null, "" ou só espaço): o do Control preenche', async () => {
+    for (const vazio of [null, '', '   ']) {
+      vi.resetModules();
+      const banco: Banco = { clientes: [cliente({ whatsapp: vazio })], alteracoes: [] };
+      const { service, fake } = await carregar(banco);
+
+      const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: DO_CONTROL }]);
+
+      expect(r, `vazio=${JSON.stringify(vazio)}`).toMatchObject({ atualizados: 1, ignorados: [], avisos: [] });
+      expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: DO_CONTROL });
+      expect(banco.clientes[0]!['whatsapp']).toBe(DO_CONTROL);
+    }
+  });
+
+  it('cliente novo recebe o WhatsApp do Control', async () => {
+    const { service, fake } = await carregar({ clientes: [], alteracoes: [] });
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '777', razao_social: 'LOJA NOVA LTDA', whatsapp: DO_CONTROL },
+    ]);
+
+    expect(r.criados).toBe(1);
+    const [insert] = fake.gravacoes.filter((g) => g.tabela === 'customers' && g.operacao === 'insert');
+    expect((insert!.valores as Linha[])[0]).toMatchObject({ erp_id: '00777', whatsapp: DO_CONTROL });
+  });
+
+  // ─── Revisão de 22/09/2026: o vazio que o app deixou, o lixo das cargas ───
+
+  /** O fixo que o Control tem para o cliente — outra coisa que o WhatsApp. */
+  const FIXO_DO_CONTROL = '3233331111';
+
+  it('WhatsApp que o app APAGOU (edição só dele, ou mista com o e-mail): o telefone do Control não volta no envio seguinte', async () => {
+    const apagadas = [
+      // Só WhatsApp: nasce fora da fila (erp_pendente = false).
+      () => alteracao('cli-1', { whatsapp: { antes: DO_APP, depois: null } }, { erp_pendente: false }),
+      // Mista: pendente pelo e-mail, que o Control já tem.
+      () =>
+        alteracao('cli-1', {
+          whatsapp: { antes: DO_APP, depois: null },
+          email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' },
+        }),
+    ];
+    for (const apagada of apagadas) {
+      vi.resetModules();
+      const banco: Banco = { clientes: [cliente({ whatsapp: null })], alteracoes: [apagada()] };
+      const { service, fake } = await carregar(banco);
+
+      const r = await service.receberClientes(EMPRESA, [
+        { ...REGISTRO, whatsapp: FIXO_DO_CONTROL, email: 'loja@teste.invalid' },
+      ]);
+
+      expect(r).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [], avisos: [] });
+      expect(updatesDe(fake, 'customers')).toEqual([]);
+      expect(banco.clientes[0]!['whatsapp']).toBeNull();
+    }
+  });
+
+  it('o histórico é lido em lote, só para quem o lote ia preencher: o cliente que nunca teve WhatsApp recebe o do Control no mesmo envio', async () => {
+    const banco: Banco = {
+      leiturasDoHistorico: [],
+      clientes: [
+        cliente({ id: 'apagou', erp_id: '00001', cnpj: null, whatsapp: null }),
+        cliente({ id: 'nunca-teve', erp_id: '00002', cnpj: null, whatsapp: null }),
+        cliente({ id: 'tem', erp_id: '00003', cnpj: null }),
+      ],
+      alteracoes: [
+        alteracao('apagou', { whatsapp: { antes: DO_APP, depois: null } }, { erp_pendente: false }),
+        // Edição de outro campo não é "o app decidiu o WhatsApp".
+        alteracao('nunca-teve', { email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' } }, {
+          erp_pendente: false,
+        }),
+      ],
+    };
+    const { service, fake } = await carregar(banco);
+
+    const r = await service.receberClientes(EMPRESA, [
+      { codigo: '1', razao_social: 'LOJA TESTE LTDA', whatsapp: FIXO_DO_CONTROL },
+      { codigo: '2', razao_social: 'LOJA TESTE LTDA', whatsapp: FIXO_DO_CONTROL },
+      { codigo: '3', razao_social: 'LOJA TESTE LTDA', whatsapp: FIXO_DO_CONTROL },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 1, sem_mudanca: 2, ignorados: [], avisos: [] });
+    const porId = new Map(banco.clientes.map((c) => [c['id'], c['whatsapp']]));
+    expect(porId.get('apagou')).toBeNull();
+    expect(porId.get('nunca-teve')).toBe(FIXO_DO_CONTROL);
+    expect(porId.get('tem')).toBe(DO_APP);
+    // Uma leitura do histórico do WhatsApp, só com os dois que o lote ia preencher.
+    const leituras = (banco.leiturasDoHistorico ?? []).filter((c) =>
+      c.filtros.some((f) => f.metodo === 'or' && String(f.args[0]).includes('campos->whatsapp')),
+    );
+    expect(leituras).toHaveLength(1);
+    const ids = leituras[0]!.filtros.find((f) => f.metodo === 'in')!.args[1] as string[];
+    expect([...ids].sort()).toEqual(['apagou', 'nunca-teve']);
+  });
+
+  it('sem a 051 não há histórico: o WhatsApp vazio é preenchido como antes', async () => {
+    const banco: Banco = { clientes: [cliente({ whatsapp: null })], alteracoes: [] };
+    const { service, fake } = await carregar(banco, { com051: false });
+
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: FIXO_DO_CONTROL }]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [], avisos: [] });
+    expect(updatesDe(fake, 'customers')[0]).toMatchObject({ whatsapp: FIXO_DO_CONTROL });
+    expect(fake.filtrosDe('customer_changes', 'or').filter((f) => String(f.args[0]).includes('campos->whatsapp'))).toEqual([]);
+  });
+
+  it('WhatsApp com um NOME no lugar do número (carga de carteira antiga): o número do Control o troca — com e sem a 051', async () => {
+    for (const com051 of [true, false]) {
+      for (const lixo of ['MARIA', '0', '1234567']) {
+        vi.resetModules();
+        const banco: Banco = { clientes: [cliente({ whatsapp: lixo })], alteracoes: [] };
+        const { service, fake } = await carregar(banco, { com051 });
+
+        const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: DO_CONTROL }]);
+
+        const onde = `com051=${com051} lixo=${lixo}`;
+        expect(r, onde).toMatchObject({ atualizados: 1, ignorados: [], avisos: [] });
+        expect(updatesDe(fake, 'customers')[0], onde).toMatchObject({ whatsapp: DO_CONTROL });
+        expect(banco.clientes[0]!['whatsapp'], onde).toBe(DO_CONTROL);
+      }
+    }
+  });
+
+  it('whatsapp vazio do Control nunca apaga nada — nem o número do app, nem o nome que o conserto ainda vai trocar', async () => {
+    for (const doApp of [DO_APP, 'MARIA']) {
+      for (const vazio of [null, '', '   ']) {
+        vi.resetModules();
+        const banco: Banco = { clientes: [cliente({ whatsapp: doApp })], alteracoes: [] };
+        const { service, fake } = await carregar(banco);
+
+        const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: vazio }]);
+
+        const onde = `${JSON.stringify(vazio)} sobre ${doApp}`;
+        expect(r, onde).toMatchObject({ atualizados: 0, sem_mudanca: 1, avisos: [] });
+        expect(updatesDe(fake, 'customers'), onde).toEqual([]);
+        expect(banco.clientes[0]!['whatsapp'], onde).toBe(doApp);
+      }
+    }
+  });
+
+  it('edição mista pendente (WhatsApp e e-mail): o Control com o e-mail igual a fecha — o WhatsApp não conta nem é trocado', async () => {
+    const mista = () =>
+      alteracao('cli-1', {
+        whatsapp: { antes: '00900000001', depois: DO_APP },
+        email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' },
+      });
+    const banco: Banco = { clientes: [cliente()], alteracoes: [mista()] };
+    const { service, fake } = await carregar(banco);
+
+    const r = await service.receberClientes(EMPRESA, [
+      { ...REGISTRO, whatsapp: DO_CONTROL, email: 'loja@teste.invalid' },
+    ]);
+
+    expect(r).toMatchObject({ atualizados: 0, sem_mudanca: 1, ignorados: [], avisos: [] });
+    expect(updatesDe(fake, 'customers')).toEqual([]);
+    expect(banco.alteracoes[0]).toMatchObject({ erp_atualizado_via: 'api' });
+    expect(banco.clientes[0]!['whatsapp']).toBe(DO_APP);
+
+    // O Control ainda com o e-mail velho: o aviso fala só do e-mail.
+    vi.resetModules();
+    const velho: Banco = { clientes: [cliente()], alteracoes: [mista()] };
+    const b = await carregar(velho);
+    const r2 = await b.service.receberClientes(EMPRESA, [
+      { ...REGISTRO, whatsapp: DO_CONTROL, email: 'velho@teste.invalid' },
+    ]);
+    expect(r2.avisos).toEqual([
+      'Cliente 123: email alterados no app ainda não aplicados no Control — mantido o valor do app.',
+    ]);
+    expect(velho.alteracoes[0]).toMatchObject({ erp_atualizado_em: null, erp_atualizado_via: null });
+    expect(velho.clientes[0]).toMatchObject({ whatsapp: DO_APP, email: 'loja@teste.invalid' });
+  });
+
+  it('alterado_no_app nunca traz whatsapp: a mista sai só com o e-mail; a só de WhatsApp (mesmo gravada pendente antes da regra) não puxa o cliente', async () => {
+    const banco: Banco = {
+      clientes: [
+        cliente({ id: 'mista', erp_id: '00001', cnpj: null, updated_at: '2026-09-17T10:00:00.000Z' }),
+        cliente({ id: 'so-whatsapp', erp_id: '00002', cnpj: null, updated_at: '2026-09-17T10:00:00.000Z' }),
+      ],
+      alteracoes: [
+        alteracao('mista', {
+          whatsapp: { antes: '00900000001', depois: DO_APP },
+          email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' },
+        }),
+        // Gravada em 21/09/2026, antes da regra: erp_pendente = true só com WhatsApp.
+        alteracao('so-whatsapp', { whatsapp: { antes: '00900000001', depois: DO_APP } }),
+      ],
+    };
+    const { service } = await carregar(banco);
+
+    // Sem desde: a lista inteira — a só de WhatsApp sai sem alterado_no_app.
+    const { registros } = await service.listarClientesAlterados(EMPRESA);
+    const porCodigo = new Map(registros.map((r: { codigo: string }) => [r.codigo, r]));
+    expect(porCodigo.get('00001')).toMatchObject({ alterado_no_app: { campos: ['email'] } });
+    expect(porCodigo.get('00002')).toMatchObject({ alterado_no_app: null });
+
+    // Com um desde depois do updated_at: só a mista (pendência de verdade) volta.
+    const depois = await service.listarClientesAlterados(EMPRESA, '2026-09-18T00:00:00.000Z');
+    expect(depois.registros.map((r: { codigo: string }) => r.codigo)).toEqual(['00001']);
+  });
+
+  it('a linha só de WhatsApp gravada pendente antes da regra não é conferida, nem marcada, nem segura o carimbo (049)', async () => {
+    const legado = alteracao('cli-1', { whatsapp: { antes: '00900000001', depois: DO_APP } });
+    const banco: Banco = { clientes: [cliente({ erp_updated_at: null })], alteracoes: [legado] };
+    const { service, fake } = await carregar(banco, { com049: true });
+
+    const r = await service.receberClientes(EMPRESA, [{ ...REGISTRO, whatsapp: DO_APP, email: 'novo@teste.invalid' }]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [], avisos: [] });
+    // Nada de edição do app esperando o Control: a gravação carimba como a de sempre.
+    const [patch] = updatesDe(fake, 'customers');
+    expect(patch).toMatchObject({ email: 'novo@teste.invalid' });
+    expect(patch!['erp_updated_at']).toBe(patch!['updated_at']);
+    // E a linha fica como estava: nem dada por atualizada pelo Control.
+    expect(updatesDe(fake, 'customer_changes')).toEqual([]);
+    expect(legado).toMatchObject({ erp_pendente: true, erp_atualizado_em: null, erp_atualizado_via: null });
+  });
+
+  // ─── A adoção pelo CNPJ não põe na fila a edição só de WhatsApp ───────────
+  const SEM_CODIGO = { erp_id: null, whatsapp: DO_APP, updated_at: '2026-09-17T10:02:00.000Z', erp_updated_at: null };
+  const ADOCAO = { codigo: '999', razao_social: 'LOJA TESTE LTDA', cnpj_cpf: '00000000000191' };
+  const semCodigo = (campos: Record<string, { antes: string | null; depois: string | null }>, id: string) =>
+    alteracao('cli-1', campos, { id, erp_pendente: false, alterado_em: '2026-09-17T10:02:00.000Z' });
+
+  it('adoção: a edição só de WhatsApp feita sem código continua fora da fila — com o campo diferente no registro ou sem ele', async () => {
+    for (const registro of [{ ...ADOCAO, whatsapp: '00900000001' }, ADOCAO]) {
+      vi.resetModules();
+      const banco: Banco = {
+        clientes: [cliente(SEM_CODIGO)],
+        alteracoes: [semCodigo({ whatsapp: { antes: '00900000001', depois: DO_APP } }, 'so-whatsapp')],
+      };
+      const { service, fake } = await carregar(banco, { com049: true });
+
+      const r = await service.receberClientes(EMPRESA, [registro]);
+
+      expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+      expect(r.avisos.filter((a) => a.startsWith('Cliente '))).toEqual([]);
+      expect(banco.clientes[0]).toMatchObject({ erp_id: '00999', whatsapp: DO_APP });
+      expect(updatesDe(fake, 'customer_changes')).toEqual([]);
+      expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: false, erp_atualizado_em: null });
+      // Nada pendente: o carimbo sai, e o GET não diz que o app editou algo.
+      const [patch] = updatesDe(fake, 'customers');
+      expect(patch!['erp_updated_at']).toBe(patch!['updated_at']);
+    }
+  });
+
+  it('adoção: a edição mista feita sem código entra na fila pelo e-mail — e o GET a leva só com o e-mail', async () => {
+    const banco: Banco = {
+      clientes: [cliente(SEM_CODIGO)],
+      alteracoes: [
+        semCodigo(
+          {
+            whatsapp: { antes: '00900000001', depois: DO_APP },
+            email: { antes: 'velho@teste.invalid', depois: 'loja@teste.invalid' },
+          },
+          'mista',
+        ),
+      ],
+    };
+    const { service } = await carregar(banco);
+
+    const r = await service.receberClientes(EMPRESA, [ADOCAO]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+    expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: true, erp_atualizado_em: null });
+    const { registros } = await service.listarClientesAlterados(EMPRESA);
+    expect(registros[0]).toMatchObject({ codigo: '00999', alterado_no_app: { campos: ['email'] } });
+  });
+
+  it('adoção: a edição só de WhatsApp que chega DEPOIS da leitura do 2c também fica fora da fila (o 3a)', async () => {
+    const banco: Banco = { clientes: [cliente(SEM_CODIGO)], alteracoes: [] };
+    banco.antesDoUpdateDeCliente = () => {
+      if (banco.alteracoes.length === 0) {
+        banco.alteracoes.push(semCodigo({ whatsapp: { antes: '00900000001', depois: DO_APP } }, 'tardia'));
+      }
+    };
+    const { service, fake } = await carregar(banco);
+
+    const r = await service.receberClientes(EMPRESA, [ADOCAO]);
+
+    expect(r).toMatchObject({ atualizados: 1, ignorados: [] });
+    expect(updatesDe(fake, 'customer_changes')).toEqual([]);
+    expect(banco.alteracoes[0]).toMatchObject({ erp_pendente: false });
+  });
+
+  it('colocarNaFilaDoControl recusa, ela mesma, a edição só de WhatsApp', async () => {
+    const soWhatsapp = semCodigo({ whatsapp: { antes: '1', depois: '2' } }, 'so-whatsapp');
+    const mista = semCodigo({ whatsapp: { antes: '1', depois: '2' }, email: { antes: 'a@teste.invalid', depois: 'b@teste.invalid' } }, 'mista');
+    const banco: Banco = { clientes: [], alteracoes: [soWhatsapp, mista] };
+    await carregar(banco);
+    const { colocarNaFilaDoControl } = await import('../apps/api/src/modules/customers/customers.alteracoes.service.js');
+
+    const marcadas = await colocarNaFilaDoControl(EMPRESA, [soWhatsapp, mista] as unknown as Parameters<typeof colocarNaFilaDoControl>[1]);
+
+    expect(marcadas).toEqual(['mista']);
+    expect(soWhatsapp['erp_pendente']).toBe(false);
+    expect(mista['erp_pendente']).toBe(true);
   });
 });
 
@@ -1694,7 +2074,8 @@ describe('GET /clientes e /representantes — servidor_hora', () => {
     const DURANTE = new Date('2026-09-17T15:00:04.000Z');
     const cliente = {
       codigo: '00123',
-      alterado_no_app: { em: '2026-09-17T14:59:00.000Z', campos: ['whatsapp'] },
+      // 'email' e não 'whatsapp' (22/09/2026): o WhatsApp nunca sai no alterado_no_app.
+      alterado_no_app: { em: '2026-09-17T14:59:00.000Z', campos: ['email'] },
     };
     const listarClientesAlterados = vi.fn(async () => {
       // A consulta demora: o relógio anda enquanto ela roda.
@@ -1796,6 +2177,65 @@ describe('o contrato publicado diz o que o código faz (revisão de 17/09/2026)'
       expect(linha, doc).not.toMatch(/quem editou por último/);
       expect(linha, doc).toMatch(/edição do app pendente prevalece até o ERP devolver o mesmo valor/);
     }
+  });
+
+  it('o WhatsApp é do app (22/09/2026): a linha do dono, o "só preenche quem está sem" e o "nunca traz whatsapp" estão escritos', () => {
+    for (const doc of DOCS) {
+      const texto = ler(doc);
+      // A linha do cadastro compartilhado já não lista o WhatsApp…
+      expect(linhaDoDono(texto, 'Cadastro do cliente'), doc).not.toMatch(/WhatsApp/);
+      // …e ele tem a linha dele, com o app como dono.
+      const linhaDoWhatsapp = texto.split(/\r?\n/).find((l) => /WhatsApp do cliente/.test(l) && /\|\s*\*\*App\*\*|<td class="t-mut">App/.test(l));
+      expect(linhaDoWhatsapp, doc).toBeDefined();
+      const corrido = texto.replace(/\s+/g, ' ');
+      expect(corrido, doc).toMatch(/[Ss]ó preenche (o WhatsApp de )?quem está sem/);
+      expect(corrido, doc).toMatch(/nunca traz (`|<code>)whatsapp/);
+    }
+    const brief = ler('docs/BRIEF-ERP-FABIO.md').replace(/\s+/g, ' ');
+    expect(brief).toMatch(/\*\*nunca traz `whatsapp`\*\*/);
+    expect(brief).toMatch(/\*\*só preenche quem está sem\*\*/);
+  });
+
+  it('nenhuma linha de tabela dos docs põe o WhatsApp com o ERP de dono (revisão de 22/09/2026)', () => {
+    // A tabela do pedido dizia "Cliente | cliente.* | ERP | … WhatsApp, e-mail"
+    // — o contrário da linha "WhatsApp do cliente = App" da mesma página.
+    const donoERP = (linha: string) =>
+      /^\s*\|/.test(linha)
+        ? linha
+            .split('|')
+            .map((c) => c.trim())
+            .some((c) => /^(\*\*)?ERP(\*\*)?$/.test(c))
+        : /<td class="t-mut">(<b>)?ERP(<\/b>)?<\/td>/.test(linha);
+    for (const doc of DOCS) {
+      const comWhatsappDoERP = ler(doc)
+        .split(/\r?\n/)
+        .filter((l) => /WhatsApp/i.test(l) && donoERP(l));
+      expect(comWhatsappDoERP, doc).toEqual([]);
+    }
+  });
+
+  it('o WhatsApp que o app apagou, o que não é telefone e o vazio do Control estão escritos (revisão de 22/09/2026)', () => {
+    for (const doc of DOCS) {
+      const texto = ler(doc).replace(/\s+/g, ' ');
+      expect(texto, doc).toMatch(/apagou (o WhatsApp )?no app(<\/b>)? continua vazio/);
+      expect(texto, doc).toMatch(/menos de 8 dígitos/);
+      expect(texto, doc).toMatch(/nunca apaga nada/);
+    }
+    const brief = ler('docs/BRIEF-ERP-FABIO.md').replace(/\s+/g, ' ');
+    expect(brief).toMatch(/menos de 8 dígitos/);
+    expect(brief).toMatch(/nunca apaga nada/);
+  });
+
+  it('a data de "atualizado" é a mesma no topo do .md e no topo e no rodapé do HTML', () => {
+    // O rodapé foi para 22 set e o topo ficou em 16 set: o integrador olha o
+    // topo para saber se o contrato mudou (revisão de 22/09/2026).
+    const doMd = /\*\*Atualizado (\d{1,2} [a-z]{3} \d{4})\.\*\*/.exec(ler('docs/API-PARCEIRO.md'))?.[1];
+    const doHtml = [...ler('apps/web/public/api-parceiro.html').matchAll(/atualizado (\d{1,2} [a-z]{3} \d{4})/g)].map(
+      (m) => m[1],
+    );
+    expect(doMd).toBe('22 set 2026');
+    expect(doHtml.length).toBeGreaterThanOrEqual(2);
+    expect([...new Set(doHtml)]).toEqual([doMd]);
   });
 
   it('servidor_hora não promete "nunca nenhuma" sem a folga; o motivo novo de ignorados e o casamento pelo código estão escritos', () => {

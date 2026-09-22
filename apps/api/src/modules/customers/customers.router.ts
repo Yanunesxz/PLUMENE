@@ -7,6 +7,7 @@ import {
   trocarTabelaDoClienteHandler,
   marcarInatividadeHandler,
   marcarVarejoHandler,
+  marcarInativoHandler,
   atrelarCodigoErpHandler,
   vinculosDoClienteHandler,
   excluirClienteHandler,
@@ -72,6 +73,13 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
     '/customers/:id/varejo',
     { preHandler: [authenticate, requireRole(['rep'])] },
     marcarVarejoHandler,
+  );
+  // Cliente inativo (migração 052): não compra mais, sai da régua inteira. Os
+  // mesmos papéis da inatividade — rep na própria carteira, os demais em todas.
+  fastify.patch(
+    '/customers/:id/inativo',
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'relacionamento'])] },
+    marcarInativoHandler,
   );
   // O número do cliente no Control, atrelado ao cadastro nascido no app. É a
   // Larissa (financeiro) quem inclui e atrela — o admin fica como válvula.

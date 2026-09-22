@@ -298,44 +298,51 @@ afterEach(() => {
 });
 
 const WHATSAPP_NOVO = { novo: { whatsapp: '32988880000' }, vistos: { whatsapp: '32999990000' } };
+/**
+ * A edição de exemplo dos testes genéricos (pendência, aviso, compare-and-set,
+ * falhas). Era o WhatsApp até 22/09/2026, quando ele virou dado só do app — a
+ * edição só dele não fica pendente nem avisa o financeiro. O e-mail vai ao
+ * Control: as mesmas asserções seguem valendo com ele.
+ */
+const EMAIL_NOVO = { novo: { email: 'novo@exemplo.com' }, vistos: { email: 'loja@exemplo.com' } };
 
 // ─── Quem pode ───────────────────────────────────────────────────────────────
 
 describe('PATCH /customers/:id/cadastro — quem pode', () => {
   it('rep na própria carteira (pelo código do Control): 200, grava e registra', async () => {
     const banco = novoBanco({ customers: [cliente()] });
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(200);
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     expect(historico(banco)).toHaveLength(1);
     expect(historico(banco)[0]).toMatchObject({
       company_id: EMPRESA,
       customer_id: CLIENTE_ID,
       alterado_por: 'rep-ficticio',
       alterado_por_nome: 'REP FICTICIO',
-      campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } },
+      campos: { email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' } },
       erp_pendente: true,
     });
-    expect((corpo['data'] as Corpo)['whatsapp']).toBe('32988880000');
+    expect((corpo['data'] as Corpo)['email']).toBe('novo@exemplo.com');
     expect(corpo['erp_pendente']).toBe(true);
     expect(corpo['avisados']).toEqual({ financeiro: 1, admin: 1 });
   });
 
   it('rep que cadastrou o cliente (rep_id) também edita', async () => {
     const banco = novoBanco({ customers: [cliente({ rep_id: 'rep-outro', rep_erp_id: null })] });
-    const { res } = await editar(banco, WHATSAPP_NOVO, TOKEN.outroRep);
+    const { res } = await editar(banco, EMAIL_NOVO, TOKEN.outroRep);
     expect(res.statusCode).toBe(200);
   });
 
   it('rep com cliente de OUTRA carteira: 404, nada gravado', async () => {
     const banco = novoBanco({ customers: [cliente()] });
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.outroRep);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.outroRep);
 
     expect(res.statusCode).toBe(404);
     expect(corpo['code']).toBe('NOT_FOUND');
     expect(fake.gravacoes).toHaveLength(0);
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
   });
 
   for (const [papel, token] of [
@@ -344,7 +351,7 @@ describe('PATCH /customers/:id/cadastro — quem pode', () => {
   ] as const) {
     it(`${papel}: 403 sem tocar no banco`, async () => {
       const banco = novoBanco({ customers: [cliente()] });
-      const { res, fake } = await editar(banco, WHATSAPP_NOVO, token);
+      const { res, fake } = await editar(banco, EMAIL_NOVO, token);
       expect(res.statusCode).toBe(403);
       expect(fake.filtros).toHaveLength(0);
     });
@@ -392,12 +399,12 @@ describe('PATCH /customers/:id/cadastro — quem pode', () => {
 
   it('gerente edita cliente de qualquer carteira', async () => {
     const banco = novoBanco({ customers: [cliente({ rep_erp_id: '01234' })] });
-    const { res } = await editar(banco, WHATSAPP_NOVO, TOKEN.gerente);
+    const { res } = await editar(banco, EMAIL_NOVO, TOKEN.gerente);
     expect(res.statusCode).toBe(200);
   });
 
   it('id que não é UUID: 404 sem consultar o banco', async () => {
-    const { res, fake } = await editar(novoBanco(), WHATSAPP_NOVO, TOKEN.admin, 'nao-e-um-id');
+    const { res, fake } = await editar(novoBanco(), EMAIL_NOVO, TOKEN.admin, 'nao-e-um-id');
     expect(res.statusCode).toBe(404);
     expect(fake.filtros).toHaveLength(0);
   });
@@ -476,35 +483,35 @@ describe('PATCH /customers/:id/cadastro — o corpo', () => {
 
 describe('PATCH /customers/:id/cadastro — alguém mudou no meio', () => {
   it('o valor visto já não é o do banco: 409 MUDOU_DE_NOVO com a ficha de agora, nada gravado', async () => {
-    const banco = novoBanco({ customers: [cliente({ whatsapp: '32977770000' })] });
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const banco = novoBanco({ customers: [cliente({ email: 'outra@exemplo.com' })] });
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(409);
     expect(corpo['code']).toBe('MUDOU_DE_NOVO');
-    expect(corpo['campos']).toEqual(['whatsapp']);
-    expect((corpo['data'] as Corpo)['whatsapp']).toBe('32977770000');
+    expect(corpo['campos']).toEqual(['email']);
+    expect((corpo['data'] as Corpo)['email']).toBe('outra@exemplo.com');
     expect(fake.gravacoes).toHaveLength(0);
   });
 
   it('a edição que cai entre a leitura e o UPDATE: o compare-and-set afeta 0 linhas → 409, sem histórico', async () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.interceptar = (c, b) => {
-      // Outra pessoa grava o WhatsApp um instante antes deste UPDATE.
-      if (c.tabela === 'customers' && c.operacao === 'update') doCliente(b)['whatsapp'] = '32966660000';
+      // Outra pessoa grava o e-mail um instante antes deste UPDATE.
+      if (c.tabela === 'customers' && c.operacao === 'update') doCliente(b)['email'] = 'outro@exemplo.com';
       return undefined;
     };
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(409);
     expect(corpo['code']).toBe('MUDOU_DE_NOVO');
-    expect(corpo['campos']).toEqual(['whatsapp']);
-    expect(doCliente(banco)['whatsapp']).toBe('32966660000'); // a edição do outro ficou
+    expect(corpo['campos']).toEqual(['email']);
+    expect(doCliente(banco)['email']).toBe('outro@exemplo.com'); // a edição do outro ficou
     expect(gravacoesEm(fake)).toEqual(['customers.update']);
     expect(historico(banco)).toHaveLength(0);
 
     // A condição do UPDATE: id, empresa e o valor que estava no banco.
     const eqDoUpdate = fake.filtrosDe('customers', 'eq').map((f) => f.args);
-    expect(eqDoUpdate).toContainEqual(['whatsapp', '32999990000']);
+    expect(eqDoUpdate).toContainEqual(['email', 'loja@exemplo.com']);
     expect(eqDoUpdate).toContainEqual(['company_id', EMPRESA]);
   });
 
@@ -524,8 +531,8 @@ describe('PATCH /customers/:id/cadastro — alguém mudou no meio', () => {
     const banco = novoBanco({ customers: [cliente()] });
     let fichasQueFalharam = 0;
     banco.interceptar = (c, b) => {
-      // Outra pessoa grava o WhatsApp um instante antes deste UPDATE…
-      if (c.tabela === 'customers' && c.operacao === 'update') doCliente(b)['whatsapp'] = '32966660000';
+      // Outra pessoa grava o e-mail um instante antes deste UPDATE…
+      if (c.tabela === 'customers' && c.operacao === 'update') doCliente(b)['email'] = 'outro@exemplo.com';
       // …e a releitura da ficha, logo depois, dá timeout.
       if (ehALeituraDaFicha(c)) {
         fichasQueFalharam++;
@@ -533,7 +540,7 @@ describe('PATCH /customers/:id/cadastro — alguém mudou no meio', () => {
       }
       return undefined;
     };
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(fichasQueFalharam).toBe(1);
     expect(res.statusCode).toBe(409);
@@ -542,7 +549,7 @@ describe('PATCH /customers/:id/cadastro — alguém mudou no meio', () => {
     expect(String(corpo['error'])).not.toContain('carteira');
     // Nada gravado: o UPDATE não achou o cadastro como lido; o cliente segue na carteira do rep.
     expect(gravacoesEm(fake)).toEqual(['customers.update']);
-    expect(doCliente(banco)).toMatchObject({ whatsapp: '32966660000', rep_erp_id: '00779' });
+    expect(doCliente(banco)).toMatchObject({ email: 'outro@exemplo.com', rep_erp_id: '00779' });
     expect(historico(banco)).toHaveLength(0);
   });
 
@@ -770,14 +777,14 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       c.tabela === 'customer_changes' && c.operacao === 'insert'
         ? { data: null, error: { message: 'permission denied' } }
         : undefined;
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('ALTERACAO_NAO_REGISTRADA');
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert', 'customers.update']);
     // Voltou como estava, e o desfazer só valia onde ainda estava o que esta edição gravou.
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
-    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['whatsapp', '32988880000']);
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
+    expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['email', 'novo@exemplo.com']);
     expect(aviso).not.toHaveBeenCalled();
   });
 
@@ -786,12 +793,12 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.interceptar = (c, b) => {
       if (c.tabela === 'customer_changes' && c.operacao === 'insert') {
-        doCliente(b)['whatsapp'] = '32955550000'; // alguém gravou no meio
+        doCliente(b)['email'] = 'terceiro@exemplo.com'; // alguém gravou no meio
         return { data: null, error: { message: 'permission denied' } };
       }
       return undefined;
     };
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(500);
     expect(corpo['code']).toBe('ALTERACAO_SEM_HISTORICO');
@@ -804,7 +811,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
   });
 
   it('o histórico não grava e, antes do desfazer, o cadastro já VOLTOU ao valor de antes: 503 "nada mudou", sem alerta falso', async () => {
-    // Revisão de 17/09/2026. O lote do Control leu o WhatsApp novo sem pendência
+    // Revisão de 17/09/2026. O lote do Control leu o e-mail novo sem pendência
     // (o histórico falhou) e gravou o antigo de volta — o compare-and-set dele
     // passa, a condição é o próprio valor novo. O desfazer sai sem erro e com 0
     // linhas: antes, 500 "O cadastro foi alterado… avise o suporte" com o
@@ -813,17 +820,17 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.interceptar = (c, b) => {
       if (c.tabela === 'customer_changes' && c.operacao === 'insert') {
-        doCliente(b)['whatsapp'] = '32999990000'; // o valor de antes, gravado no meio
+        doCliente(b)['email'] = 'loja@exemplo.com'; // o valor de antes, gravado no meio
         return { data: null, error: { message: 'insert or update on table "customer_changes" violates foreign key constraint', code: '23503' } };
       }
       return undefined;
     };
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('ALTERACAO_NAO_REGISTRADA');
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert', 'customers.update']);
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
     expect(historico(banco)).toHaveLength(0);
     const mensagens = log.mock.calls.map((c) => String(c[0])).join('\n');
     expect(mensagens).not.toContain('SEM HISTÓRICO');
@@ -837,7 +844,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
     let updates = 0;
     banco.interceptar = (c, b) => {
       if (c.tabela === 'customer_changes' && c.operacao === 'insert') {
-        doCliente(b)['whatsapp'] = '32955550000'; // alguém gravou no meio
+        doCliente(b)['email'] = 'terceiro@exemplo.com'; // alguém gravou no meio
         return { data: null, error: { message: 'permission denied' } };
       }
       if (c.tabela !== 'customers') return undefined;
@@ -845,7 +852,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       // Depois do desfazer (o segundo UPDATE), o banco para de responder.
       return updates >= 2 && c.operacao === 'select' ? { data: null, error: { message: 'fetch failed' } } : undefined;
     };
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('GRAVACAO_NAO_CONFIRMADA');
@@ -874,15 +881,15 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       aplicar(c, b);
       return REDE_CAIU;
     };
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     // Antes: 500 "Nada foi alterado" com o cliente alterado e nenhuma linha no
     // histórico — a mudança nunca chegava à fila do Control.
     expect(res.statusCode).toBe(200);
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     expect(historico(banco)).toHaveLength(1);
     expect(historico(banco)[0]).toMatchObject({
-      campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } },
+      campos: { email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' } },
       erp_pendente: true,
     });
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert']);
@@ -893,12 +900,12 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
   it('o UPDATE respondeu erro e não gravou: 500 UPDATE_FAILED "Nada foi alterado", sem histórico', async () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.interceptar = (c) => (c.tabela === 'customers' && c.operacao === 'update' ? REDE_CAIU : undefined);
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(500);
     expect(corpo['code']).toBe('UPDATE_FAILED');
     expect(String(corpo['error'])).toContain('Nada foi alterado');
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
     expect(gravacoesEm(fake)).toEqual(['customers.update']);
     expect(historico(banco)).toHaveLength(0);
   });
@@ -916,7 +923,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       }
       return gravou ? REDE_CAIU : undefined;
     };
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('GRAVACAO_NAO_CONFIRMADA');
@@ -992,12 +999,12 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       aplicar(c, b);
       return REDE_CAIU;
     };
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     // Antes: 503 "Nada foi alterado", o cliente desfeito — e a linha do
     // histórico ficava pendente, pedindo ao financeiro um valor que o app não tem.
     expect(res.statusCode).toBe(200);
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert']);
     const idMandado = (fake.ultimaGravacao('customer_changes', 'insert')!.valores as Corpo)['id'];
     expect(String(idMandado)).toMatch(/^[0-9a-f-]{36}$/);
@@ -1020,7 +1027,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       }
       return inseriu && c.operacao === 'select' ? REDE_CAIU : undefined;
     };
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('ALTERACAO_NAO_REGISTRADA');
@@ -1033,7 +1040,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
     const idMandado = (fake.ultimaGravacao('customer_changes', 'insert')!.valores as Corpo)['id'];
     expect(fake.filtrosDe('customer_changes', 'eq').map((f) => f.args)).toContainEqual(['id', idMandado]);
     expect(historico(banco)).toHaveLength(0);
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
     expect(aviso).not.toHaveBeenCalled();
   });
 
@@ -1050,12 +1057,12 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       }
       return inseriu ? REDE_CAIU : undefined;
     };
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(500);
     expect(corpo['code']).toBe('ALTERACAO_SEM_HISTORICO');
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert', 'customer_changes.delete']);
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     const mensagens = log.mock.calls.map((c) => String(c[0])).join('\n');
     expect(mensagens).toContain('ALERTA');
     expect(mensagens).not.toContain('LOJA FICTICIA');
@@ -1085,13 +1092,13 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       aplicar(c, b);
       return REDE_CAIU;
     });
-    const { res, corpo, fake } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo, fake } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     // Antes: 500 "O cadastro foi alterado… avise o suporte" com o cadastro já de
     // volta — a tela fechava o diálogo e a digitação sumia.
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('ALTERACAO_NAO_REGISTRADA');
-    expect(doCliente(banco)['whatsapp']).toBe('32999990000');
+    expect(doCliente(banco)['email']).toBe('loja@exemplo.com');
     expect(historico(banco)).toHaveLength(0);
     expect(gravacoesEm(fake)).toEqual(['customers.update', 'customer_changes.insert', 'customers.update']);
     const mensagens = log.mock.calls.map((c) => String(c[0])).join('\n');
@@ -1103,11 +1110,11 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
     const log = vi.spyOn(console, 'error').mockImplementation(() => {});
     const banco = novoBanco({ customers: [cliente()] });
     banco.interceptar = historicoRecusadoE(() => REDE_CAIU);
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(500);
     expect(corpo['code']).toBe('ALTERACAO_SEM_HISTORICO');
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     const mensagens = log.mock.calls.map((c) => String(c[0])).join('\n');
     expect(mensagens).toContain('SEM HISTÓRICO');
   });
@@ -1122,7 +1129,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       },
       () => REDE_CAIU,
     );
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('GRAVACAO_NAO_CONFIRMADA');
@@ -1142,13 +1149,13 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
       }
       return undefined;
     };
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     // A edição ficou: dizer "cliente não encontrado" faria a pessoa digitar tudo de novo.
     expect(res.statusCode).toBe(500);
     expect(corpo['code']).toBe('SALVO_SEM_RELER_A_FICHA');
     expect(String(corpo['error'])).toContain('foi salvo');
-    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(doCliente(banco)['email']).toBe('novo@exemplo.com');
     expect(historico(banco)).toHaveLength(1);
     expect(corpo['erp_pendente']).toBe(true);
     expect(aviso).toHaveBeenCalledTimes(1);
@@ -1157,7 +1164,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
   it('sem a 051: 503 MIGRACAO_PENDENTE e nada é lido nem gravado no cliente', async () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.ausentes.add('customer_changes');
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.admin);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.admin);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('MIGRACAO_PENDENTE');
@@ -1169,7 +1176,7 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
   it('banco sem resposta sobre a 051: 503 TENTE_DE_NOVO e nada gravado', async () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.mudas.add('customer_changes');
-    const { res, fake, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.admin);
+    const { res, fake, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.admin);
 
     expect(res.statusCode).toBe(503);
     expect(corpo['code']).toBe('TENTE_DE_NOVO');
@@ -1199,13 +1206,13 @@ describe('PATCH /customers/:id/cadastro — falhas', () => {
 describe('PATCH /customers/:id/cadastro — o aviso', () => {
   it('cliente no Control e canal de cadastro fora da API: avisa, sem mandar para quem editou', async () => {
     const banco = novoBanco({ customers: [cliente()] });
-    const { corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(aviso).toHaveBeenCalledTimes(1);
     expect(aviso).toHaveBeenCalledWith(
       EMPRESA,
       { id: CLIENTE_ID, name: 'LOJA FICTICIA LTDA', erp_id: '09999' },
-      ['whatsapp'],
+      ['email'],
       'rep-ficticio',
     );
     expect(corpo['control_puxa_pela_api']).toBe(false);
@@ -1214,7 +1221,7 @@ describe('PATCH /customers/:id/cadastro — o aviso', () => {
   it('canal de cadastro na API: sem push (o Control puxa), mas a alteração fica pendente', async () => {
     const banco = novoBanco({ customers: [cliente()] });
     banco.tabelas['companies']![0]!['canal_cadastro'] = 'api';
-    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    const { res, corpo } = await editar(banco, EMAIL_NOVO, TOKEN.rep);
 
     expect(res.statusCode).toBe(200);
     expect(aviso).not.toHaveBeenCalled();
@@ -1244,10 +1251,12 @@ describe('PATCH /customers/:id/cadastro — o aviso', () => {
     }));
     const avisos = await import('../apps/api/src/modules/push/push.avisos.js');
 
+    // O campo solto do exemplo era o WhatsApp até 22/09/2026 — hoje só do app,
+    // fora da frase do push (ver o teste da edição mista, abaixo).
     const r = await avisos.avisarCadastroAlteradoNoControl(
       EMPRESA,
       { id: CLIENTE_ID, name: 'LOJA FICTICIA LTDA', erp_id: '09999' },
-      ['whatsapp', 'cep', 'address'],
+      ['email', 'cep', 'address'],
       'rep-ficticio',
     );
 
@@ -1262,7 +1271,7 @@ describe('PATCH /customers/:id/cadastro — o aviso', () => {
       url: `/customers/${CLIENTE_ID}`,
       tag: `cliente-alterado-${CLIENTE_ID}`,
     });
-    expect(String(push['body'])).toContain('WhatsApp, Endereço');
+    expect(String(push['body'])).toContain('E-mail, Endereço');
     expect(String(push['body'])).toContain('09999');
   });
 });
@@ -1277,7 +1286,9 @@ function alteracao(sobrescrever: Linha): Linha {
     alterado_por: 'rep-ficticio',
     alterado_por_nome: 'REP FICTICIO',
     alterado_em: '2026-09-10T12:00:00.000Z',
-    campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } },
+    // Era o WhatsApp até 22/09/2026 — hoje só do app, nunca pendência. A fila, a
+    // ficha, a baixa e o lote são provados com um campo que vai ao Control.
+    campos: { email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' } },
     erp_pendente: true,
     erp_atualizado_em: null,
     erp_atualizado_por: null,
@@ -1323,7 +1334,7 @@ describe('GET /customers/:id — as alterações na ficha', () => {
     expect(lista.filter((a) => a['erp_pendente'] === true && a['erp_atualizado_em'] === null)).toHaveLength(2);
     expect(lista.some((a) => a['alterado_em'] === dia(3) && a['erp_atualizado_em'] === null)).toBe(true); // pendente antiga não some
     expect(lista.some((a) => a['customer_id'] === OUTRO_CLIENTE_ID)).toBe(false);
-    expect(lista[0]).toMatchObject({ alterado_em: dia(15), campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } } });
+    expect(lista[0]).toMatchObject({ alterado_em: dia(15), campos: { email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' } } });
   });
 
   it('sem a 051 a ficha abre sem o campo', async () => {
@@ -1648,5 +1659,142 @@ describe('alterações em lote — para a API de Parceiro', () => {
     expect(porId('outra-empresa')['erp_atualizado_em']).toBeNull();
     expect(porId('resolvida')['erp_atualizado_via']).toBe('app');
     expect(await resolverAlteracoesPelaApi(EMPRESA, [])).toEqual([]);
+  });
+});
+
+// ─── O WhatsApp é só do app (22/09/2026) ─────────────────────────────────────
+//
+// Pedido do Yan: "que eu possa alterar o wtss do cliente sem ter que subir pro
+// control, numero uma coisa numero de wtss outro". A edição só de WhatsApp grava
+// o histórico mas não fica pendente — nem push, nem fila, nem alterado_no_app.
+// Na mista, a linha fica pendente pelo outro campo, com o WhatsApp dentro dela.
+
+describe('PATCH /customers/:id/cadastro — o WhatsApp é só do app (22/09/2026)', () => {
+  it('só o WhatsApp, num cliente com código: grava o histórico, erp_pendente = false, sem push ao financeiro', async () => {
+    const banco = novoBanco({ customers: [cliente()] });
+    const { res, corpo } = await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+
+    expect(res.statusCode).toBe(200);
+    expect(doCliente(banco)['whatsapp']).toBe('32988880000');
+    expect(historico(banco)).toHaveLength(1);
+    expect(historico(banco)[0]).toMatchObject({
+      campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } },
+      erp_pendente: false,
+    });
+    expect(corpo['erp_pendente']).toBe(false);
+    expect((corpo['alteracao'] as Corpo)['erp_pendente']).toBe(false);
+    expect(corpo['avisados']).toBeNull();
+    expect(aviso).not.toHaveBeenCalled();
+  });
+
+  it('só o WhatsApp não entra na fila da Minha área nem no alterado_no_app', async () => {
+    const banco = novoBanco({ customers: [cliente()] });
+    await editar(banco, WHATSAPP_NOVO, TOKEN.rep);
+    expect(historico(banco)).toHaveLength(1);
+
+    vi.resetModules();
+    const { res, corpo } = await ler(banco, '/customers/alteracoes-pendentes', TOKEN.financeiro);
+    expect(res.statusCode).toBe(200);
+    expect(corpo['data']).toEqual([]);
+
+    vi.resetModules();
+    const { lerAlteracoesPendentesEmLote, alteradoNoApp } = await carregarAlteracoes(banco);
+    const mapa = await lerAlteracoesPendentesEmLote(EMPRESA);
+    expect(mapa!.get(CLIENTE_ID)).toBeUndefined();
+    expect(alteradoNoApp(mapa!.get(CLIENTE_ID))).toBeNull();
+  });
+
+  it('mista (WhatsApp e e-mail): pendente pelo e-mail, o WhatsApp na mesma linha do histórico, e o financeiro avisado', async () => {
+    const banco = novoBanco({ customers: [cliente()] });
+    const { res, corpo } = await editar(
+      banco,
+      {
+        novo: { whatsapp: '32988880000', email: 'novo@exemplo.com' },
+        vistos: { whatsapp: '32999990000', email: 'loja@exemplo.com' },
+      },
+      TOKEN.rep,
+    );
+
+    expect(res.statusCode).toBe(200);
+    expect(historico(banco)).toHaveLength(1);
+    expect(historico(banco)[0]).toMatchObject({
+      campos: {
+        whatsapp: { antes: '32999990000', depois: '32988880000' },
+        email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' },
+      },
+      erp_pendente: true,
+    });
+    expect(corpo['erp_pendente']).toBe(true);
+    expect(aviso).toHaveBeenCalledTimes(1);
+
+    // Para o Control, só o e-mail: as colunas pendentes e o alterado_no_app.
+    vi.resetModules();
+    const { lerAlteracoesPendentesEmLote, alteradoNoApp, colunasPendentes, alteracoesQueAlcancaram } =
+      await carregarAlteracoes(banco);
+    const doCliente = (await lerAlteracoesPendentesEmLote(EMPRESA))!.get(CLIENTE_ID)!;
+    expect(doCliente).toHaveLength(1);
+    expect([...colunasPendentes(doCliente)]).toEqual(['email']);
+    expect(alteradoNoApp(doCliente)).toMatchObject({ campos: ['email'] });
+    // O e-mail chegou ao Control: a linha está alcançada — o WhatsApp nunca vai chegar lá.
+    expect(alteracoesQueAlcancaram(doCliente, new Set(['email']))).toEqual([historico(banco)[0]!['id']]);
+  });
+
+  it('a fila da Minha área não lista a linha só de WhatsApp gravada pendente antes da regra; a mista, sim', async () => {
+    const banco = novoBanco({
+      customers: [
+        cliente(),
+        cliente({ id: OUTRO_CLIENTE_ID, name: 'OUTRA LOJA FICTICIA', erp_id: '08888', rep_erp_id: '00780' }),
+      ],
+      customer_changes: [
+        // 21/09/2026: a edição só de WhatsApp ainda nascia pendente.
+        alteracao({ campos: { whatsapp: { antes: '32999990000', depois: '32988880000' } }, alterado_em: '2026-09-21T10:00:00.000Z' }),
+        alteracao({
+          customer_id: OUTRO_CLIENTE_ID,
+          campos: {
+            whatsapp: { antes: '32999990000', depois: '32988880000' },
+            email: { antes: 'loja@exemplo.com', depois: 'novo@exemplo.com' },
+          },
+          alterado_em: '2026-09-21T11:00:00.000Z',
+        }),
+      ],
+    });
+
+    const { res, corpo } = await ler(banco, '/customers/alteracoes-pendentes', TOKEN.financeiro);
+
+    expect(res.statusCode).toBe(200);
+    expect((corpo['data'] as Corpo[]).map((c) => c['customer_id'])).toEqual([OUTRO_CLIENTE_ID]);
+  });
+
+  it('o push da edição mista não fala do WhatsApp — só do que atualizar no Control', async () => {
+    vi.resetModules();
+    const fake = criarSupabaseFake({
+      users: { data: [{ id: 'fin-ficticio' }], error: null },
+      push_subscriptions: { data: [{ endpoint: 'https://push/ficticio', p256dh: 'p', auth: 'a' }], error: null },
+    });
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    vi.doMock('../apps/api/src/config/env.js', () => ({
+      env: { VAPID_PUBLIC_KEY: 'pub', VAPID_PRIVATE_KEY: 'priv', VAPID_SUBJECT: 'mailto:teste@teste.local' },
+    }));
+    const enviados: string[] = [];
+    vi.doMock('../apps/api/src/modules/push/webpush.js', () => ({
+      webpush: {
+        setVapidDetails: vi.fn(),
+        sendNotification: vi.fn(async (_a: unknown, corpo: string) => {
+          enviados.push(corpo);
+        }),
+      },
+    }));
+    const avisos = await import('../apps/api/src/modules/push/push.avisos.js');
+
+    await avisos.avisarCadastroAlteradoNoControl(
+      EMPRESA,
+      { id: CLIENTE_ID, name: 'LOJA FICTICIA LTDA', erp_id: '09999' },
+      ['whatsapp', 'email'],
+      'rep-ficticio',
+    );
+
+    const push = JSON.parse(enviados[0]!) as Corpo;
+    expect(String(push['body'])).toContain('mudou no app: E-mail. Atualize no Control.');
+    expect(String(push['body'])).not.toContain('WhatsApp');
   });
 });

@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
   CAMPOS_EDITAVEIS_DO_CLIENTE,
+  CAMPOS_SO_DO_APP,
   CAMPO_DO_CONTRATO_DO_PARCEIRO,
+  PECAS_DO_ENDERECO_DO_CLIENTE,
   ROTULO_DO_CAMPO_DO_CADASTRO,
+  algumCampoVaiParaOControl,
+  campoSoDoAppPreenchido,
   camposNoContratoDoParceiro,
   camposQueVieram,
   editaQualquerCliente,
@@ -17,6 +21,7 @@ import {
   podeTrocarDocumentoDoCliente,
   primeiroErroDaEdicao,
   rotulosDosCamposAlterados,
+  vaiParaOControl,
   validarEdicaoDoCadastro,
   valoresEditaveisDoCliente,
   veAlteracoesPendentesDoCadastro,
@@ -284,5 +289,40 @@ describe('rótulos e o contrato do parceiro', () => {
     expect(formatarValorDoCadastro('cep', '36000000')).toBe('36000-000');
     expect(formatarValorDoCadastro('email', null)).toBe('(vazio)');
     expect(formatarValorDoCadastro('whatsapp', '32999990000')).toBe('32999990000');
+  });
+});
+
+describe('campos só do app (22/09/2026)', () => {
+  // Yan: "que eu possa alterar o wtss do cliente sem ter que subir pro control,
+  // numero uma coisa numero de wtss outro".
+  it('hoje só o WhatsApp', () => {
+    expect([...CAMPOS_SO_DO_APP]).toEqual(['whatsapp']);
+  });
+
+  it('vaiParaOControl: o WhatsApp não; todo o resto sim — a linha address e as peças do endereço inclusive', () => {
+    expect(vaiParaOControl('whatsapp')).toBe(false);
+    for (const campo of CAMPOS_EDITAVEIS_DO_CLIENTE.filter((c) => c !== 'whatsapp')) {
+      expect(vaiParaOControl(campo), campo).toBe(true);
+    }
+    expect(vaiParaOControl('address')).toBe(true);
+    for (const peca of PECAS_DO_ENDERECO_DO_CLIENTE) expect(vaiParaOControl(peca), peca).toBe(true);
+  });
+
+  it('algumCampoVaiParaOControl: só WhatsApp (ou nada) não; mista sim', () => {
+    expect(algumCampoVaiParaOControl(['whatsapp'])).toBe(false);
+    expect(algumCampoVaiParaOControl([])).toBe(false);
+    expect(algumCampoVaiParaOControl(['whatsapp', 'email'])).toBe(true);
+    expect(algumCampoVaiParaOControl(new Set(['cep', 'address']))).toBe(true);
+  });
+
+  it('campoSoDoAppPreenchido: o WhatsApp só conta como preenchido com telefone — nome no lugar do número é vazio (revisão de 22/09/2026)', () => {
+    // O que o app grava (10 ou 11 dígitos, com ou sem máscara) e um fixo de 8.
+    for (const tel of ['32999990000', '(32) 99999-0000', '3233331111', '33331111']) {
+      expect(campoSoDoAppPreenchido('whatsapp', tel), tel).toBe(true);
+    }
+    // Vazio, e o lixo das cargas antigas: um nome, um "0", um ramal.
+    for (const vazio of [null, undefined, '', '   ', 'MARIA', 'JUNIOR', '0', '1234567', 'Contato: ANA 123']) {
+      expect(campoSoDoAppPreenchido('whatsapp', vazio), String(vazio)).toBe(false);
+    }
   });
 });

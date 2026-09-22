@@ -116,3 +116,17 @@ describe('a data que aparece ao lado do selo', () => {
     expect(dataDaUltimaCompra('não é data')).toBeNull();
   });
 });
+
+describe('cliente inativo (migração 052)', () => {
+  it('inativo sai da régua — e vence até o varejo', () => {
+    const s = situacaoDoCliente({ last_purchase_at: diasAtras(10), inativo: true, varejo: true });
+    expect(s.nivel).toBe('inativo');
+    expect(s.rotulo).toContain('não compra mais');
+    expect(NOME_DO_NIVEL[s.nivel]).toBe('Inativo');
+  });
+
+  it('sem a marca, nada muda', () => {
+    expect(situacaoDoCliente({ last_purchase_at: diasAtras(900), inativo: false }).nivel).toBe('parado');
+    expect(situacaoDoCliente({ last_purchase_at: diasAtras(10), inativo: null }).nivel).toBe('ativo');
+  });
+});

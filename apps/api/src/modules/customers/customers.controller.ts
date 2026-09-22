@@ -6,13 +6,20 @@ import {
   obterCliente,
   marcarInatividade,
   marcarVarejo,
+  marcarInativo,
   atrelarCodigoErp,
 } from './customers.service.js';
 import { excluirCliente, lerVinculosParaExcluir } from './customers.exclusao.service.js';
 import { editarCadastroDoCliente } from './customers.edicao.service.js';
 import { confirmarAlteracoesNoControl, listarClientesComAlteracaoPendente } from './customers.alteracoes.service.js';
 import { z } from 'zod';
-import { editaQualquerCliente, podeTrocarDocumentoDoCliente, primeiroErroDaEdicao } from '@csb/shared';
+import {
+  editaQualquerCliente,
+  podeTrocarDocumentoDoCliente,
+  primeiroErroDaEdicao,
+  CHAVES_DE_MOTIVO,
+  motivoExigeNota,
+} from '@csb/shared';
 import type { AlteracoesPendentesResponse, AvisadosDaAlteracao } from '@csb/shared';
 import { resolverTabelaEscolhida } from '../reps/reps.service.js';
 import { parseBody } from '../../lib/validation.js';
@@ -34,6 +41,22 @@ const inatividadeSchema = z.object({
 });
 
 const varejoSchema = z.object({ varejo: z.boolean() });
+
+// Marcar inativo exige motivo da lista (as chaves do CRM); "outro" exige nota.
+// Desmarcar não leva nada. Sem texto livre no motivo — pedido literal do Yan.
+const inativoSchema = z
+  .object({
+    inativo: z.boolean(),
+    motivo: z.enum(CHAVES_DE_MOTIVO).optional(),
+    nota: z.string().trim().max(300).optional(),
+  })
+  .superRefine((b, ctx) => {
+    if (!b.inativo) return;
+    if (!b.motivo) ctx.addIssue({ code: 'custom', path: ['motivo'], message: 'Escolha o motivo' });
+    if (motivoExigeNota(b.motivo) && !b.nota) {
+      ctx.addIssue({ code: 'custom', path: ['nota'], message: 'Diga em poucas palavras qual é o outro motivo' });
+    }
+  });
 
 export async function listCustomers(request: FastifyRequest, reply: FastifyReply): Promise<void> {
   const { company_id, sub: rep_id, role, erp_rep_id } = request.user;
@@ -273,6 +296,66 @@ export async function marcarVarejoHandler(request: FastifyRequest, reply: Fastif
   }
   await reply.status(500).send({
     error: 'Não foi possível salvar a marca de varejo',
+    code: 'UPDATE_FAILED',
+    statusCode: 500,
+  });
+}
+
+/**
+ * PATCH /customers/:id/inativo — o cliente que não compra mais sai da régua
+ * inteira (migração 052). Rep na própria carteira; relacionamento e gerência
+ * em qualquer uma — os mesmos que explicam o cliente esfriado (039).
+ */
+export async function marcarInativoHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, sub, role, erp_rep_id } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(inativoSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await marcarInativo(
+    company_id,
+    id,
+    {
+      rep_id: sub,
+      erp_rep_id: erp_rep_id ?? null,
+      irrestrito: role === 'manager' || role === 'admin' || role === 'relacionamento',
+    },
+    sub,
+    body,
+  );
+
+  if (r.ok) {
+    await reply.send({
+      data: { inativo: r.inativo, inativo_motivo: r.motivo, inativo_nota: r.nota, inativo_marcado_em: r.marcado_em },
+    });
+    return;
+  }
+  if (r.motivo === 'sem_migracao') {
+    await reply.status(503).send({
+      error: 'A marca de cliente inativo precisa da migração 052',
+      code: 'INATIVO_INDISPONIVEL',
+      statusCode: 503,
+    });
+    return;
+  }
+  if (r.motivo === 'cliente_nao_encontrado') {
+    await reply.status(404).send({
+      error: 'Cliente não encontrado na sua carteira',
+      code: 'NOT_FOUND',
+      statusCode: 404,
+    });
+    return;
+  }
+  if (r.motivo === 'nao_esfriado') {
+    await reply.status(409).send({
+      error: 'Só cliente esfriado pode ser marcado como inativo',
+      code: 'CLIENTE_NAO_ESFRIADO',
+      statusCode: 409,
+    });
+    return;
+  }
+  await reply.status(500).send({
+    error: 'Não foi possível salvar o cliente inativo',
     code: 'UPDATE_FAILED',
     statusCode: 500,
   });

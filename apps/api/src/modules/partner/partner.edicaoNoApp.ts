@@ -32,8 +32,8 @@
  *
  * "Mais recente" entre TODAS as edições da coluna, não só as pendentes
  * (revisão de 17/09/2026). O Control resolve edição por edição: aplicou só a
- * mais nova (WhatsApp B→C) e ainda não a mais velha (WhatsApp A→B e e-mail
- * X→Y), a mais nova sai da fila — e, contando só as pendentes, o `depois`
+ * mais nova (nome fantasia B→C) e ainda não a mais velha (nome fantasia A→B e
+ * e-mail X→Y), a mais nova sai da fila — e, contando só as pendentes, o `depois`
  * vencido da velha (B) virava o valor do app. O Control com tudo igual ao app
  * (C e Y) levava aviso falso e a velha nunca fechava; o Control com o B que o
  * cartão ainda mostrava fechava a velha e gravava B por cima do C do app.
@@ -49,6 +49,14 @@
  * (regra da fase 0). Para CONFERIR se o Control já tem o valor do app, "" é o
  * Control dizendo que o campo está vazio lá — senão uma edição que limpou o
  * e-mail no app nunca seria dada por alcançada.
+ *
+ * O WHATSAPP NÃO ENTRA AQUI (22/09/2026). É dado só do app (Yan: "numero uma
+ * coisa numero de wtss outro"): o Control não o recebe, então ele nunca
+ * "alcança" nem é "mantido" com aviso. Quem o protege é a regra do próprio
+ * POST (`receberClientes`): cliente existente com WhatsApp preenchido ignora o
+ * que o Control mandar; vazio, é preenchido — menos o vazio que o app deixou
+ * de propósito (edição do WhatsApp no histórico, o passo 2d; revisão de
+ * 22/09/2026). Uma edição mista (WhatsApp e e-mail) é conferida só pelo e-mail.
  */
 import {
   CAMPO_DO_CONTRATO_DO_PARCEIRO,
@@ -56,6 +64,7 @@ import {
   camposNoContratoDoParceiro,
   ehPecaDoEndereco,
   mesmoValorDoCadastro,
+  vaiParaOControl,
 } from '@csb/shared';
 import type {
   AlteracaoDoCliente,
@@ -130,8 +139,11 @@ export function conferirEdicoesDoApp(
   if (pendentes.length === 0) return NADA_PENDENTE;
 
   // O valor do app de cada coluna pendente: o da edição mais recente vence —
-  // pendente ou não (ver o cabeçalho). Só as colunas de alguma pendente entram.
-  const colunasDasPendentes = new Set<string>(pendentes.flatMap((a) => Object.keys(a.campos)));
+  // pendente ou não (ver o cabeçalho). Só as colunas de alguma pendente entram,
+  // e só as que vão para o Control (o WhatsApp não é conferido, 22/09/2026).
+  const colunasDasPendentes = new Set<string>(
+    pendentes.flatMap((a) => Object.keys(a.campos)).filter(vaiParaOControl),
+  );
   const doApp = new Map<CampoDoHistoricoDoCadastro, string | null>();
   const maisAntigasPrimeiro = [...new Map((alteracoes ?? []).map((a) => [a.id, a])).values()].sort(
     (a, b) => a.alterado_em.localeCompare(b.alterado_em) || a.id.localeCompare(b.id),
@@ -245,7 +257,11 @@ export function colunasQueOLoteApagou(
   const apagadas = new Set<CampoDoHistoricoDoCadastro>();
   for (const a of edicoesNaoVistas.filter(estaPendente)) {
     for (const [coluna, mudanca] of Object.entries(a.campos)) {
-      if (!mudanca || !ehColunaDoHistorico(coluna) || !trocadaPeloLote(coluna)) continue;
+      // O WhatsApp não volta por aqui (22/09/2026): o lote só o grava onde o
+      // app o tinha vazio e nunca o editou (o 2d de `receberClientes`) — a
+      // regra do POST, a mesma com ou sem edição no meio; a edição que troca a
+      // coluna depois da leitura barra o UPDATE pelo compare-and-set.
+      if (!mudanca || !ehColunaDoHistorico(coluna) || !vaiParaOControl(coluna) || !trocadaPeloLote(coluna)) continue;
       if (mesmoValorDoCadastro(coluna, mudanca.depois, lidas[coluna])) apagadas.add(coluna);
     }
   }

@@ -8,6 +8,7 @@ export * from './types/product.js';
 export * from './types/tarefa.js';
 export * from './types/user.js';
 export * from './constants/bonus.js';
+export * from './constants/clienteInativo.js';
 export * from './constants/orderStatus.js';
 export * from './constants/statusDoCliente.js';
 export * from './constants/permissoes.js';
