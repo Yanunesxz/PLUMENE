@@ -28,7 +28,7 @@ import { AlteracoesParaOControl } from '../../components/comercial/AlteracoesPar
 import { TrocarTabelaDoCliente } from './TrocarTabelaDoCliente.js';
 import { ExcluirCliente } from './ExcluirCliente.js';
 import { linhasDoDono } from '../../lib/donoDoCliente.js';
-import { seloDoPedido } from '../../lib/pedido.js';
+import { seloDoPedido, linkDoWhatsApp } from '../../lib/pedido.js';
 import { situacaoDoCliente, VARIANTE_DO_FRESCOR } from '../../lib/carteira.js';
 import { formatBRL } from '../../lib/utils.js';
 import {
@@ -540,7 +540,7 @@ export function PaginaCliente() {
             rotulo="WhatsApp"
             valor={cliente.whatsapp}
             icone={MessageCircle}
-            href={cliente.whatsapp ? `https://wa.me/${cliente.whatsapp.replace(/\D/g, '')}` : undefined}
+            href={cliente.whatsapp ? linkDoWhatsApp(cliente.whatsapp) : undefined}
           />
           <Dado rotulo="E-mail" valor={cliente.email} icone={Mail} />
           {cliente.logradouro ? (

@@ -26,6 +26,7 @@ import { ConfirmarTabela } from '../../components/comercial/ConfirmarTabela.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { dataDaUltimaCompra, situacaoDoCliente, type NivelDaCarteira } from '../../lib/carteira.js';
 import { mesmoCodigoErp } from '../../lib/codigoErp.js';
+import { linkDoWhatsApp } from '../../lib/pedido.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import {
   documento,
@@ -730,7 +731,7 @@ export function PaginaClientes() {
                 )}
                 {customer.whatsapp && (
                   <a
-                    href={`https://wa.me/${customer.whatsapp.replace(/\D/g, '')}`}
+                    href={linkDoWhatsApp(customer.whatsapp)}
                     target="_blank"
                     rel="noopener noreferrer"
                     aria-label="Abrir WhatsApp"

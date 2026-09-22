@@ -166,7 +166,23 @@ export interface OrderWithItems extends Order {
    * do representante no Control. É o que o financeiro confere antes de lançar
    * no ERP. Ausente no cache offline.
    */
-  rep_info?: { name: string; erp_rep_id: string | null } | null;
+  rep_info?: {
+    name: string;
+    erp_rep_id: string | null;
+    /**
+     * O telefone do representante — para o escritório mandar a cópia do
+     * pedido no WhatsApp dele (22/09/2026). Não vai para o login da loja.
+     */
+    phone?: string | null;
+  } | null;
+  /**
+   * O WhatsApp do cliente, lido do CADASTRO no GET /orders/:id (22/09/2026).
+   * Antes o botão "Enviar pedido para o cliente" lia a cópia da carteira no
+   * aparelho: quando o cliente não estava nela, o link saía sem número e o
+   * WhatsApp pedia para escolher o contato. `null` = o cadastro não tem
+   * WhatsApp; ausente = cache offline ou API antiga (a tela usa a cópia local).
+   */
+  customer_whatsapp?: string | null;
 }
 
 // ─── Pedido excluído (aba do admin) ──────────────────────────────────────────

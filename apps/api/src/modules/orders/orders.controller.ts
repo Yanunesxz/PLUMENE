@@ -83,11 +83,27 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
   // E quem vendeu vai resolvido (nome + código no Control): é o que o
   // financeiro confere antes de lançar no ERP. Consulta à parte, nunca um
   // embed — o rep_id tem três chaves para users e o PostgREST se perde.
-  const { data: rep } = await supabase
-    .from('users')
-    .select('name, erp_rep_id')
-    .eq('id', order.rep_id)
-    .maybeSingle();
+  //
+  // O telefone do rep e o WhatsApp do cliente (22/09/2026) vão para os botões
+  // do WhatsApp: "Enviar pedido para o cliente" lia o número da cópia da
+  // carteira no aparelho, e cliente fora dela saía sem número. O telefone do
+  // representante não vai para o login da loja — ela fala com ele pelo app.
+  const ehLoja = role === 'store';
+  const [{ data: rep }, { data: cliente }] = await Promise.all([
+    supabase
+      .from('users')
+      .select(ehLoja ? 'name, erp_rep_id' : 'name, erp_rep_id, phone')
+      .eq('id', order.rep_id)
+      .maybeSingle(),
+    order.customer_id
+      ? supabase
+          .from('customers')
+          .select('whatsapp')
+          .eq('id', order.customer_id)
+          .eq('company_id', company_id)
+          .maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
 
   // Os canais da empresa (048) vão junto: é por eles que a tela sabe se
   // "Lançar" pede o número (manual) ou solicita ao Control (api), e se o botão
@@ -106,7 +122,10 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
     data: {
       ...order,
       public_link: `${env.APP_PUBLIC_URL}/pedido/${tokenDoPedido(order.id)}`,
-      rep_info: (rep as { name: string; erp_rep_id: string | null } | null) ?? null,
+      rep_info: (rep as { name: string; erp_rep_id: string | null; phone?: string | null } | null) ?? null,
+      // Só quando a leitura respondeu: sem ela o campo fica ausente e a tela
+      // usa a cópia local, em vez de concluir "cliente sem WhatsApp".
+      ...(cliente ? { customer_whatsapp: (cliente as { whatsapp: string | null }).whatsapp ?? null } : {}),
       canais,
     },
   });
