@@ -236,6 +236,19 @@ describe('preenchimento do modelo oficial', () => {
     expect(xml).toMatch(/<c r="AA13"[^>]*>.*?<\/f><v>53\.90<\/v><\/c>/s);
   });
 
+  it('o UNIT acha o preço também quando quem abre RECALCULA: a ref sai como texto e a Plan2 guarda número', () => {
+    // O celular do representante e o Google Planilhas recalculam ao abrir;
+    // VLOOKUP("0130") não acha o 130 numérico da Plan2 e mostrava "-". A
+    // fórmula ganha a segunda tentativa pelo número (Yan, 23/09/2026).
+    const xml = sheet1(folhaComUmaLinha().arquivo);
+    const aa13 = xml.match(/<c r="AA13"[^>]*>([\s\S]*?)<\/c>/)?.[1] ?? '';
+    expect(aa13).toContain('VLOOKUP(VALUE(A13),Plan2!$A$1:$F$777,6,0)');
+    // A cadeia inteira, como o Excel vai ler.
+    expect(aa13).toMatch(/IFERROR\(VLOOKUP\(A13,[^)]*\),IFERROR\(VLOOKUP\(VALUE\(A13\),[^)]*\),(&quot;|")-(&quot;|")\)\)/);
+    // Só o UNIT muda: o TOTAL da linha continua a fórmula do modelo.
+    expect(xml).toMatch(/<c r="AB13"[^>]*>.*?IFERROR\(AA13\*Z13,(&quot;|")-(&quot;|")\).*?<\/c>/s);
+  });
+
   it('fecha o total do rodapé com o que está na grade', () => {
     const xml = sheet1(folhaComUmaLinha().arquivo);
     // 3 peças × 53,90
