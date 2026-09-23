@@ -718,11 +718,9 @@ export async function setOrderDiscount(
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
-  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
-  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
-  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
-  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
+  // a foto sai AGORA, antes de mexer. Se ela falha, a edição SEGUE mesmo assim
+  // — ver fotoDoErpSemTravar.
+  await fotoDoErpSemTravar(o, company_id);
 
   const { data: itens } = await supabase
     .from('order_items')
@@ -777,6 +775,24 @@ export async function setOrderDiscount(
  * Ninguém: pedido faturado ou já no ERP. A nota saiu por aquele valor; mexer
  * aqui criaria uma verdade diferente da do Control.
  */
+/**
+ * A foto do que o Control conhece (046), tirada antes de uma edição — SEM
+ * travar a edição quando ela falha.
+ *
+ * Até 23/09/2026 a edição parava com 503 quando a foto não saía (soluço na
+ * detecção da tabela ou na busca): a ideia era não perder o aviso "mudou depois
+ * de ir para o ERP". Na prática travou a Simone num pedido antigo, e o Yan
+ * cravou: "não pode travar nada agora, o Fábio vai demorar pra API". Então a
+ * falha fica registrada no log e a venda segue; o que se perde é só o aviso
+ * daquela mudança — a próxima foto sai com ela dentro.
+ */
+async function fotoDoErpSemTravar(o: Pick<Order, 'id' | 'status'>, company_id: string): Promise<void> {
+  const foto = await garantirFotoDoErp(o, company_id);
+  if (foto === 'falhou') {
+    console.error(`[046] sem foto do Control para o pedido ${o.id}; a edição segue sem ela`);
+  }
+}
+
 function podeMexerNoPedido(
   o: Order,
   role: AuthRole,
@@ -879,11 +895,9 @@ export async function setOrderItems(
   if (original === 'falhou') return { ok: false, reason: 'original_nao_guardado' };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
-  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
-  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
-  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
-  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
+  // a foto sai AGORA, antes de mexer. Se ela falha, a edição SEGUE mesmo assim
+  // — ver fotoDoErpSemTravar.
+  await fotoDoErpSemTravar(o, company_id);
 
   // A tabela DO pedido, com a mesma dedução de sempre: a gravada (025), senão a
   // do cadastro do cliente, senão a do representante dono.
@@ -1014,11 +1028,9 @@ export async function setOrderPayment(
   if (!(await detectarColunaDaCondicao())) return { ok: false, reason: 'sem_coluna' };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
-  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
-  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
-  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
-  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
+  // a foto sai AGORA, antes de mexer. Se ela falha, a edição SEGUE mesmo assim
+  // — ver fotoDoErpSemTravar.
+  await fotoDoErpSemTravar(o, company_id);
 
   let gravar: string | null = null;
   if (payment_condition_id) {
@@ -1460,11 +1472,9 @@ export async function setOrderNotes(
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   // Pedido já lançado sem foto do que o Control conhece (lançado antes da 046):
-  // a foto sai AGORA, antes de mexer, senão esta edição nunca acusaria
-  // "mudou depois de ir para o ERP". Se a foto FALHA, a edição não passa: gravar
-  // sem ela apagaria esta mudança do aviso para sempre (a próxima foto já sairia
-  // com ela dentro). Tabela ausente ou pedido não lançado seguem normalmente.
-  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') return { ok: false, reason: 'sem_foto_do_erp' };
+  // a foto sai AGORA, antes de mexer. Se ela falha, a edição SEGUE mesmo assim
+  // — ver fotoDoErpSemTravar.
+  await fotoDoErpSemTravar(o, company_id);
 
   // Sem a lista de SKUs em mãos: o modo genérico reconhece a linha de cor pelo
   // formato completo ("0015 3M azul"), que é o que `observacaoDeCores` grava.

@@ -147,15 +147,20 @@ describe('a edição de um pedido lançado fotografa ANTES de mexer', () => {
     expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
   });
 
-  it('se a foto FALHA, a edição não passa — senão essa mudança sumiria do aviso para sempre', async () => {
+  it('se a foto FALHA, a edição passa mesmo assim — nada trava a venda (Yan, 23/09/2026)', async () => {
+    // Até 23/09 a edição parava com 503. Travou a Simone num pedido antigo e o
+    // Yan cravou "não pode travar nada agora": a falha vai para o log e a
+    // mudança é gravada; perde-se só o aviso "mudou depois do ERP" daquela vez.
     respostaDaFoto = 'falhou';
     const lancado = { id: 'o1', rep_id: REP, status: 'sent_erp', invoiced: false, notes: 'entregar sexta' };
-    const { setOrderNotes, fake } = await carregarServico({ orders: { data: lancado, error: null } });
+    const { setOrderNotes, fake } = await carregarServico({
+      orders: [{ data: lancado, error: null }, { data: { ...lancado, notes: 'entregar segunda' }, error: null }],
+    });
 
     const r = await setOrderNotes('o1', EMPRESA, REP, 'rep', 'entregar segunda', true);
 
-    expect(r).toEqual({ ok: false, reason: 'sem_foto_do_erp' });
-    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+    expect(r.ok).toBe(true);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeDefined();
   });
 
   it('tabela ausente não trava a edição — o app segue como antes da 046', async () => {
