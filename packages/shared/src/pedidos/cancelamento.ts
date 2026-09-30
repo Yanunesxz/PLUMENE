@@ -49,6 +49,18 @@ export function podeCancelarPedido(
   return 'forbidden';
 }
 
+/**
+ * Informar ou trocar o motivo de um pedido JÁ cancelado — o recusado antes da
+ * 053 nasceu sem porquê (ex.: #14560). É mesa do financeiro: só ele e o admin,
+ * e só enquanto o pedido não foi faturado.
+ */
+export function podeInformarMotivo(
+  pedido: PedidoParaCancelar,
+  papel: AuthRole | undefined,
+): boolean {
+  return pedido.status === 'rejected' && !pedido.invoiced && (papel === 'financeiro' || papel === 'admin');
+}
+
 /** Um motivo da lista do admin. */
 export interface MotivoDeCancelamento {
   id: string;

@@ -34,7 +34,8 @@ export async function cancelarPedidoHandler(request: FastifyRequest, reply: Fast
 
   const r = await cancelarPedido(id, company_id, sub, role, venda_interna === true, body);
   if (r.ok) {
-    avisarCancelamentoAoRep(company_id, r.order, r.order.cancel_reason_label ?? 'sem motivo', sub);
+    // Só o motivo de um pedido que já estava cancelado: o rep não é avisado de novo.
+    if (!r.soOMotivo) avisarCancelamentoAoRep(company_id, r.order, r.order.cancel_reason_label ?? 'sem motivo', sub);
     await reply.send({ data: r.order });
     return;
   }

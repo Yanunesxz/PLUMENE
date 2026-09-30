@@ -196,3 +196,41 @@ describe('motivos de cancelamento: só o admin mexe', { timeout: 20_000 }, () =>
     });
   });
 });
+
+describe('pedido já cancelado sem motivo (recusado antes da 053)', { timeout: 20_000 }, () => {
+  it('só financeiro e admin informam o motivo, e só antes de faturar', async () => {
+    const { podeInformarMotivo } = await import('@csb/shared');
+    expect(podeInformarMotivo({ status: 'rejected', rep_id: 'r' }, 'financeiro')).toBe(true);
+    expect(podeInformarMotivo({ status: 'rejected', rep_id: 'r' }, 'admin')).toBe(true);
+    expect(podeInformarMotivo({ status: 'rejected', rep_id: 'r' }, 'rep')).toBe(false);
+    expect(podeInformarMotivo({ status: 'rejected', rep_id: 'r' }, 'manager')).toBe(false);
+    expect(podeInformarMotivo({ status: 'rejected', rep_id: 'r', invoiced: true }, 'financeiro')).toBe(false);
+    expect(podeInformarMotivo({ status: 'approved', rep_id: 'r' }, 'financeiro')).toBe(false);
+  });
+
+  it('a Larissa informa o motivo do #14560: grava o porquê e o pedido continua cancelado', async () => {
+    const { app, fake } = await subirApp({
+      orders: pedido({ status: 'rejected', order_number: 14560 }),
+      order_cancel_reasons: { data: MOTIVO, error: null },
+    });
+    const res = await app.inject(cancelar(TOKEN_FINANCEIRO, { reason_id: MOTIVO_ID }));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado).toMatchObject({ status: 'rejected', cancel_reason_label: 'CLIENTE COM PARCELA VENCIDA' });
+    expect(fake.filtrosDe('orders', 'eq').some((f) => f.args[0] === 'status' && f.args[1] === 'rejected')).toBe(true);
+  });
+
+  it('o representante não mexe no motivo de pedido já cancelado — 409', async () => {
+    const { app, fake } = await subirApp({
+      orders: pedido({ status: 'rejected' }),
+      order_cancel_reasons: { data: MOTIVO, error: null },
+    });
+    const res = await app.inject(cancelar(TOKEN_REP));
+    await app.close();
+
+    expect(res.statusCode).toBe(409);
+    expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+});

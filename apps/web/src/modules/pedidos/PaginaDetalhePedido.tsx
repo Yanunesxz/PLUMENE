@@ -47,7 +47,14 @@ import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
-import { precoDoTamanho, coresPorSku, semLinhasDeCor, minimoDaCondicao, podeCancelarPedido } from '@csb/shared';
+import {
+  precoDoTamanho,
+  coresPorSku,
+  semLinhasDeCor,
+  minimoDaCondicao,
+  podeCancelarPedido,
+  podeInformarMotivo,
+} from '@csb/shared';
 import type {
   Order,
   OrderWithItems,
@@ -161,6 +168,8 @@ export function PaginaDetalhePedido() {
   const cancelamento = order
     ? podeCancelarPedido(order, user?.role, user?.id, user?.role === 'rep' && user?.venda_interna === true)
     : 'forbidden';
+  // Pedido já cancelado (inclusive o recusado antes da 053, sem porquê).
+  const soOMotivo = !!order && podeInformarMotivo(order, user?.role);
 
   const cancelarComMotivo = async (motivo: { reason_id: string; note?: string }) => {
     if (!id || !token || salvandoCancelamento) return;
@@ -172,7 +181,10 @@ export function PaginaDetalhePedido() {
       const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
       setOrder(r.data);
       await db.orders.update(id, { status: 'rejected' }).catch(() => {});
-      setToast({ message: 'Pedido cancelado — está na aba Cancelados.', type: 'success' });
+      setToast({
+        message: soOMotivo ? 'Motivo registrado.' : 'Pedido cancelado — está na aba Cancelados.',
+        type: 'success',
+      });
     } catch (err) {
       setToast({ message: err instanceof Error ? err.message : 'Não foi possível cancelar.', type: 'error' });
     } finally {
@@ -1323,7 +1335,8 @@ export function PaginaDetalhePedido() {
                 </span>
               ) : (
                 canInvoice &&
-                (!order.invoiced || podeDesmarcar) && (
+                // Pedido cancelado não se fatura (053) — o desmarcar segue valendo.
+                (order.invoiced ? podeDesmarcar : order.status !== 'rejected') && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1468,9 +1481,19 @@ export function PaginaDetalhePedido() {
           )}
 
           {/* Cancelado com motivo (053): o porquê, quem e quando, no topo. */}
-          {order.status === 'rejected' && order.cancelled_at && (
+          {order.status === 'rejected' && !ehLoja && (order.cancelled_at || soOMotivo) && (
             <div className="rounded-xl border border-danger/30 bg-danger-soft/40 p-4">
-              <p className="text-sm font-semibold text-danger-soft-foreground">Pedido cancelado</p>
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-danger-soft-foreground">Pedido cancelado</p>
+                {soOMotivo && (
+                  <Button variant="outline" size="sm" onClick={() => setCancelandoPedido(true)}>
+                    {order.cancel_reason_label ? 'Trocar motivo' : 'Informar motivo'}
+                  </Button>
+                )}
+              </div>
+              {!order.cancel_reason_label && (
+                <p className="mt-1 text-sm text-danger-soft-foreground">Sem motivo registrado.</p>
+              )}
               {order.cancel_reason_label && (
                 <p className="mt-1 text-sm text-foreground">
                   <span className="text-muted-foreground">Motivo: </span>
@@ -1480,10 +1503,12 @@ export function PaginaDetalhePedido() {
               {order.cancel_note && (
                 <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">“{order.cancel_note}”</p>
               )}
-              <p className="mt-1 text-[11px] text-subtle">
-                Cancelado{order.cancelled_by_name ? ` por ${order.cancelled_by_name}` : ''} em{' '}
-                {new Date(order.cancelled_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
-              </p>
+              {order.cancelled_at && (
+                <p className="mt-1 text-[11px] text-subtle">
+                  Cancelado{order.cancelled_by_name ? ` por ${order.cancelled_by_name}` : ''} em{' '}
+                  {new Date(order.cancelled_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                </p>
+              )}
             </div>
           )}
 
@@ -1910,6 +1935,7 @@ export function PaginaDetalhePedido() {
           ocupado={salvandoCancelamento}
           onConfirmar={(m) => void cancelarComMotivo(m)}
           onFechar={() => setCancelandoPedido(false)}
+          soOMotivo={soOMotivo}
         />
       )}
 

@@ -1,6 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
-import { podeCancelarPedido, type MotivoDeCancelamento, type PodeCancelar } from '@csb/shared';
+import { podeCancelarPedido, podeInformarMotivo, type MotivoDeCancelamento, type PodeCancelar } from '@csb/shared';
 import type { AuthRole, Order } from '@csb/shared';
 
 /**
@@ -105,7 +105,7 @@ export async function editarMotivo(
 // ─── Cancelar ────────────────────────────────────────────────────────────────
 
 export type ResultadoDoCancelamento =
-  | { ok: true; order: Order }
+  | { ok: true; order: Order; soOMotivo: boolean }
   | {
       ok: false;
       reason: 'not_found' | 'sem_migracao' | 'motivo_invalido' | 'erro' | Exclude<PodeCancelar, 'ok'>;
@@ -130,7 +130,10 @@ export async function cancelarPedido(
   if (!lido) return { ok: false, reason: 'not_found' };
   const o = lido as unknown as Order;
 
-  const acesso = podeCancelarPedido(o, role, user_id, vendaInterna);
+  // Pedido já cancelado (inclusive o recusado antes da 053, sem porquê): o
+  // financeiro e o admin informam ou trocam o motivo, sem mexer no status.
+  const soOMotivo = podeInformarMotivo(o, role);
+  const acesso = soOMotivo ? 'ok' : podeCancelarPedido(o, role, user_id, vendaInterna);
   if (acesso !== 'ok') return { ok: false, reason: acesso };
 
   const { data: motivo } = await supabase
@@ -144,8 +147,9 @@ export async function cancelarPedido(
 
   const agora = new Date().toISOString();
   // Só cancela quem ainda não foi faturado nem cancelado: dois toques ao mesmo
-  // tempo, ou a nota chegando no meio, não passam por cima um do outro.
-  const { data, error } = await supabase
+  // tempo, ou a nota chegando no meio, não passam por cima um do outro. No
+  // caminho "só o motivo", o pedido TEM de continuar cancelado.
+  let gravar = supabase
     .from('orders')
     .update({
       status: 'rejected',
@@ -157,14 +161,15 @@ export async function cancelarPedido(
       updated_at: agora,
     })
     .eq('id', id)
-    .eq('company_id', company_id)
-    .neq('status', 'rejected')
+    .eq('company_id', company_id);
+  gravar = soOMotivo ? gravar.eq('status', 'rejected') : gravar.neq('status', 'rejected');
+  const { data, error } = await gravar
     .or('invoiced.is.null,invoiced.eq.false')
     .select('*')
     .maybeSingle();
   if (error) return { ok: false, reason: 'erro' };
   if (!data) return { ok: false, reason: 'ja_cancelado' };
-  return { ok: true, order: data as unknown as Order };
+  return { ok: true, order: data as unknown as Order, soOMotivo };
 }
 
 /** O nome de quem cancelou, para o detalhe do pedido dizer "por Larissa". */

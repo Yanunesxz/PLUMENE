@@ -12,6 +12,8 @@ interface Props {
   ocupado?: boolean;
   onConfirmar: (motivo: { reason_id: string; note?: string }) => void;
   onFechar: () => void;
+  /** Pedido que JÁ está cancelado: a janela só informa (ou troca) o motivo. */
+  soOMotivo?: boolean;
 }
 
 /**
@@ -20,7 +22,7 @@ interface Props {
  * Pedido da Larissa pelo Yan (30/09/2026). O motivo sai da lista que o admin
  * mantém; a observação é opcional — é onde ela escreve o detalhe do caso.
  */
-export function CancelarPedido({ numero, cliente, ocupado, onConfirmar, onFechar }: Props) {
+export function CancelarPedido({ numero, cliente, ocupado, onConfirmar, onFechar, soOMotivo = false }: Props) {
   const { token } = useAuthStore();
   const [motivos, setMotivos] = useState<MotivoDeCancelamento[] | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -39,7 +41,11 @@ export function CancelarPedido({ numero, cliente, ocupado, onConfirmar, onFechar
     };
   }, [token]);
 
-  const titulo = numero ? `Cancelar o pedido #${numero}?` : 'Cancelar este pedido?';
+  const titulo = soOMotivo
+    ? `Motivo do cancelamento${numero ? ` do pedido #${numero}` : ''}`
+    : numero
+      ? `Cancelar o pedido #${numero}?`
+      : 'Cancelar este pedido?';
 
   return (
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center" role="dialog" aria-modal="true" aria-label={titulo}>
@@ -53,7 +59,9 @@ export function CancelarPedido({ numero, cliente, ocupado, onConfirmar, onFechar
             <p className="text-[15px] font-semibold leading-snug text-foreground">{titulo}</p>
             {cliente && <p className="mt-1 truncate text-sm font-medium text-foreground">{cliente}</p>}
             <p className="mt-1.5 text-sm text-muted-foreground">
-              O pedido vai para a aba Cancelados e o representante recebe o aviso com o motivo.
+              {soOMotivo
+                ? 'O pedido já está cancelado. Aqui só fica registrado o porquê.'
+                : 'O pedido vai para a aba Cancelados e o representante recebe o aviso com o motivo.'}
             </p>
           </div>
         </div>
@@ -110,6 +118,8 @@ export function CancelarPedido({ numero, cliente, ocupado, onConfirmar, onFechar
                 <>
                   <Spinner /> Cancelando…
                 </>
+              ) : soOMotivo ? (
+                'Salvar motivo'
               ) : (
                 'Cancelar pedido'
               )}
