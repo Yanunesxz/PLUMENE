@@ -45,8 +45,9 @@ import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFatura
 import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
+import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
-import { precoDoTamanho, coresPorSku, semLinhasDeCor, minimoDaCondicao } from '@csb/shared';
+import { precoDoTamanho, coresPorSku, semLinhasDeCor, minimoDaCondicao, podeCancelarPedido } from '@csb/shared';
 import type {
   Order,
   OrderWithItems,
@@ -154,6 +155,30 @@ export function PaginaDetalhePedido() {
   const podeDesmarcar =
     (user?.role === 'manager' || user?.role === 'admin' || user?.role === 'financeiro') && podeFaturar;
   const [confirmandoFatura, setConfirmandoFatura] = useState(false);
+  // ─── Cancelar com motivo (053) ─────────────────────────────────────────────
+  const [cancelandoPedido, setCancelandoPedido] = useState(false);
+  const [salvandoCancelamento, setSalvandoCancelamento] = useState(false);
+  const cancelamento = order
+    ? podeCancelarPedido(order, user?.role, user?.id, user?.role === 'rep' && user?.venda_interna === true)
+    : 'forbidden';
+
+  const cancelarComMotivo = async (motivo: { reason_id: string; note?: string }) => {
+    if (!id || !token || salvandoCancelamento) return;
+    setSalvandoCancelamento(true);
+    try {
+      await api.patch<ApiResponse<Order>>(`/orders/${id}/cancelar`, motivo, token);
+      setCancelandoPedido(false);
+      // Relê o pedido inteiro: a resposta crua não traz o nome de quem cancelou.
+      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      setOrder(r.data);
+      await db.orders.update(id, { status: 'rejected' }).catch(() => {});
+      setToast({ message: 'Pedido cancelado — está na aba Cancelados.', type: 'success' });
+    } catch (err) {
+      setToast({ message: err instanceof Error ? err.message : 'Não foi possível cancelar.', type: 'error' });
+    } finally {
+      setSalvandoCancelamento(false);
+    }
+  };
   const [invoicing, setInvoicing] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -1409,7 +1434,11 @@ export function PaginaDetalhePedido() {
                   size="lg"
                   variant="destructive"
                   disabled={decidindo !== null}
-                  onClick={() => void handleDecisao('rejected')}
+                  // Recusar é cancelar com motivo (053): a janela pede o porquê.
+                  // Sem a regra do cancelamento (caso raro), cai no recusar antigo.
+                  onClick={() =>
+                    cancelamento === 'ok' ? setCancelandoPedido(true) : void handleDecisao('rejected')
+                  }
                 >
                   <X className="h-4 w-4" strokeWidth={2.5} />
                   {decisao.rotuloRecusar}
@@ -1436,6 +1465,26 @@ export function PaginaDetalhePedido() {
               onPedir={(obs) => void mexerNaSincronia('pedir', obs)}
               onConfirmar={(assinatura) => void mexerNaSincronia('confirmar', undefined, assinatura)}
             />
+          )}
+
+          {/* Cancelado com motivo (053): o porquê, quem e quando, no topo. */}
+          {order.status === 'rejected' && order.cancelled_at && (
+            <div className="rounded-xl border border-danger/30 bg-danger-soft/40 p-4">
+              <p className="text-sm font-semibold text-danger-soft-foreground">Pedido cancelado</p>
+              {order.cancel_reason_label && (
+                <p className="mt-1 text-sm text-foreground">
+                  <span className="text-muted-foreground">Motivo: </span>
+                  {order.cancel_reason_label}
+                </p>
+              )}
+              {order.cancel_note && (
+                <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">“{order.cancel_note}”</p>
+              )}
+              <p className="mt-1 text-[11px] text-subtle">
+                Cancelado{order.cancelled_by_name ? ` por ${order.cancelled_by_name}` : ''} em{' '}
+                {new Date(order.cancelled_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+              </p>
+            </div>
           )}
 
           {/* Veio assim, foi faturado assado (044). Só aparece quando há o
@@ -1759,6 +1808,21 @@ export function PaginaDetalhePedido() {
             </div>
           )}
 
+          {/* Cancelar com motivo (053) — quando não há o "Recusar" da fila,
+              que já abre a mesma janela. */}
+          {!decisao && !ehLoja && cancelamento === 'ok' && (
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full text-danger-soft-foreground hover:bg-danger-soft"
+              disabled={salvandoCancelamento}
+              onClick={() => setCancelandoPedido(true)}
+            >
+              <X className="h-4 w-4" />
+              Cancelar pedido
+            </Button>
+          )}
+
           {!order.invoiced && !ehLoja && podeAprovar && (
             <Button
               variant="outline"
@@ -1836,6 +1900,16 @@ export function PaginaDetalhePedido() {
             void toggleInvoiced();
           }}
           onCancelar={() => setConfirmandoFatura(false)}
+        />
+      )}
+
+      {cancelandoPedido && order && (
+        <CancelarPedido
+          numero={order.order_number}
+          cliente={nomeDoComprador(order, custName)}
+          ocupado={salvandoCancelamento}
+          onConfirmar={(m) => void cancelarComMotivo(m)}
+          onFechar={() => setCancelandoPedido(false)}
         />
       )}
 

@@ -16,7 +16,7 @@ export const ORDER_STATUS_LABELS: Record<OrderStatus, string> = {
   pending_rep: 'Com o representante',
   pending_approval: 'Aguardando Aprovação',
   approved: 'Aprovado',
-  rejected: 'Recusado',
+  rejected: 'Cancelado',
   sent_erp: 'Enviado ao ERP',
   error_erp: 'Erro no ERP',
 };

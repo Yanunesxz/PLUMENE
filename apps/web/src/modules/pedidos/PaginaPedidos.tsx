@@ -67,7 +67,7 @@ function filtrosDeStatus(
       { value: 'all', label: 'Todos' },
       { value: 'pending_rep', label: 'Com o representante' },
       { value: 'approved', label: 'Aprovados' },
-      { value: 'rejected', label: 'Recusados' },
+      { value: 'rejected', label: 'Cancelados' },
     ];
   }
   if (papel === 'rep') {
@@ -78,7 +78,7 @@ function filtrosDeStatus(
       { value: 'pending_rep', label: 'Para revisar' },
       { value: 'a_faturar', label: 'Aprovados — sem faturar' },
       { value: 'faturados', label: 'Faturados' },
-      { value: 'rejected', label: 'Recusados' },
+      { value: 'rejected', label: 'Cancelados' },
     ];
   }
   return [
@@ -87,7 +87,7 @@ function filtrosDeStatus(
     { value: 'pending_approval', label: 'Pendentes' },
     { value: 'a_faturar', label: 'A faturar' },
     { value: 'faturados', label: 'Faturados' },
-    { value: 'rejected', label: 'Recusados' },
+    { value: 'rejected', label: 'Cancelados' },
     { value: 'draft', label: 'Rascunhos' },
     // A cópia dos pedidos apagados (migração 040) — auditoria, só do admin.
     ...(ehAdmin ? [{ value: 'excluidos' as const, label: 'Excluídos' }] : []),
@@ -116,13 +116,15 @@ function pedidoNoFiltro(o: Order, filtro: FiltroDeStatus): boolean {
  * O "já vi" é consequência da AÇÃO — aceitou, mudou de fila — e não de um
  * marcador de lido, que mentiria (abrir sem tratar não é tratar).
  */
-type FilaDoFinanceiro = 'chegaram' | 'a_lancar' | 'a_faturar' | 'faturados' | 'rascunhos' | 'all';
+type FilaDoFinanceiro = 'chegaram' | 'a_lancar' | 'a_faturar' | 'faturados' | 'cancelados' | 'rascunhos' | 'all';
 
 const FILAS_DO_FINANCEIRO: { value: FilaDoFinanceiro; label: string }[] = [
   { value: 'chegaram', label: 'Chegaram' },
   { value: 'a_lancar', label: 'A lançar' },
   { value: 'a_faturar', label: 'A faturar' },
   { value: 'faturados', label: 'Faturados' },
+  // Cancelados com motivo (053) — pedido da Larissa, 30/09/2026.
+  { value: 'cancelados', label: 'Cancelados' },
   { value: 'rascunhos', label: 'Rascunhos' },
   { value: 'all', label: 'Todos' },
 ];
@@ -135,6 +137,7 @@ function pedidoNaFila(o: Order, fila: FilaDoFinanceiro): boolean {
   // Lançado no ERP: agora é só esperar a nota sair para carimbar o faturado.
   if (fila === 'a_faturar') return o.status === 'sent_erp' && !o.invoiced;
   if (fila === 'faturados') return o.invoiced === true;
+  if (fila === 'cancelados') return o.status === 'rejected';
   return o.status === 'draft';
 }
 

@@ -3,6 +3,7 @@ import { detectar, detectarComCerteza } from '../../lib/detectarColuna.js';
 import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
 import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.js';
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
+import { nomeDeQuemCancelou } from './cancelamento.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -72,7 +73,8 @@ export async function getOrders(
     // enviados ao ERP — mais os que ele próprio criar. Fora do alcance dele só
     // a triagem (pedido de loja parado no rep) e o rascunho alheio.
     if (role === 'financeiro') {
-      query = query.or(`status.in.(pending_approval,approved,sent_erp),rep_id.eq.${rep_id}`);
+      // + os cancelados (053): a aba "Cancelados" é da mesa dele.
+      query = query.or(`status.in.(pending_approval,approved,sent_erp,rejected),rep_id.eq.${rep_id}`);
     }
 
     return query;
@@ -119,6 +121,8 @@ export async function getOrderById(
   // que a fábrica está com a versão velha depois de a venda interna editar.
   const sincronia = await lerSincronia(pedido.id, company_id);
   if (sincronia) pedido.erp_sync = sincronia;
+  // Cancelado com motivo (053): quem cancelou, pelo nome.
+  if (pedido.cancelled_by) pedido.cancelled_by_name = await nomeDeQuemCancelou(pedido.cancelled_by);
   // As notas que o Control informou, com as peças de cada uma (048): é o
   // "como foi faturado" de verdade. Sem a 048, lista vazia.
   pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
