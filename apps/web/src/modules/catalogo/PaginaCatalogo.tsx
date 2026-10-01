@@ -369,11 +369,11 @@ export function PaginaCatalogo() {
         <button
           type="button"
           onClick={() => void navigate('/orders/new')}
-          className="fixed bottom-24 right-4 z-40 flex items-center gap-3 rounded-full bg-primary py-3 pl-4 pr-5 text-white shadow-lg transition-colors hover:bg-primary/90 md:bottom-6"
+          className="fixed bottom-24 right-4 z-40 flex items-center gap-3 rounded-full bg-primary py-3 pl-4 pr-5 text-primary-foreground shadow-lg transition-colors hover:bg-primary/90 md:bottom-6"
         >
           <span className="relative flex h-6 w-6 items-center justify-center">
             <ShoppingCart className="h-5 w-5" strokeWidth={2} />
-            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-white px-1 text-[11px] font-bold text-primary-soft-foreground">
+            <span className="absolute -right-2 -top-2 flex h-4 min-w-4 items-center justify-center rounded-full bg-card px-1 text-[11px] font-bold text-primary-soft-foreground">
               {cartCount}
             </span>
           </span>
@@ -424,7 +424,7 @@ function Chip({
       className={cn(
         'shrink-0 whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors',
         active
-          ? 'border-primary bg-primary text-white'
+          ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground',
       )}
     >

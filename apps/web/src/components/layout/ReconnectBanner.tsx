@@ -27,16 +27,16 @@ export function ReconnectBanner({ title, detail, onDone }: ReconnectBannerProps)
   return (
     <div className="pointer-events-none fixed inset-x-0 top-0 z-50 flex justify-center px-4 safe-top">
       <div
-        className={`mt-3 flex max-w-sm items-center gap-3 rounded-xl bg-positive px-4 py-3 text-white shadow-lg transition-all duration-300 ${
+        className={`mt-3 flex max-w-sm items-center gap-3 rounded-xl bg-positive px-4 py-3 text-on-status shadow-lg transition-all duration-300 ${
           visible ? 'translate-y-0 opacity-100' : '-translate-y-6 opacity-0'
         }`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/20">
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-on-status/20">
           <Wifi className="h-4 w-4" strokeWidth={2.5} />
         </span>
         <div className="min-w-0">
           <p className="text-sm font-semibold leading-tight">{title}</p>
-          {detail && <p className="text-xs leading-tight text-white/90">{detail}</p>}
+          {detail && <p className="text-xs leading-tight text-on-status/90">{detail}</p>}
         </div>
       </div>
     </div>

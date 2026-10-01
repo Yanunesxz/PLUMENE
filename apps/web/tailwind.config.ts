@@ -41,6 +41,8 @@ export default {
         positive: withSoft('positive'),
         warn: withSoft('warn'),
         danger: withSoft('danger'),
+        // Texto em cima de fundo de status cheio: branco no claro, preto no escuro.
+        'on-status': 'hsl(var(--on-status) / <alpha-value>)',
       },
       borderRadius: {
         xl: 'calc(var(--radius) + 4px)',
@@ -49,7 +51,7 @@ export default {
         sm: 'calc(var(--radius) - 4px)',
       },
       fontFamily: {
-        sans: ['Inter Variable', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Manrope Variable', 'Manrope', 'system-ui', 'sans-serif'],
       },
       minHeight: { touch: '44px' },
       minWidth: { touch: '44px' },

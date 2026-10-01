@@ -22,11 +22,11 @@ export function Toast({ message, type = 'info', onDone }: ToastProps) {
       ? 'bg-positive'
       : type === 'error'
         ? 'bg-danger'
-        : 'bg-gray-800';
+        : 'bg-foreground !text-background';
 
   return (
     <div
-      className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-white text-sm shadow-lg transition-opacity duration-300 ${colorClass} ${visible ? 'opacity-100' : 'opacity-0'}`}
+      className={`fixed bottom-20 left-1/2 -translate-x-1/2 z-50 px-4 py-2 rounded-lg text-on-status text-sm shadow-lg transition-opacity duration-300 ${colorClass} ${visible ? 'opacity-100' : 'opacity-0'}`}
     >
       {message}
     </div>

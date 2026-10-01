@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { LogOut, WifiOff } from 'lucide-react';
+import { BotaoDeTema } from './ControlesDeTema.js';
 import { Logo } from '../interface/Logo.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
@@ -97,6 +98,7 @@ export function SideNav() {
               <p className="truncate text-[11px] text-muted-foreground">{USER_ROLE_LABELS[user.role]}</p>
             )}
           </div>
+          <BotaoDeTema className="h-9 w-9 shrink-0" />
           <button
             type="button"
             onClick={handleLogout}
