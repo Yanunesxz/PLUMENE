@@ -2,7 +2,7 @@
 
 Plataforma web comercial para representantes de vendas — catálogo, pedidos e painel gerencial com suporte offline-first.
 
-**Padrão: SystemDesing v0.2.0** (etapa 1 aplicada: fonte, cores, tema claro e escuro, crédito — ver [ESTADO.md](ESTADO.md) e [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md)).
+**Padrão: SystemDesing v0.2.0** (etapa 1 aplicada: fonte, cores, tema claro e escuro — ver [ESTADO.md](ESTADO.md) e [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md)).
 
 ## Visão Geral
 
