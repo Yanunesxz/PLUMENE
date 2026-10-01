@@ -186,7 +186,8 @@ apps/api/src/
 │                                   Sem ela a edição NÃO acontece (503 MIGRACAO_PENDENTE) e a API de Parceiro segue como
 │                                   antes. Idempotente; SQL para os dois bancos em _tools/SQL-PARA-RODAR-051.sql (termina
 │                                   com o NOTIFY). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
-│       └── 052_cliente_inativo.sql → customers.inativo/inativo_motivo/inativo_nota/inativo_marcado_por/inativo_marcado_em/inativo_origem (a aba "Inativos": não compra mais, sai da régua; motivo de lista fechada com as chaves do CRM; controle interno, não vai ao Control)
+│       ├── 052_cliente_inativo.sql → customers.inativo/inativo_motivo/inativo_nota/inativo_marcado_por/inativo_marcado_em/inativo_origem (a aba "Inativos": não compra mais, sai da régua; motivo de lista fechada com as chaves do CRM; controle interno, não vai ao Control)
+│       └── 053_pedido_cancelado.sql → order_cancel_reasons (motivos que o admin mantém, nascem os 4 do Yan) + orders.cancel_reason_id/cancel_reason_label/cancel_note/cancelled_at/cancelled_by (cancelar pedido com motivo; status vai a rejected, aba "Cancelados")
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])

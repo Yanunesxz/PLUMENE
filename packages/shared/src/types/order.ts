@@ -81,6 +81,17 @@ export interface Order {
    */
   erp_requested_at?: string | null;
   erp_requested_by?: string | null;
+  /**
+   * Pedido CANCELADO com motivo (migração 053). O status vai a 'rejected'; aqui
+   * ficam o porquê (texto do motivo na hora), a observação, quem e quando.
+   */
+  cancel_reason_id?: string | null;
+  cancel_reason_label?: string | null;
+  cancel_note?: string | null;
+  cancelled_at?: string | null;
+  cancelled_by?: string | null;
+  /** Nome de quem cancelou — resolvido pela API no detalhe do pedido. */
+  cancelled_by_name?: string | null;
   created_by: string;
   approved_by: string | null;
   created_at: string;

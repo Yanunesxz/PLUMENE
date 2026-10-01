@@ -2,6 +2,12 @@ import type { FastifyInstance } from 'fastify';
 import { authenticate, requireRole, requirePermission } from '../../middleware/auth.js';
 import { diagnosticoDoEmail } from '../../lib/email.js';
 import {
+  cancelarPedidoHandler,
+  listarMotivosHandler,
+  criarMotivoHandler,
+  editarMotivoHandler,
+} from './cancelamento.controller.js';
+import {
   listOrders,
   getOrder,
   createOrderHandler,
@@ -87,6 +93,25 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
   fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
+  // Cancelar com motivo (053). Quem pode é a regra `podeCancelarPedido`
+  // (shared) — rep e gerente antes do financeiro, financeiro/admin até faturar.
+  fastify.patch(
+    '/orders/:id/cancelar',
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
+    cancelarPedidoHandler,
+  );
+  // Os motivos: todo mundo que cancela lê; só o admin cria, renomeia e desativa.
+  fastify.get(
+    '/orders/motivos-de-cancelamento',
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
+    listarMotivosHandler,
+  );
+  fastify.post('/orders/motivos-de-cancelamento', { preHandler: [authenticate, requireRole(['admin'])] }, criarMotivoHandler);
+  fastify.patch(
+    '/orders/motivos-de-cancelamento/:id',
+    { preHandler: [authenticate, requireRole(['admin'])] },
+    editarMotivoHandler,
+  );
   // Mexer no pedido em aberto — peças, desconto e condição de pagamento — segue
   // um portão só (podeMexerNoPedido, no service): o representante nos próprios
   // pedidos enquanto estão com ele; o gerente em tudo que ainda não virou nota.

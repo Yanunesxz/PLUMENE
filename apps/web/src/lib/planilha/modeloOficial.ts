@@ -169,10 +169,31 @@ function aplicarPatches(xml: string, patches: Map<string, Patch>): string {
         return `<c r="${referencia}"${base}><v>${numeroXml(patch.valor)}</v></c>`;
       }
 
-      const formula = (interno ?? '').match(/<f[\s\S]*?(?:\/>|<\/f>)/)?.[0] ?? '';
+      const formula = formulaQueAchaARef((interno ?? '').match(/<f[\s\S]*?(?:\/>|<\/f>)/)?.[0] ?? '');
       const escrito = patch.tipo === 'taxa' ? taxaXml(patch.valor) : numeroXml(patch.valor);
       return `<c r="${referencia}"${base}>${formula}<v>${escrito}</v></c>`;
     },
+  );
+}
+
+/**
+ * A fórmula do UNIT do modelo procura a referência na Plan2 do jeito que a
+ * célula A está — e A sai sempre como TEXTO ("0130", o zero da frente é o que
+ * o Control lê), enquanto a Plan2 guarda a referência normal como NÚMERO (130)
+ * e só a faixa maior como texto ("0130E"). Quem recalcula ao abrir (o celular,
+ * o Google Planilhas, o LibreOffice) não acha 130 procurando "0130" e mostra
+ * "-" no preço e no total; o Excel do escritório mostrava o valor guardado.
+ * Era isso que fazia a planilha do representante sair "sem preço" e a do
+ * financeiro sair certa — a mesma planilha (Yan, 23/09/2026: "padroniza").
+ *
+ * A saída: a MESMA procura, e, se ela falhar, a procura pelo número. O
+ * formato da fórmula continua o do modelo; só ganha a segunda tentativa.
+ */
+export function formulaQueAchaARef(formula: string): string {
+  return formula.replace(
+    /IFERROR\(VLOOKUP\((A\d+),([^,]+),(\d+),0\),(&quot;|")-(&quot;|")\)/,
+    (_, ref: string, tabela: string, coluna: string, abre: string, fecha: string) =>
+      `IFERROR(VLOOKUP(${ref},${tabela},${coluna},0),IFERROR(VLOOKUP(VALUE(${ref}),${tabela},${coluna},0),${abre}-${fecha}))`,
   );
 }
 

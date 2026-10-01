@@ -146,6 +146,27 @@ export function avisarMesaDaRecusa(
   );
 }
 
+/**
+ * Pedido CANCELADO (053): o dono fica sabendo, com o motivo — é o que ele vai
+ * explicar à loja. Quem cancelou o próprio pedido não recebe aviso de si mesmo.
+ */
+export function avisarCancelamentoAoRep(
+  company_id: string,
+  pedido: PedidoParaAviso,
+  motivo: string,
+  quemCancelou: string,
+): void {
+  if (pedido.rep_id === quemCancelou) return;
+  engolir(
+    enviarParaUsuarios(company_id, [pedido.rep_id], {
+      title: `${nomeDoPedido(pedido)} foi cancelado`,
+      body: `Motivo: ${motivo}`,
+      url: rota(pedido),
+      tag: `pedido-${pedido.id}`,
+    }),
+  );
+}
+
 /** A nota saiu — a notícia que o representante mais espera. */
 export function avisarFaturadoAoRep(
   company_id: string,

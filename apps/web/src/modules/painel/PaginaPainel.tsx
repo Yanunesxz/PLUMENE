@@ -11,6 +11,7 @@ import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { EnviarAviso } from './EnviarAviso.js';
 import { ReguaDaCarteira } from './ReguaDaCarteira.js';
+import { MotivosDeCancelamento } from './MotivosDeCancelamento.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
@@ -109,6 +110,9 @@ export function PaginaPainel() {
 
       {/* A régua das cores é do dono da fábrica, não do gerente. */}
       {user?.role === 'admin' && <ReguaDaCarteira />}
+
+      {/* Os motivos de cancelar pedido (053) — "deixe que o admin crie e escolha". */}
+      {user?.role === 'admin' && <MotivosDeCancelamento />}
 
       {metrics.topClientes.length > 0 && (
         <section>
