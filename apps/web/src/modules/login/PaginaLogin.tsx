@@ -11,8 +11,6 @@ import { Spinner } from '../../components/interface/Spinner.js';
 import { MARCA } from '../../lib/marca.js';
 import type { LoginResponse, ApiResponse } from '@csb/shared';
 
-import { EscolhaDeTemaSegmentada } from '../../components/layout/ControlesDeTema.js';
-
 export function PaginaLogin() {
   const navigate = useNavigate();
   const login = useAuthStore((s) => s.login);
@@ -122,9 +120,6 @@ export function PaginaLogin() {
         </div>
 
         <p className="mt-6 text-center text-xs text-muted-foreground">© 2026 {MARCA.nome}</p>
-        <div className="mt-3 flex flex-col items-center gap-1">
-          <EscolhaDeTemaSegmentada />
-        </div>
       </div>
     </div>
   );
