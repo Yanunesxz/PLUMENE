@@ -53,17 +53,3 @@ export function EscolhaDeTemaSegmentada({ className }: { className?: string }) {
     </div>
   );
 }
-
-/** "Criado por Yan Nunes" — uma linha pequena, como marca d'água (sistema de cliente). */
-export function Credito({ className }: { className?: string }) {
-  return (
-    <footer className={cn('flex justify-center px-4 py-3 text-xs text-muted-foreground', className)}>
-      <span>
-        Criado por{' '}
-        <a href="https://github.com/Yanunesxz" rel="noopener noreferrer" target="_blank" className="font-medium">
-          Yan Nunes
-        </a>
-      </span>
-    </footer>
-  );
-}

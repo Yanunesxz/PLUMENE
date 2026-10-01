@@ -12,7 +12,7 @@ import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { useReguaDaCarteira } from '../../hooks/useReguaDaCarteira.js';
 import { MARCA } from '../../lib/marca.js';
-import { BotaoDeTema, Credito, EscolhaDeTemaSegmentada } from './ControlesDeTema.js';
+import { BotaoDeTema, EscolhaDeTemaSegmentada } from './ControlesDeTema.js';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
@@ -99,11 +99,10 @@ export function AppLayout() {
           <div className="mx-auto w-full max-w-6xl">
             <Outlet />
           </div>
-          {/* Padrão Yan Nunes: a escolha do tema e a linha do crédito, no pé de
-              toda tela. No celular é aqui que se volta para "Aparelho". */}
-          <div className="mx-auto mt-6 flex w-full max-w-6xl flex-col items-center gap-1 border-t border-border pt-4">
+          {/* Padrão Yan Nunes: a escolha do tema no pé de toda tela. No
+              celular é aqui que se volta para "Aparelho". */}
+          <div className="mx-auto mt-6 flex w-full max-w-6xl flex-col items-center gap-1 border-t border-border py-4">
             <EscolhaDeTemaSegmentada />
-            <Credito className="py-2" />
           </div>
         </main>
       </div>

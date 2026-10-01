@@ -27,7 +27,7 @@ Feito sem trocar nenhuma classe de tela, para não quebrar nada em produção:
 - Cores fixas que quebravam no escuro trocadas por token (`text-white`,
   `bg-white`, `bg-gray-800` em botão de perigo, toast, faixa de reconexão,
   catálogo, painel e pedidos).
-- **Crédito** "Criado por Yan Nunes" em uma linha, no pé das telas e no login.
+- Sem a linha "Criado por Yan Nunes": o Yan pediu para tirar (01/10/2026).
 - `index.html`: `color-scheme` e `theme-color` claro/escuro.
 
 ### Etapa 2 — falta (cada item é um PR, tela por tela)
