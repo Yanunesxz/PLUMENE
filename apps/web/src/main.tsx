@@ -4,14 +4,16 @@ import { RouterProvider } from 'react-router-dom';
 import { router } from './router/index.js';
 import { observarInstalacao } from './lib/instalarApp.js';
 import { observarAtualizacao } from './lib/atualizarApp.js';
-import '@fontsource-variable/inter';
-// Só os títulos usam a serifada — é a letra do monograma da marca.
-import '@fontsource-variable/bodoni-moda';
+// Manrope em tudo (Padrão Yan Nunes). Do pacote, e não do Google Fonts: o app
+// trabalha offline na rua, e a fonte tem de estar dentro dele.
+import '@fontsource-variable/manrope';
 import './styles/globals.css';
+import { iniciarTema } from './lib/tema.js';
 
 // Antes de renderizar: o navegador avisa que dá para instalar assim que a
 // página carrega, e esse aviso não se repete. Se a escuta só existisse dentro de
 // uma tela, o convite já teria passado quando ela montasse.
+iniciarTema();
 observarInstalacao();
 
 // Registra o service worker e passa a conferir sozinho se saiu versão nova.

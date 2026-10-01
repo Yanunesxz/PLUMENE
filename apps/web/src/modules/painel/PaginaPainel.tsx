@@ -126,7 +126,7 @@ export function PaginaPainel() {
                   <div className="flex min-w-0 items-center gap-3">
                     <span
                       className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                        i === 0 ? 'bg-primary text-white' : 'bg-primary-soft text-primary-soft-foreground'
+                        i === 0 ? 'bg-primary text-primary-foreground' : 'bg-primary-soft text-primary-soft-foreground'
                       }`}
                     >
                       {i === 0 ? <Crown className="h-3.5 w-3.5" /> : i + 1}

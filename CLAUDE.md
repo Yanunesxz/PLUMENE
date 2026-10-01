@@ -5,6 +5,18 @@ o que o sistema faz em [SOBRE-O-PROJETO.md](SOBRE-O-PROJETO.md).
 
 ---
 
+## 🎨 Visual: Padrão Yan Nunes (SystemDesing v0.2.0)
+
+Menu no celular: abas
+
+O padrão está em [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md) e o andamento da
+migração em [ESTADO.md](ESTADO.md). Regra que vale desde já: **nenhuma cor
+fixa em tela** (`bg-white`, `text-white`, `bg-gray-800`, hex): use os tokens
+(`bg-card`, `text-foreground`, `text-primary-foreground`, `text-on-status`),
+senão a tela quebra no tema escuro.
+
+---
+
 ## 🚨 `main` é produção
 
 Não existe CI, não existe staging. Todo push no `main` sobe **na hora** para os

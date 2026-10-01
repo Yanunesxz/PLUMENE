@@ -2,6 +2,8 @@
 
 Plataforma web comercial para representantes de vendas — catálogo, pedidos e painel gerencial com suporte offline-first.
 
+**Padrão: SystemDesing v0.2.0** (etapa 1 aplicada: fonte, cores, tema claro e escuro, crédito — ver [ESTADO.md](ESTADO.md) e [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md)).
+
 ## Visão Geral
 
 Este sistema é uma camada moderna integrada ao ERP existente. **Não substitui o ERP** — ele continua responsável por estoque real, faturamento, financeiro e emissão fiscal.

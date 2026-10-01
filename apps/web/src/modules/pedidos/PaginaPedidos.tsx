@@ -723,7 +723,7 @@ export function PaginaPedidos() {
                       isSelected ? 'border-primary bg-primary' : 'border-border bg-background',
                     )}
                   >
-                    {isSelected && <span className="h-2 w-2 rounded-full bg-white" />}
+                    {isSelected && <span className="h-2 w-2 rounded-full bg-primary-foreground" />}
                   </span>
                   {card}
                 </button>
@@ -767,7 +767,7 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
       className={cn(
         'shrink-0 whitespace-nowrap rounded-full border px-3.5 text-xs font-medium transition-colors',
         active
-          ? 'border-primary bg-primary text-white'
+          ? 'border-primary bg-primary text-primary-foreground'
           : 'border-border bg-card text-muted-foreground hover:border-primary/50 hover:text-foreground',
       )}
     >
