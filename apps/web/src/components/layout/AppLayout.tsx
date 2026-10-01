@@ -12,7 +12,7 @@ import { useSyncOnReconnect } from '../../hooks/useSyncOnReconnect.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { useReguaDaCarteira } from '../../hooks/useReguaDaCarteira.js';
 import { MARCA } from '../../lib/marca.js';
-import { BotaoDeTema, EscolhaDeTemaSegmentada } from './ControlesDeTema.js';
+import { BotaoDeTema } from './ControlesDeTema.js';
 
 export function AppLayout() {
   const { user, logout } = useAuthStore();
@@ -98,11 +98,6 @@ export function AppLayout() {
         <main className="min-w-0 flex-1 overflow-x-hidden pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">
           <div className="mx-auto w-full max-w-6xl">
             <Outlet />
-          </div>
-          {/* Padrão Yan Nunes: a escolha do tema no pé de toda tela. No
-              celular é aqui que se volta para "Aparelho". */}
-          <div className="mx-auto mt-6 flex w-full max-w-6xl flex-col items-center gap-1 border-t border-border py-4">
-            <EscolhaDeTemaSegmentada />
           </div>
         </main>
       </div>

@@ -21,9 +21,9 @@ Feito sem trocar nenhuma classe de tela, para não quebrar nada em produção:
   `--primary`…): neutros preto/branco/cinza e status `#116329 / #7A5200 /
   #B3121F` (claro) e `#3FB950 / #D29922 / #FF7B72` (escuro).
 - **Tema claro e escuro**: começa igual ao aparelho; lua/sol na barra do topo
-  (celular) e no rodapé do menu lateral (computador); "Aparelho · Claro ·
-  Escuro" no pé de toda tela e no login; chave `tema` no localStorage; script
-  de uma linha no `index.html` (não pisca). Logo invertida no escuro.
+  (celular) e no canto do usuário do menu lateral (computador) — e só ali,
+  pedido do Yan (01/10/2026). Chave `tema` no localStorage; script de uma linha
+  no `index.html` (não pisca). Logo invertida no escuro.
 - Cores fixas que quebravam no escuro trocadas por token (`text-white`,
   `bg-white`, `bg-gray-800` em botão de perigo, toast, faixa de reconexão,
   catálogo, painel e pedidos).
