@@ -332,7 +332,7 @@ export async function marcarInativoHandler(request: FastifyRequest, reply: Fasti
   }
   if (r.motivo === 'sem_migracao') {
     await reply.status(503).send({
-      error: 'A marca de cliente inativo precisa da migração 052',
+      error: 'A marca de cliente perdido precisa da migração 052',
       code: 'INATIVO_INDISPONIVEL',
       statusCode: 503,
     });
@@ -348,14 +348,14 @@ export async function marcarInativoHandler(request: FastifyRequest, reply: Fasti
   }
   if (r.motivo === 'nao_esfriado') {
     await reply.status(409).send({
-      error: 'Só cliente esfriado pode ser marcado como inativo',
+      error: 'Só cliente inativo (vermelho) pode ser marcado como perdido',
       code: 'CLIENTE_NAO_ESFRIADO',
       statusCode: 409,
     });
     return;
   }
   await reply.status(500).send({
-    error: 'Não foi possível salvar o cliente inativo',
+    error: 'Não foi possível salvar o cliente perdido',
     code: 'UPDATE_FAILED',
     statusCode: 500,
   });

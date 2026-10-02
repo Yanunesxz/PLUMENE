@@ -83,7 +83,7 @@ export function ReguaDaCarteira() {
           </div>
           <div className="space-y-1.5">
             <label htmlFor="regua-esfriado" className="text-sm font-medium text-foreground">
-              Vira <span className="text-danger">esfriado</span> com
+              Vira <span className="text-danger">inativo</span> com
             </label>
             <div className="flex items-center gap-2">
               <Input
@@ -112,7 +112,7 @@ export function ReguaDaCarteira() {
           </li>
           <li>
             <span className="mr-1.5 inline-block h-2 w-2 rounded-full bg-danger align-middle" />
-            Esfriado: {numerosBons ? e : atual.esfriado} dias ou mais — e aí o representante tem de
+            Inativo: {numerosBons ? e : atual.esfriado} dias ou mais — e aí o representante tem de
             registrar o motivo.
           </li>
         </ul>

@@ -206,7 +206,7 @@ export function PaginaClientes() {
     const decorados = (customers ?? []).map((c) => ({
       cliente: c,
       // Varejo marcado pela venda interna sai da régua: não conta em Atenção
-      // nem em Esfriados — é o que para a cobrança de contato (047).
+      // nem em Inativos — é o que para a cobrança de contato (047).
       situacao: situacaoDoCliente(c),
     }));
     const contagem = { ativo: 0, esfriando: 0, parado: 0, sem_registro: 0, varejo: 0, inativo: 0 } as Record<
@@ -248,19 +248,19 @@ export function PaginaClientes() {
 
   // As cores do Yan: verde ativo, amarelo atenção, vermelho ESFRIADO — o nome
   // que ele passou a usar em 11/09/2026 para o cliente que sumiu.
-  // Ordem do Yan (02/09): ativo → atenção → esfriado, e o ATIVO com o número —
+  // Ordem do Yan (02/09): ativo → atenção → inativo, e o ATIVO com o número —
   // o rep precisa ver quantos clientes vivos tem, não só quantos pararam.
   const FILTROS: Array<{ valor: NivelDaCarteira | 'all'; rotulo: string; cor?: string }> = [
     { valor: 'all', rotulo: 'Todos' },
     { valor: 'ativo', rotulo: `Ativos${contagem.ativo ? ` (${contagem.ativo})` : ''}`, cor: 'bg-positive' },
     { valor: 'esfriando', rotulo: `Atenção${contagem.esfriando ? ` (${contagem.esfriando})` : ''}`, cor: 'bg-warn' },
-    { valor: 'parado', rotulo: `Esfriados${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
+    { valor: 'parado', rotulo: `Inativos${contagem.parado ? ` (${contagem.parado})` : ''}`, cor: 'bg-danger' },
     { valor: 'sem_registro', rotulo: 'Sem registro' },
     // Só aparece quando existe: carteira sem balcão não ganha um chip vazio.
     ...(contagem.varejo > 0 ? [{ valor: 'varejo' as const, rotulo: `Varejo (${contagem.varejo})` }] : []),
     // A aba dos que não compram mais (052) — pedido do Yan de 22/09/2026.
     // Sempre visível: é para onde a pessoa vai conferir quem já foi marcado.
-    { valor: 'inativo', rotulo: `Inativos${contagem.inativo ? ` (${contagem.inativo})` : ''}` },
+    { valor: 'inativo', rotulo: `Perdidos${contagem.inativo ? ` (${contagem.inativo})` : ''}` },
   ];
 
   useEffect(() => {

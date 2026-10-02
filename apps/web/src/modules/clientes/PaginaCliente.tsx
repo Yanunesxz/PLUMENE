@@ -223,7 +223,7 @@ export function PaginaCliente() {
       setMarcandoInativo(false);
       setToast({
         message: res.data.inativo
-          ? 'Cliente marcado como inativo — sai da régua e dos alertas.'
+          ? 'Cliente marcado como perdido — sai da régua e dos alertas.'
           : 'Cliente reativado — volta para a régua da carteira.',
         type: 'success',
       });
@@ -528,7 +528,7 @@ export function PaginaCliente() {
               </p>
               <p className="text-xs text-muted-foreground">
                 {cliente.varejo
-                  ? 'Fora dos alertas e da lista de esfriados — ninguém vai cobrar contato.'
+                  ? 'Fora dos alertas e da lista de inativos — ninguém vai cobrar contato.'
                   : 'Marque quem compra no balcão e não volta: ele sai dos alertas e da cobrança de contato.'}
               </p>
             </div>
@@ -560,7 +560,7 @@ export function PaginaCliente() {
           <div className="mt-4 rounded-lg border border-border bg-sunken p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-sm font-medium text-foreground">Cliente inativo</p>
+                <p className="text-sm font-medium text-foreground">Cliente perdido</p>
                 <p className="text-xs text-muted-foreground">
                   {rotuloDoMotivo(cliente.inativo_motivo) ?? 'Sem motivo registrado'}
                   {cliente.inativo_nota ? ` — “${cliente.inativo_nota}”` : ''}
@@ -591,11 +591,11 @@ export function PaginaCliente() {
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-foreground">Este cliente não compra mais?</p>
                     <p className="text-xs text-muted-foreground">
-                      Marque como inativo: ele sai da régua, dos alertas e da cobrança de contato.
+                      Marque como cliente perdido: ele sai da régua, dos alertas e da cobrança de contato.
                     </p>
                   </div>
                   <Button variant="outline" size="sm" onClick={() => setMarcandoInativo(true)}>
-                    Marcar inativo
+                    Marcar como perdido
                   </Button>
                 </div>
               ) : (
@@ -606,7 +606,7 @@ export function PaginaCliente() {
                   }}
                   className="grid gap-3"
                 >
-                  <p className="text-sm font-medium text-foreground">Por que este cliente ficou inativo?</p>
+                  <p className="text-sm font-medium text-foreground">Por que este cliente foi perdido?</p>
                   <div className="grid gap-2">
                     {MOTIVOS_DE_INATIVO.map((m) => (
                       <label key={m.chave} className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
@@ -643,7 +643,7 @@ export function PaginaCliente() {
                         salvandoInativo || !motivoInativo || (motivoExigeNota(motivoInativo) && !notaInativo.trim())
                       }
                     >
-                      {salvandoInativo ? 'Salvando…' : 'Confirmar inativo'}
+                      {salvandoInativo ? 'Salvando…' : 'Confirmar cliente perdido'}
                     </Button>
                   </div>
                 </form>
@@ -842,7 +842,7 @@ export function PaginaCliente() {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-danger-soft-foreground">
-                Cliente esfriado — {situacao.rotulo.replace('Esfriado — ', '')}
+                Cliente inativo — {situacao.rotulo.replace('Inativo — ', '')}
               </p>
               {cliente.inactivity_reason ? (
                 <>
@@ -887,7 +887,7 @@ export function PaginaCliente() {
                 onChange={(e) => setMotivo(e.target.value)}
                 placeholder="Motivo — fechou, trocou de fornecedor, sem retorno no contato…"
                 className="rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground"
-                aria-label="Motivo de o cliente ter esfriado"
+                aria-label="Motivo de o cliente ter ficado inativo"
               />
               <textarea
                 value={obsMotivo}

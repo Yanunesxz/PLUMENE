@@ -186,7 +186,7 @@ function quemProcurarPrimeiro(
 
   return candidatos.map(({ c, dias }) => {
     const partes = [
-      `- ${c.trade_name?.trim() || c.name} — ${dias >= regua.esfriado ? 'esfriado' : 'em atenção'} ${tempoParado(dias)}`,
+      `- ${c.trade_name?.trim() || c.name} — ${dias >= regua.esfriado ? 'inativo' : 'em atenção'} ${tempoParado(dias)}`,
     ];
     if (c.total_purchased) partes.push(`já comprou ${brl(c.total_purchased)}`);
     if (c.overdue_amount) partes.push(`vencido ${brl(c.overdue_amount)}`);
@@ -210,7 +210,7 @@ export function relatorioLocal(
 
   const dona = opcoes.alcance === 'empresa inteira' ? 'A empresa tem' : 'Sua carteira tem';
   blocos.push(
-    `${dona} ${r.total} clientes: ${r.parados} esfriados (${regua.esfriado}+ dias sem comprar), ` +
+    `${dona} ${r.total} clientes: ${r.parados} inativos (${regua.esfriado}+ dias sem comprar), ` +
       `${r.esfriando} em atenção (${regua.atencao} a ${regua.esfriado} dias), ${r.ativos} ativos e ${r.semRegistro} sem registro de compra.` +
       (r.vencidoTotal > 0 ? ` Há ${brl(r.vencidoTotal)} vencidos.` : ''),
   );
@@ -233,23 +233,23 @@ export function relatorioLocal(
       .slice(0, 8)
       .map(
         ({ nome, rr }) =>
-          `- ${nome}: ${rr.parados} esfriados de ${rr.total}` +
+          `- ${nome}: ${rr.parados} inativos de ${rr.total}` +
           (rr.vencidoTotal > 0 ? `, ${brl(rr.vencidoTotal)} vencidos` : ''),
       );
-    if (linhas.length > 0) blocos.push(`Carteiras com mais clientes esfriados:\n${linhas.join('\n')}`);
+    if (linhas.length > 0) blocos.push(`Carteiras com mais clientes inativos:\n${linhas.join('\n')}`);
   }
 
   const prioridade = quemProcurarPrimeiro(clientes, hoje, regua);
   if (prioridade.length > 0) {
     blocos.push(`Quem procurar primeiro:\n${prioridade.join('\n')}`);
     blocos.push(
-      'Próximo passo: comece pelos esfriados que mais compravam — recuperar cliente antigo é a venda mais barata que existe.',
+      'Próximo passo: comece pelos inativos que mais compravam — recuperar cliente antigo é a venda mais barata que existe.',
     );
   } else {
     blocos.push(
       r.semRegistro === r.total
         ? 'Ainda não há registro de compra nesta carteira — os selos acendem quando o histórico for carregado.'
-        : 'Nenhum cliente esfriado ou em atenção — carteira em dia.',
+        : 'Nenhum cliente inativo ou em atenção — carteira em dia.',
     );
   }
 
@@ -281,7 +281,7 @@ export function montarPedido(
 ): string {
   return (
     `Faca o relatorio simples da ${escopo}.\n\n` +
-    `Resumo: ${resumo.total} clientes | ${resumo.parados} esfriados (${regua.esfriado}+ dias sem comprar) | ` +
+    `Resumo: ${resumo.total} clientes | ${resumo.parados} inativos (${regua.esfriado}+ dias sem comprar) | ` +
     `${resumo.esfriando} em atencao (${regua.atencao}-${regua.esfriado} dias) | ${resumo.ativos} ativos | ` +
     `${resumo.semRegistro} sem registro de compra | vencido total ${reais(resumo.vencidoTotal)}\n\n` +
     `Dados:\n${linhas.join('\n')}`
