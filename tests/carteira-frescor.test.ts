@@ -16,7 +16,7 @@ import { REGUA_PADRAO } from '@csb/shared';
  * sem comprar" da Minha Área e nos filtros da lista de Clientes.
  *
  * Desde 11/09/2026 os DIAS são da fábrica (migração 043) — o admin muda no
- * Painel — e o vermelho se chama ESFRIADO, não mais "inativo".
+ * Painel — e o vermelho se chama INATIVO de novo (02/10/2026); o marcado à mão (052) é "perdido".
  */
 
 const diasAtras = (n: number) => new Date(Date.now() - n * 86_400_000).toISOString().slice(0, 10);
@@ -36,10 +36,10 @@ describe('situação da compra', () => {
     expect(situacaoDaCompra(diasAtras(179)).nivel).toBe('esfriando');
   });
 
-  it('6+ meses = parado (o vermelho, que a tela chama de Esfriado)', () => {
+  it('6+ meses = parado (o vermelho, que a tela chama de Inativo)', () => {
     expect(situacaoDaCompra(diasAtras(180)).nivel).toBe('parado');
     expect(situacaoDaCompra(diasAtras(900)).nivel).toBe('parado');
-    expect(NOME_DO_NIVEL.parado).toBe('Esfriado');
+    expect(NOME_DO_NIVEL.parado).toBe('Inativo');
   });
 
   it('sem data (ou data inválida) = sem registro, nunca um palpite', () => {
@@ -48,9 +48,9 @@ describe('situação da compra', () => {
     expect(situacaoDaCompra('não é data').nivel).toBe('sem_registro');
   });
 
-  it('o rótulo fala tempo humano e a cor do Yan: vermelho = Esfriado', () => {
+  it('o rótulo fala tempo humano e a cor do Yan: vermelho = Inativo', () => {
     expect(situacaoDaCompra(diasAtras(0)).rotulo).toBe('Comprou hoje');
-    expect(situacaoDaCompra(diasAtras(240)).rotulo).toMatch(/^Esfriado — sem comprar há \d+ meses$/);
+    expect(situacaoDaCompra(diasAtras(240)).rotulo).toMatch(/^Inativo — sem comprar há \d+ meses$/);
     expect(situacaoDaCompra(diasAtras(120)).rotulo).toMatch(/^Atenção — sem comprar há \d+ meses$/);
   });
 });
@@ -122,7 +122,7 @@ describe('cliente inativo (migração 052)', () => {
     const s = situacaoDoCliente({ last_purchase_at: diasAtras(10), inativo: true, varejo: true });
     expect(s.nivel).toBe('inativo');
     expect(s.rotulo).toContain('não compra mais');
-    expect(NOME_DO_NIVEL[s.nivel]).toBe('Inativo');
+    expect(NOME_DO_NIVEL[s.nivel]).toBe('Perdido');
   });
 
   it('sem a marca, nada muda', () => {

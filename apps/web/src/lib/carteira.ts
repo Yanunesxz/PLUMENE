@@ -92,7 +92,7 @@ export function situacaoDaCompra(
     return { nivel: 'sem_registro', rotulo: 'Sem compra registrada', dias: null };
   }
   const nivel = frescorPorDias(dias, comRegua);
-  if (nivel === 'parado') return { nivel, rotulo: `Esfriado — sem comprar ${rotuloDeTempo(dias)}`, dias };
+  if (nivel === 'parado') return { nivel, rotulo: `Inativo — sem comprar ${rotuloDeTempo(dias)}`, dias };
   if (nivel === 'esfriando') return { nivel, rotulo: `Atenção — sem comprar ${rotuloDeTempo(dias)}`, dias };
   return { nivel: 'ativo', rotulo: `Comprou ${rotuloDeTempo(dias)}`, dias };
 }
@@ -126,7 +126,7 @@ export function situacaoDoCliente(
   // Inativo (052) vem antes de tudo: não compra mais, não é para reativar.
   if (cliente.inativo === true) {
     const dias = diasSemComprar(cliente.last_purchase_at);
-    return { nivel: 'inativo', rotulo: 'Inativo — não compra mais', dias };
+    return { nivel: 'inativo', rotulo: 'Cliente perdido — não compra mais', dias };
   }
   if (cliente.varejo === true) {
     const dias = diasSemComprar(cliente.last_purchase_at);
@@ -137,27 +137,30 @@ export function situacaoDoCliente(
 
 /**
  * O vocabulário do Yan para as cores: verde de ativo, amarelo de atenção,
- * vermelho de ESFRIADO — nasceu "desativado" (31/08/2026), virou "inativo" no
- * mesmo dia e virou "esfriado" em 11/09/2026, que é como ele fala do cliente
- * que sumiu. Nome curto para chips e títulos.
+ * vermelho de INATIVO — nasceu "desativado" (31/08/2026), virou "inativo",
+ * "esfriado" em 11/09/2026 e de novo "inativo" em 02/10/2026. O cliente que o
+ * rep marca de propósito (052) é o "cliente perdido": "parou de comprar por
+ * um período longo o suficiente para indicar que dificilmente voltará".
+ * Só o nome da tela muda — as chaves (`parado`, `inativo`) ficam, por causa
+ * dos links salvos. Nome curto para chips e títulos.
  */
 export const NOME_DO_NIVEL: Record<NivelDaCarteira, string> = {
   ativo: 'Ativo',
   esfriando: 'Atenção',
-  parado: 'Esfriado',
+  parado: 'Inativo',
   sem_registro: 'Sem registro',
   varejo: 'Varejo',
-  inativo: 'Inativo',
+  inativo: 'Perdido',
 };
 
-/** O mesmo nome no plural, para o chip que conta ("Esfriados (37)"). */
+/** O mesmo nome no plural, para o chip que conta ("Inativos (37)"). */
 export const NOME_DO_NIVEL_PLURAL: Record<NivelDaCarteira, string> = {
   ativo: 'Ativos',
   esfriando: 'Atenção',
-  parado: 'Esfriados',
+  parado: 'Inativos',
   sem_registro: 'Sem registro',
   varejo: 'Varejo',
-  inativo: 'Inativos',
+  inativo: 'Perdidos',
 };
 
 /** Cor do selo, no vocabulário do Badge. Varejo é neutro: fora da régua, nem bom nem ruim. */

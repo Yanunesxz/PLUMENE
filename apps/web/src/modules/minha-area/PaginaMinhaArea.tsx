@@ -450,7 +450,7 @@ export function PaginaMinhaArea() {
       )}
 
       {/* A saúde da carteira: quem parou de comprar é venda esperando visita.
-          O toque cai na lista de Clientes já filtrada nos esfriados. */}
+          O toque cai na lista de Clientes já filtrada nos inativos. */}
       {(carteira.parados > 0 || carteira.esfriando > 0) && (
         <Link
           to="/customers?frescor=parado"
@@ -458,7 +458,7 @@ export function PaginaMinhaArea() {
         >
           <p className="text-sm font-semibold text-warn-soft-foreground">
             {carteira.parados > 0
-              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} esfriado${carteira.parados > 1 ? 's' : ''} — sem comprar há ${regua.esfriado}+ dias`
+              ? `${carteira.parados} cliente${carteira.parados > 1 ? 's' : ''} inativo${carteira.parados > 1 ? 's' : ''} — sem comprar há ${regua.esfriado}+ dias`
               : `${carteira.esfriando} cliente${carteira.esfriando > 1 ? 's' : ''} em atenção`}
           </p>
           <p className="mt-0.5 text-xs text-warn-soft-foreground/80">
