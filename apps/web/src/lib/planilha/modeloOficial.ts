@@ -1,5 +1,5 @@
 import { unzipSync, zipSync } from 'fflate';
-import { nucleoDaRef } from './colunas.js';
+import { nucleoDaRef, SUFIXO_PLUS } from './colunas.js';
 import type { LinhaDaPlanilha } from './linhas.js';
 
 /**
@@ -188,12 +188,22 @@ function aplicarPatches(xml: string, patches: Map<string, Patch>): string {
  *
  * A saída: a MESMA procura, e, se ela falhar, a procura pelo número. O
  * formato da fórmula continua o do modelo; só ganha a segunda tentativa.
+ *
+ * E a terceira, para a linha PLUS (Yan, 05/10/2026: "o tamanho Plus na tabela
+ * exportada está sem preço"): a linha sai como "0130 PLUS", que o Control lê,
+ * mas a Plan2 guarda o preço da faixa maior como "0130E". Nem a procura pelo
+ * texto nem pelo número acham; trocando " PLUS" por "E", acha. Conferido nas
+ * três tabelas da CS: as 138 refs com preço maior no app têm o mesmo valor no
+ * "E" da Plan2.
  */
 export function formulaQueAchaARef(formula: string): string {
   return formula.replace(
     /IFERROR\(VLOOKUP\((A\d+),([^,]+),(\d+),0\),(&quot;|")-(&quot;|")\)/,
     (_, ref: string, tabela: string, coluna: string, abre: string, fecha: string) =>
-      `IFERROR(VLOOKUP(${ref},${tabela},${coluna},0),IFERROR(VLOOKUP(VALUE(${ref}),${tabela},${coluna},0),${abre}-${fecha}))`,
+      `IFERROR(VLOOKUP(${ref},${tabela},${coluna},0),` +
+      `IFERROR(VLOOKUP(VALUE(${ref}),${tabela},${coluna},0),` +
+      `IFERROR(VLOOKUP(SUBSTITUTE(${ref},${abre}${SUFIXO_PLUS}${fecha},${abre}E${fecha}),${tabela},${coluna},0),` +
+      `${abre}-${fecha})))`,
   );
 }
 
