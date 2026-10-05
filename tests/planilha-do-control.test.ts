@@ -243,10 +243,25 @@ describe('preenchimento do modelo oficial', () => {
     const xml = sheet1(folhaComUmaLinha().arquivo);
     const aa13 = xml.match(/<c r="AA13"[^>]*>([\s\S]*?)<\/c>/)?.[1] ?? '';
     expect(aa13).toContain('VLOOKUP(VALUE(A13),Plan2!$A$1:$F$777,6,0)');
-    // A cadeia inteira, como o Excel vai ler.
-    expect(aa13).toMatch(/IFERROR\(VLOOKUP\(A13,[^)]*\),IFERROR\(VLOOKUP\(VALUE\(A13\),[^)]*\),(&quot;|")-(&quot;|")\)\)/);
+    // A cadeia inteira, como o Excel vai ler: texto, número, PLUS→E, e só aí "-".
+    expect(aa13).toMatch(
+      /IFERROR\(VLOOKUP\(A13,[^)]*\),IFERROR\(VLOOKUP\(VALUE\(A13\),[^)]*\),IFERROR\(VLOOKUP\(SUBSTITUTE\(A13,(&quot;|") PLUS(&quot;|"),(&quot;|")E(&quot;|")\),[^)]*\),(&quot;|")-(&quot;|")\)\)\)/,
+    );
     // Só o UNIT muda: o TOTAL da linha continua a fórmula do modelo.
     expect(xml).toMatch(/<c r="AB13"[^>]*>.*?IFERROR\(AA13\*Z13,(&quot;|")-(&quot;|")\).*?<\/c>/s);
+  });
+
+  it('a linha PLUS acha o preço da faixa maior: "0130 PLUS" procura o "0130E" da Plan2', () => {
+    // Yan, 05/10/2026: "o tamanho Plus na tabela exportada está sem preço".
+    // A linha sai "0130 PLUS" (é o que o Control lê) e a Plan2 guarda o preço
+    // maior como "0130E" — sem a troca, quem recalcula via "-".
+    const { linhas } = montarLinhas([item('0130', 'M', 2, 43.9), item('0130', '48', 3, 53.9)]);
+    const xml = sheet1(preencherModelo(modelo(), { linhas }).arquivo);
+    expect(xml).toContain('<t>0130 PLUS</t>');
+    const aa14 = xml.match(/<c r="AA14"[^>]*>([\s\S]*?)<\/c>/)?.[1] ?? '';
+    expect(aa14).toMatch(/VLOOKUP\(SUBSTITUTE\(A14,(&quot;|") PLUS(&quot;|"),(&quot;|")E(&quot;|")\),Plan2!/);
+    // E o valor guardado já é o preço maior, para quem não recalcula.
+    expect(aa14).toMatch(/<v>53\.90<\/v>$/);
   });
 
   it('fecha o total do rodapé com o que está na grade', () => {
