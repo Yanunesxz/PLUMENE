@@ -36,6 +36,7 @@ import type {
   RepListItem,
   ProductWithPrice,
   CorDaFicha,
+  PriceTable,
 } from '@csb/shared';
 
 const ALL_REPS = '__all__';
@@ -210,6 +211,12 @@ export function PaginaPedidos() {
   // continua saindo na planilha dela. A lista de escolha (só ativas) deixaria o
   // pedido "tabela não identificada".
   const { todas: tabelas } = useMinhasTabelas();
+  // "Minhas tabelas" é o conjunto de quem VENDE. O financeiro não tem tabela
+  // nenhuma atrelada, então para ele a lista vinha vazia e todo pedido saía
+  // "tabela de preço não identificada — exportado na Tabela 1" — o que a
+  // Larissa via e o admin não (Yan, 07/10/2026). Quem lê os pedidos de todos
+  // reconhece as tabelas da empresa inteira, que a API já entrega a esses papéis.
+  const [tabelasDaEmpresa, setTabelasDaEmpresa] = useState<PriceTable[]>([]);
 
   const orders = useLiveQuery(() => db.orders.orderBy('created_at').reverse().toArray(), []);
   const customers = useLiveQuery(() => db.customers.toArray(), []);
@@ -277,12 +284,22 @@ export function PaginaPedidos() {
 
   const numeroPorTabela = useMemo(() => {
     const m = new Map<string, NumeroDaTabela>();
-    for (const t of tabelas) {
+    for (const t of [...tabelas, ...tabelasDaEmpresa]) {
       const numero = numeroDaTabela(t);
       if (numero) m.set(t.id, numero);
     }
     return m;
-  }, [tabelas]);
+  }, [tabelas, tabelasDaEmpresa]);
+
+  useEffect(() => {
+    if (!token || !isManager) return;
+    api
+      .getLista<ApiResponse<PriceTable[]>>('/price-tables?incluir_inativas=1', token)
+      .then((res) => setTabelasDaEmpresa(res.data))
+      .catch(() => {
+        /* offline: fica com "minhas tabelas" */
+      });
+  }, [token, isManager]);
 
   useEffect(() => {
     if (!token) return;

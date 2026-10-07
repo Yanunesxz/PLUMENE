@@ -26,6 +26,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
+import { CartaoLimparCache } from '../../components/interface/CartaoLimparCache.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { seloDoPedido } from '../../lib/pedido.js';
@@ -329,6 +330,8 @@ export function PaginaMinhaAreaLoja() {
       <CartaoAvisos />
 
       <CartaoAtualizar />
+
+      <CartaoLimparCache />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">

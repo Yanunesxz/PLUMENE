@@ -14,6 +14,7 @@ import { PaginaMinhaArea } from '../modules/minha-area/PaginaMinhaArea.js';
 import { PaginaConvite } from '../modules/publico/PaginaConvite.js';
 import { PaginaPedidoPublico } from '../modules/publico/PaginaPedidoPublico.js';
 import { PaginaSemAcesso } from '../modules/sistema/PaginaSemAcesso.js';
+import { PaginaLimparCache } from '../modules/sistema/PaginaLimparCache.js';
 import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 
 // Telas que só gerente/admin abrem. O representante — que é quem usa o app no
@@ -78,6 +79,8 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   // não tem (ou nunca terá) conta.
   { path: '/convite/:token', element: <PaginaConvite /> },
   { path: '/pedido/:token', element: <PaginaPedidoPublico /> },
+  // Sem login: é o link que se manda para o aparelho que travou (07/10/2026).
+  { path: '/limpar-cache', element: <PaginaLimparCache /> },
   {
     path: '/vitrine/:token',
     element: (
