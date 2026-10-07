@@ -27,6 +27,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
+import { CartaoLimparCache } from '../../components/interface/CartaoLimparCache.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { situacaoDoCliente, reguaDaCarteira } from '../../lib/carteira.js';
@@ -519,6 +520,8 @@ export function PaginaMinhaArea() {
       <CartaoAvisos />
 
       <CartaoAtualizar />
+
+      <CartaoLimparCache />
 
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
