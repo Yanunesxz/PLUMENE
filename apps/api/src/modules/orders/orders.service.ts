@@ -56,10 +56,15 @@ export async function getOrders(
   // Paginado: o PostgREST corta em 1.000 linhas SEM avisar. Passando disso, o
   // gerente veria a lista mais antiga sumir da tela — e as somas do painel
   // (vendas do mês, faturamento, ticket) sairiam erradas sem nada indicar erro.
-  return buscarTudo<Order>((de, ate) => {
+  //
+  // O NOME do cliente vem junto (08/10/2026): a lista lia o nome da carteira
+  // em cache no aparelho, e depois que o financeiro trocou o cliente de dois
+  // pedidos do Magno para lojas fora da carteira dele, o celular dele não tinha
+  // como dizer de quem eram.
+  const linhas = await buscarTudo<Order & { customer?: { name: string } | null }>((de, ate) => {
     let query = supabase
       .from('orders')
-      .select('*')
+      .select('*, customer:customers(name)')
       .eq('company_id', company_id)
       .order('created_at', { ascending: false })
       .range(de, ate);
@@ -79,6 +84,9 @@ export async function getOrders(
 
     return query;
   });
+  return linhas.map(({ customer, ...pedido }) =>
+    customer?.name ? { ...pedido, customer_name: customer.name } : pedido,
+  );
 }
 
 export async function getOrderById(

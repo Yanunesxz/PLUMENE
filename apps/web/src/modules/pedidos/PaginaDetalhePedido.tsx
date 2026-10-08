@@ -194,7 +194,8 @@ export function PaginaDetalhePedido() {
       // Relê o pedido inteiro: o WhatsApp e o código do cliente vêm na leitura.
       const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
       setOrder(r.data);
-      await db.orders.update(id, { customer_id }).catch(() => {});
+      // A lista lê o cache: sem o nome novo junto, ela seguiria no antigo.
+      await db.orders.update(id, { customer_id, customer_name: r.data.customer_name }).catch(() => {});
       setTrocandoCliente(false);
       const avisos = [
         res.meta?.tabela_diferente ? 'o cliente novo é de outra tabela — confira os preços' : null,
@@ -1180,7 +1181,7 @@ export function PaginaDetalhePedido() {
             <div className="mt-2 flex items-center justify-between gap-2">
               <span className="flex min-w-0 items-baseline gap-2">
                 <p className="min-w-0 truncate text-lg font-bold text-foreground">
-                  {ehLoja ? (user?.name ?? 'Meu pedido') : (order.customer_name ?? nomeDoComprador(order, custName))}
+                  {ehLoja ? (user?.name ?? 'Meu pedido') : nomeDoComprador(order, custName)}
                 </p>
                 {/* Cliente errado no pedido: o rep troca antes de enviar para a
                     fábrica; o financeiro e o admin, até faturar. */}

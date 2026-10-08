@@ -326,6 +326,32 @@ export function PaginaPedidos() {
       .catch(() => {});
   }, [token, ehLoja]);
 
+  // A lista só relia os pedidos ao ABRIR a tela. O rep deixa o app aberto nela
+  // o dia inteiro e vai e volta do WhatsApp — e o que o escritório mudou (o
+  // cliente trocado pela Larissa, 08/10/2026) não chegava até ele sair e
+  // voltar. Agora relê quando o app volta para a frente e quando a internet
+  // volta, no máximo uma vez a cada 30 s.
+  useEffect(() => {
+    if (!token) return;
+    let ultima = Date.now();
+    const reler = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - ultima < 30_000) return;
+      ultima = Date.now();
+      api
+        .get<ApiResponse<Order[]>>('/orders', token)
+        .then((res) => db.orders.bulkPut(res.data))
+        .catch(() => {
+          /* offline: segue o cache */
+        });
+    };
+    document.addEventListener('visibilitychange', reler);
+    window.addEventListener('online', reler);
+    return () => {
+      document.removeEventListener('visibilitychange', reler);
+      window.removeEventListener('online', reler);
+    };
+  }, [token]);
+
   useEffect(() => {
     if (!token || !ehVendaInterna) return;
     api
