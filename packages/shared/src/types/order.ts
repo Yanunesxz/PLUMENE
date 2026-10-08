@@ -194,6 +194,8 @@ export interface OrderWithItems extends Order {
    * WhatsApp; ausente = cache offline ou API antiga (a tela usa a cópia local).
    */
   customer_whatsapp?: string | null;
+  /** O nome do cliente pelo cadastro, resolvido na leitura do pedido. */
+  customer_name?: string;
 }
 
 // ─── Pedido excluído (aba do admin) ──────────────────────────────────────────
