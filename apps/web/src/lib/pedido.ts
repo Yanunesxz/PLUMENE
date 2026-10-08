@@ -15,7 +15,9 @@ import {
  * passa por aqui para não precisar repetir essa decisão.
  */
 export function nomeDoComprador(order: Order, nomePorCliente: Map<string, string>): string {
-  if (order.customer_id) return nomePorCliente.get(order.customer_id) ?? 'Cliente';
+  // O nome que o servidor resolveu vem primeiro: a carteira em cache não tem o
+  // cliente que o financeiro pôs no pedido fora dela (troca de cliente, 08/10).
+  if (order.customer_id) return order.customer_name ?? nomePorCliente.get(order.customer_id) ?? 'Cliente';
   return order.guest_name?.trim() || 'Visitante';
 }
 

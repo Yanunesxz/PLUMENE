@@ -24,6 +24,13 @@ export interface Order {
   /** Nulo em pedido de vitrine: não há cliente cadastrado por trás. */
   customer_id: string | null;
   /**
+   * O nome do cliente pelo CADASTRO, resolvido pela API na lista e no detalhe
+   * (08/10/2026). A tela prefere este ao da carteira em cache: o financeiro
+   * pode trocar o cliente do pedido para um de fora da carteira do rep.
+   * Ausente no pedido feito offline que ainda não subiu.
+   */
+  customer_name?: string;
+  /**
    * Tabela que precificou ESTE pedido (migração 025). Nulo nos anteriores a ela
    * — aí quem lê deduz pelo cadastro do cliente, como era antes.
    */
@@ -194,8 +201,6 @@ export interface OrderWithItems extends Order {
    * WhatsApp; ausente = cache offline ou API antiga (a tela usa a cópia local).
    */
   customer_whatsapp?: string | null;
-  /** O nome do cliente pelo cadastro, resolvido na leitura do pedido. */
-  customer_name?: string;
 }
 
 // ─── Pedido excluído (aba do admin) ──────────────────────────────────────────
