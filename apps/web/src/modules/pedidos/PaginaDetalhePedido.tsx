@@ -46,6 +46,7 @@ import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
+import { TrocarClienteDoPedido } from '../../components/comercial/TrocarClienteDoPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import {
   precoDoTamanho,
@@ -54,8 +55,10 @@ import {
   minimoDaCondicao,
   podeCancelarPedido,
   podeInformarMotivo,
+  podeTrocarClienteDoPedido,
 } from '@csb/shared';
 import type {
+  ResultadoDaTrocaDeCliente,
   Order,
   OrderWithItems,
   ApiResponse,
@@ -170,6 +173,43 @@ export function PaginaDetalhePedido() {
     : 'forbidden';
   // Pedido já cancelado (inclusive o recusado antes da 053, sem porquê).
   const soOMotivo = !!order && podeInformarMotivo(order, user?.role);
+
+  // ─── Trocar o cliente do pedido (rep escolheu a loja errada, 08/10/2026) ──
+  const podeTrocarCliente =
+    !!order && !!order.customer_id && podeTrocarClienteDoPedido(order, user?.role, user?.id) === 'ok';
+  const [trocandoCliente, setTrocandoCliente] = useState(false);
+  const [salvandoTroca, setSalvandoTroca] = useState(false);
+  const [erroDaTroca, setErroDaTroca] = useState<string | null>(null);
+
+  const trocarCliente = async (customer_id: string) => {
+    if (!id || !token || salvandoTroca) return;
+    setSalvandoTroca(true);
+    setErroDaTroca(null);
+    try {
+      const res = await api.patch<ApiResponse<Order> & { meta?: ResultadoDaTrocaDeCliente }>(
+        `/orders/${id}/cliente`,
+        { customer_id },
+        token,
+      );
+      // Relê o pedido inteiro: o WhatsApp e o código do cliente vêm na leitura.
+      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      setOrder(r.data);
+      await db.orders.update(id, { customer_id }).catch(() => {});
+      setTrocandoCliente(false);
+      const avisos = [
+        res.meta?.tabela_diferente ? 'o cliente novo é de outra tabela — confira os preços' : null,
+        res.meta?.ja_no_control ? 'troque o cliente no Control também' : null,
+      ].filter(Boolean);
+      setToast({
+        message: avisos.length ? `Cliente trocado — ${avisos.join('; ')}.` : 'Cliente trocado.',
+        type: 'success',
+      });
+    } catch (err) {
+      setErroDaTroca(err instanceof Error ? err.message : 'Não foi possível trocar o cliente.');
+    } finally {
+      setSalvandoTroca(false);
+    }
+  };
 
   const cancelarComMotivo = async (motivo: { reason_id: string; note?: string }) => {
     if (!id || !token || salvandoCancelamento) return;
@@ -1138,9 +1178,25 @@ export function PaginaDetalhePedido() {
               </Badge>
             </div>
             <div className="mt-2 flex items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-lg font-bold text-foreground">
-                {ehLoja ? (user?.name ?? 'Meu pedido') : nomeDoComprador(order, custName)}
-              </p>
+              <span className="flex min-w-0 items-baseline gap-2">
+                <p className="min-w-0 truncate text-lg font-bold text-foreground">
+                  {ehLoja ? (user?.name ?? 'Meu pedido') : (order.customer_name ?? nomeDoComprador(order, custName))}
+                </p>
+                {/* Cliente errado no pedido: o rep troca antes de enviar para a
+                    fábrica; o financeiro e o admin, até faturar. */}
+                {podeTrocarCliente && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErroDaTroca(null);
+                      setTrocandoCliente(true);
+                    }}
+                    className="shrink-0 text-xs font-semibold text-muted-foreground underline hover:text-foreground"
+                  >
+                    trocar cliente
+                  </button>
+                )}
+              </span>
               {zapDoComprador && (
                 <a
                   href={linkDoWhatsApp(zapDoComprador)}
@@ -1936,6 +1992,20 @@ export function PaginaDetalhePedido() {
           onConfirmar={(m) => void cancelarComMotivo(m)}
           onFechar={() => setCancelandoPedido(false)}
           soOMotivo={soOMotivo}
+        />
+      )}
+
+      {trocandoCliente && order && (
+        <TrocarClienteDoPedido
+          numero={order.order_number}
+          clienteAtualId={order.customer_id}
+          clientes={customers ?? []}
+          tabelaDoPedido={order.price_table_id}
+          jaNoControl={order.status === 'sent_erp' || !!order.erp_order_id || !!order.erp_requested_at}
+          ocupado={salvandoTroca}
+          erro={erroDaTroca}
+          onConfirmar={(c) => void trocarCliente(c)}
+          onFechar={() => setTrocandoCliente(false)}
         />
       )}
 

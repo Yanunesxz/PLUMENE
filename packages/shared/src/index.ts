@@ -22,6 +22,7 @@ export * from './pedidos/numeroErp.js';
 export * from './pedidos/pedidoOriginal.js';
 export * from './pedidos/sincroniaErp.js';
 export * from './pedidos/cancelamento.js';
+export * from './pedidos/trocaDeCliente.js';
 export * from './cadastro/documento.js';
 export * from './cadastro/endereco.js';
 export * from './cadastro/codigoErp.js';

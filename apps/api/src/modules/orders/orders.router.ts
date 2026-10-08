@@ -7,6 +7,7 @@ import {
   criarMotivoHandler,
   editarMotivoHandler,
 } from './cancelamento.controller.js';
+import { trocarClienteHandler } from './trocaDeCliente.controller.js';
 import {
   listOrders,
   getOrder,
@@ -99,6 +100,14 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/orders/:id/cancelar',
     { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
     cancelarPedidoHandler,
+  );
+  // Trocar o CLIENTE do pedido (rep escolheu a loja errada). Quem pode é a
+  // regra `podeTrocarClienteDoPedido` (shared): o rep antes de enviar para a
+  // fábrica, financeiro e admin até faturar.
+  fastify.patch(
+    '/orders/:id/cliente',
+    { preHandler: [authenticate, requireRole(['rep', 'admin', 'financeiro'])] },
+    trocarClienteHandler,
   );
   // Os motivos: todo mundo que cancela lê; só o admin cria, renomeia e desativa.
   fastify.get(

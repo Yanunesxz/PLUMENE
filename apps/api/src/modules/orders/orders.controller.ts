@@ -98,7 +98,7 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
     order.customer_id
       ? supabase
           .from('customers')
-          .select('whatsapp')
+          .select('whatsapp, name')
           .eq('id', order.customer_id)
           .eq('company_id', company_id)
           .maybeSingle()
@@ -126,6 +126,10 @@ export async function getOrder(request: FastifyRequest, reply: FastifyReply): Pr
       // Só quando a leitura respondeu: sem ela o campo fica ausente e a tela
       // usa a cópia local, em vez de concluir "cliente sem WhatsApp".
       ...(cliente ? { customer_whatsapp: (cliente as { whatsapp: string | null }).whatsapp ?? null } : {}),
+      // O nome do cadastro, resolvido aqui: depois de o financeiro trocar o
+      // cliente do pedido (08/10/2026), o novo pode não estar na carteira em
+      // cache de quem olha — e a tela diria só "Cliente".
+      ...(cliente && (cliente as { name?: string }).name ? { customer_name: (cliente as { name: string }).name } : {}),
       canais,
     },
   });

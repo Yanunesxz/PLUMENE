@@ -167,6 +167,27 @@ export function avisarCancelamentoAoRep(
   );
 }
 
+/**
+ * O financeiro (ou o admin) trocou o CLIENTE do pedido — o rep tinha escolhido
+ * a loja errada (08/10/2026). O dono fica sabendo para quem o pedido foi.
+ */
+export function avisarClienteTrocadoAoRep(
+  company_id: string,
+  pedido: PedidoParaAviso,
+  nomeDoCliente: string,
+  quemTrocou: string,
+): void {
+  if (pedido.rep_id === quemTrocou) return;
+  engolir(
+    enviarParaUsuarios(company_id, [pedido.rep_id], {
+      title: `${nomeDoPedido(pedido)}: cliente trocado`,
+      body: `O pedido agora é de ${nomeDoCliente}.`,
+      url: rota(pedido),
+      tag: `pedido-${pedido.id}`,
+    }),
+  );
+}
+
 /** A nota saiu — a notícia que o representante mais espera. */
 export function avisarFaturadoAoRep(
   company_id: string,
