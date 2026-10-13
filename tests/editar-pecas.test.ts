@@ -591,6 +591,38 @@ describe('a venda interna mexe no próprio pedido até o carimbo', () => {
     await app.close();
   });
 
+  it('as cores das refs de 5 dígitos (Plumene) também ficam — pelo SKU das peças do pedido', async () => {
+    // PL02707 (09/10/2026): a tela tirava da caixa as linhas "22197 3P azul
+    // marinho" e o servidor, que só conhecia ref de 3–4 dígitos, não as
+    // guardava — a cor sumia do pedido. Agora o servidor lê as refs das peças.
+    vi.resetModules();
+    const NA_FABRICA = {
+      ...PEDIDO_NA_TRIAGEM,
+      status: 'sent_erp',
+      notes: '22197 3P azul marinho\n22240 1P Cor única\n2246 1P Variadas',
+    };
+    const { app, fake } = await subir({
+      orders: [
+        { data: NA_FABRICA, error: null },
+        { data: { ...NA_FABRICA, notes: 'gravado' }, error: null },
+      ],
+      order_items: { data: [{ product_id: 'p1' }, { product_id: 'p2' }, { product_id: 'p3' }], error: null },
+      products: { data: [{ sku: '22197' }, { sku: '22240' }, { sku: '2246' }], error: null },
+    });
+    const res = await app.inject({
+      method: 'PATCH',
+      url: '/orders/o1/observacao',
+      headers: { authorization: `Bearer ${TOKEN_INTERNA}` },
+      payload: { notes: 'PL02707' },
+    });
+    expect(res.statusCode).toBe(200);
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores;
+    expect(gravado).toMatchObject({
+      notes: 'PL02707\n\n22197 3P azul marinho\n22240 1P Cor única\n2246 1P Variadas',
+    });
+    await app.close();
+  });
+
   it('a observação também trava no carimbo', async () => {
     vi.resetModules();
     const { app } = await subir({

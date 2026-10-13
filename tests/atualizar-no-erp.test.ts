@@ -315,6 +315,19 @@ describe('divergenciaComOErp — as quatro portas', () => {
     expect(d.mudou).toBe(false);
   });
 
+  it('anotar o número do Control na observação não acende o aviso (SX17531, PL02707)', async () => {
+    // A Simone escreve o número do pedido na observação depois do lançamento:
+    // o Control já sabe o próprio número — não há o que atualizar lá.
+    const { divergenciaComOErp, assinaturaDoPedido } = await import('@csb/shared');
+    const antes = { items: [item(3)], notes: '0130 3M azul' };
+    const depois = { items: [item(3)], notes: 'SX17531\n\n0130 3M azul' };
+    expect(divergenciaComOErp(antes, depois).mudou).toBe(false);
+    expect(divergenciaComOErp(antes, { ...depois, notes: '0130 3M azul\npl 02707' }).mudou).toBe(false);
+    expect(assinaturaDoPedido(depois)).toBe(assinaturaDoPedido(antes));
+    // Mas texto de verdade junto do número continua contando.
+    expect(divergenciaComOErp(antes, { ...depois, notes: 'SX17531 entregar sexta\n\n0130 3M azul' }).observacaoMudou).toBe(true);
+  });
+
   it('troca de preço sozinha não pede atualização no Control', async () => {
     const { divergenciaComOErp } = await import('@csb/shared');
     const d = divergenciaComOErp({ items: [item(5)] }, { items: [{ ...item(5), unit_price: 9, total: 45 }] });

@@ -1,7 +1,13 @@
 import { describe, it, expect } from 'vitest';
 // O módulo mora no pacote compartilhado: a planilha (web) e a API de Parceiro
 // leem as mesmas linhas de cor das notas do pedido.
-import { observacaoDeCores, juntarObservacao, semLinhasDeCor, coresPorSku } from '../packages/shared/src/pedidos/observacaoCores.js';
+import {
+  observacaoDeCores,
+  juntarObservacao,
+  semLinhasDeCor,
+  apenasLinhasDeCor,
+  coresPorSku,
+} from '../packages/shared/src/pedidos/observacaoCores.js';
 
 /**
  * A cor escolhida não cabe no item do pedido: o ERP recebe tudo como sortido
@@ -91,6 +97,14 @@ describe('semLinhasDeCor — o rodapé da planilha fica só com o que o rep digi
     const notas = '0015 vai na segunda remessa';
     // "vai" não é quantidade+tamanho — a linha é recado, não cor.
     expect(semLinhasDeCor(notas, skus)).toBe('0015 vai na segunda remessa');
+  });
+
+  // PL02707 (09/10/2026): as refs da Plumene têm 5 dígitos. O modo genérico
+  // só aceitava 3–4, e salvar a observação apagava as cores delas.
+  it('modo genérico reconhece as refs de 5 dígitos da Plumene', () => {
+    const notas = 'PL02707\n\n22197 3P azul marinho\n2246 1P Variadas';
+    expect(apenasLinhasDeCor(notas, null)).toBe('22197 3P azul marinho\n2246 1P Variadas');
+    expect(semLinhasDeCor(notas, null)).toBe('PL02707');
   });
 
   it('só as cores, sem texto do rep, vira rodapé vazio', () => {

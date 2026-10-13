@@ -1,5 +1,6 @@
 import type { Order } from '../types/order.js';
 import { compararComOOriginal, type DiferencaDoPedido, type ItemDaFoto } from './pedidoOriginal.js';
+import { numeroErpValido } from './numeroErp.js';
 
 /**
  * O QUE O CONTROL CONHECE de um pedido já lançado (migração 046).
@@ -58,7 +59,20 @@ export interface DivergenciaComOErp {
   mudou: boolean;
 }
 
-const texto = (s: string | null | undefined): string => (s ?? '').trim();
+/**
+ * A observação como o Control precisa conhecê-la. Linha que é SÓ um número do
+ * Control ("SX17531", "PL02707") não conta: a venda interna anota o número do
+ * pedido na observação depois do lançamento, e isso acendia "O Control está
+ * com a versão antiga" sem nada a atualizar lá (Yan, 13/10/2026) — o Control
+ * já sabe o próprio número. Vale igual na divergência e na assinatura.
+ */
+const texto = (s: string | null | undefined): string =>
+  (s ?? '')
+    .split('\n')
+    .filter((linha) => !numeroErpValido(linha.trim()))
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 
 /**
  * O que mudou entre a foto do Control e o pedido de hoje.

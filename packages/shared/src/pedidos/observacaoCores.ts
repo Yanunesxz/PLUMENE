@@ -78,7 +78,7 @@ export function juntarObservacao(digitada: string | undefined, cores: string): s
  * `observacaoDeCores` escreve. Texto do rep que apenas MENCIONA uma
  * referência no meio da frase não casa com esse formato e fica.
  *
- * `skusDoPedido = null` aceita qualquer token com cara de referência (3–4
+ * `skusDoPedido = null` aceita qualquer token com cara de referência (3–5
  * dígitos): é para quem só tem o pedido SEM os itens em mãos, como o cartão
  * de decisão da triagem. Um pouco mais permissivo, mas a linha ainda precisa
  * do formato completo "ref qtd+tamanho texto" para ser tirada.
@@ -99,7 +99,8 @@ export function semLinhasDeCor(
 /** O critério único de "linha de cor" — o formato exato que `observacaoDeCores` escreve. */
 function ehLinhaDeCor(linha: string, skusDoPedido: ReadonlySet<string> | null): boolean {
   const [sku, qtdTam, ...resto] = linha.trim().split(/\s+/);
-  const ehRef = (s: string) => (skusDoPedido ? skusDoPedido.has(s) : /^\d{3,4}$/.test(s));
+  // 3 a 5 dígitos: as refs da Plumene têm 5 (22197) — ver setOrderNotes.
+  const ehRef = (s: string) => (skusDoPedido ? skusDoPedido.has(s) : /^\d{3,5}$/.test(s));
   // No modo genérico a linha precisa do texto da cor no fim — com o
   // conjunto de SKUs em mãos, o critério é o MESMO de sempre (planilha).
   const formatoOk = skusDoPedido ? true : resto.length > 0;
