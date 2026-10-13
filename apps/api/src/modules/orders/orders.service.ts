@@ -1447,6 +1447,16 @@ export async function cancelarSolicitacaoAoErp(
   return { ok: true, solicitado_em: o.erp_requested_at, ja_cancelado: false };
 }
 
+/** As referências (sku) das peças do pedido. Vazio se a leitura falhar. */
+async function skusDoPedido(order_id: string): Promise<Set<string>> {
+  const { data: itens, error } = await supabase.from('order_items').select('product_id').eq('order_id', order_id);
+  if (error || !itens || itens.length === 0) return new Set();
+  const ids = [...new Set((itens as { product_id: string }[]).map((i) => i.product_id))];
+  const { data: prods, error: e2 } = await supabase.from('products').select('sku').in('id', ids);
+  if (e2 || !prods) return new Set();
+  return new Set((prods as { sku: string | null }[]).map((p) => p.sku).filter((s): s is string => !!s));
+}
+
 export type NotesResult =
   | { ok: true; order: Order }
   | { ok: false; reason: 'not_found' | 'forbidden' | 'tarde_demais' | 'sem_foto_do_erp' };
@@ -1488,9 +1498,14 @@ export async function setOrderNotes(
   // — ver fotoDoErpSemTravar.
   await fotoDoErpSemTravar(o, company_id);
 
-  // Sem a lista de SKUs em mãos: o modo genérico reconhece a linha de cor pelo
-  // formato completo ("0015 3M azul"), que é o que `observacaoDeCores` grava.
-  const cores = apenasLinhasDeCor(o.notes, null);
+  // As linhas de cor reconhecidas pelas REFERÊNCIAS DO PEDIDO — o mesmo
+  // critério da tela, que tira essas linhas da caixa de texto antes de mandar.
+  // Até 09/10/2026 o servidor usava só o modo genérico (ref de 3–4 dígitos), e
+  // as refs de 5 dígitos da Plumene (22197, 22237…) eram tiradas pela tela e
+  // não guardadas aqui: a cor escolhida sumia do pedido (PL02707). Sem as
+  // peças em mãos, o modo genérico continua de reserva.
+  const skus = await skusDoPedido(id);
+  const cores = apenasLinhasDeCor(o.notes, skus.size > 0 ? skus : null);
   const notes = juntarObservacao(textoLivre, cores) ?? null;
 
   const { data, error } = await supabase
