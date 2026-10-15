@@ -1,4 +1,4 @@
-import type { AuthRole, UserRole } from '../constants/userRole.js';
+import type { AuthRole, UserRole, PAPEIS_GERENCIAVEIS } from '../constants/userRole.js';
 import type { PermissaoGerente } from '../constants/permissoes.js';
 
 export interface Company {
@@ -146,8 +146,13 @@ export interface UpdateRepRequest {
 // Papéis que o admin cria por aqui. Representante nasce em `/reps` (precisa de
 // CPF, tabela e código ERP) e loja nasce por convite — ter dois lugares
 // criando a mesma coisa é como um deles fica esquecido. O financeiro entrou
-// na migração 030: login da fábrica, criado como os outros.
-export type PapelGerenciavel = Extract<UserRole, 'admin' | 'manager' | 'financeiro' | 'relacionamento'>;
+// na migração 030: login da fábrica, criado como os outros. O VISUALIZADOR
+// entrou na 054 (Yan, 15/10/2026: "cria essa opção de login").
+//
+// A lista vive em PAPEIS_GERENCIAVEIS (constants/userRole.ts) e o tipo sai
+// dela: era um `Extract<UserRole, …>` escrito à mão ao lado de outras quatro
+// listas iguais, e acrescentar um papel exigia acertar as cinco.
+export type PapelGerenciavel = (typeof PAPEIS_GERENCIAVEIS)[number];
 
 /** Um login na tela do admin. Nunca carrega hash de senha. */
 export interface UsuarioListItem {

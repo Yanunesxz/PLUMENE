@@ -3,10 +3,12 @@ import { Input } from '../../components/interface/Input.js';
 import { Button } from '../../components/interface/Button.js';
 import { Spinner } from '../../components/interface/Spinner.js';
 import {
+  PAPEIS_GERENCIAVEIS,
   PERMISSAO_LABELS,
   TODAS_PERMISSOES,
   PERMISSOES_PADRAO_GERENTE,
   USER_ROLE_LABELS,
+  ehPapelGerenciavel,
   temPermissao,
 } from '@csb/shared';
 import type { UsuarioListItem, PapelGerenciavel, PermissaoGerente } from '@csb/shared';
@@ -32,21 +34,18 @@ interface Props {
 export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancelar }: Props) {
   // Papel que não se cria por aqui (rep, loja) fica travado: o formulário edita
   // nome, e-mail e senha desses logins, mas não os transforma em gerente.
-  const papelFixo =
-    editando !== null &&
-    editando.role !== 'admin' &&
-    editando.role !== 'manager' &&
-    editando.role !== 'financeiro' &&
-    editando.role !== 'relacionamento';
+  // A lista é `PAPEIS_GERENCIAVEIS` (shared): o mesmo conjunto estava escrito à
+  // mão em cinco lugares, e o papel novo da 054 só funcionaria se todos os
+  // cinco fossem acertados juntos.
+  const papelFixo = editando !== null && !ehPapelGerenciavel(editando.role);
 
   const [form, setForm] = useState<DadosDoFormulario>({
     name: editando?.name ?? '',
     email: editando?.email ?? '',
     password: '',
-    role:
-      editando?.role === 'admin' || editando?.role === 'financeiro' || editando?.role === 'relacionamento'
-        ? editando.role
-        : 'manager',
+    // Editando um login da fábrica, o papel começa no que ele JÁ é. O gerente
+    // é o padrão de quem nasce aqui, e de quem tem papel travado.
+    role: editando && ehPapelGerenciavel(editando.role) ? editando.role : 'manager',
     permissions: editando
       ? TODAS_PERMISSOES.filter((t) => temPermissao('manager', editando.permissions, t))
       : [...PERMISSOES_PADRAO_GERENTE],
@@ -95,14 +94,18 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
 
         {!papelFixo && (
           <Campo label="Papel" obrigatorio>
-            <div className="flex gap-2">
-              {(['manager', 'financeiro', 'relacionamento', 'admin'] as const).map((papel) => (
+            {/* Gerente | Financeiro | Relacionamento | Visualizador |
+                Administrador — na ordem de PAPEIS_GERENCIAVEIS. Quebra linha
+                em vez de dividir a largura: com cinco papéis, "Relacionamento"
+                e "Administrador" não cabem lado a lado num celular. */}
+            <div className="flex flex-wrap gap-2">
+              {PAPEIS_GERENCIAVEIS.map((papel) => (
                 <button
                   key={papel}
                   type="button"
                   onClick={() => setForm((f) => ({ ...f, role: papel }))}
                   className={cn(
-                    'flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
+                    'flex-1 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-medium transition-colors',
                     form.role === papel
                       ? 'border-foreground bg-primary-soft text-primary-soft-foreground'
                       : 'border-input text-muted-foreground hover:bg-muted',
@@ -112,6 +115,16 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
                 </button>
               ))}
             </div>
+            {/* O que cada papel novo significa, onde a dúvida nasce. O bloco de
+                teclas abaixo só existe para gerente, então o visualizador
+                precisa de UMA linha dizendo o que ele é. */}
+            {form.role === 'visualizador' && (
+              <p className="text-xs text-muted-foreground">
+                Vê tudo e não altera nada: pedidos de todos os representantes, clientes de todas as
+                carteiras, catálogo, painel e esta lista de logins. Nenhum botão de salvar, aprovar,
+                faturar, importar ou excluir aparece para ele.
+              </p>
+            )}
           </Campo>
         )}
 

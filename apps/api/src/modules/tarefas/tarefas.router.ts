@@ -17,7 +17,14 @@ import {
 export async function tarefasRouter(fastify: FastifyInstance): Promise<void> {
   // O papel relacionamento (Bruna, migração 038) existe PARA isto: marcar a
   // visita e acompanhar o OK. Entra na leitura e na criação, como o escritório.
-  const forcaDeVendas = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento'])] };
+  // O visualizador (054, 15/10/2026) entra só na LEITURA — este `forcaDeVendas`
+  // guarda uma rota GET e mais nada. Criar, dar OK e excluir seguem sem ele.
+  const forcaDeVendas = {
+    preHandler: [
+      authenticate,
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'visualizador']),
+    ],
+  };
   const escritorio = { preHandler: [authenticate, requireRole(['manager', 'admin', 'financeiro', 'relacionamento'])] };
 
   fastify.get('/tarefas', forcaDeVendas, listarTarefasHandler);

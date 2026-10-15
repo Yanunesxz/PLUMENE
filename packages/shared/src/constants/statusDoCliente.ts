@@ -89,7 +89,11 @@ export function valorDaVenda(pedido: {
  * Gerente e administrador tocam o fluxo por dentro e precisam distinguir "na
  * fila" de "liberado para o ERP". Representante e loja, não: para eles o que
  * importa é se a mercadoria vem.
+ *
+ * O VISUALIZADOR entra (15/10/2026): ele é escritório — "ve tudo tudo" —, e
+ * com os três degraus do cliente a lista dele mentiria sobre o que o
+ * financeiro está vendo na mesma tela.
  */
 export function usaStatusInterno(papel: string | undefined): boolean {
-  return papel === 'manager' || papel === 'admin';
+  return papel === 'manager' || papel === 'admin' || papel === 'visualizador';
 }

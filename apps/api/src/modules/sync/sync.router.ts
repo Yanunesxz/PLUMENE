@@ -33,9 +33,11 @@ export async function syncRouter(fastify: FastifyInstance): Promise<void> {
     erpStockSyncHandler,
   );
 
+  // Só lê o estado do ERP: o visualizador entra (054, 15/10/2026). Puxar
+  // (/full, /stock) e a fila offline (/sync) seguem fechados para ele.
   fastify.get(
     '/erp/status',
-    { preHandler: [authenticate, requireRole(['admin', 'manager'])] },
+    { preHandler: [authenticate, requireRole(['admin', 'manager', 'visualizador'])] },
     erpStatusHandler,
   );
 }

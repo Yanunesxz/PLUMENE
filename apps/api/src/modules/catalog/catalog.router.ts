@@ -8,9 +8,11 @@ export async function catalogRouter(fastify: FastifyInstance): Promise<void> {
   fastify.get('/products', { preHandler: authenticate }, listProducts);
   // Tabelas de preço para o seletor de consulta no catálogo. Só gerente/admin:
   // o representante não escolhe tabela, então nem precisa saber quais existem.
+  // O visualizador entra porque é LEITURA e o catálogo dele abre pelo seletor
+  // (15/10/2026: "ve cliente, produto ve tudo tudo mas nao altera nada").
   fastify.get(
     '/catalog/price-tables',
-    { preHandler: [authenticate, requireRole(['manager', 'admin'])] },
+    { preHandler: [authenticate, requireRole(['manager', 'admin', 'visualizador'])] },
     listCatalogPriceTables,
   );
   // Importação de catálogo da própria empresa (multi-fábrica) e upload de foto

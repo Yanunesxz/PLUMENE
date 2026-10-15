@@ -1,6 +1,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
 import { useAuthStore } from '../store/authStore.js';
 import { api } from '../services/api.js';
+import { ehSoLeitura } from '@csb/shared';
 import type { ApiResponse } from '@csb/shared';
 
 /**
@@ -84,17 +85,30 @@ export interface AvisosNoCelular {
 }
 
 export function useAvisosNoCelular(): AvisosNoCelular {
-  const { token } = useAuthStore();
-  const estado = useSyncExternalStore(assinar, lerEstado);
+  const { token, user } = useAuthStore();
+  const estadoDoAparelho = useSyncExternalStore(assinar, lerEstado);
   const [ocupado, setOcupado] = useState(false);
   const [aviso, setAviso] = useState<string | null>(null);
 
+  /**
+   * Papel de SÓ LEITURA não assina aviso nenhum (visualizador, 054,
+   * 15/10/2026): ele não trabalha fila, então não existe aviso de fluxo para
+   * ele receber — e assinar GRAVA em push_subscriptions, o que o papel não faz.
+   *
+   * O portão fica AQUI, e não no botão: o estado é global de módulo e quem o
+   * consome são três lugares (o cartão da Minha área, o sino do menu, a
+   * central de Alertas). `indisponivel` é o mesmo estado de um navegador sem
+   * suporte: nenhum deles oferece ativar.
+   */
+  const soLeitura = ehSoLeitura(user?.role);
+  const estado = soLeitura ? 'indisponivel' : estadoDoAparelho;
+
   useEffect(() => {
-    if (token) void descobrir(token);
-  }, [token]);
+    if (token && !soLeitura) void descobrir(token);
+  }, [token, soLeitura]);
 
   const ativar = async () => {
-    if (!token || !chaveGlobal || ocupado) return;
+    if (soLeitura || !token || !chaveGlobal || ocupado) return;
     setOcupado(true);
     setAviso(null);
     try {
@@ -126,7 +140,7 @@ export function useAvisosNoCelular(): AvisosNoCelular {
   };
 
   const desativar = async () => {
-    if (!token || ocupado) return;
+    if (soLeitura || !token || ocupado) return;
     setOcupado(true);
     setAviso(null);
     try {

@@ -48,6 +48,7 @@ import { CadastrosAlteradosParaOControl } from '../../components/comercial/Cadas
 import { useMinhaMeta } from '../../hooks/useMinhaMeta.js';
 import {
   podeConfirmarAlteracaoNoControl,
+  veAlteracoesPendentesDoCadastro,
   type AlteracoesPendentesResponse,
   type ClienteComAlteracaoPendente,
 } from '@csb/shared';
@@ -159,11 +160,18 @@ export function PaginaMinhaArea() {
 
   // ─── Cadastros alterados para atualizar no Control (051) ──────────────────
   // "Quando mudar lá tem que mudar no ERP do Fábio também" (Yan, 17/09/2026).
-  // Só para quem mexe no Control. Só online: é uma fila que muda a cada edição,
-  // e mostrar a de ontem faria alguém digitar no Control o que já foi feito.
-  // Falhando a leitura, o cartão só não aparece — a ficha de cada cliente
-  // continua mostrando o que falta.
-  const veCadastrosAlterados = podeConfirmarAlteracaoNoControl(user?.role);
+  // Só online: é uma fila que muda a cada edição, e mostrar a de ontem faria
+  // alguém digitar no Control o que já foi feito. Falhando a leitura, o cartão
+  // só não aparece — a ficha de cada cliente continua mostrando o que falta.
+  //
+  // O portão é `veAlteracoesPendentesDoCadastro` (15/10/2026) — a pergunta
+  // certa é "quem VÊ a fila", que é a mesma do `requireRole` da rota. Com
+  // `podeConfirmarAlteracaoNoControl` aqui, o helper de leitura não tinha
+  // chamador nenhum: a rota deixava o visualizador ler e tela nenhuma
+  // desenhava a fila. Dar BAIXA segue sendo de quem mexe no Control, e é isso
+  // que o cartão recebe em `podeConfirmar`.
+  const veCadastrosAlterados = veAlteracoesPendentesDoCadastro(user?.role);
+  const podeDarBaixaNoControl = podeConfirmarAlteracaoNoControl(user?.role);
   const [cadastrosAlterados, setCadastrosAlterados] = useState<ClienteComAlteracaoPendente[]>([]);
   useEffect(() => {
     if (!token || !veCadastrosAlterados || !isOnline) return;
@@ -445,7 +453,10 @@ export function PaginaMinhaArea() {
             </Link>
           )}
           {mostraAlterados && (
-            <CadastrosAlteradosParaOControl clientes={cadastrosAlterados} />
+            <CadastrosAlteradosParaOControl
+              clientes={cadastrosAlterados}
+              podeConfirmar={podeDarBaixaNoControl}
+            />
           )}
         </div>
       )}

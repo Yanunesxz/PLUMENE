@@ -26,6 +26,7 @@ import {
   type CanaisDoPedido,
 } from '../../lib/pedido.js';
 import { PedidosExcluidos } from './PedidosExcluidos.js';
+import { ehSoLeitura } from '@csb/shared';
 import type {
   Order,
   Customer,
@@ -146,9 +147,15 @@ export function PaginaPedidos() {
   const { token, hasRole, user } = useAuthStore();
   // O financeiro anda com a fábrica aqui: mesmos filtros, mesmo filtro por
   // representante (a API já limita a lista dele aos aprovados + os próprios).
-  const isManager = hasRole('manager', 'admin', 'financeiro');
+  // O visualizador (054) também: sem ele nesta lista, cairia nos filtros do
+  // REPRESENTANTE e perderia o "Filtrar por representante" — e ele enxerga
+  // pedido de todos ("pode ver tudo", Yan, 15/10/2026).
+  const isManager = hasRole('manager', 'admin', 'financeiro', 'visualizador');
   const ehFinanceiro = hasRole('financeiro');
   const ehLoja = hasRole('store');
+  // Papel que não altera nada: todo botão de ação desta tela some para ele —
+  // nada de botão que leva a 403.
+  const soLeitura = ehSoLeitura(user?.role);
   // A venda interna (Simone e Nicoli) fecha a própria venda: carimba o
   // faturado direto do cartão, sem abrir pedido por pedido. A API confere de
   // novo que o pedido é DELA; desfazer um toque errado fica no detalhe.
@@ -185,10 +192,12 @@ export function PaginaPedidos() {
       setFaturando(null);
     }
   };
-  const ehAdmin = hasRole('admin');
+  // A aba "Excluídos" (040) é auditoria — e auditar é o trabalho do
+  // visualizador (054), então ele vê a aba junto com o admin. É só leitura.
+  const veExcluidos = hasRole('admin', 'visualizador');
   const STATUS_FILTERS = useMemo(
-    () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep', ehAdmin),
-    [ehLoja, isManager, ehAdmin],
+    () => filtrosDeStatus(ehLoja ? 'store' : isManager ? 'fabrica' : 'rep', veExcluidos),
+    [ehLoja, isManager, veExcluidos],
   );
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
@@ -530,10 +539,15 @@ export function PaginaPedidos() {
               </Button>
             )
           )}
-          <Link to="/orders/new" className={cn(buttonVariants({ size: 'md' }))}>
-            <Plus className="h-4 w-4" strokeWidth={2.5} />
-            Novo pedido
-          </Link>
+          {/* Quem só olha não monta pedido (visualizador, 054): o link some em
+              vez de levar a uma tela que ele não pode usar. "Exportar" e
+              "Gerar planilha" ficam — exportar só LÊ e gera arquivo. */}
+          {!soLeitura && (
+            <Link to="/orders/new" className={cn(buttonVariants({ size: 'md' }))}>
+              <Plus className="h-4 w-4" strokeWidth={2.5} />
+              Novo pedido
+            </Link>
+          )}
         </div>
       </div>
 
@@ -654,7 +668,7 @@ export function PaginaPedidos() {
         </>
       )}
 
-      {status === 'excluidos' && ehAdmin && token ? (
+      {status === 'excluidos' && veExcluidos && token ? (
         <PedidosExcluidos token={token} />
       ) : isInitialLoading ? (
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

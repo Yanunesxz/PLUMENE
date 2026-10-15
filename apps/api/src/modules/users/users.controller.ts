@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CriarUsuarioRequest, AtualizarUsuarioRequest } from '@csb/shared';
+import { PAPEIS_GERENCIAVEIS, USER_ROLE_LABELS } from '@csb/shared';
 import {
   listUsuarios,
   criarUsuario,
@@ -35,7 +36,24 @@ const RESPOSTA: Record<MotivoUsuario, { status: number; code: string; error: str
   papel_invalido: {
     status: 400,
     code: 'VALIDATION_ERROR',
-    error: 'Papel ou permissão inválidos. Por aqui criam-se administradores, gerentes e financeiro.',
+    // A lista cresceu com as migrações (030 financeiro, 038 relacionamento,
+    // 054 visualizador) e a frase ficou atrás: agora ela sai de
+    // PAPEIS_GERENCIAVEIS, que é a mesma lista que o service confere.
+    error: `Papel ou permissão inválidos. Por aqui criam-se: ${PAPEIS_GERENCIAVEIS.map(
+      (p) => USER_ROLE_LABELS[p],
+    ).join(', ')}.`,
+  },
+  // O banco recusou o papel (CHECK de users.role): o código subiu e o SQL
+  // ainda não foi colado. Era um 500 "Não foi possível concluir a operação",
+  // sem pista nenhuma — e, pelo histórico do projeto, é o primeiro estado em
+  // que esta tela vai ser usada. 503 MIGRACAO_PENDENTE é o que o resto do
+  // sistema já responde nesse caso (cancelamento e exclusão de cliente), e a
+  // frase diz o que fazer.
+  migracao_pendente: {
+    status: 503,
+    code: 'MIGRACAO_PENDENTE',
+    error:
+      'O banco ainda não aceita o papel Visualizador. Cole _tools/SQL-PARA-RODAR-054.sql no SQL Editor dos dois bancos e tente de novo. Nada foi criado nem alterado.',
   },
   erro: { status: 500, code: 'ERRO', error: 'Não foi possível concluir a operação.' },
 };

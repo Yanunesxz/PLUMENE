@@ -43,6 +43,7 @@ import {
   mensagemDoErroDaConfirmacao,
 } from '../../lib/edicaoDoCadastro.js';
 import {
+  ehSoLeitura,
   formatarDocumento,
   formatarCep,
   apenasDigitos,
@@ -741,8 +742,10 @@ export function PaginaCliente() {
         {/* Bloqueado no Control não trava a venda (decisão 8 de 16/09/2026):
             o botão fica, o selo acima avisa. */}
         <div className="mt-4 flex flex-wrap gap-2">
-          {/* O relacionamento não vende — seleciona e encaminha. */}
-          {user?.role !== 'relacionamento' && (
+          {/* O relacionamento não vende — seleciona e encaminha. O
+              visualizador (054) também não: gate negativo, então ele precisa
+              sair por `ehSoLeitura` ou ganharia o botão de graça. */}
+          {user?.role !== 'relacionamento' && !ehSoLeitura(user?.role) && (
             <Button onClick={() => void navigate(`/orders/new?customer_id=${cliente.id}`)}>
               <ShoppingCart className="h-4 w-4" strokeWidth={2.5} />
               Novo pedido
@@ -932,11 +935,13 @@ export function PaginaCliente() {
             com quem vende.
             Com uma ativa só, o botão aparece para tirar o cliente de uma tabela
             desligada no Control (podeTrocarTabelaDoCliente). */}
-        {podeTrocarTabelaDoCliente(todasAsTabelas, cliente.price_table_id) && user?.role !== 'financeiro' && (
-          <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
-            Trocar
-          </Button>
-        )}
+        {podeTrocarTabelaDoCliente(todasAsTabelas, cliente.price_table_id) &&
+          user?.role !== 'financeiro' &&
+          !ehSoLeitura(user?.role) && (
+            <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
+              Trocar
+            </Button>
+          )}
       </div>
 
       {/* ─── Histórico ────────────────────────────────────────────────────── */}

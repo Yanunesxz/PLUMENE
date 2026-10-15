@@ -1,3 +1,4 @@
+import { ehSoLeitura } from './userRole.js';
 import type { AuthRole } from './userRole.js';
 
 /**
@@ -77,4 +78,30 @@ export function temPermissao(
   if (role !== 'manager') return true;
   if (permissions == null) return PERMISSOES_PADRAO_GERENTE.includes(tecla);
   return permissions.includes(tecla);
+}
+
+/**
+ * A tecla LIGA O BOTÃO para esta pessoa?
+ *
+ * É `temPermissao` com um portão antes: papel de SÓ LEITURA não age, e tecla
+ * nenhuma muda isso (visualizador, 054 — Yan, 15/10/2026: "ve tudo tudo mas
+ * nao altera nada").
+ *
+ * As duas perguntas são diferentes e as duas precisam existir:
+ *
+ *   • `temPermissao` responde "esta pessoa ENTRA?" — e deixa passar quem não é
+ *     gerente de propósito, para não derrubar a triagem do representante em
+ *     `PATCH /orders/:id/status`. É ela que guarda o `permissao=` das rotas, e
+ *     é por ela que o visualizador entra em /representantes para LER.
+ *   • esta responde "o BOTÃO aparece?". Sem ela, o visualizador veria "Excluir
+ *     pedido" e "Enviar pra fábrica" — botões que a API recusa com 403, que é
+ *     exatamente o que não pode existir na tela.
+ */
+export function teclaLigaOBotao(
+  role: AuthRole,
+  permissions: readonly string[] | null | undefined,
+  tecla: PermissaoGerente,
+): boolean {
+  if (ehSoLeitura(role)) return false;
+  return temPermissao(role, permissions, tecla);
 }

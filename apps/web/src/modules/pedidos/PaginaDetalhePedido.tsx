@@ -53,6 +53,7 @@ import {
   coresPorSku,
   semLinhasDeCor,
   minimoDaCondicao,
+  ehSoLeitura,
   podeCancelarPedido,
   podeInformarMotivo,
   podeTrocarClienteDoPedido,
@@ -108,6 +109,12 @@ export function PaginaDetalhePedido() {
   // A loja acompanha o próprio pedido: não fatura e não apaga (a rota nega os
   // dois), então os botões não aparecem em vez de responder 403 no toque.
   const ehLoja = user?.role === 'store';
+  // O visualizador (054): "ele pode ver tudo so nao pode alterar nada" (Yan,
+  // 15/10/2026). Vale também para os dois botões de WhatsApp desta tela, que
+  // não são rota nenhuma (são link wa.me, não dá 403) e MANDAM mensagem para
+  // fora em nome da fábrica — ação, como convidar loja, que ele não tem.
+  // "Copiar link do pedido" fica: copiar não manda nada a ninguém.
+  const soLeitura = ehSoLeitura(user?.role);
   // Quem mexe no Control de verdade: é quem confirma que já atualizou lá.
   const ehEscritorioDoErp = user?.role === 'financeiro' || user?.role === 'admin';
   // undefined = carregando, null = não encontrado
@@ -968,7 +975,11 @@ export function PaginaDetalhePedido() {
     : (order?.guest_whatsapp ?? null);
   // A cópia vai para o rep quando quem olha NÃO é ele — o escritório (ou a
   // venda interna num pedido de outro rep) avisando quem vendeu.
-  const enviaCopiaAoRep = !ehLoja && !!order?.rep_info && order.rep_id !== user?.id;
+  //
+  // `!soLeitura` porque para o visualizador a condição seria SEMPRE verdadeira
+  // (o id dele nunca é o `rep_id` de um pedido), e mandar a cópia é mandar
+  // mensagem — o que ele não faz (15/10/2026).
+  const enviaCopiaAoRep = !ehLoja && !soLeitura && !!order?.rep_info && order.rep_id !== user?.id;
 
   const clearCart = useCartStore((s) => s.clear);
   const addToCart = useCartStore((s) => s.add);
@@ -1282,7 +1293,7 @@ export function PaginaDetalhePedido() {
                 abertura), então o rep manda o link, ajusta o pedido no app e a
                 cliente vê a versão nova no MESMO link. O link só existe online
                 (a API assina o token); no cache offline o botão some. */}
-            {!ehLoja && order.public_link && (
+            {!ehLoja && !soLeitura && order.public_link && (
               <a
                 href={linkDoWhatsApp(
                   zapDoComprador,
@@ -1297,7 +1308,12 @@ export function PaginaDetalhePedido() {
                 Enviar pedido para o cliente
               </a>
             )}
-            {!ehLoja && order.public_link && situacaoDoWhatsapp(zapDoComprador) !== 'ok' && (
+            {/* O aviso de WhatsApp incompleto acompanha o botão: sem botão de
+                enviar, não há o que avisar. */}
+            {!ehLoja &&
+              !soLeitura &&
+              order.public_link &&
+              situacaoDoWhatsapp(zapDoComprador) !== 'ok' && (
               <p className="mt-1.5 text-xs text-muted-foreground">
                 {situacaoDoWhatsapp(zapDoComprador) === 'sem'
                   ? 'O cliente está sem WhatsApp no cadastro: o WhatsApp vai pedir para você escolher o contato.'

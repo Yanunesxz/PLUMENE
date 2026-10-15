@@ -107,6 +107,12 @@ export async function getCustomers(
     // os que o ERP atribuiu ao código dele (rep_erp_id). Sem a segunda metade o
     // rep enxergava só o punhado que digitou à mão — os 1.3 mil vindos do ERP
     // ficavam invisíveis porque chegam com rep_id nulo.
+    //
+    // O filtro é SÓ do representante, e isso é de propósito: o escritório —
+    // gerente, admin, financeiro, relacionamento e o VISUALIZADOR (054,
+    // 15/10/2026) — lê a empresa inteira, que é o que a regra do Yan pede
+    // ("ve cliente (…) ve tudo tudo"). Quem não pode chegar aqui é barrado
+    // pelo `requireRole` da rota, não por este `if`.
     if (role === 'rep') {
       query = erp_rep_id
         ? query.or(`rep_id.eq.${rep_id},rep_erp_id.eq.${erp_rep_id}`)

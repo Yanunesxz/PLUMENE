@@ -9,16 +9,28 @@ const NO_CARTAO = 10;
 /**
  * "CADASTROS ALTERADOS PARA ATUALIZAR NO CONTROL" — na Minha Área de quem mexe
  * no Control (financeiro; admin como válvula), ao lado de "Para incluir no
- * Control".
+ * Control", e no Painel de quem só acompanha a fila.
  *
  * "Quando mudar lá tem que mudar no ERP do Fábio também" (Yan, 17/09/2026). O
  * push avisa na hora; este cartão é o que sobra quando o aviso se perde — o
  * celular desligado, a notificação apagada sem ler. Cada linha abre a ficha,
  * onde está o "antes → depois" e o botão "Já atualizei no Control".
  *
+ * `podeConfirmar` é só a FRASE: quem dá baixa lê "Toque para ver o que mudou e
+ * dar baixa"; quem não dá — o visualizador (054) e o gerente — lê a versão sem
+ * promessa de botão, porque na ficha a baixa também não vai aparecer para ele
+ * (Yan, 15/10/2026: "ve tudo tudo mas nao altera nada"). O botão em si vive em
+ * `AlteracoesParaOControl`, na ficha do cliente.
+ *
  * Quem decide se aparece é a página: some com a fila vazia ou sem a 051.
  */
-export function CadastrosAlteradosParaOControl({ clientes }: { clientes: readonly ClienteComAlteracaoPendente[] }) {
+export function CadastrosAlteradosParaOControl({
+  clientes,
+  podeConfirmar,
+}: {
+  clientes: readonly ClienteComAlteracaoPendente[];
+  podeConfirmar: boolean;
+}) {
   const idDoTitulo = useId();
   const total = clientes.length;
   const dia = (iso: string) => new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
@@ -32,7 +44,8 @@ export function CadastrosAlteradosParaOControl({ clientes }: { clientes: readonl
         Cadastros alterados para atualizar no Control ({total})
       </h2>
       <p className="mt-0.5 text-xs text-primary-soft-foreground/80">
-        Mudaram no app depois de estarem no Control. Toque para ver o que mudou e dar baixa.
+        Mudaram no app depois de estarem no Control. Toque para ver o que mudou
+        {podeConfirmar ? ' e dar baixa.' : '.'}
       </p>
       <ul className="mt-2 divide-y divide-primary/15">
         {clientes.slice(0, NO_CARTAO).map((c) => (
