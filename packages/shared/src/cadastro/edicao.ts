@@ -260,9 +260,31 @@ export function podeConfirmarAlteracaoNoControl(role: AuthRole | null | undefine
   return role === 'admin' || role === 'financeiro';
 }
 
-/** Quem vê a fila "Cadastros alterados para atualizar no Control". */
+/**
+ * Quem vê a fila CONSOLIDADA "Cadastros alterados para atualizar no Control" —
+ * a da empresa inteira, o cartão do Painel e da Minha Área.
+ *
+ * Uma lista só, e não três: o `requireRole` de `GET /customers/alteracoes-
+ * pendentes`, o portão do cartão no Painel e o da Minha Área lêem daqui. Eram
+ * listas escritas à mão, e em 15/10/2026 a rota liberou o visualizador sem que
+ * nenhuma tela dele desenhasse a fila: a permissão existia e não tinha porta.
+ *
+ * É LEITURA, então o visualizador entra: ele "ve tudo tudo mas nao altera
+ * nada" (Yan, 15/10/2026) e a fila do Control está entre o que ele acompanha.
+ * Dar BAIXA ("Já atualizei no Control") continua sendo só de quem mexe no
+ * Control — `podeConfirmarAlteracaoNoControl`, que é o que a tela passa como
+ * `podeConfirmar` para o cartão.
+ */
+export const PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL: readonly AuthRole[] = [
+  'admin',
+  'financeiro',
+  'manager',
+  'visualizador',
+];
+
+/** Esta pessoa vê a fila consolidada do Control? */
 export function veAlteracoesPendentesDoCadastro(role: AuthRole | null | undefined): boolean {
-  return role === 'admin' || role === 'financeiro' || role === 'manager';
+  return role != null && PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL.includes(role);
 }
 
 // ─── Normalização ────────────────────────────────────────────────────────────

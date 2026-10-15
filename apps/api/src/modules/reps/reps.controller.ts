@@ -55,8 +55,11 @@ export async function minhasPriceTablesHandler(
 ): Promise<void> {
   const { company_id, sub, role } = request.user;
   const opcoes = { incluirInativas: querInativas(request) };
+  // O visualizador (054, 15/10/2026) recebe TODAS: ele não tem conjunto
+  // próprio, e pelo ramo do representante a lista sairia vazia — aí o seletor
+  // de tabela do catálogo dele simplesmente desapareceria da tela.
   const tables =
-    role === 'manager' || role === 'admin'
+    role === 'manager' || role === 'admin' || role === 'visualizador'
       ? await listPriceTables(company_id, opcoes)
       : await listRepPriceTables(company_id, sub, opcoes);
   await reply.send({ data: tables });

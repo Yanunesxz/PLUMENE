@@ -14,7 +14,7 @@ import { SeletorTamanho } from '../../components/comercial/SeletorTamanho.js';
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import type { ProductWithPrice, ApiResponse } from '@csb/shared';
-import { precoDoTamanho, rotuloDaTabela } from '@csb/shared';
+import { ehSoLeitura, precoDoTamanho, rotuloDaTabela } from '@csb/shared';
 
 const ALL = '__all__';
 
@@ -82,8 +82,15 @@ export const segmentoDoProduto = (p: Pick<ProductWithPrice, 'name'>): Segmento =
 export function PaginaCatalogo() {
   const { token, user } = useAuthStore();
   const navigate = useNavigate();
-  // Representante não vê o estoque atual da fábrica.
-  const canSeeStock = user?.role === 'manager' || user?.role === 'admin';
+  // Representante não vê o estoque atual da fábrica. O visualizador (054) vê:
+  // é escritório, e o servidor manda a quantidade para ele (`includeStock` em
+  // catalog.controller) — se a tela não mostrasse, o dado chegaria e morreria.
+  const canSeeStock =
+    user?.role === 'manager' || user?.role === 'admin' || user?.role === 'visualizador';
+  // Quem só olha não monta carrinho (Yan, 15/10/2026: "nao altera nada"). Sem
+  // isto ele escolheria tamanho, encheria o carrinho e tomaria 403 no envio —
+  // "botão que leva a 403", que é justamente o que não pode existir.
+  const soLeitura = ehSoLeitura(user?.role);
   const cartItems = useCartStore((s) => s.items);
   const addToCart = useCartStore((s) => s.add);
   const [search, setSearch] = useState('');
@@ -356,7 +363,11 @@ export function PaginaCatalogo() {
                 product={display}
                 showStock={canSeeStock}
                 inOrder={group.some((g) => cartItems.some((i) => i.product_id === g.id))}
-                onAdd={() => setPicker({ product: rep, group })}
+                // Sem `onAdd` o cartão não desenha o botão de adicionar — é
+                // assim que o catálogo fica de consulta para quem só olha.
+                // Espalhado em vez de `undefined` por causa do
+                // exactOptionalPropertyTypes do tsconfig.
+                {...(soLeitura ? {} : { onAdd: () => setPicker({ product: rep, group }) })}
                 swatches={swatches}
                 prioritaria={indice < 6}
               />
@@ -365,7 +376,10 @@ export function PaginaCatalogo() {
         </div>
       )}
 
-      {cartCount > 0 && (
+      {/* O carrinho é guardado no navegador: se um representante usou este
+          aparelho antes, a bolha ficaria aí e levaria o visualizador para a
+          tela de montar pedido. */}
+      {cartCount > 0 && !soLeitura && (
         <button
           type="button"
           onClick={() => void navigate('/orders/new')}

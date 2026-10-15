@@ -56,6 +56,10 @@ function MinhaArea() {
   }
   // O relacionamento não vende — a "área" dele são as Atividades.
   if (papel === 'relacionamento') return <Navigate to="/atividades" replace />;
+  // O visualizador (054) não tem "minha área": a tela é toda de ação — ativar
+  // avisos, gerar relatório, dar OK em tarefa, sincronizar a fila offline — e
+  // ele "nao altera nada" (Yan, 15/10/2026). O Painel é a leitura equivalente.
+  if (papel === 'visualizador') return <Navigate to="/dashboard" replace />;
   return <PaginaMinhaArea />;
 }
 
@@ -67,6 +71,10 @@ function MinhaArea() {
 function Inicio() {
   const papel = useAuthStore((s) => s.user?.role);
   if (papel === 'relacionamento') return <Navigate to="/atividades" replace />;
+  // O visualizador (054) abre no PAINEL: é a visão de cima — o que vendeu, o
+  // que está na mesa do financeiro, os top clientes. O catálogo, para quem não
+  // monta pedido, é o lugar errado para começar.
+  if (papel === 'visualizador') return <Navigate to="/dashboard" replace />;
   return <Navigate to={papel === 'financeiro' ? '/orders' : '/catalog'} replace />;
 }
 
@@ -100,7 +108,16 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           { path: 'minha-area', element: <MinhaArea /> },
           { path: 'catalog', element: <PaginaCatalogo /> },
           { path: 'orders', element: <PaginaPedidos /> },
-          { path: 'orders/new', element: <PaginaNovoPedido /> },
+          {
+            // A tela é 100% de escrita (escolher cliente, grade, desconto,
+            // condição, salvar/enviar), e até 15/10/2026 estava aberta a
+            // qualquer papel autenticado. A guarda é a mesma lista do
+            // `POST /orders`: quem monta pedido. O visualizador não entra —
+            // sem isto ele montaria o carrinho inteiro para tomar 403 no envio.
+            path: 'orders/new',
+            element: <PrivateRoute roles={['rep', 'manager', 'admin', 'financeiro', 'store']} />,
+            children: [{ index: true, element: <PaginaNovoPedido /> }],
+          },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },
           { path: 'customers', element: <PaginaClientes /> },
           { path: 'customers/:id', element: <PaginaCliente /> },
@@ -122,20 +139,28 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
           {
             // A mesa de quem marca tarefa: Fabian, Bruna e a gerência. O rep
             // não entra — as tarefas DELE chegam na Minha Área.
+            // O visualizador (054) entra só para LER o andamento; "Excluir"
+            // da tarefa não aparece para ele.
             path: 'atividades',
-            element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'relacionamento']} />,
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'relacionamento', 'visualizador']} />,
             children: [{ index: true, element: <AoCarregar><PaginaAtividades /></AoCarregar> }],
           },
           {
+            // O visualizador (054) entra: métricas, Top clientes e filas são
+            // leitura. A régua e os motivos de cancelamento já são `admin`, e
+            // o envio de aviso em massa some para ele.
             path: 'dashboard',
-            element: <PrivateRoute roles={['manager', 'admin']} />,
+            element: <PrivateRoute roles={['manager', 'admin', 'visualizador']} />,
             children: [{ index: true, element: <AoCarregar><PaginaPainel /></AoCarregar> }],
           },
           {
             // O financeiro entra para VER (a tecla não se aplica a ele e a API
-            // nega as escritas); a tela esconde os botões de mexer.
+            // nega as escritas); a tela esconde os botões de mexer. O
+            // visualizador (054) entra pelo mesmo caminho — e atenção: a
+            // `permissao` desta rota NÃO o segura (temPermissao devolve true
+            // para quem não é gerente), então quem esconde botão é a tela.
             path: 'representantes',
-            element: <PrivateRoute roles={['manager', 'admin', 'financeiro']} permissao="gerenciar_representantes" />,
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'visualizador']} permissao="gerenciar_representantes" />,
             children: [{ index: true, element: <AoCarregar><PaginaRepresentantes /></AoCarregar> }],
           },
           // Era `roles={['admin']}`: o admin continua entrando sempre (tecla não
@@ -146,16 +171,20 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             children: [{ index: true, element: <AoCarregar><PaginaImportar /></AoCarregar> }],
           },
           {
+            // O visualizador (054) entra para ver QUEM TEM ACESSO — "nao pode
+            // mudar logins e etc.." (Yan, 15/10/2026). A tela esconde "Novo
+            // login" e os três botões de cada cartão; a API nega o resto.
             path: 'logins',
-            element: <PrivateRoute roles={['admin']} />,
+            element: <PrivateRoute roles={['admin', 'visualizador']} />,
             children: [{ index: true, element: <AoCarregar><PaginaLogins /></AoCarregar> }],
           },
           {
             // O estado da integração com o Control e o botão de pedir uma
             // passada agora. O gerente olha; financeiro e admin pedem (a
             // API nega o PATCH ao gerente e a tela esconde o botão).
+            // O visualizador (054) olha como o gerente: `podePedir` já o nega.
             path: 'integracao',
-            element: <PrivateRoute roles={['manager', 'admin', 'financeiro']} />,
+            element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'visualizador']} />,
             children: [{ index: true, element: <AoCarregar><PaginaIntegracao /></AoCarregar> }],
           },
         ],

@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL } from '@csb/shared';
 import { authenticate, requireRole } from '../../middleware/auth.js';
 import {
   listCustomers,
@@ -30,15 +31,27 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
   // O relacionamento (Bruna, migração 038) LÊ qualquer carteira: o trabalho
   // dela é achar o cliente parado e encaminhar pro rep — sem ler, não há o que
   // encaminhar. Escrever cadastro continua fora do alcance dela.
-  const leitura = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento'])] };
+  // O VISUALIZADOR (054, 15/10/2026) entra em toda LEITURA desta tela e em
+  // nenhuma escrita: "ve cliente (…) ve tudo tudo mas nao altera nada".
+  const leitura = {
+    preHandler: [
+      authenticate,
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'visualizador']),
+    ],
+  };
   const escrita = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] };
 
   fastify.get('/customers', leitura, listCustomers);
   // A fila "Cadastros alterados para atualizar no Control" (051). Rota estática:
   // o Fastify a prefere a /customers/:id, e ela fica antes por clareza.
+  //
+  // Os papéis vêm de `PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL`, no shared — a MESMA
+  // lista que acende o cartão da fila no Painel e na Minha Área. Escrita à mão
+  // aqui, a rota liberou o visualizador (15/10/2026) sem que nenhuma tela dele
+  // mostrasse a fila: permissão sem porta.
   fastify.get(
     '/customers/alteracoes-pendentes',
-    { preHandler: [authenticate, requireRole(['financeiro', 'admin', 'manager'])] },
+    { preHandler: [authenticate, requireRole([...PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL])] },
     alteracoesPendentesHandler,
   );
   fastify.get('/customers/:id', leitura, getCustomerHandler);
@@ -92,6 +105,14 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
   // pedido, login, convite, vitrine ou tarefa sai juntado em outro cadastro, e
   // a cópia fica em deleted_customers (migração 050).
   const soAdmin = { preHandler: [authenticate, requireRole(['admin'])] };
-  fastify.get('/customers/:id/vinculos', soAdmin, vinculosDoClienteHandler);
+  // Os vínculos do cliente (pedido, login, convite, vitrine, tarefa) são
+  // LEITURA — o visualizador entra, como em qualquer outra ficha. EXCLUIR
+  // continua só com o admin, logo abaixo: é por isso que as duas rotas deixaram
+  // de dividir o mesmo `soAdmin`.
+  fastify.get(
+    '/customers/:id/vinculos',
+    { preHandler: [authenticate, requireRole(['admin', 'visualizador'])] },
+    vinculosDoClienteHandler,
+  );
   fastify.post('/customers/:id/excluir', soAdmin, excluirClienteHandler);
 }

@@ -92,8 +92,16 @@ export async function getCustomerHandler(request: FastifyRequest, reply: Fastify
   const cliente = await obterCliente(company_id, id, {
     rep_id,
     erp_rep_id: erp_rep_id ?? null,
+    // O visualizador (054, 15/10/2026) lê a ficha de QUALQUER carteira: sem
+    // isto a ficha responderia 404 "não encontrado na sua carteira" — ele não
+    // tem carteira. É leitura; os outros `irrestrito` deste arquivo são de
+    // escrita (trocar tabela, inatividade, perdido) e seguem sem ele.
     irrestrito:
-      role === 'manager' || role === 'admin' || role === 'financeiro' || role === 'relacionamento',
+      role === 'manager' ||
+      role === 'admin' ||
+      role === 'financeiro' ||
+      role === 'relacionamento' ||
+      role === 'visualizador',
   });
 
   if (!cliente) {
@@ -744,7 +752,12 @@ export async function editarCadastroDoClienteHandler(request: FastifyRequest, re
 
 /**
  * GET /customers/alteracoes-pendentes — a fila "Cadastros alterados para
- * atualizar no Control" da Minha área (financeiro, admin e gerente).
+ * atualizar no Control", da empresa inteira.
+ *
+ * Quem lê são os papéis de `PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL` (shared):
+ * financeiro, admin, gerente e — desde 15/10/2026 — o visualizador, que
+ * acompanha a fila no Painel sem o botão de dar baixa. A lista fica no shared
+ * para a rota, o cartão do Painel e o da Minha Área não discordarem.
  * Sem a 051: lista vazia com `migracao_pendente: true`.
  */
 export async function alteracoesPendentesHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

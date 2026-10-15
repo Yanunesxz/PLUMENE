@@ -46,7 +46,12 @@ export async function listProducts(request: FastifyRequest, reply: FastifyReply)
   // régua de comprador (onlyPriced) devolvia catálogo VAZIO — e sem catálogo no
   // aparelho o pedido mostrava "Produto" genérico e a planilha saía com "fora
   // do catálogo baixado" em todo item.
-  const canChooseTable = role === 'manager' || role === 'admin' || role === 'financeiro';
+  // O visualizador (054, 15/10/2026) entra na mesma régua, e pelo MESMO motivo
+  // do financeiro: ele não tem tabela própria no token, então a régua de
+  // comprador (onlyPriced) devolveria catálogo VAZIO — "ve (…) produto ve tudo
+  // tudo". Só leitura: o estoque e a consulta por tabela não gravam nada.
+  const canChooseTable =
+    role === 'manager' || role === 'admin' || role === 'financeiro' || role === 'visualizador';
   if (price_table_id && !canChooseTable) {
     const permitida = role === 'rep' && (await repPodeUsarTabela(company_id, sub, price_table_id));
     if (!permitida) {

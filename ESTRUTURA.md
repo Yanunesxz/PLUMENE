@@ -11,7 +11,11 @@ SetorxWeb/
 ├── packages/
 │   └── shared/   → Tipos e regras usados por web E api
 ├── _tools/       → Scripts utilitários (rodam local, acesso ao ERP)
-├── tests/        → Testes automatizados (vitest) — cobrem web, api e shared
+├── tests/        → Testes automatizados (vitest) — cobrem web, api e shared.
+│                  inventarioDeRotas.ts não é teste: é o LEITOR dos routers (toda rota e os
+│                  papéis de cada uma). visualizador-inventario confere o texto e
+│                  visualizador-rotas bate em cada escrita com token de visualizador exigindo
+│                  403 — texto erra, 403 não
 └── (raiz)        → Configuração do monorepo e deploy
 ```
 
@@ -49,7 +53,15 @@ packages/shared/src/
 │   ├── product.ts        → Product, ProductVariant (tamanho), ProductWithPrice, CatalogProduct
 │   └── order.ts          → Order, OrderItem, OrderWithItems, CreateOrderRequest, tipos de sync
 ├── constants/            → uniões + rótulos PT
-│   ├── userRole.ts       → 'admin' | 'manager' | 'rep' + labels
+│   ├── userRole.ts       → 'admin' | 'manager' | 'rep' | 'store' | 'financeiro' | 'relacionamento' |
+│   │                       'visualizador' + labels. As listas que a regra usa: PAPEIS_DA_FABRICA (quem
+│   │                       MEXE em pedido de qualquer rep), PAPEIS_QUE_LEEM_O_ESCRITORIO (os mesmos +
+│   │                       visualizador, que só LÊ), SO_LEITURA/ehSoLeitura (054: vê tudo, não altera
+│   │                       nada) e PAPEIS_GERENCIAVEIS/ehPapelGerenciavel (os papéis que o admin cria
+│   │                       na tela de Logins — uma lista só, antes estava escrita à mão em cinco lugares)
+│   ├── permissoes.ts     → teclas do gerente. temPermissao = quem ENTRA (deixa passar quem não é
+│   │                       gerente, de propósito: é o que mantém a triagem do rep);
+│   │                       teclaLigaOBotao = o botão APARECE (nega papel de só leitura)
 │   └── orderStatus.ts    → status do pedido + labels + fluxo permitido
 ├── pedidos/              → regras do pedido que a API e a tela precisam contar IGUAL
 │   ├── numeroErp.ts      → o número do Control ("CS17379"; série da marca, CS/PL): normaliza,
@@ -67,9 +79,15 @@ packages/shared/src/
 │   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
 │                           (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
 ├── cadastro/
-│   └── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
-│                           GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
-│                           tests/codigo-miolo.test.ts confere a paridade
+│   ├── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
+│   │                       GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
+│   │                       tests/codigo-miolo.test.ts confere a paridade
+│   └── edicao.ts         → o cadastro do cliente (051): quem edita, quem troca CPF/CNPJ, o
+│                           histórico "antes → depois" e a normalização dos campos.
+│                           PAPEIS_QUE_VEEM_A_FILA_DO_CONTROL / veAlteracoesPendentesDoCadastro =
+│                           quem VÊ a fila "Cadastros alterados para atualizar no Control" (a
+│                           mesma lista no requireRole da rota, no cartão do Painel e no da Minha
+│                           Área); podeConfirmarAlteracaoNoControl = quem DÁ BAIXA nela
 └── pricing/
     ├── faixaDeTamanho.ts → EG/XG/48-54 custam mais: qual tamanho é "faixa maior"
     │                       e qual preço cobrar. Usado pela API (grava o pedido)
@@ -185,9 +203,18 @@ apps/api/src/
 │                                   parcial das pendentes; RLS). Pendente = erp_pendente AND erp_atualizado_em IS NULL.
 │                                   Sem ela a edição NÃO acontece (503 MIGRACAO_PENDENTE) e a API de Parceiro segue como
 │                                   antes. Idempotente; SQL para os dois bancos em _tools/SQL-PARA-RODAR-051.sql (termina
-│                                   com o NOTIFY). É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
+│                                   com o NOTIFY)
 │       ├── 052_cliente_inativo.sql → customers.inativo/inativo_motivo/inativo_nota/inativo_marcado_por/inativo_marcado_em/inativo_origem (a aba "Inativos": não compra mais, sai da régua; motivo de lista fechada com as chaves do CRM; controle interno, não vai ao Control)
-│       └── 053_pedido_cancelado.sql → order_cancel_reasons (motivos que o admin mantém, nascem os 4 do Yan) + orders.cancel_reason_id/cancel_reason_label/cancel_note/cancelled_at/cancelled_by (cancelar pedido com motivo; status vai a rejected, aba "Cancelados")
+│       ├── 053_pedido_cancelado.sql → order_cancel_reasons (motivos que o admin mantém, nascem os 4 do Yan) + orders.cancel_reason_id/cancel_reason_label/cancel_note/cancelled_at/cancelled_by (cancelar pedido com motivo; status vai a rejected, aba "Cancelados")
+│       └── 054_perfil_visualizador.sql → recria o CHECK de users.role com 'visualizador' (o login que vê tudo e não
+│                                   altera nada, pedido do Yan em 15/10/2026). Mesmo padrão da 038 (DO $$ que acha o
+│                                   CHECK por pg_get_constraintdef e recria chk_users_role); idempotente, termina com
+│                                   NOTIFY pgrst. Sem ela o admin escolhe "Visualizador" na tela de Logins e o banco
+│                                   recusa o INSERT — o login não nasce. SQL para os dois bancos em
+│                                   _tools/SQL-PARA-RODAR-054.sql; conferência em _tools/conferir-054.mjs (CHECK não se
+│                                   lê por GET: o script prova indireto, achando um login já gravado com o papel, e
+│                                   imprime o SELECT do SQL Editor quando ainda não existe nenhum).
+│                                   É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
 │   └── auth.ts           → authenticate (valida JWT) + requireRole(['manager','admin'])
@@ -282,7 +309,10 @@ apps/api/src/
 │   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
 │   │                       valor_minimo (detectar), que a tela usa só para AVISAR
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
-│   │                       teclas do gerente (só admin entra)
+│   │                       teclas do gerente (só admin entra; o visualizador LÊ a lista).
+│   │                       Papel que o banco recusa (CHECK chk_users_role, 23514) não é 500:
+│   │                       vira 503 MIGRACAO_PENDENTE dizendo qual SQL falta — é o estado
+│   │                       normal enquanto o código já subiu e a 054 não foi colada
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin). As listas
 │   │                       /price-tables e /price-tables/minhas trazem só as ATIVAS no Control;
 │   │                       ?incluir_inativas=1 traz também as desligadas (com active=false), para a
@@ -437,7 +467,9 @@ apps/web/
     │   ├── interface/     → design system (botões/inputs): Button, Input, Select, SearchSelect,
     │   │                    Badge, Card, Toast, Spinner, Skeleton, Textarea, EmptyState,
     │   │                    BotaoTema (claro/escuro/automático)
-    │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel)
+    │   ├── layout/        → AppLayout (casca), SideNav, BottomNav, navItems (menu por papel — o
+    │   │                     fim de navItemsForRole é `return repItems`, então papel SEM ramo
+    │   │                     próprio herda o menu do representante; todo papel novo precisa do seu)
     │   └── comercial/     → CartaoProduto, SeletorTamanho, CartaoDecisao (aprovar/recusar),
     │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela
     │                        (nunca oferece tabela inativa), AvisoDeValorMinimo (o pedido mínimo
@@ -509,6 +541,10 @@ _tools/
 │   │                Também grava no catálogo: mesmas travas do sync.py
 │   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-054.sql         → a 054 (papel 'visualizador' no CHECK de users.role) para colar nos DOIS bancos
+│                                    (idempotente; só troca o CHECK, não mexe em linha nenhuma; termina com o NOTIFY).
+│                                    Conferir depois com node _tools/conferir-054.mjs (sem argumento mede os dois) — e
+│                                    o CHECK em si só se lê no SQL Editor, com o SELECT que o script imprime
 ├── SQL-PARA-RODAR-051.sql         → a 051 (customer_changes) para colar nos DOIS bancos (idempotente; termina com o
 │                                    NOTIFY). Conferir depois com node _tools/conferir-051.mjs (sem argumento mede os dois)
 ├── SQL-PARA-RODAR-050.sql         → a 050 para colar nos DOIS bancos, DEPOIS da 049 (termina com o NOTIFY).

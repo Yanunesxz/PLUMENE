@@ -30,6 +30,7 @@ import { linkDoWhatsApp } from '../../lib/pedido.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import {
   documento,
+  ehSoLeitura,
   formatarDocumento,
   cepValido,
   formatarCep,
@@ -403,8 +404,11 @@ export function PaginaClientes() {
       <div className="mb-4 flex items-center justify-between gap-3">
         <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Clientes</h1>
         {/* O financeiro só VISUALIZA cadastro — a API nega a escrita dele. O
-            relacionamento (Bruna) também não cadastra: seleciona e encaminha. */}
-        {user?.role !== 'financeiro' && user?.role !== 'relacionamento' && (
+            relacionamento (Bruna) também não cadastra: seleciona e encaminha.
+            E quem só olha (visualizador, 054) nunca cadastra.
+            `ehSoLeitura` em vez de mais um `!==`: esta lista é NEGATIVA, então
+            todo papel novo nasce com o botão até alguém se lembrar de tirá-lo. */}
+        {user?.role !== 'financeiro' && user?.role !== 'relacionamento' && !ehSoLeitura(user?.role) && (
           <Button size="md" onClick={() => setShowForm((s) => !s)}>
             {showForm ? <X className="h-4 w-4" strokeWidth={2.5} /> : <UserPlus className="h-4 w-4" strokeWidth={2.5} />}
             {showForm ? 'Cancelar' : 'Novo cliente'}
@@ -721,7 +725,9 @@ export function PaginaClientes() {
               {/* Atalho para vender direto, sem passar pela ficha. A tabela e o
                   botão de trocar vivem na ficha: aqui já são três alvos de
                   toque, e um quarto no celular vira erro de dedo. */}
-              {user?.role !== 'relacionamento' && (
+              {/* Gate negativo, de novo: o visualizador (054) sai por
+                  `ehSoLeitura` — ele não vende. */}
+              {user?.role !== 'relacionamento' && !ehSoLeitura(user?.role) && (
                 <button
                   type="button"
                   onClick={() => void navigate(`/orders/new?customer_id=${customer.id}`)}

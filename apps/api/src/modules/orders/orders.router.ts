@@ -33,7 +33,29 @@ import {
 export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // A loja consulta os pedidos DELA; o visitante da vitrine não consulta nada —
   // ele só monta e envia, e não tem onde acompanhar (não há conta).
-  const daFabricaOuLoja = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'store', 'financeiro'])] };
+  //
+  // Esta lista guarda SÓ rotas GET (pedidos, detalhe, canais e condições de
+  // pagamento), e é por isso que o visualizador cabe nela: "ele pode ver tudo
+  // so nao pode alterar nada" (Yan, 15/10/2026). Se algum dia uma escrita for
+  // pendurada aqui, tests/visualizador-inventario.test.ts quebra.
+  const daFabricaOuLoja = {
+    preHandler: [
+      authenticate,
+      requireRole(['rep', 'manager', 'admin', 'store', 'financeiro', 'visualizador']),
+    ],
+  };
+  // Quem MONTA pedido. Até 15/10/2026 esta rota tinha só `authenticate` —
+  // qualquer papel autenticado criava pedido em nome de si mesmo, e o
+  // visualizador criaria também. A lista é a de hoje, explícita: a venda (rep,
+  // gerente, admin, financeiro), a loja e o visitante da vitrine (`guest`, que
+  // fecha o pedido pelo link). Relacionamento e visualizador ficam fora — nem
+  // um nem outro tem tela que leve até aqui.
+  const montaPedido = {
+    preHandler: [
+      authenticate,
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest']),
+    ],
+  };
   // Mexer no ciclo do pedido é de quem vende. Quem compra não muda status nem
   // apaga: sem isto, uma loja poderia aprovar o próprio pedido.
   //
@@ -76,22 +98,24 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // O último número do Control lançado — para a Larissa seguir a ordem de lá.
   fastify.get(
     '/orders/ultimo-numero-erp',
-    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin', 'visualizador'])] },
     ultimoNumeroErpHandler,
   );
   // A aba "Excluídos" (migração 040): a cópia de cada pedido apagado, com as
   // peças e quem apagou. Só o admin — é auditoria, não operação. Fica antes
   // do /orders/:id por clareza; o roteador já prefere a rota fixa.
+  // O visualizador entra: auditoria é justamente o que ele faz, e a regra do
+  // Yan (15/10/2026) cita os excluídos entre o que ele lê.
   fastify.get(
     '/orders/excluidos',
-    { preHandler: [authenticate, requireRole(['admin'])] },
+    { preHandler: [authenticate, requireRole(['admin', 'visualizador'])] },
     listDeletedOrdersHandler,
   );
   // Os canais que mudam a tela de pedidos (048) — a lista esconde o "Marcar
   // faturado" do cartão quando o faturamento vem do Control. Sem dado de pedido.
   fastify.get('/orders/canais', daFabricaOuLoja, canaisDosPedidosHandler);
   fastify.get('/orders/:id', daFabricaOuLoja, getOrder);
-  fastify.post('/orders', { preHandler: authenticate }, createOrderHandler);
+  fastify.post('/orders', montaPedido, createOrderHandler);
   fastify.delete('/orders/:id', decideOPedido, deleteOrderHandler);
   fastify.patch('/orders/:id/status', decideOPedido, updateStatusHandler);
   // Cancelar com motivo (053). Quem pode é a regra `podeCancelarPedido`
@@ -110,9 +134,16 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     trocarClienteHandler,
   );
   // Os motivos: todo mundo que cancela lê; só o admin cria, renomeia e desativa.
+  // O visualizador lê a lista porque é ela que dá o nome do motivo no pedido
+  // cancelado que ele abre (`?todos=1`, com os inativos, segue só do admin).
   fastify.get(
     '/orders/motivos-de-cancelamento',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
+    {
+      preHandler: [
+        authenticate,
+        requireRole(['rep', 'manager', 'admin', 'financeiro', 'visualizador']),
+      ],
+    },
     listarMotivosHandler,
   );
   fastify.post('/orders/motivos-de-cancelamento', { preHandler: [authenticate, requireRole(['admin'])] }, criarMotivoHandler);

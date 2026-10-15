@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { ehSoLeitura } from '@csb/shared';
 import { useOnlineStatus } from './useOnlineStatus.js';
 import { flushSyncQueue } from '../offline/sync.js';
 import { useAuthStore } from '../store/authStore.js';
@@ -11,10 +12,20 @@ interface SyncCallbacks {
 export function useSyncOnReconnect({ onSynced, onFailed }: SyncCallbacks = {}) {
   const isOnline = useOnlineStatus();
   const wasOffline = useRef(!isOnline);
-  const { token } = useAuthStore();
+  const { token, user } = useAuthStore();
+  /**
+   * Papel de só leitura não descarrega fila (visualizador, 054, 15/10/2026).
+   *
+   * Ele nunca monta pedido, então a fila dele é sempre vazia — MENOS num
+   * aparelho que um representante usou antes: a fila fica no navegador, e ao
+   * reconectar este hook a mandaria como POST /sync em nome de quem está
+   * logado agora. A rota recusa o papel; não chamar é o certo de qualquer
+   * forma, porque o pedido não é dele.
+   */
+  const soLeitura = ehSoLeitura(user?.role);
 
   useEffect(() => {
-    if (isOnline && wasOffline.current && token) {
+    if (isOnline && wasOffline.current && token && !soLeitura) {
       wasOffline.current = false;
       flushSyncQueue(token)
         .then(({ synced, failed }) => {
@@ -27,5 +38,5 @@ export function useSyncOnReconnect({ onSynced, onFailed }: SyncCallbacks = {}) {
     if (!isOnline) {
       wasOffline.current = true;
     }
-  }, [isOnline, token, onSynced, onFailed]);
+  }, [isOnline, token, soLeitura, onSynced, onFailed]);
 }

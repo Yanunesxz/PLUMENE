@@ -15,8 +15,20 @@ import { MotivosDeCancelamento } from './MotivosDeCancelamento.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { formatBRL } from '../../lib/utils.js';
-import type { Order, CustomerListItem, ApiResponse } from '@csb/shared';
-import { valorDaVenda } from '@csb/shared';
+import { CadastrosAlteradosParaOControl } from '../../components/comercial/CadastrosAlteradosParaOControl.js';
+import type {
+  Order,
+  CustomerListItem,
+  ApiResponse,
+  AlteracoesPendentesResponse,
+  ClienteComAlteracaoPendente,
+} from '@csb/shared';
+import {
+  ehSoLeitura,
+  podeConfirmarAlteracaoNoControl,
+  valorDaVenda,
+  veAlteracoesPendentesDoCadastro,
+} from '@csb/shared';
 
 export function PaginaPainel() {
   const { token, user } = useAuthStore();
@@ -44,6 +56,33 @@ export function PaginaPainel() {
     for (const c of customers ?? []) m.set(c.id, c.name);
     return m;
   }, [customers]);
+
+  // ─── A fila do Control no Painel (051) ─────────────────────────────────────
+  // "Cadastros alterados para atualizar no Control": a fila da EMPRESA, não a
+  // de um cliente só. Estava apenas na Minha Área, atrás de quem dá baixa — e
+  // o visualizador (054), que a rota já deixava ler, não tinha onde vê-la: a
+  // Minha Área dele cai no Painel. Aqui é a porta dessa leitura (Yan,
+  // 15/10/2026: "ve cliente, produto ve tudo tudo mas nao altera nada").
+  //
+  // Dar baixa continua na ficha do cliente, com quem mexe no Control; este
+  // cartão só lista e leva até lá. Falhando a leitura (sem a 051, ou offline),
+  // o cartão simplesmente não aparece.
+  const veFilaDoControl = veAlteracoesPendentesDoCadastro(user?.role);
+  const podeDarBaixaNoControl = podeConfirmarAlteracaoNoControl(user?.role);
+  const [filaDoControl, setFilaDoControl] = useState<ClienteComAlteracaoPendente[]>([]);
+  useEffect(() => {
+    if (!token || !veFilaDoControl) return;
+    let valendo = true;
+    api
+      .get<AlteracoesPendentesResponse>('/customers/alteracoes-pendentes', token)
+      .then((r) => {
+        if (valendo) setFilaDoControl(r.migracao_pendente ? [] : r.data);
+      })
+      .catch(() => {});
+    return () => {
+      valendo = false;
+    };
+  }, [token, veFilaDoControl]);
 
   const metrics = useMemo(() => {
     const orders = allOrders ?? [];
@@ -106,7 +145,18 @@ export function PaginaPainel() {
         <MetricCard icon={Wallet} tint="brand" value={formatBRL(metrics.ticket)} label="Ticket médio" />
       </div>
 
-      <EnviarAviso />
+      {/* Mandar aviso para o celular de todo mundo é ESCRITA (POST
+          /push/enviar) e estava sem guarda de papel nenhuma — o visualizador
+          (054) ganharia o envio em massa junto com o Painel. */}
+      {!ehSoLeitura(user?.role) && <EnviarAviso />}
+
+      {/* A fila do Control (051): some com a fila vazia. */}
+      {veFilaDoControl && filaDoControl.length > 0 && (
+        <CadastrosAlteradosParaOControl
+          clientes={filaDoControl}
+          podeConfirmar={podeDarBaixaNoControl}
+        />
+      )}
 
       {/* A régua das cores é do dono da fábrica, não do gerente. */}
       {user?.role === 'admin' && <ReguaDaCarteira />}

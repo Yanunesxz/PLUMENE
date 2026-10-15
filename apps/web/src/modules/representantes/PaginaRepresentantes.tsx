@@ -12,7 +12,7 @@ import { Toast } from '../../components/interface/Toast.js';
 import { PainelDaMeta } from '../../components/comercial/PainelDaMeta.js';
 import { cn } from '@/lib/utils';
 import { mesmoCodigoErp } from '../../lib/codigoErp.js';
-import { rotuloDaTabela, tabelaEstaAtiva } from '@csb/shared';
+import { ehSoLeitura, rotuloDaTabela, tabelaEstaAtiva } from '@csb/shared';
 import type {
   RepListItem,
   PriceTable,
@@ -46,8 +46,11 @@ export function PaginaRepresentantes() {
   // parâmetro nada muda — o campo continua começando vazio.
   const buscaDaUrl = params.get('busca')?.trim() ?? '';
   // O financeiro entra para VER — a API nega as escritas dele, e a tela não
-  // mostra botão que só responderia "acesso negado" no toque.
-  const somenteLeitura = user?.role === 'financeiro';
+  // mostra botão que só responderia "acesso negado" no toque. O visualizador
+  // (054) idem, e aqui é obrigatório: a `permissao` da rota NÃO o segura
+  // (`temPermissao` devolve true para quem não é gerente), então sem este
+  // ramo os quatro botões — novo, meta, editar, excluir — apareceriam.
+  const somenteLeitura = user?.role === 'financeiro' || ehSoLeitura(user?.role);
   const [reps, setReps] = useState<RepListItem[] | null>(null);
   /** Todas as tabelas da empresa, com as desligadas no Control (`active: false`). */
   const [tables, setTables] = useState<PriceTable[]>([]);

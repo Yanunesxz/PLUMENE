@@ -10,6 +10,12 @@ interface Props {
   /** O login de quem está mexendo — não ganha botão de bloquear nem de excluir. */
   ehVoce: boolean;
   ocupado: boolean;
+  /**
+   * Quem olha só olha (visualizador, 054): o cartão perde os três botões —
+   * editar, bloquear e excluir. Ele abre esta tela para saber QUEM tem acesso,
+   * e "nao pode mudar logins e etc.." (Yan, 15/10/2026).
+   */
+  soLeitura?: boolean;
   onEditar: () => void;
   onAlternarAtivo: () => void;
   onExcluir: () => void;
@@ -19,6 +25,7 @@ export function CartaoDeLogin({
   usuario,
   ehVoce,
   ocupado,
+  soLeitura = false,
   onEditar,
   onAlternarAtivo,
   onExcluir,
@@ -51,15 +58,17 @@ export function CartaoDeLogin({
 
         <div className="flex shrink-0 items-center gap-1">
           {!usuario.active && <Badge variant="gray">Bloqueado</Badge>}
-          <button
-            type="button"
-            onClick={onEditar}
-            aria-label={`Editar ${usuario.name}`}
-            className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <Pencil className="h-4 w-4" />
-          </button>
-          {!ehVoce && (
+          {!soLeitura && (
+            <button
+              type="button"
+              onClick={onEditar}
+              aria-label={`Editar ${usuario.name}`}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Pencil className="h-4 w-4" />
+            </button>
+          )}
+          {!ehVoce && !soLeitura && (
             <>
               <button
                 type="button"

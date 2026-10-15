@@ -83,6 +83,30 @@ const relacionamentoItems: NavItem[] = [
   { to: '/customers', label: 'Clientes', icon: Users },
 ];
 
+/**
+ * O VISUALIZADOR (054). Pedido do Yan, 15/10/2026: "ele pode ver tudo so nao
+ * pode alterar nada (…) ve cliente, produto ve tudo tudo mas nao altera nada".
+ *
+ * Tudo o que ele LÊ e nada que leve a tela de escrita: sem "Minha área" (é
+ * cheia de ação — push, relatório de IA, OK de tarefa, fila offline), sem
+ * "Alertas" (central do representante, que ativa os avisos), sem "Acessos" (é
+ * gerar convite e vitrine) e sem "Importar produtos".
+ *
+ * Nenhum item com `fila:` de propósito: fila é marcador de trabalho a fazer, e
+ * ele não trabalha fila nenhuma. Com oito itens, os rótulos curtos são o que
+ * faz o menu de abas do celular caber.
+ */
+const visualizadorItems: NavItem[] = [
+  { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { to: '/orders', label: 'Pedidos', icon: ClipboardList },
+  { to: '/catalog', label: 'Catálogo', short: 'Catál.', icon: ShoppingBag },
+  { to: '/customers', label: 'Clientes', short: 'Client.', icon: Users },
+  { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
+  { to: '/atividades', label: 'Atividades', short: 'Ativ.', icon: CalendarClock },
+  { to: '/integracao', label: 'Integração', short: 'Control', icon: Cable },
+  { to: '/logins', label: 'Logins', icon: ShieldCheck },
+];
+
 export function navItemsForRole(
   role: UserRole | undefined,
   permissions?: PermissaoGerente[] | null,
@@ -93,6 +117,10 @@ export function navItemsForRole(
   }
   if (role === 'financeiro') return financeiroItems;
   if (role === 'relacionamento') return relacionamentoItems;
+  // Antes do `return repItems` do fim, que é o que o papel desconhecido pega:
+  // sem este ramo o visualizador ganharia o menu do REPRESENTANTE inteiro
+  // (Minha área com fila de triagem, Alertas e Acessos).
+  if (role === 'visualizador') return visualizadorItems;
   if (role === 'store') return storeItems;
   return repItems;
 }

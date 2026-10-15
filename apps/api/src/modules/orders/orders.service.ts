@@ -69,6 +69,10 @@ export async function getOrders(
       .order('created_at', { ascending: false })
       .range(de, ate);
 
+    // Sem filtro para o escritório — gerente, admin e o VISUALIZADOR (054,
+    // 15/10/2026) veem pedido de TODOS os representantes, que é o que a regra
+    // do Yan pede ("pode ver tudo so nao pode alterar nada"). Quem não pode
+    // chegar aqui é barrado pelo `requireRole` da rota.
     if (role === 'rep') query = query.eq('rep_id', rep_id);
     // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
     // tenha quem tiver montado (ela mesma ou o representante).
@@ -109,7 +113,8 @@ export async function getOrderById(
     .eq('id', id)
     .eq('company_id', company_id);
 
-  // Representante só acessa os próprios pedidos (gerente/admin veem todos).
+  // Representante só acessa os próprios pedidos (gerente, admin e o
+  // visualizador da 054 veem todos — o detalhe é leitura).
   if (role === 'rep' && rep_id) query = query.eq('rep_id', rep_id);
   // Loja só acessa os pedidos do cliente que ela representa.
   if (role === 'store') query = query.eq('customer_id', customer_id ?? '');

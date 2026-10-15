@@ -2,7 +2,7 @@ import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
 import { hashPassword } from '../../lib/password.js';
 import { deleteRep } from '../reps/reps.service.js';
-import { TODAS_PERMISSOES } from '@csb/shared';
+import { TODAS_PERMISSOES, ehPapelGerenciavel } from '@csb/shared';
 import type {
   UsuarioListItem,
   CriarUsuarioRequest,
@@ -18,7 +18,27 @@ export type MotivoUsuario =
   | 'ultimo_admin'
   | 'tem_pedidos'
   | 'papel_invalido'
+  | 'migracao_pendente'
   | 'erro';
+
+/**
+ * O banco recusou o PAPEL — falta a migração que o acrescenta ao CHECK de
+ * `users.role`.
+ *
+ * O código sobe antes do SQL (é a regra do CLAUDE.md), então existe uma janela
+ * em que a tela de Logins já oferece "Visualizador" (054) e o banco ainda tem
+ * o CHECK da 038. Nessa janela o INSERT volta com 23514 e, sem este teste, a
+ * resposta era 500 "Não foi possível concluir a operação" — o admin não tem
+ * como adivinhar que o que falta é colar o SQL. Agora vira 503
+ * MIGRACAO_PENDENTE com a frase que diz o que fazer.
+ *
+ * Mesmo truque do `recusouOStatus` em orders.service: CHECK não se detecta com
+ * SELECT, descobre-se tentando gravar.
+ */
+function recusouOPapel(error: { code?: string; message?: string } | null): boolean {
+  if (!error) return false;
+  return error.code === '23514' && /role/i.test(error.message ?? '');
+}
 
 export type ResultadoUsuario =
   | { ok: true; usuario: UsuarioListItem; teclas_ignoradas?: boolean }
@@ -28,8 +48,20 @@ export type ResultadoExclusao =
   | { ok: true; clientes_sem_representante: number }
   | { ok: false; motivo: MotivoUsuario; pedidos?: number };
 
-/** Ordem da tela: quem tem mais poder primeiro. */
-const ORDEM_PAPEL: Record<UserRole, number> = { admin: 0, manager: 1, financeiro: 2, relacionamento: 3, rep: 4, store: 5 };
+/**
+ * Ordem da tela: quem tem mais poder primeiro. O visualizador (054) entra
+ * depois do escritório e antes de quem vende — é o último dos logins da
+ * fábrica justamente porque não altera nada.
+ */
+const ORDEM_PAPEL: Record<UserRole, number> = {
+  admin: 0,
+  manager: 1,
+  financeiro: 2,
+  relacionamento: 3,
+  visualizador: 4,
+  rep: 5,
+  store: 6,
+};
 
 /**
  * `permissions` e `last_login_at` vêm da 022, que pode não estar aplicada.
@@ -119,15 +151,14 @@ export async function criarUsuario(
   company_id: string,
   body: CriarUsuarioRequest,
 ): Promise<ResultadoUsuario> {
-  // Financeiro e relacionamento entram aqui junto: são logins da fábrica,
-  // criados pelo admin como os outros. Rep e loja continuam nascendo nos
-  // fluxos próprios (carteira/acesso).
-  if (
-    body.role !== 'admin' &&
-    body.role !== 'manager' &&
-    body.role !== 'financeiro' &&
-    body.role !== 'relacionamento'
-  ) {
+  // Financeiro, relacionamento e visualizador (054) entram aqui junto: são
+  // logins da fábrica, criados pelo admin como os outros. Rep e loja continuam
+  // nascendo nos fluxos próprios (carteira/acesso).
+  //
+  // A lista é `PAPEIS_GERENCIAVEIS`, no shared: estava escrita à mão aqui e na
+  // atualização logo abaixo, e sem acertar as DUAS o papel novo respondia
+  // `papel_invalido` e o login não nascia.
+  if (!ehPapelGerenciavel(body.role)) {
     return { ok: false, motivo: 'papel_invalido' };
   }
   if (body.permissions && !teclasValidas(body.permissions)) {
@@ -161,6 +192,10 @@ export async function criarUsuario(
     .select('*')
     .single();
 
+  if (recusouOPapel(error)) {
+    console.error('[users] o banco não aceita o papel', body.role, '— falta a migração:', error?.message);
+    return { ok: false, motivo: 'migracao_pendente' };
+  }
   if (error || !data) {
     console.error('[users] falha ao criar login:', error?.code, error?.message);
     return { ok: false, motivo: 'erro' };
@@ -188,13 +223,9 @@ export async function atualizarUsuario(
   const alvo = await buscar(company_id, id);
   if (!alvo) return { ok: false, motivo: 'nao_encontrado' };
 
-  if (
-    body.role !== undefined &&
-    body.role !== 'admin' &&
-    body.role !== 'manager' &&
-    body.role !== 'financeiro' &&
-    body.role !== 'relacionamento'
-  ) {
+  // Mesma lista da criação (PAPEIS_GERENCIAVEIS): o papel novo tem de passar
+  // nos dois lugares, senão o admin cria o visualizador e não consegue editá-lo.
+  if (body.role !== undefined && !ehPapelGerenciavel(body.role)) {
     return { ok: false, motivo: 'papel_invalido' };
   }
   if (body.permissions != null && !teclasValidas(body.permissions)) {
@@ -252,6 +283,12 @@ export async function atualizarUsuario(
     .select('*')
     .maybeSingle();
 
+  if (recusouOPapel(error)) {
+    // `error?.`: `recusouOPapel` não é type guard, então o TypeScript não sabe
+    // que aqui `error` nunca é nulo — e `pnpm verify` parava no typecheck.
+    console.error('[users] o banco não aceita o papel', update['role'], '— falta a migração:', error?.message);
+    return { ok: false, motivo: 'migracao_pendente' };
+  }
   if (error) {
     console.error('[users] falha ao atualizar login:', error.code, error.message);
     return { ok: false, motivo: 'erro' };

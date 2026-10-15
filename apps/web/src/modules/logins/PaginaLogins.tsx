@@ -8,6 +8,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDeLogin } from './CartaoDeLogin.js';
 import { FormularioDeLogin, type DadosDoFormulario } from './FormularioDeLogin.js';
+import { ehPapelGerenciavel, ehSoLeitura } from '@csb/shared';
 import type {
   UsuarioListItem,
   CriarUsuarioRequest,
@@ -16,12 +17,19 @@ import type {
   UserRole,
 } from '@csb/shared';
 
-/** Grupos na ordem em que a fábrica pensa: quem manda primeiro. */
+/**
+ * Grupos na ordem em que a fábrica pensa: quem manda primeiro.
+ *
+ * Papel que não está aqui fica INVISÍVEL na tela — a lista é filtrada grupo
+ * por grupo, e o que não casa com nenhum não aparece. Foi por isso que o
+ * visualizador (054, 15/10/2026) teve de entrar junto com o papel.
+ */
 const GRUPOS: Array<{ papel: UserRole; titulo: string }> = [
   { papel: 'admin', titulo: 'Administradores' },
   { papel: 'manager', titulo: 'Gerentes' },
   { papel: 'financeiro', titulo: 'Financeiro' },
   { papel: 'relacionamento', titulo: 'Relacionamento' },
+  { papel: 'visualizador', titulo: 'Visualizadores' },
   { papel: 'rep', titulo: 'Representantes' },
   { papel: 'store', titulo: 'Lojas' },
 ];
@@ -30,6 +38,10 @@ type Resposta = ApiResponse<UsuarioListItem> & { aviso?: string };
 
 export function PaginaLogins() {
   const { token, user } = useAuthStore();
+  // O visualizador (054) entra para LER quem tem acesso: nenhum botão de ação
+  // nesta tela aparece para ele — nem "Novo login", nem editar, bloquear ou
+  // excluir no cartão. "nao pode mudar logins e etc.." (Yan, 15/10/2026).
+  const soLeitura = ehSoLeitura(user?.role);
   const [usuarios, setUsuarios] = useState<UsuarioListItem[] | null>(null);
   const [busca, setBusca] = useState('');
   const [form, setForm] = useState<{ aberto: boolean; editando: UsuarioListItem | null }>({
@@ -85,17 +97,17 @@ export function PaginaLogins() {
     setSalvando(true);
     try {
       if (form.editando) {
-        const daFabrica =
-          form.editando.role === 'admin' ||
-          form.editando.role === 'manager' ||
-          form.editando.role === 'financeiro' ||
-          form.editando.role === 'relacionamento';
+        // Papel e teclas só viajam quando o login é dos que nascem AQUI
+        // (PAPEIS_GERENCIAVEIS, no shared). Era a mesma lista escrita à mão, a
+        // quarta de cinco iguais — e sem o visualizador nela, editar um
+        // visualizador mandaria o papel em branco.
+        const daFabrica = ehPapelGerenciavel(form.editando.role);
         const corpo: AtualizarUsuarioRequest = {
           name: dados.name,
           email: dados.email,
           ...(dados.password ? { password: dados.password } : {}),
-          // Papel e teclas só viajam quando o login é de admin/gerente — para um
-          // rep, este formulário mexe em nome, e-mail e senha e mais nada.
+          // Para um rep ou uma loja, este formulário mexe em nome, e-mail e
+          // senha e mais nada: o papel deles não se troca por aqui.
           ...(daFabrica
             ? {
                 role: dados.role,
@@ -188,26 +200,37 @@ export function PaginaLogins() {
           <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Logins</h1>
           {usuarios && <p className="text-sm text-muted-foreground">{usuarios.length} no total</p>}
         </div>
-        <Button
-          size="md"
-          onClick={() => (form.aberto ? fechar() : setForm({ aberto: true, editando: null }))}
-        >
-          {form.aberto ? (
-            <X className="h-4 w-4" strokeWidth={2.5} />
-          ) : (
-            <UserPlus className="h-4 w-4" strokeWidth={2.5} />
-          )}
-          {form.aberto ? 'Cancelar' : 'Novo login'}
-        </Button>
+        {!soLeitura && (
+          <Button
+            size="md"
+            onClick={() => (form.aberto ? fechar() : setForm({ aberto: true, editando: null }))}
+          >
+            {form.aberto ? (
+              <X className="h-4 w-4" strokeWidth={2.5} />
+            ) : (
+              <UserPlus className="h-4 w-4" strokeWidth={2.5} />
+            )}
+            {form.aberto ? 'Cancelar' : 'Novo login'}
+          </Button>
+        )}
       </div>
 
       <div className="mb-4 flex items-start gap-2 rounded-lg bg-muted px-3 py-2.5 text-xs text-muted-foreground">
         <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-        <p>
-          Bloquear tira o acesso: a pessoa não entra mais e quem já estiver com o app aberto cai em
-          até 1 hora. Representante e loja são criados nas telas próprias — aqui você controla o
-          login deles.
-        </p>
+        {soLeitura ? (
+          <p>
+            Seu acesso é de <strong className="font-semibold">Visualizador</strong>: você vê tudo e
+            não altera nada. Esta lista está aqui para você saber quem tem acesso — criar, editar,
+            bloquear e excluir login são do administrador.
+          </p>
+        ) : (
+          <p>
+            Bloquear tira o acesso: a pessoa não entra mais e quem já estiver com o app aberto cai
+            em até 1 hora. Representante e loja são criados nas telas próprias — aqui você controla
+            o login deles. <strong className="font-semibold">Visualizador</strong> vê tudo e não
+            altera nada: serve para quem precisa acompanhar sem o risco de mexer.
+          </p>
+        )}
       </div>
 
       {form.aberto && (
@@ -262,6 +285,7 @@ export function PaginaLogins() {
                       usuario={u}
                       ehVoce={u.id === user?.id}
                       ocupado={ocupado === u.id}
+                      soLeitura={soLeitura}
                       onEditar={() => {
                         setErro('');
                         setForm({ aberto: true, editando: u });

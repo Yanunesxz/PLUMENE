@@ -7,6 +7,7 @@ import { Badge } from '../../components/interface/Badge.js';
 import { Button } from '../../components/interface/Button.js';
 import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Toast } from '../../components/interface/Toast.js';
+import { ehSoLeitura } from '@csb/shared';
 import type { ApiResponse, TarefaDoRep } from '@csb/shared';
 
 /**
@@ -51,8 +52,12 @@ export function PaginaAtividades() {
   const abertas = (tarefas ?? []).filter((t) => t.status !== 'feita');
   const feitas = (tarefas ?? []).filter((t) => t.status === 'feita').slice(0, 12);
   // Excluir: quem criou, ou a gerência (a API confere de novo).
+  // O visualizador (054) sai antes do teste por NOME: ele nunca criou tarefa
+  // nenhuma, mas um homônimo de quem criou faria o botão aparecer — e ele "nao
+  // altera nada" (Yan, 15/10/2026).
   const podeExcluir = (t: TarefaDoRep) =>
-    user?.role === 'admin' || user?.role === 'manager' || t.criado_por_nome === user?.name;
+    !ehSoLeitura(user?.role) &&
+    (user?.role === 'admin' || user?.role === 'manager' || t.criado_por_nome === user?.name);
 
   return (
     <div className="p-4 md:p-6">

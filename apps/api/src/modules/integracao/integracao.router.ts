@@ -15,9 +15,11 @@ import { authenticate, requireRole } from '../../middleware/auth.js';
 import { pedirSincronizacaoHandler, statusDaIntegracaoHandler } from './integracao.controller.js';
 
 export async function integracaoRouter(fastify: FastifyInstance): Promise<void> {
+  // O visualizador (054, 15/10/2026) olha a tela de acompanhamento — é
+  // leitura. Pedir sincronização continua com financeiro/admin, logo abaixo.
   fastify.get(
     '/erp/integracao/status',
-    { preHandler: [authenticate, requireRole(['admin', 'manager', 'financeiro'])] },
+    { preHandler: [authenticate, requireRole(['admin', 'manager', 'financeiro', 'visualizador'])] },
     statusDaIntegracaoHandler,
   );
   // O gerente vê, mas quem PEDE é o financeiro (ou o admin): é a mesa dele que
