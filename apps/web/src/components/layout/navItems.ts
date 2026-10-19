@@ -41,14 +41,16 @@ const storeItems: NavItem[] = [
 const managerItems: NavItem[] = [
   // Sem número no Painel: a fila de aceite é do financeiro, não do gerente.
   { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  // Metas e desempenho da equipe num relance (19/10/2026).
-  { to: '/desempenho', label: 'Dashboard', short: 'Metas', icon: BarChart3 },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
   // As tarefas que o escritório marcou e o andamento (OK do rep, feitas).
   { to: '/atividades', label: 'Atividades', short: 'Ativ.', icon: CalendarClock },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact, permissao: 'gerenciar_representantes' },
+  // Metas e desempenho da equipe num relance (19/10/2026) — logo abaixo de
+  // Representantes, pedido do Yan. Sem tecla: o gerente sem a de gerenciar
+  // representantes continua vendo as metas (é leitura).
+  { to: '/desempenho', label: 'Metas', icon: BarChart3 },
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
   // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
   // não se aplica a ele. O gerente só vê se o admin ligar a dele.
@@ -100,11 +102,11 @@ const relacionamentoItems: NavItem[] = [
  */
 const visualizadorItems: NavItem[] = [
   { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
-  { to: '/desempenho', label: 'Dashboard', short: 'Metas', icon: BarChart3 },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/catalog', label: 'Catálogo', short: 'Catál.', icon: ShoppingBag },
   { to: '/customers', label: 'Clientes', short: 'Client.', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
+  { to: '/desempenho', label: 'Metas', icon: BarChart3 },
   { to: '/atividades', label: 'Atividades', short: 'Ativ.', icon: CalendarClock },
   { to: '/integracao', label: 'Integração', short: 'Control', icon: Cable },
   { to: '/logins', label: 'Logins', icon: ShieldCheck },
