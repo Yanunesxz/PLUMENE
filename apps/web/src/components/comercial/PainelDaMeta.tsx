@@ -15,6 +15,7 @@ import { Button } from '../interface/Button.js';
 import { Input } from '../interface/Input.js';
 import { ReguaDaMeta } from './ReguaDaMeta.js';
 import { formatBRLCurto } from '../../lib/utils.js';
+import { lerValorDigitado } from '../../lib/valorDigitado.js';
 
 /** Linha da grade. Texto, não número: campo vazio precisa poder existir. */
 interface Linha {
@@ -105,8 +106,21 @@ export function PainelDaMeta({
         .at(-1)?.competencia;
 
   const faixas: FaixaDeBonus[] = normalizarFaixas(
-    linhas.map((l) => ({ meta: Number(l.meta), bonus: Number(l.bonus) })),
+    linhas.map((l) => ({ meta: lerValorDigitado(l.meta) ?? 0, bonus: lerValorDigitado(l.bonus) ?? 0 })),
   );
+
+  // A linha que não vira faixa precisa DIZER por quê. Antes ela sumia calada:
+  // meta de 50 mil sem bônus não desenhava a régua e salvava "sem
+  // bonificação" (Yan, 19/10/2026). O banco exige meta e bônus maiores que zero.
+  const problemaDaLinha = (l: Linha): string | null => {
+    const meta = lerValorDigitado(l.meta);
+    const bonus = lerValorDigitado(l.bonus);
+    if (!l.meta.trim() && !l.bonus.trim()) return null; // linha vazia: ignorada
+    if (meta === null || meta <= 0) return 'Preencha a meta (ex.: 50.000 ou 50k).';
+    if (bonus === null || bonus <= 0) return 'Preencha o bônus desta faixa (ex.: 500).';
+    return null;
+  };
+  const algumaLinhaComProblema = linhas.some((l) => problemaDaLinha(l) !== null);
 
   const trocar = (i: number, campo: keyof Linha) => (e: React.ChangeEvent<HTMLInputElement>) =>
     setLinhas((prev) => prev.map((l, j) => (i === j ? { ...l, [campo]: e.target.value } : l)));
@@ -195,24 +209,23 @@ export function PainelDaMeta({
             </div>
             {linhas.map((linha, i) => (
               <div key={i} className="grid grid-cols-[1fr_1fr_36px] items-center gap-2">
+                {/* Texto, não `type="number"`: assim "50.000" e "50k" valem — ver lerValorDigitado. */}
                 <Input
-                  type="number"
-                  min={0}
-                  step={1000}
-                  inputMode="numeric"
+                  type="text"
+                  inputMode="decimal"
                   value={linha.meta}
                   onChange={trocar(i, 'meta')}
-                  placeholder="50000"
+                  // "ex.:" e não só o número: o "500" cinza do bônus parecia
+                  // preenchido, e a faixa sem bônus sumia ao salvar (19/10/2026).
+                  placeholder="ex.: 50.000"
                   aria-label={`Meta da faixa ${i + 1}`}
                 />
                 <Input
-                  type="number"
-                  min={0}
-                  step={100}
-                  inputMode="numeric"
+                  type="text"
+                  inputMode="decimal"
                   value={linha.bonus}
                   onChange={trocar(i, 'bonus')}
-                  placeholder="500"
+                  placeholder="ex.: 500"
                   aria-label={`Bônus da faixa ${i + 1}`}
                 />
                 <button
@@ -223,6 +236,9 @@ export function PainelDaMeta({
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
+                {problemaDaLinha(linha) && (
+                  <p className="col-span-3 -mt-1 text-xs font-medium text-danger">{problemaDaLinha(linha)}</p>
+                )}
               </div>
             ))}
           </div>
@@ -286,7 +302,7 @@ export function PainelDaMeta({
         <Button type="button" variant="outline" onClick={onFechar}>
           Fechar
         </Button>
-        <Button type="button" disabled={salvando} onClick={() => void salvar()}>
+        <Button type="button" disabled={salvando || algumaLinhaComProblema} onClick={() => void salvar()}>
           {salvando ? 'Salvando…' : 'Salvar meta'}
         </Button>
       </div>
