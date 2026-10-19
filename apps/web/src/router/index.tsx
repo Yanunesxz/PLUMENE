@@ -21,6 +21,7 @@ import { PaginaNaoEncontrada } from '../modules/sistema/PaginaNaoEncontrada.js';
 // celular, em campo — não precisa baixar nada disto para ver o catálogo.
 // PaginaImportar sozinha carrega a biblioteca de planilhas.
 const PaginaPainel = lazy(() => import('../modules/painel/PaginaPainel.js').then((m) => ({ default: m.PaginaPainel })));
+const PaginaDashboard = lazy(() => import('../modules/painel/PaginaDashboard.js').then((m) => ({ default: m.PaginaDashboard })));
 const PaginaRepresentantes = lazy(() => import('../modules/representantes/PaginaRepresentantes.js').then((m) => ({ default: m.PaginaRepresentantes })));
 const PaginaImportar = lazy(() => import('../modules/importar/PaginaImportar.js').then((m) => ({ default: m.PaginaImportar })));
 const PaginaAcessos = lazy(() => import('../modules/acessos/PaginaAcessos.js').then((m) => ({ default: m.PaginaAcessos })));
@@ -132,6 +133,13 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'alertas',
             element: <PrivateRoute roles={['rep']} />,
             children: [{ index: true, element: <AoCarregar><PaginaAlertas /></AoCarregar> }],
+          },
+          {
+            // Metas e desempenho da equipe (19/10/2026) — leitura do gerente
+            // comercial; o admin e o visualizador também leem.
+            path: 'desempenho',
+            element: <PrivateRoute roles={['manager', 'admin', 'visualizador']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaDashboard /></AoCarregar> }],
           },
           // Endereço antigo da loja: quem tem o app instalado tem este link
           // salvo. Leva para o novo lugar em vez de dar "página não encontrada".

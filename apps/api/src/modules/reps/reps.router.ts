@@ -11,6 +11,7 @@ import {
   salvarMetaHandler,
   minhaMetaHandler,
 } from './reps.controller.js';
+import { metasDaEquipeHandler } from './metasDaEquipe.js';
 
 export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   // O financeiro entra nas LEITURAS: ele visualiza o cadastro dos
@@ -40,6 +41,8 @@ export async function repsRouter(fastify: FastifyInstance): Promise<void> {
   fastify.get('/price-tables', guard, listPriceTablesHandler);
 
   // Meta de bonificação: quem cadastra é o gerente, por representante e por mês.
+  // As de TODOS num mês, para o Dashboard (19/10/2026).
+  fastify.get('/reps/metas', guard, metasDaEquipeHandler);
   fastify.get('/reps/:id/meta', guard, listarMetasHandler);
   fastify.put('/reps/:id/meta', podeGerenciar, salvarMetaHandler);
 

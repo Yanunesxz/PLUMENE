@@ -1,4 +1,4 @@
-import { ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing, Cable } from 'lucide-react';
+import { BarChart3, ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing, Cable } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -41,6 +41,8 @@ const storeItems: NavItem[] = [
 const managerItems: NavItem[] = [
   // Sem número no Painel: a fila de aceite é do financeiro, não do gerente.
   { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  // Metas e desempenho da equipe num relance (19/10/2026).
+  { to: '/desempenho', label: 'Dashboard', short: 'Metas', icon: BarChart3 },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/customers', label: 'Clientes', icon: Users },
@@ -98,6 +100,7 @@ const relacionamentoItems: NavItem[] = [
  */
 const visualizadorItems: NavItem[] = [
   { to: '/dashboard', label: 'Painel', icon: LayoutDashboard },
+  { to: '/desempenho', label: 'Dashboard', short: 'Metas', icon: BarChart3 },
   { to: '/orders', label: 'Pedidos', icon: ClipboardList },
   { to: '/catalog', label: 'Catálogo', short: 'Catál.', icon: ShoppingBag },
   { to: '/customers', label: 'Clientes', short: 'Client.', icon: Users },
