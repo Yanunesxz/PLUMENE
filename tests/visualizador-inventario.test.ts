@@ -57,7 +57,8 @@ const PAPEL = 'visualizador';
 // `requireRole` e se o papel ficou de fora. Ao acrescentar, suba o número.
 const QUANTOS_ROUTERS = 14;
 // 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
-const QUANTAS_ROTAS = 107;
+// Parceiro: +1 rota de leitura — GET /partner/v1/pedidos/cancelados.
+const QUANTAS_ROTAS = 108;
 const QUANTAS_ESCRITAS = 57;
 
 describe('inventário: o leitor de routers está funcionando', () => {

@@ -160,6 +160,34 @@ describe('PATCH /orders/:id/cliente', { timeout: 20_000 }, () => {
     expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
   });
 
+  /**
+   * O AVISO AO CONTROL (19/10/2026). Trocar a loja de um pedido que já está no
+   * Control manda a nota para outro CNPJ. Não há booleano gravado: tanto o
+   * cartão da tela quanto o `alterado_apos_importacao` do
+   * GET /partner/v1/pedidos são a comparação com a foto da 046 — então o que a
+   * troca precisa garantir é que a foto exista e saiba dizer qual era o cliente.
+   */
+  it('pedido já no Control: a foto do que a fábrica tem na mão é tirada ANTES da troca, com o cliente antigo', async () => {
+    const { app, fake } = await subirApp({ erp_order_id: 'CS17400' }, CERTO);
+    const res = await app.inject(trocar(TOKEN_FINANCEIRO));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const foto = fake.ultimaGravacao('order_erp_sync', 'insert')?.valores as {
+      snapshot: { customer_id: string };
+    };
+    expect(foto.snapshot.customer_id).toBe(CLIENTE_ERRADO);
+  });
+
+  it('rascunho que nunca foi ao Control não vira foto nenhuma', async () => {
+    const { app, fake } = await subirApp({ status: 'draft' }, CERTO);
+    const res = await app.inject(trocar(TOKEN_REP));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+
   it('o gerente não troca — 403 já na rota', async () => {
     const { app, fake } = await subirApp({ status: 'draft' }, CERTO);
     const res = await app.inject(trocar(TOKEN_GERENTE));

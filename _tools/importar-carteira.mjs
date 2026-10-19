@@ -14,11 +14,16 @@
  * campo preenchido de cliente existente.
  *
  * Uso: node importar-carteira.mjs "arquivo.xlsx" CODIGO_DO_REP [--aplicar]
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_cadastro` da empresa não é
+ * 'carga'. Com o cadastro vindo do Control, o vínculo cliente↔representante é
+ * dele — atrelar aqui seria um segundo escritor em `customers`.
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import path from 'node:path';
+import { exigirCanalDeCarga } from './canal-de-carga.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const EMPRESA = '4a9fccd7-6241-4b8e-9c0b-b18aca364fba'; // Corpo Sensual
@@ -40,6 +45,13 @@ for (const l of readFileSync(path.join(RAIZ, 'apps/api/.env'), 'utf8').split(/\r
 }
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
+});
+
+// ─── O canal do cadastro ─────────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: EMPRESA,
+  canais: ['cadastro'],
+  acao: 'A carga da carteira por planilha',
 });
 
 const txt = (v) => {

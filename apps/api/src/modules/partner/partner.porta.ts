@@ -31,6 +31,39 @@ export function momentoComFuso(v: string): boolean {
 }
 
 /**
+ * Quanto o `servidor_hora` recua em relação à hora de antes da consulta.
+ *
+ * A hora de antes não basta (revisão de 17/09/2026): a hora que a linha leva
+ * é carimbada ANTES de a gravação ser confirmada — a API toma a hora e só
+ * então manda o UPDATE; a trigger da 013 usa o início da transação, no relógio
+ * do banco. Um UPDATE que espera trava, fila do PostgREST ou rede confirma
+ * DEPOIS de a puxada ter lido a lista, com uma hora ANTERIOR ao
+ * `servidor_hora` — e ficava de fora das duas puxadas. Dois minutos cobrem
+ * essas esperas com sobra; o preço é o que mudou nesse intervalo sair de novo
+ * na puxada seguinte, o que é inofensivo (reenviar é `sem_mudanca`, e um
+ * cancelado repetido só pede que o Control não fature de novo).
+ */
+export const FOLGA_DO_SERVIDOR_HORA_MS = 2 * 60_000;
+
+/**
+ * O `servidor_hora` de uma puxada — o `desde` que o Control manda na próxima.
+ *
+ * Tomado ANTES da consulta (17/09/2026) e recuado pela folga acima. Antes era
+ * tomado depois: uma gravação feita enquanto a lista era lida (com a hora dela
+ * entre o início da leitura e a resposta) não entrava nesta lista e ficava
+ * antes do `desde` da próxima — nunca saía. Com a hora de antes, menos a
+ * folga, o pior caso é a mesma linha sair mais de uma vez, o que é inofensivo.
+ *
+ * Vale para TODA rota `?desde=` do parceiro (19/10/2026): clientes,
+ * representantes, excluídos e cancelados. No cancelado o furo é o pior de
+ * todos — o cancelamento que não sai nesta lista nem na próxima vira nota
+ * emitida de um pedido que a fábrica já cancelou.
+ */
+export function horaDaPuxada(): string {
+  return new Date(Date.now() - FOLGA_DO_SERVIDOR_HORA_MS).toISOString();
+}
+
+/**
  * Aceita `{ <chave>: [...] }` (uma ou mais chaves aceitas), `{ dados: [...] }`
  * ou a lista pura no corpo.
  */

@@ -82,12 +82,14 @@ describe('excluir guarda a cópia antes de apagar', () => {
   beforeAll(async () => {
     vi.resetModules();
     ({ app, fake } = await subir({
-      // 1ª consulta: o cabeçalho para as regras; 2ª: o pedido inteiro para a
-      // cópia; 3ª: a resposta do DELETE.
+      // 1ª consulta: a sonda da coluna `erp_requested_at` (049), que decide se
+      // o cabeçalho pede a coluna; 2ª: o cabeçalho para as regras; 3ª: o pedido
+      // inteiro para a cópia; 4ª: a resposta do DELETE.
       // O dublê pré-carrega a resposta seguinte a cada entrega, então entre
-      // duas consultas vai um OK de enchimento: cabeçalho (regras), enchimento,
-      // pedido inteiro (a cópia), enchimento, e a resposta do DELETE.
-      orders: [{ data: PEDIDO, error: null }, OK, { data: PEDIDO_INTEIRO, error: null }, OK, OK],
+      // duas consultas vai um OK de enchimento: sonda, enchimento, cabeçalho
+      // (regras), enchimento, pedido inteiro (a cópia), enchimento, e a
+      // resposta do DELETE.
+      orders: [OK, OK, { data: PEDIDO, error: null }, OK, { data: PEDIDO_INTEIRO, error: null }, OK, OK],
       deleted_orders: OK, // a tabela existe (detecção) e o insert gravou
     }));
     const res = await app.inject({
@@ -137,7 +139,8 @@ describe('sem a migração 040, excluir segue como sempre foi', () => {
   beforeAll(async () => {
     vi.resetModules();
     ({ app, fake } = await subir({
-      orders: [{ data: PEDIDO, error: null }, OK],
+      // Sonda da 049, enchimento, o cabeçalho, e o resto é OK (a resposta do DELETE).
+      orders: [OK, OK, { data: PEDIDO, error: null }, OK],
       deleted_orders: SEM_TABELA,
     }));
     const res = await app.inject({
@@ -166,9 +169,10 @@ describe('com a tabela no ar, cópia que não gravou segura o pedido', () => {
     vi.resetModules();
     ({ app, fake } = await subir({
       // O dublê pré-carrega a resposta seguinte a cada entrega, então entre
-      // duas consultas vai um OK de enchimento: cabeçalho (regras), enchimento,
-      // pedido inteiro (a cópia), enchimento, e a resposta do DELETE.
-      orders: [{ data: PEDIDO, error: null }, OK, { data: PEDIDO_INTEIRO, error: null }, OK, OK],
+      // duas consultas vai um OK de enchimento: sonda da 049, enchimento,
+      // cabeçalho (regras), enchimento, pedido inteiro (a cópia), enchimento,
+      // e a resposta do DELETE.
+      orders: [OK, OK, { data: PEDIDO, error: null }, OK, { data: PEDIDO_INTEIRO, error: null }, OK, OK],
       // detecção passa; o insert falha
       deleted_orders: [OK, { data: null, error: { message: 'disco cheio' } }],
     }));

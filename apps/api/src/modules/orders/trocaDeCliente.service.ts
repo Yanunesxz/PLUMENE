@@ -1,5 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { clienteDaCarteira } from '../access/invites.service.js';
+import { garantirFotoDoErp, registrarClienteNaFoto } from './erpSync.service.js';
 import { podeTrocarClienteDoPedido, type PodeTrocarCliente } from '@csb/shared';
 import type { AuthRole, Order, ResultadoDaTrocaDeCliente } from '@csb/shared';
 
@@ -14,6 +15,12 @@ import type { AuthRole, Order, ResultadoDaTrocaDeCliente } from '@csb/shared';
  * Não precisa de migração: é uma coluna que já existe. Todos veem a troca na
  * próxima leitura do pedido — inclusive o aparelho do rep, que regrava o cache
  * a cada GET /orders.
+ *
+ * PEDIDO JÁ NO CONTROL (19/10/2026): a troca acende o aviso "o Control está
+ * com a versão antiga" na tela e `alterado_apos_importacao` no
+ * GET /partner/v1/pedidos. Não há booleano gravado: as duas coisas são a
+ * comparação com a foto da 046, e o que este serviço faz é garantir que a
+ * foto exista e saiba dizer qual era o cliente.
  */
 
 export type ResultadoDaTroca =
@@ -71,6 +78,16 @@ export async function trocarClienteDoPedido(
     return { ok: true, order: o, mudou: false, antes: o.customer_id ?? null, tabela_diferente, ja_no_control };
   }
 
+  // O pedido que já está no Control precisa ter a foto do que a fábrica tem na
+  // mão ANTES desta troca — é contra ela que o `alterado_apos_importacao` do
+  // GET /partner/v1/pedidos compara. Sem foto não há com o que comparar, e a
+  // nota sairia no CNPJ errado sem aviso nenhum. Mesma postura das outras
+  // edições (23/09/2026, "não pode travar nada agora"): foto que não sai vira
+  // log, nunca trava a troca.
+  if ((await garantirFotoDoErp(o, company_id)) === 'falhou') {
+    console.error(`[046] sem foto do Control para o pedido ${o.id}; a troca de cliente segue sem ela`);
+  }
+
   // Grava só se o pedido continua trocável: a nota chegando no meio, ou o rep
   // enviando para a fábrica ao mesmo tempo, não passam por cima.
   let gravar = supabase
@@ -87,6 +104,10 @@ export async function trocarClienteDoPedido(
     return { ok: false, reason: 'erro' };
   }
   if (!data) return { ok: false, reason: quem.role === 'rep' ? 'ja_enviado' : 'faturado' };
+
+  // Foto antiga que não guarda cliente nenhum: fica registrado NELA qual é o
+  // cliente que o Control conhece, senão a diferença não apareceria.
+  await registrarClienteNaFoto(id, company_id, o.customer_id ?? null);
 
   console.info(
     `[troca-cliente] pedido ${o.order_number ?? id}: cliente ${o.customer_id ?? '-'} -> ${novo.id} por ${quem.id} (${quem.role})`,

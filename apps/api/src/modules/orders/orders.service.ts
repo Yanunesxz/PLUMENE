@@ -568,7 +568,19 @@ export async function createOrder(
 
 export type DeleteOrderResult =
   | { ok: true }
-  | { ok: false; reason: 'not_found' | 'forbidden' | 'invoiced' | 'tem_numero_erp' | 'sem_copia' };
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'forbidden'
+        | 'invoiced'
+        | 'tem_numero_erp'
+        /** Solicitado ao Control e ainda sem número: cancele a solicitação antes (049). */
+        | 'solicitado_ao_erp'
+        /** O banco não respondeu se a 049 existe: sem saber, não se apaga. */
+        | 'sem_resposta_do_banco'
+        | 'sem_copia';
+    };
 
 // ─── Pedidos excluídos (migração 040) ────────────────────────────────────────
 //
@@ -642,15 +654,32 @@ export async function deleteOrder(
   /** Nome de quem está excluindo — vai gravado na cópia, para a aba do admin. */
   nome_de_quem_exclui = '',
 ): Promise<DeleteOrderResult> {
+  // `erp_requested_at` é da 049, e o código sobe antes de o SQL rodar: pedir a
+  // coluna num banco que ainda não a tem derruba o SELECT inteiro e o pedido
+  // viraria "não encontrado". Então a sonda decide o que pedir — e "não sei"
+  // NÃO vira "não existe" aqui (ver a recusa logo abaixo).
+  const temSolicitacao = await detectarComCerteza('orders', 'erp_requested_at');
+  const colunas =
+    temSolicitacao === 'existe'
+      ? 'id, rep_id, invoiced, erp_order_id, erp_requested_at'
+      : 'id, rep_id, invoiced, erp_order_id';
+
   const { data: order } = await supabase
     .from('orders')
-    .select('id, rep_id, invoiced, erp_order_id')
+    .select(colunas)
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
 
   if (!order) return { ok: false, reason: 'not_found' };
-  const o = order as { rep_id: string; invoiced: boolean | null; erp_order_id?: string | null };
+  // `as unknown`: o select dinâmico (com/sem a coluna da 049) tira do
+  // supabase-js a inferência do shape — mesmo caso do getOrderById.
+  const o = order as unknown as {
+    rep_id: string;
+    invoiced: boolean | null;
+    erp_order_id?: string | null;
+    erp_requested_at?: string | null;
+  };
   if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
   if (o.invoiced) return { ok: false, reason: 'invoiced' };
   // Pedido com número do Control já existe LÁ (integração, fase 0). Apagar aqui
@@ -658,6 +687,21 @@ export async function deleteOrder(
   // faturamento dele chegaria procurando um número sem dono. Vale para todos,
   // admin incluído: o caminho é o financeiro corrigir, não o pedido sumir.
   if (o.erp_order_id) return { ok: false, reason: 'tem_numero_erp' };
+
+  // Sem saber se a 049 existe não dá para saber se há solicitação em aberto —
+  // e é justamente este o guarda que impede o pedido órfão no Control. Apagar
+  // na dúvida, por um soluço de rede, é o pior desfecho possível: a recusa é
+  // "tente de novo", nada foi excluído.
+  if (temSolicitacao === 'nao_sei') return { ok: false, reason: 'sem_resposta_do_banco' };
+
+  // Solicitado ao Control e ainda sem número (049): o pedido JÁ SAIU na fila
+  // GET /partner/v1/pedidos e pode estar sendo gravado no Control neste
+  // segundo. Apagar aqui deixa o Control com um pedido órfão — e ele nem
+  // apareceria em GET /partner/v1/pedidos/excluidos, que só lista quem tinha
+  // número. A saída é cancelar a solicitação primeiro
+  // (PATCH /orders/:id/cancelar-solicitacao): sem solicitação em aberto, o
+  // pedido volta a ser um aprovado comum e a exclusão passa.
+  if (o.erp_requested_at) return { ok: false, reason: 'solicitado_ao_erp' };
 
   // Com a tabela no ar, a cópia é obrigatória: se ela não gravou, o pedido não
   // é apagado — é exatamente o "sumiu sem rastro" que a 040 existe para evitar.

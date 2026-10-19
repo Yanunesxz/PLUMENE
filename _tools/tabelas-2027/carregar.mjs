@@ -13,10 +13,19 @@
  *
  * Uso:  node carregar.mjs [--aplicar]
  * Sem --aplicar só mostra o que faria.
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_catalogo` ou
+ * `companies.canal_cadastro` da empresa não é 'carga'. É o script mais
+ * perigoso do _tools — ele APAGA as tabelas de preço antigas (e os preços vão
+ * junto por CASCADE) e ainda remapeia `users.price_table_id` e
+ * `customers.price_table_id`. Com o catálogo vindo do Control, as tabelas que
+ * ele mandou sumiriam; com o cadastro vindo do Control, o remapeamento seria
+ * um segundo escritor no vínculo de rep e de cliente.
  */
 import { readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { exigirCanalDeCarga } from '../canal-de-carga.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..', '..');
@@ -57,6 +66,13 @@ const morra = (msg, erro) => {
   console.error(`✖ ${msg}${erro ? `: ${erro.message}` : ''}`);
   process.exit(1);
 };
+
+// ─── 0. Os canais da empresa ─────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: COMPANY_ID,
+  canais: ['catalogo', 'cadastro'],
+  acao: 'A troca das tabelas de preço por aqui',
+});
 
 // ─── 1. Leitura do estado atual ──────────────────────────────────────────────
 const precos2027 = JSON.parse(readFileSync(join(AQUI, 'tabelas-2027.json'), 'utf8'));

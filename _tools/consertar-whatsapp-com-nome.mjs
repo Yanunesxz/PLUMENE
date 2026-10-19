@@ -14,12 +14,19 @@
  *     é o ruim (ninguém editou no meio).
  *
  * Uso: node _tools/consertar-whatsapp-com-nome.mjs [--aplicar] [pasta-das-planilhas]
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_cadastro` da empresa não é
+ * 'carga'. O WhatsApp em si é dado só do app, mas o número vem de uma planilha
+ * do Control que envelhece no dia em que o Control passa a mandar o cadastro —
+ * e um conserto em massa direto em `customers` passa por fora da edição do app
+ * (051) e entra no que o Control puxa como "mudou no app".
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { readFileSync, readdirSync, writeFileSync, mkdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { exigirCanalDeCarga } from './canal-de-carga.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const EMPRESA = '4a9fccd7-6241-4b8e-9c0b-b18aca364fba'; // Corpo Sensual
@@ -37,6 +44,13 @@ for (const l of readFileSync(path.join(RAIZ, 'apps/api/.env'), 'utf8').split(/\r
 }
 const db = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
+});
+
+// ─── O canal do cadastro ─────────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: EMPRESA,
+  canais: ['cadastro'],
+  acao: 'O conserto do WhatsApp em massa por planilha',
 });
 
 const txt = (v) => {

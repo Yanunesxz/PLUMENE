@@ -329,6 +329,26 @@ apps/api/src/
 │   │                       evento solicitacao_cancelada só com a 050; sem a 049, 409.
 │   │                       O POST /partner/v1/pedidos/:id/confirmar aceita o pedido de
 │   │                       solicitação cancelada (o Control pode tê-lo puxado): o número vence
+│   │                       deleteOrder recusa DUAS vezes pelo Control: com número
+│   │                       (tem_numero_erp → 409 ORDER_HAS_ERP_NUMBER) e com solicitação em
+│   │                       aberto (solicitado_ao_erp → 409 ORDER_REQUESTED_TO_ERP; 049, sonda
+│   │                       detectarComCerteza em erp_requested_at — sonda sem resposta =
+│   │                       503 SOLICITACAO_INDISPONIVEL e nada é apagado). O porquê: pedido
+│   │                       solicitado já saiu na fila do Control e NÃO apareceria em
+│   │                       /partner/v1/pedidos/excluidos, que só lista quem tinha número.
+│   │                       A saída é cancelar a solicitação e só então excluir
+│   │                       (a tela do pedido mostra "Cancelar solicitação" mesmo fora do
+│   │                       bloco de "Lançar no Control", senão o cancelado que ficou na fila
+│   │                       não teria como sair dela — e não teria como ser excluído)
+│   │                       erpSync.service.ts → a foto do que o Control conhece (046):
+│   │                       registrarNoErp, garantirFotoDoErp (a primeira foto do pedido
+│   │                       lançado antes da 046), atualizarNumeroNaFoto e, desde 19/10/2026,
+│   │                       registrarClienteNaFoto — a troca de cliente carimba NA FOTO o
+│   │                       cliente ANTIGO (o que o Control conhece), senão a foto velha, que
+│   │                       não guarda cliente, nunca acusaria a troca. Foto já com cliente
+│   │                       não é tocada, e a trava por confirmado_em devolve 'foto_mais_nova'
+│   │                       trocaDeCliente.service.ts → PATCH /orders/:id/cliente: garante a
+│   │                       foto antes de gravar e carimba nela o cliente antigo depois
 │   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
 │   │                       valor_minimo (detectar), que a tela usa só para AVISAR
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
@@ -345,10 +365,11 @@ apps/api/src/
 │   ├── partner/          → API DE PARCEIRO (o ERP do Fábio, o "Control"). Sem JWT: header
 │   │                       X-API-Key (partner.auth.ts lê PARTNER_API_KEYS direto de
 │   │                       process.env; sem a env → 503 PARTNER_API_DISABLED; chave errada
-│   │                       → 401 PARTNER_UNAUTHORIZED). DEZENOVE rotas (partner.router.ts):
+│   │                       → 401 PARTNER_UNAUTHORIZED). VINTE rotas (partner.router.ts):
 │   │                         GET  /partner/v1/status                 (+ `canais`, sincronizar_agora — expira em 15 min —, solicitado_em)
 │   │                         GET  /partner/v1/pedidos                (a fila: aprovado + SOLICITADO ao Control)
 │   │                         GET  /partner/v1/pedidos/excluidos      (excluídos com número; livre)
+│   │                         GET  /partner/v1/pedidos/cancelados     (cancelados que o Control pode ter; exige canal; avisos sem a 053)
 │   │                         POST /partner/v1/pedidos/:id/confirmar  (o ERP devolve o número)
 │   │                         POST /partner/v1/pedidos/:id/conciliar  (sent_erp sem número)
 │   │                         POST /partner/v1/pedidos/:id/excluir    (o Control excluiu; partner.cadastros.controller)
@@ -365,8 +386,8 @@ apps/api/src/
 │   │                         POST /partner/v1/estoque                (idem)
 │   │                         POST /partner/v1/retrato                (partner.retrato.service; 1x/dia)
 │   │                         POST /partner/v1/sincronizacao          (partner.sincronizacao.controller; livre)
-│   │                       Canal por empresa (048, lib/canais.ts): pedidos/confirmar/conciliar/excluir
-│   │                       exigem canal_pedido_erp='api'; faturamento, canal_faturamento='api';
+│   │                       Canal por empresa (048, lib/canais.ts): pedidos/cancelados/confirmar/
+│   │                       conciliar/excluir exigem canal_pedido_erp='api'; faturamento, canal_faturamento='api';
 │   │                       clientes/representantes (POST e GET), canal_cadastro='api'; as cinco do
 │   │                       catálogo, canal_catalogo='api'; retrato, canal_retrato='api'. Senão
 │   │                       409 CANAL_FECHADO. status/conciliacao/excluidos/sincronizacao são livres.
@@ -591,6 +612,11 @@ _tools/
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
 │                    conferir-046, conferir-048, conferir-049, conferir-050, conferir-051 e conferir-055 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
+├── canal-de-carga.mjs → a trava de canal dos scripts, num lugar só (19/10/2026).
+│                        Dez scripts a importam: as cargas de CADASTRO, de CATÁLOGO e de
+│                        RETRATO recusam a empresa cujo canal correspondente não é 'carga'
+│                        (com o canal em 'api' quem escreve é o Control, e a carga passaria
+│                        por cima). tabelas-2027/carregar.mjs exige os DOIS canais.
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
                  → cargas e consertos pontuais direto no Supabase (fora do app).
                    faturar-retroativo.mjs exige --empresa=<uuid>, é ensaio por padrão

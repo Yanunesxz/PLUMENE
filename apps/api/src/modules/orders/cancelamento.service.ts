@@ -124,7 +124,7 @@ export async function cancelarPedido(
 
   const { data: lido } = await supabase
     .from('orders')
-    .select('id, rep_id, status, invoiced, order_number, guest_name')
+    .select('id, rep_id, status, invoiced, order_number, guest_name, cancelled_at')
     .eq('id', id)
     .eq('company_id', company_id)
     .maybeSingle();
@@ -147,6 +147,14 @@ export async function cancelarPedido(
   if (!m || !m.active) return { ok: false, reason: 'motivo_invalido' };
 
   const agora = new Date().toISOString();
+  // O MOMENTO DO CANCELAMENTO NÃO SE REGRAVA (19/10/2026). No caminho "só o
+  // motivo" o pedido já está cancelado: regravar o `cancelled_at` fazia o
+  // `cancelado_em` do GET /partner/v1/pedidos/cancelados mentir sobre quando o
+  // pedido foi cancelado e — pior — empurrava a linha para o fim da ordem da
+  // lista paginada, de onde a linha da fronteira caía numa página já lida e
+  // sumia. Só quem foi cancelado antes da 053 (recusado sem porquê) ganha a
+  // hora de agora, que é a melhor que existe.
+  const cancelado_em = (o as { cancelled_at?: string | null }).cancelled_at ?? agora;
   // Só cancela quem ainda não foi faturado nem cancelado: dois toques ao mesmo
   // tempo, ou a nota chegando no meio, não passam por cima um do outro. No
   // caminho "só o motivo", o pedido TEM de continuar cancelado.
@@ -157,7 +165,7 @@ export async function cancelarPedido(
       cancel_reason_id: m.id,
       cancel_reason_label: m.label,
       cancel_note: body.note?.trim() || null,
-      cancelled_at: agora,
+      cancelled_at: cancelado_em,
       cancelled_by: user_id,
       updated_at: agora,
     })

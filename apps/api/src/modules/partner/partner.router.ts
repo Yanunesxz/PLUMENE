@@ -27,6 +27,7 @@ import {
   partnerConciliarOrderHandler,
   partnerConciliacaoHandler,
   partnerExcluidosHandler,
+  partnerCanceladosHandler,
   partnerClientesHandler,
   partnerRepresentantesHandler,
   partnerFaturamentoHandler,
@@ -82,6 +83,9 @@ export async function partnerRouter(fastify: FastifyInstance): Promise<void> {
   // ── Pedidos (canal_pedido_erp = 'api') ────────────────────────────────────
   // A fila: aprovado, sem número, não faturado e SOLICITADO pelo financeiro.
   fastify.get('/partner/v1/pedidos', partnerOrdersHandler);
+  // Os CANCELADOS no app (053) que o Control pode ter: sumir da fila não se
+  // distingue de "ainda não chegou" — sem esta lista ele fatura um cancelado.
+  fastify.get('/partner/v1/pedidos/cancelados', partnerCanceladosHandler);
   fastify.post('/partner/v1/pedidos/:id/confirmar', partnerConfirmOrderHandler);
   // O passivo: pedido enviado ao ERP sem número recebe o número do Control.
   fastify.post('/partner/v1/pedidos/:id/conciliar', partnerConciliarOrderHandler);

@@ -36,9 +36,9 @@ export interface SincroniaComOErp {
 }
 
 /**
- * O pedido reduzido ao que vai para o Control e que a venda interna consegue
- * mudar depois do lançamento: as peças, o desconto (AB46 da planilha), a
- * condição de pagamento (C8) e a observação. Serve igual para a foto e para o
+ * O pedido reduzido ao que vai para o Control e que o app consegue mudar
+ * depois do lançamento: as peças, o desconto (AB46 da planilha), a condição de
+ * pagamento (C8), a observação e o CLIENTE. Serve igual para a foto e para o
  * pedido de hoje.
  */
 export interface PedidoParaComparar {
@@ -46,6 +46,12 @@ export interface PedidoParaComparar {
   discount_percent?: number | null | undefined;
   payment_condition_id?: string | null | undefined;
   notes?: string | null | undefined;
+  /**
+   * O cliente do pedido (troca de cliente, 08/10/2026). Ausente nas fotos
+   * tiradas antes de ele entrar na conta — e ausência aqui é "não se sabe",
+   * nunca "sem cliente": veja `divergenciaComOErp`.
+   */
+  customer_id?: string | null | undefined;
 }
 
 export interface DivergenciaComOErp {
@@ -55,6 +61,8 @@ export interface DivergenciaComOErp {
   desconto: { antes: number; depois: number } | null;
   condicaoMudou: boolean;
   observacaoMudou: boolean;
+  /** O pedido é de outro cliente agora: a nota sairia no CNPJ errado. */
+  clienteMudou: boolean;
   /** `false` = o Control está em dia; a tela não mostra aviso nenhum. */
   mudou: boolean;
 }
@@ -77,10 +85,12 @@ const texto = (s: string | null | undefined): string =>
 /**
  * O que mudou entre a foto do Control e o pedido de hoje.
  *
- * As quatro portas são as quatro rotas que o mesmo portão de edição deixa a
- * venda interna usar depois do lançamento (peças, desconto, pagamento,
- * observação). Olhar só as peças deixava passar o desconto trocado de 5% para
- * 8% — e a nota sairia com o desconto velho.
+ * As portas são as rotas que o app deixa abrir depois do lançamento: as quatro
+ * do portão de edição da venda interna (peças, desconto, pagamento,
+ * observação) e a troca de cliente do financeiro (08/10/2026). Olhar só as
+ * peças deixava passar o desconto trocado de 5% para 8% — e a nota sairia com
+ * o desconto velho; deixar o cliente de fora deixava a nota sair no CNPJ
+ * errado, que é pior.
  *
  * Troca de PREÇO sozinha não conta: ela só acontece como consequência de uma
  * edição de peças (o servidor reprecifica ao salvar), e o Control precifica
@@ -103,12 +113,23 @@ export function divergenciaComOErp(
   const condicaoMudou = (noControl.payment_condition_id ?? null) !== (hoje.payment_condition_id ?? null);
   const observacaoMudou = texto(noControl.notes) !== texto(hoje.notes);
 
+  // O CLIENTE é a única porta ASSIMÉTRICA: só acusa quando a foto diz quem o
+  // Control conhece. Foto sem cliente é "não se sabe", não "o Control conhece
+  // ninguém" — as fotos tiradas antes de o cliente entrar na conta não têm o
+  // campo, e tratá-las como "sem cliente" acenderia o aviso em TODO pedido já
+  // lançado de uma vez. O buraco que a assimetria deixa é fechado na origem: a
+  // troca de cliente carimba o cliente antigo na própria foto quando ela não
+  // tem nenhum (`registrarClienteNaFoto`, na API).
+  const clienteNoControl = noControl.customer_id ?? null;
+  const clienteMudou = clienteNoControl !== null && clienteNoControl !== (hoje.customer_id ?? null);
+
   return {
     itens,
     desconto,
     condicaoMudou,
     observacaoMudou,
-    mudou: itens.mudou || desconto !== null || condicaoMudou || observacaoMudou,
+    clienteMudou,
+    mudou: itens.mudou || desconto !== null || condicaoMudou || observacaoMudou || clienteMudou,
   };
 }
 
@@ -124,6 +145,15 @@ export function divergenciaComOErp(
  * Função pura e determinística nos dois lados (tela e API): as peças são
  * somadas por produto+variante e ordenadas, então a ordem em que o banco
  * devolve as linhas não muda o resultado.
+ *
+ * O cliente entrou na impressão em 19/10/2026, junto com a troca de cliente:
+ * sem ele, o financeiro podia trocar a loja do pedido enquanto a Larissa
+ * digitava no Control, e a confirmação dela tirava uma foto nova que engolia a
+ * troca — o Control ficava com o CNPJ velho e nunca mais ninguém era avisado.
+ * A conta de entrar: as impressões guardadas antes disso não batem mais com as
+ * de agora, então os pedidos que estiverem com aviso aberto no dia do deploy
+ * pedem "confira a lista outra vez" uma vez. Erra para o lado de mandar
+ * conferir, nunca para o de engolir mudança.
  */
 export function assinaturaDoPedido(p: PedidoParaComparar): string {
   const porChave = new Map<string, number>();
@@ -140,6 +170,7 @@ export function assinaturaDoPedido(p: PedidoParaComparar): string {
     `d:${Number(p.discount_percent ?? 0).toFixed(3)}`,
     `c:${p.payment_condition_id ?? ''}`,
     `o:${texto(p.notes)}`,
+    `k:${p.customer_id ?? ''}`,
   ].join('\n');
 
   // FNV-1a de 32 bits: curto para ir no corpo, e colisão aqui só faria uma

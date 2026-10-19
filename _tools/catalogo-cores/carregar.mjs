@@ -9,6 +9,12 @@
  *
  * Uso:  node carregar.mjs [--aplicar]
  * Sem --aplicar ele só mostra o que faria.
+ *
+ * SEM TRAVA DE CANAL, de propósito: este script escreve só em product_colors,
+ * que é dado do catálogo em PDF e nunca do Control — a API de parceiro só LÊ
+ * as bolinhas (partner.service.ts) para mandar a cor junto do pedido. Continua
+ * valendo depois que `canal_catalogo` virar 'api'. Quem mexe em
+ * `products.active` é o sincronizar.mjs ao lado, e esse tem a trava.
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';

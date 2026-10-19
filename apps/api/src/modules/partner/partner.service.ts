@@ -62,7 +62,9 @@ export interface PartnerOrder {
   /**
    * O app mudou este pedido DEPOIS de o Control o conhecer? É a comparação do
    * pedido de hoje com a foto do que o Control conhece (046, order_erp_sync):
-   * peças, desconto, condição de pagamento ou observação diferentes. NÃO é
+   * peças, desconto, condição de pagamento, observação ou CLIENTE diferentes
+   * (o cliente desde 19/10/2026 — o financeiro troca a loja do pedido quando o
+   * rep mandou na errada, e a nota sairia no CNPJ antigo). NÃO é
    * `updated_at > erp_order_set_at`: a trigger da 013 grava `updated_at` com a
    * hora do banco (sempre um pouco depois do carimbo da confirmação), e o
    * faturamento e as notas regravam `updated_at` sem mudar nada que o Control
@@ -137,6 +139,8 @@ export interface EnderecoDoCliente {
 
 interface OrderRow {
   id: string;
+  /** O cliente do pedido HOJE (001/014) — entra na comparação com a foto. */
+  customer_id?: string | null;
   order_number?: number | null;
   status: string;
   total: number | null;
@@ -213,7 +217,7 @@ const COLUNAS_DO_CADASTRO_REAL =
 
 function buildOrderSelect(c: ColunasOpcionais): string {
   return `
-    id, ${c.orderNumber ? 'order_number, ' : ''}status, total, notes,
+    id, customer_id, ${c.orderNumber ? 'order_number, ' : ''}status, total, notes,
     created_at, updated_at, erp_order_id, price_table_erp_code, price_column,
     ${c.priceTable ? 'price_table_id, ' : ''}
     ${c.solicitado ? 'erp_requested_at, ' : ''}
@@ -316,8 +320,13 @@ type FotosDoControl = Map<string, PedidoParaComparar>;
 /**
  * O app mudou o pedido depois de o Control o conhecer? A comparação é a mesma
  * do aviso "Atualizar no ERP" da tela (`divergenciaComOErp`): peças, desconto,
- * condição e observação do pedido de hoje contra a foto. Sem número, sem foto
- * ou sem a 046: `null` (não se acusa nada).
+ * condição, observação e CLIENTE do pedido de hoje contra a foto. Sem número,
+ * sem foto ou sem a 046: `null` (não se acusa nada).
+ *
+ * O cliente entrou em 19/10/2026: o financeiro troca a loja de um pedido que
+ * já está no Control (o rep mandou na errada) e, sem isto, a nota saía no CNPJ
+ * antigo sem ninguém ser avisado. Foto que não diz cliente nenhum não acusa a
+ * troca sozinha — a regra assimétrica está em `divergenciaComOErp`.
  */
 function alteradoAposImportacao(row: OrderRow, fotos: FotosDoControl | null): boolean | null {
   if (!row.erp_order_id || !fotos) return null;
@@ -333,6 +342,7 @@ function alteradoAposImportacao(row: OrderRow, fotos: FotosDoControl | null): bo
     discount_percent: row.discount_percent ?? null,
     payment_condition_id: row.payment_condition_id ?? null,
     notes: row.notes,
+    customer_id: row.customer_id ?? null,
   };
   return divergenciaComOErp(foto, hoje).mudou;
 }
@@ -344,6 +354,8 @@ interface LinhaDaFoto {
   desconto: number | string | null;
   condicao: string | null;
   observacao: string | null;
+  /** O cliente que o Control conhece. `null` na foto que não o guarda. */
+  cliente: string | null;
 }
 
 /**
@@ -364,7 +376,8 @@ async function fotosDoControl(company_id: string, rows: OrderRow[]): Promise<Fot
         .from('order_erp_sync')
         .select(
           'order_id, itens:snapshot->items, desconto:snapshot->discount_percent, ' +
-            'condicao:snapshot->>payment_condition_id, observacao:snapshot->>notes',
+            'condicao:snapshot->>payment_condition_id, observacao:snapshot->>notes, ' +
+            'cliente:snapshot->>customer_id',
         )
         .eq('company_id', company_id)
         .in('order_id', lote)
@@ -377,6 +390,7 @@ async function fotosDoControl(company_id: string, rows: OrderRow[]): Promise<Fot
         discount_percent: l.desconto == null ? null : Number(l.desconto),
         payment_condition_id: l.condicao ?? null,
         notes: l.observacao ?? null,
+        customer_id: l.cliente ?? null,
       });
     }
   }
@@ -1149,3 +1163,135 @@ export async function listarExcluidosComNumero(
   return excluidos;
 }
 
+// ─── Pedidos CANCELADOS no app que o Control pode ter ───────────────────────
+
+export interface PedidoCanceladoParceiro {
+  /** O id que o pedido tem no app (o mesmo do `GET /pedidos`). */
+  id: string;
+  numero: number | null;
+  /** O número do Control, quando o pedido já o tinha. */
+  pedido_erp: string | null;
+  cancelado_em: string;
+  /** O motivo pelo texto que ele tinha NA HORA (orders.cancel_reason_label). */
+  motivo: string | null;
+  /** A observação de quem cancelou (orders.cancel_note), quando houve. */
+  observacao: string | null;
+}
+
+interface LinhaCancelada {
+  id: string;
+  /** Ausente no banco que ainda não tem a 009 (ver `colunasDoCancelado`). */
+  order_number?: number | null;
+  erp_order_id: string | null;
+  cancelled_at: string;
+  cancel_reason_label: string | null;
+  cancel_note: string | null;
+}
+
+/**
+ * As colunas da lista, com `order_number` só quando ela existe (009) — como
+ * `buildOrderSelect` faz na fila. `string` (e não literal) para o PostgREST
+ * não inferir a linha.
+ */
+function colunasDoCancelado(temNumero: boolean): string {
+  const numero = temNumero ? 'order_number, ' : '';
+  return `id, ${numero}erp_order_id, cancelled_at, cancel_reason_label, cancel_note`;
+}
+
+/**
+ * O que a lista devolve quando o banco desta marca ainda não guarda o
+ * cancelamento (a 053, aqui dentro).
+ *
+ * Não é só a lista que falta: sem ela o app não cancela pedido nenhum (a tela
+ * recusa com "migração pendente"), e aprovado não vai para 'rejected' por
+ * outro caminho (ORDER_STATUS_FLOW). Lista vazia aqui é a verdade.
+ *
+ * A frase sai no corpo da resposta, que é contrato público: fala do que o
+ * parceiro vê, sem número de migração do app (19/10/2026 — o programa do
+ * parceiro registra e mostra esta frase crua).
+ */
+const AVISO_SEM_CANCELAMENTO =
+  'Esta marca ainda não guarda o cancelamento de pedido: a lista vem sempre vazia, e aqui o pedido ' +
+  'que o Control já conhece ainda não pode ser cancelado no app.';
+
+/** O mesmo, quando o banco não registra a solicitação ao Control (a 049). */
+const AVISO_SEM_SOLICITACAO =
+  'Esta marca ainda não registra a solicitação ao Control: a lista traz só o pedido cancelado que ' +
+  'já tinha número do Control.';
+
+/**
+ * Os pedidos CANCELADOS no app que o Control pode ter — para o ERP não faturar
+ * um pedido que a fábrica já cancelou (053).
+ *
+ * Cancelar manda o pedido para 'rejected': ele sai da fila (`GET /pedidos`, só
+ * 'approved') e da reconciliação (`?incluir=todos`, só 'approved' e
+ * 'sent_erp'). Sumir da lista é a única notícia que o Control tinha — e sumir
+ * não se distingue de "ainda não chegou". Esta lista é o aviso explícito.
+ *
+ * SÓ o que o Control pode ter, como na exclusão avisada (exclusaoPeloControl):
+ * pedido com número do Control, ou solicitado pelo financeiro (049 — o Control
+ * pode tê-lo importado e ainda não confirmado). Aprovado que ninguém mandou
+ * lançar, rascunho e pedido recusado na triagem nunca chegaram lá.
+ *
+ * Nunca devolve cliente, peças nem quem cancelou: id, números, o momento, o
+ * motivo e a observação. A lista vem inteira, do mais antigo para o mais novo,
+ * e erro em qualquer página sobe.
+ *
+ * O status não entra no filtro de propósito: 'rejected' é terminal
+ * (ORDER_STATUS_FLOW) e só o cancelamento carimba `cancelled_at`, então a
+ * coluna sozinha já é o sinal — e é ela que o `desde` compara.
+ */
+export async function listarCanceladosDoControl(
+  company_id: string,
+  desde?: string,
+): Promise<{ cancelados: PedidoCanceladoParceiro[]; avisos: string[] }> {
+  // Sem a 053 não existe cancelamento gravado: lista vazia COM aviso, nunca
+  // 500 — a PLUMENE roda hoje assim. Mas um soluço na sonda não pode virar
+  // "nenhum cancelado" (o Control fatura o pedido cancelado): aí o erro sobe e
+  // o robô tenta de novo na próxima rodada.
+  if (!(await detectarOuFalhar('orders', 'cancelled_at'))) {
+    return { cancelados: [], avisos: [AVISO_SEM_CANCELAMENTO] };
+  }
+  // `detectarOuFalhar`, e não `detectar`: `erp_requested_at` é FILTRO da lista,
+  // não só campo de saída (mesma razão do `invoiced` em `detectarColunas`). Com
+  // `detectar`, um soluço de rede na sonda viraria 200 com a lista truncada —
+  // só quem já tinha número — mais um aviso falso de migração ausente, e o
+  // cancelado solicitado e ainda sem número ficaria para trás com o cursor já
+  // avançado. Aqui o erro sobe (500) e o robô tenta de novo na próxima rodada;
+  // ausência de verdade (42703) continua degradando com o aviso.
+  const solicitado = await detectarOuFalhar('orders', 'erp_requested_at');
+  // `order_number` (009) pode faltar como qualquer outra; é campo de saída, e
+  // sem ela o `numero` sai null — degradar aqui é inofensivo.
+  const temNumero = await detectar('orders', 'order_number');
+
+  const linhas = await buscarTudoOuFalhar<LinhaCancelada>((de, ate) => {
+    let query = supabase.from('orders').select(colunasDoCancelado(temNumero)).eq('company_id', company_id);
+    query = query.not('cancelled_at', 'is', null);
+    // Sem a 049 o "solicitado" não existe: sobra o pedido com número.
+    if (solicitado) query = query.or('erp_order_id.not.is.null,erp_requested_at.not.is.null');
+    else query = query.not('erp_order_id', 'is', null);
+    if (desde) query = query.gte('cancelled_at', desde);
+    // O desempate por id é o que faz o `.range()` valer: dois cancelamentos no
+    // mesmo instante trocariam de lugar entre uma página e a outra. O
+    // `cancelled_at` nunca é regravado (ver `cancelarPedido`, caminho "só o
+    // motivo"), então nenhuma linha já lida pula para o fim da ordem no meio
+    // da leitura — que é o furo que `buscarPelaChaveOuFalhar` fecha nas listas
+    // de cadastro, onde o `updated_at` muda o tempo todo.
+    return query
+      .order('cancelled_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(de, ate);
+  });
+
+  const avisos: string[] = [];
+  if (!solicitado) avisos.push(AVISO_SEM_SOLICITACAO);
+  const cancelados = linhas.map((linha) => ({
+    id: linha.id,
+    numero: linha.order_number ?? null,
+    pedido_erp: textoOuNull(linha.erp_order_id),
+    cancelado_em: linha.cancelled_at,
+    motivo: textoOuNull(linha.cancel_reason_label),
+    observacao: textoOuNull(linha.cancel_note),
+  }));
+  return { cancelados, avisos };
+}
