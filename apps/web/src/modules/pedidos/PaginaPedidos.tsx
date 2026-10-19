@@ -20,6 +20,7 @@ import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.j
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import {
   faturaPeloControl,
+  mostraPlanilhaDoControl,
   nomeDoComprador,
   origemParaExibir,
   seloDoPedido,
@@ -166,6 +167,11 @@ export function PaginaPedidos() {
   // é a de sempre e o servidor recusa o carimbo com FATURAMENTO_PELO_CONTROL.
   const [canais, setCanais] = useState<CanaisDoPedido | null>(null);
   const faturadoPeloControl = faturaPeloControl(canais);
+  // O canal de PEDIDOS manda na planilha do Control: com ele na API quem
+  // lança é o programa da fábrica, e exportar para importar à mão colocaria o
+  // mesmo pedido duas vezes no Control. Sem resposta (offline), a planilha
+  // fica — é o jeito de trabalhar enquanto o canal é manual.
+  const ofereceAPlanilha = mostraPlanilhaDoControl(canais, MARCA.exportaControl);
   const [faturando, setFaturando] = useState<string | null>(null);
   // O carimbo trava o pedido para sempre — ninguém fatura sem confirmar antes.
   const [confirmandoFatura, setConfirmandoFatura] = useState<Order | null>(null);
@@ -361,8 +367,12 @@ export function PaginaPedidos() {
     };
   }, [token]);
 
+  // Até 19/10/2026 só a venda interna perguntava os canais, porque só o
+  // "Marcar faturado" do cartão dependia deles. Agora a exportação da planilha
+  // também depende, e ela aparece para quem tem pedido na tela: pergunta
+  // também quando a marca tem o formulário do Control.
   useEffect(() => {
-    if (!token || !ehVendaInterna) return;
+    if (!token || (!ehVendaInterna && !MARCA.exportaControl)) return;
     api
       .get<ApiResponse<CanaisDoPedido | null>>('/orders/canais', token)
       .then((res) => setCanais(res.data))
@@ -418,6 +428,11 @@ export function PaginaPedidos() {
 
   const isInitialLoading = orders === undefined || (loading && (orders?.length ?? 0) === 0);
   const hasOrders = (orders?.length ?? 0) > 0;
+  // A escolha de pedidos só existe enquanto a planilha existe. Os canais
+  // chegam DEPOIS da tela: a resposta 'api' fecha a escolha que já estava
+  // aberta, em vez de deixar o financeiro marcando pedidos para um botão que
+  // acabou de sumir.
+  const escolhendoParaExportar = selectMode && ofereceAPlanilha;
 
   function toggleSelectMode() {
     setSelectMode((v) => !v);
@@ -435,6 +450,9 @@ export function PaginaPedidos() {
 
   async function handleExport() {
     if (!token || selected.size === 0) return;
+    // O canal pode ter virado 'api' entre o toque e este ponto: nenhuma
+    // planilha sai depois que o Control passou a receber os pedidos sozinho.
+    if (!ofereceAPlanilha) return;
     setExporting(true);
     setAvisosDaExportacao([]);
     setPacoteDaExportacao(null);
@@ -522,7 +540,7 @@ export function PaginaPedidos() {
           {hasOrders && <p className="text-sm text-muted-foreground">{filtered.length} de {orders?.length}</p>}
         </div>
         <div className="flex items-center gap-2">
-          {selectMode ? (
+          {escolhendoParaExportar ? (
             <Button variant="outline" size="md" onClick={toggleSelectMode}>
               <X className="h-4 w-4" strokeWidth={2.5} />
               Cancelar
@@ -530,14 +548,25 @@ export function PaginaPedidos() {
           ) : (
             // A exportação preenche o formulário oficial do Control da Corpo
             // Sensual — instalação de outra marca esconde o botão até ter
-            // formato próprio (VITE_BRAND_CONTROL_EXPORT=false).
+            // formato próprio (VITE_BRAND_CONTROL_EXPORT=false). Com o canal
+            // de pedidos na API some também, e aí sai a frase: lá o Control
+            // já recebe o pedido pela integração.
             hasOrders &&
-            MARCA.exportaControl && (
+            MARCA.exportaControl &&
+            (ofereceAPlanilha ? (
               <Button variant="outline" size="md" onClick={toggleSelectMode}>
                 <FileSpreadsheet className="h-4 w-4" strokeWidth={2.5} />
                 Exportar
               </Button>
-            )
+            ) : (
+              // No lugar do botão, a frase: sem ela o financeiro procura a
+              // exportação, não acha, e acha que o app quebrou. Estreita e
+              // quebrando em linhas, para ocupar no celular o mesmo espaço
+              // que o botão ocupava ao lado de "Novo pedido".
+              <span className="max-w-[7.5rem] text-right text-xs leading-tight text-muted-foreground">
+                O Control recebe os pedidos sozinho.
+              </span>
+            ))
           )}
           {/* Quem só olha não monta pedido (visualizador, 054): o link some em
               vez de levar a uma tela que ele não pode usar. "Exportar" e
@@ -551,7 +580,7 @@ export function PaginaPedidos() {
         </div>
       </div>
 
-      {selectMode && (
+      {escolhendoParaExportar && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-primary/30 bg-primary-soft p-3">
           <p className="text-sm font-medium text-foreground">{selected.size} selecionado(s)</p>
           <Button size="sm" onClick={handleExport} disabled={selected.size === 0 || exporting}>
@@ -773,7 +802,7 @@ export function PaginaPedidos() {
               </>
             );
 
-            if (selectMode) {
+            if (escolhendoParaExportar) {
               return (
                 <button
                   key={order.id}

@@ -11,11 +11,18 @@
  * isolado no começo do nome.
  *
  * Uso: node conferir-precos-tabela.mjs caminho/tabelas.json [--aplicar]
+ *
+ * TRAVA (048): só o --aplicar depende de `companies.canal_catalogo = 'carga'`.
+ * Conferir o PDF contra o banco continua valendo depois que o Control virar o
+ * dono do catálogo — é justamente aí que se quer ver se o preço dele bate com
+ * o PDF; o que fica recusado é CORRIGIR por aqui, que seria um segundo
+ * escritor em `product_prices`.
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import { exigirCanalDeCarga } from './canal-de-carga.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const EMPRESA = '4a9fccd7-6241-4b8e-9c0b-b18aca364fba';
@@ -37,6 +44,16 @@ if (!arquivo) {
   console.error('Uso: node conferir-precos-tabela.mjs tabelas.json [--aplicar]');
   process.exit(1);
 }
+
+// ─── O canal do catálogo (só para corrigir) ──────────────────────────────────
+if (APLICAR) {
+  await exigirCanalDeCarga(db, {
+    empresas: EMPRESA,
+    canais: ['catalogo'],
+    acao: 'A correção de preço por aqui',
+  });
+}
+
 const doPdf = JSON.parse(readFileSync(arquivo, 'utf8'));
 
 /** A faixa MAIOR do PDF: EG (e irmãos) ou a grade 48-54. */

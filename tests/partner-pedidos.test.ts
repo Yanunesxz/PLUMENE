@@ -503,6 +503,84 @@ describe('alterado_apos_importacao — o app mexeu depois de o Control conhecer 
   });
 });
 
+describe('alterado_apos_importacao — a troca de cliente (19/10/2026)', () => {
+  /**
+   * O financeiro troca a loja de um pedido que já está no Control (o rep
+   * mandou na errada). Sem o cliente na comparação, a nota saía no CNPJ
+   * antigo e o Control nunca era avisado.
+   */
+  const PECA = { ...ITEM, product_id: 'p1', variant_id: 'v1' };
+  const LOJA_ERRADA = 'cliente-errado';
+  const LOJA_CERTA = 'cliente-certo';
+  /** A foto (046) do pedido como o Control o conhece. */
+  const foto = (order_id: string, extra: Record<string, unknown> = {}) => ({
+    order_id,
+    itens: [{ product_id: 'p1', variant_id: 'v1', quantity: 3, unit_price: 50 }],
+    desconto: 10,
+    condicao: null,
+    observacao: null,
+    cliente: LOJA_ERRADA,
+    ...extra,
+  });
+  const importado = (id: string, customer_id: string | null) =>
+    pedido({ id, status: 'sent_erp', erp_order_id: `CS174${id.slice(-2)}`, items: [PECA], customer_id });
+
+  it('pedido trocado de cliente acende; o que não mudou de cliente, não; foto sem cliente não acende sozinha', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        {
+          data: [
+            importado('o1', LOJA_CERTA), // trocado depois do lançamento
+            importado('o2', LOJA_ERRADA), // continua na mesma loja
+            importado('o3', LOJA_CERTA), // foto velha, que não guarda cliente
+            importado('o4', null), // pedido sem cadastro (vitrine), foto velha
+          ],
+          error: null,
+        },
+      ]),
+      price_tables: { data: [], error: null },
+      order_erp_sync: emSequencia(OK, {
+        data: [foto('o1'), foto('o2'), foto('o3', { cliente: null }), foto('o4', { cliente: null })],
+        error: null,
+      }),
+    });
+
+    const lista = await getPartnerOrders(EMPRESA, { incluirImportados: true });
+
+    expect(lista.map((p) => [p.id, p.alterado_apos_importacao])).toEqual([
+      ['o1', true],
+      ['o2', false],
+      // Foto que não diz cliente nenhum não acusa a troca: fosse simétrico,
+      // TODO pedido já lançado acenderia de uma vez no dia do deploy. Quem
+      // fecha esse buraco é o carimbo do cliente antigo na foto, na troca.
+      ['o3', false],
+      ['o4', false],
+    ]);
+    // A foto é lida com o cliente dentro, e o pedido de hoje também traz o seu.
+    const selectDaFoto = fake.filtrosDe('order_erp_sync', 'select').map((f) => String(f.args[0])).at(-1)!;
+    expect(selectDaFoto).toContain('cliente:snapshot->>customer_id');
+    const selectDaLista = fake
+      .filtrosDe('orders', 'select')
+      .map((f) => String(f.args[0]))
+      .find((s) => s.includes('customer:customers'))!;
+    expect(selectDaLista).toContain('customer_id');
+  });
+
+  it('pedido que nunca foi ao Control não é afetado pela troca de cliente', async () => {
+    const { getPartnerOrders, fake } = await carregar({
+      orders: filaDaListagem([
+        { data: [pedido({ id: 'o9', customer_id: LOJA_CERTA, items: [PECA] })], error: null },
+      ]),
+      price_tables: { data: [], error: null },
+    });
+
+    const [p] = await getPartnerOrders(EMPRESA, {});
+
+    expect(p!.alterado_apos_importacao).toBeNull();
+    expect(fake.filtrosDe('order_erp_sync')).toHaveLength(0);
+  });
+});
+
 // ─── O payload ───────────────────────────────────────────────────────────────
 
 describe('o pedido como o ERP recebe', () => {

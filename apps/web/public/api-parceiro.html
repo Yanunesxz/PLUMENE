@@ -601,7 +601,7 @@
       <span class="sep">/</span>
       <span>versão 1</span>
       <span class="sep">/</span>
-      <span>atualizado 22 set 2026</span>
+      <span>atualizado 19 out 2026</span>
     </p>
     <h1>Integração de pedidos<br>para o seu ERP</h1>
     <p class="lede">
@@ -613,9 +613,9 @@
     <p class="lede" style="margin-top: 12px">
       Não exige biblioteca, componente ou linguagem específica: são chamadas
       HTTP com resposta em JSON — quatro no ciclo do pedido (testar, buscar,
-      confirmar, faturar), quatro para acertar o que aconteceu antes da
+      confirmar, faturar), cinco para acertar o que aconteceu antes da
       integração ou fora dela (conciliar, conferir a conciliação, listar os
-      excluídos e avisar uma exclusão), e as que o seu ERP usa para
+      excluídos, listar os cancelados e avisar uma exclusão), e as que o seu ERP usa para
       <b>mandar tudo</b> para o aplicativo (clientes, representantes, tabelas,
       condições, produtos, preços, estoque e o retrato do cliente) e para
       <b>puxar</b> o que mudou no aplicativo. A mesma API atende
@@ -623,6 +623,35 @@
       apenas os seus pedidos. Cada marca tem a sua URL e a sua chave (ver
       <a href="#urls">URLs e chaves por marca</a>).
     </p>
+    <div class="note warn" style="margin-top: 16px">
+      <span class="note-t">O que mudou em 19 de outubro de 2026</span>
+      <p>
+        Ainda antes da primeira chave ser emitida; nenhum campo foi renomeado
+        nem removido.
+      </p>
+      <ul>
+        <li>o <code>desde</code> do <code>GET /pedidos</code> passou a
+            <b>exigir fuso</b>, como as demais rotas:
+            <code>?desde=2026-10-15T00:00:00</code> agora responde
+            <span class="st er">400</span> <code>INVALID_DESDE</code>. É a
+            única mudança que poderia quebrar uma chamada;</li>
+        <li>entrou <code>GET /partner/v1/pedidos/cancelados</code> — o pedido
+            cancelado no aplicativo some da fila e da reconciliação, e é aqui
+            que você descobre, para não faturar um cancelado (ver
+            <a href="#ep-cancelados">Pedidos cancelados no aplicativo</a>);</li>
+        <li><code>alterado_apos_importacao</code> passou a comparar também o
+            <b>cliente</b> do pedido, porque o financeiro pode trocar a loja de
+            um pedido que já está no Control;</li>
+        <li>o <code>servidor_hora</code> dos <code>GET /pedidos/cancelados</code>
+            e <code>GET /pedidos/excluidos</code> passou a ser a hora de
+            <b>antes</b> da consulta, menos 2 minutos — guarde-o e mande como
+            <code>desde</code> na próxima chamada;</li>
+        <li>correção de texto: o canal <code>retrato</code> só aceita
+            <code>carga</code> ou <code>api</code>, e o
+            <code>GET /pedidos/excluidos</code> lista só o pedido excluído que
+            tinha número do Control.</li>
+      </ul>
+    </div>
     <div class="baseurl">
       <span class="k">Corpo Sensual</span>
       <span class="v">https://setorxweb-production.up.railway.app</span>
@@ -648,6 +677,7 @@
       <li><a href="#endpoints">Endpoints</a></li>
       <li><a href="#canais">Canal por empresa</a></li>
       <li><a href="#ep-passivo">Conciliação e excluídos</a></li>
+      <li><a href="#ep-cancelados">Pedidos cancelados no aplicativo</a></li>
       <li><a href="#ep-faturamento">Faturamento e notas</a></li>
       <li><a href="#ep-cadastros">Cadastros (clientes e reps)</a></li>
       <li><a href="#ep-catalogo">Catálogo, retrato e sincronização</a></li>
@@ -886,6 +916,19 @@
         </p>
       </div>
 
+      <div class="note warn">
+        <span class="note-t">Na mesma passada: os cancelados</span>
+        <p>
+          O financeiro pode cancelar um pedido que já está no Control. O pedido
+          cancelado <b>some</b> da fila e da reconciliação, e sumir não se
+          distingue de "ainda não chegou". Por isso, na mesma rodada de 1
+          minuto, chame também
+          <code>GET /partner/v1/pedidos/cancelados?desde=</code> e <b>não fature
+          nada que apareça ali</b> — ver
+          <a href="#ep-cancelados">Pedidos cancelados no aplicativo</a>.
+        </p>
+      </div>
+
       <h3>Intervalos recomendados</h3>
       <div class="tw">
         <table>
@@ -893,7 +936,7 @@
             <tr><th>O quê</th><th>Rotas</th><th>Quando</th></tr>
           </thead>
           <tbody>
-            <tr><td><b>Fila de pedidos</b></td><td><code>GET /pedidos</code> → grava no Control → <code>POST /pedidos/{id}/confirmar</code></td><td><b>a cada 1 minuto</b> — o financeiro fica olhando a tela esperando o número</td></tr>
+            <tr><td><b>Fila de pedidos</b></td><td><code>GET /pedidos</code> → grava no Control → <code>POST /pedidos/{id}/confirmar</code>; e <code>GET /pedidos/cancelados?desde=</code> na mesma passada</td><td><b>a cada 1 minuto</b> — o financeiro fica olhando a tela esperando o número (guarde o <code>servidor_hora</code> da resposta dos cancelados para mandar como <code>desde</code> na próxima)</td></tr>
             <tr><td><b>Cadastros e alterações, nas duas mãos</b></td><td><code>POST /clientes</code>, <code>POST /representantes</code> (só o que mudou); <code>GET /clientes?desde=</code>, <code>GET /representantes?desde=</code>, <code>GET /pedidos?incluir=todos&amp;desde=</code></td><td><b>a cada 5 minutos</b></td></tr>
             <tr><td><b>Faturamento</b></td><td><code>POST /faturamento</code></td><td><b>assim que a nota sair</b> (ou a cada 5 minutos)</td></tr>
             <tr><td><b>Catálogo, preço e estoque</b></td><td><code>POST /tabelas-preco</code>, <code>/condicoes-pagamento</code>, <code>/produtos</code>, <code>/precos</code>, <code>/estoque</code></td><td><b>a cada 30 minutos</b></td></tr>
@@ -931,6 +974,7 @@
             <li><b>A confirmação</b> — <code>POST /pedidos/{id}/confirmar</code> (e <code>POST /conciliar</code> para o passivo).</li>
             <li><b>Alterações de cliente, representante e pedido</b> — <code>GET /clientes?desde=</code> (com <code>novo_no_control</code> e <code>alterado_no_app</code>), <code>GET /representantes?desde=</code>, <code>GET /pedidos?incluir=todos&amp;desde=</code> (<code>alterado_apos_importacao</code>).</li>
             <li><b>Os excluídos</b> — <code>GET /pedidos/excluidos</code>: apagados no aplicativo que já tinham número.</li>
+            <li><b>Os cancelados</b> — <code>GET /pedidos/cancelados</code>: cancelados no aplicativo que o Control pode ter, para você não faturar um cancelado.</li>
             <li><b>A conciliação</b> — <code>GET /conciliacao</code>: contagens da fila e do passivo; e o <code>GET /status</code>, com os canais e o <code>sincronizar_agora</code>.</li>
           </ul>
         </div>
@@ -1065,9 +1109,10 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
       <h2><span class="num">06</span>Endpoints</h2>
       <p class="sub">
         Quatro fazem o ciclo do pedido — testar a conexão, buscar a fila,
-        confirmar a importação e informar o faturamento. Quatro acertam o que
+        confirmar a importação e informar o faturamento. Cinco acertam o que
         aconteceu antes da integração ou fora dela — conciliar o número, conferir
-        a conciliação, listar os excluídos e avisar que o Control excluiu. As
+        a conciliação, listar os excluídos, listar os cancelados e avisar que o
+        Control excluiu. As
         outras são a mão inversa: o seu ERP <b>manda</b> clientes,
         representantes, tabelas de preço, condições de pagamento, produtos,
         preços, estoque e o retrato do cliente, e <b>puxa</b> o que mudou no
@@ -1086,6 +1131,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <tr><td><code>POST /partner/v1/pedidos/{id}/conciliar</code></td><td>Dar o número a um pedido que foi para o ERP sem número (o passivo)</td><td>pedidos</td></tr>
             <tr><td><code>GET /partner/v1/conciliacao</code></td><td>Só contagens, para conferir o passivo antes e depois de cada rodada</td><td class="t-mut">—</td></tr>
             <tr><td><code>GET /partner/v1/pedidos/excluidos</code></td><td>Pedidos excluídos no aplicativo que já tinham número do ERP</td><td class="t-mut">—</td></tr>
+            <tr><td><code>GET /partner/v1/pedidos/cancelados</code></td><td>Pedidos cancelados no aplicativo que o Control pode ter (para não faturar um cancelado)</td><td>pedidos</td></tr>
             <tr><td><code>POST /partner/v1/faturamento</code></td><td>Informar o que foi faturado (com a nota e as peças) — fecha o ciclo</td><td>faturamento</td></tr>
             <tr><td><code>POST /partner/v1/pedidos/{id}/excluir</code></td><td>O Control excluiu o pedido do lado dele e avisa; o aplicativo exclui também</td><td>pedidos</td></tr>
             <tr><td><code>POST /partner/v1/clientes</code></td><td>O ERP envia os clientes (cadastro)</td><td>cadastro</td></tr>
@@ -1119,7 +1165,7 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             <tr><th>Canal</th><th>Rotas que dependem dele</th><th>Valor que libera a API</th></tr>
           </thead>
           <tbody>
-            <tr><td><code>pedido_erp</code></td><td><code>GET /pedidos</code>, <code>POST /confirmar</code>, <code>POST /conciliar</code>, <code>POST /pedidos/{id}/excluir</code></td><td><code>api</code></td></tr>
+            <tr><td><code>pedido_erp</code></td><td><code>GET /pedidos</code>, <code>GET /pedidos/cancelados</code>, <code>POST /confirmar</code>, <code>POST /conciliar</code>, <code>POST /pedidos/{id}/excluir</code></td><td><code>api</code></td></tr>
             <tr><td><code>faturamento</code></td><td><code>POST /faturamento</code></td><td><code>api</code></td></tr>
             <tr><td><code>cadastro</code></td><td><code>POST /clientes</code>, <code>POST /representantes</code>, <code>GET /clientes?desde=</code>, <code>GET /representantes?desde=</code></td><td><code>api</code></td></tr>
             <tr><td><code>catalogo</code></td><td><code>POST /tabelas-preco</code>, <code>POST /condicoes-pagamento</code>, <code>POST /produtos</code>, <code>POST /precos</code>, <code>POST /estoque</code></td><td><code>api</code></td></tr>
@@ -1171,6 +1217,9 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
         <code>GET /status</code>, <code>GET /conciliacao</code>,
         <code>GET /pedidos/excluidos</code> e <code>POST /sincronizacao</code>
         funcionam com qualquer canal — são diagnóstico e controle, não dado.
+        <b><code>GET /pedidos/cancelados</code> não está nesse grupo:</b> ele
+        exige o canal de pedidos ligado, como a própria fila (com o canal
+        fechado, <span class="st wr">409</span> <code>CANAL_FECHADO</code>).
       </p>
 
       <h3>Ciclo do pedido</h3>
@@ -1201,9 +1250,11 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             empresa (ver <a href="#canais">Canal por empresa</a>):
             <code>pedido_erp</code> é <code>manual</code>, <code>api</code> ou
             <code>sync_py</code>; <code>faturamento</code> é <code>manual</code> ou
-            <code>api</code>; <code>cadastro</code>, <code>catalogo</code> e
-            <code>retrato</code> são <code>carga</code>, <code>api</code> ou
-            <code>firebird</code>. Só <code>api</code> libera a rota.
+            <code>api</code>; <code>cadastro</code> e <code>catalogo</code> são
+            <code>carga</code>, <code>api</code> ou <code>firebird</code>;
+            <code>retrato</code> é <code>carga</code> ou <code>api</code>
+            (nunca <code>firebird</code> — o retrato nunca veio do Firebird).
+            Só <code>api</code> libera a rota.
           </p>
           <p>
             <code>sincronizar_agora</code> (sempre booleano) é o botão "Pedir
@@ -1272,6 +1323,22 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
             nunca uma lista parcial. Exige o canal de pedidos ligado para a API
             (<span class="st wr">409</span> <code>CANAL_FECHADO</code>).
           </p>
+          <div class="note warn">
+            <span class="note-t">O desde agora exige fuso (19/10/2026)</span>
+            <p>
+              Esta era a última rota que aceitava
+              <code>?desde=2026-10-15T00:00:00</code> sem fuso — e lia o texto
+              no fuso do <b>servidor</b>, não no seu: a janela andava até 3
+              horas em silêncio e o pedido mudado dentro dela não saía em
+              puxada nenhuma. Agora a regra é a mesma das outras rotas:
+              <code>?desde=2026-10-15T00:00:00Z</code> ou
+              <code>?desde=2026-10-15T00:00:00-03:00</code>; sem fuso responde
+              <span class="st er">400</span> <code>INVALID_DESDE</code>. Fuso
+              positivo vai na URL como <code>%2B</code> (<code>+03:00</code> →
+              <code>%2B03:00</code>). Nada quebra do seu lado — nenhuma chamada
+              foi feita ainda.
+            </p>
+          </div>
 
           <h3>Parâmetros (opcionais)</h3>
           <div class="tw">
@@ -1284,8 +1351,9 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
                   <td><code>desde</code></td>
                   <td class="t-mut"><code>2026-07-15T00:00:00Z</code></td>
                   <td>Só pedidos alterados (<code>atualizado_em</code>) a partir
-                      dessa data e hora. Serve como marcador do "até onde eu já
-                      puxei". Data inválida responde <span class="st er">400</span>
+                      dessa data e hora, em ISO <b>com fuso</b>. Serve como
+                      marcador do "até onde eu já puxei". Sem fuso ou fora do
+                      formato responde <span class="st er">400</span>
                       <code>INVALID_DESDE</code>.</td>
                 </tr>
                 <tr>
@@ -1323,7 +1391,8 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
               <b>Pedido editado depois da importação:</b> com
               <code>incluir=todos</code>, <code>alterado_apos_importacao</code>
               diz se o pedido de hoje está <b>diferente do que o Control
-              conhece</b> — peças, desconto, condição de pagamento ou observação.
+              conhece</b> — peças, desconto, condição de pagamento, observação
+              ou <b>cliente</b>.
               A comparação é com a foto que o aplicativo guarda quando o número
               do Control é gravado (e de novo quando alguém confirma na tela que
               atualizou no Control); <b>não</b> é a data de alteração do pedido,
@@ -1333,6 +1402,17 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
               aplicativo guardar a foto. Use
               <code>?incluir=todos&amp;desde=</code> na rodada de 5 minutos para
               espelhar essas alterações no ERP.
+            </p>
+            <p>
+              <b>Cliente trocado:</b> o financeiro do aplicativo pode trocar a
+              loja de um pedido que já está no Control — acontece quando o
+              representante escolhe a loja errada. Aí
+              <code>alterado_apos_importacao</code> fica <code>true</code> e o
+              bloco <code>cliente</code> já vem com o cliente NOVO
+              (<code>chave</code>, <code>codigo_erp</code>, razão social).
+              <b>A nota tem de sair no CNPJ que vier nesta resposta</b>, não no
+              do lançamento. A troca é bloqueada depois de o pedido ser
+              faturado, então isto só chega antes da nota.
             </p>
           </div>
 
@@ -1675,7 +1755,20 @@ curl -H <span class="s">"X-API-Key: SUA_CHAVE_AQUI"</span> \
           <p>
             Pedido com número do ERP não pode mais ser excluído no aplicativo; esta
             lista traz os que foram excluídos <b>antes</b> dessa trava, para o seu
-            ERP cancelar do lado dele. <code>desde</code> é opcional e, quando vem,
+            ERP cancelar do lado dele.
+          </p>
+          <p>
+            <b>Só entra aqui o pedido que tinha número do Control na hora da
+            exclusão.</b> Pedido excluído no aplicativo <b>sem</b> número nunca
+            aparece nesta lista — inclusive o que o próprio Control avisou por
+            <code>POST /pedidos/{id}/excluir</code> estando apenas solicitado
+            (sem número confirmado): esse some do aplicativo e não deixa linha
+            aqui. Para o pedido que sumiu e não está nesta lista, o caminho é
+            <a href="#ep-cancelados">Pedidos cancelados no aplicativo</a>: ou
+            ele foi cancelado, ou nunca teve número.
+          </p>
+          <p>
+            <code>desde</code> é opcional e, quando vem,
             precisa de fuso (<code>Z</code> ou <code>-03:00</code>) — sem fuso
             responde <span class="st er">400</span> <code>INVALID_DESDE</code>.
             Fuso positivo vai na URL como <code>%2B</code> (<code>+03:00</code> →
@@ -1707,6 +1800,16 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             Só id, número no aplicativo, número no ERP e o momento — nunca o
             pedido, o cliente ou quem excluiu.
           </p>
+          <p>
+            <b><code>servidor_hora</code> é a hora do aplicativo ANTES da
+            consulta, menos 2 minutos de folga</b> (desde 19/10/2026; antes era
+            tomada depois dela), como nos <code>GET /clientes</code> e
+            <code>GET /representantes</code>. Guarde-a e mande como
+            <code>desde</code> na próxima chamada: a folga é o que impede que
+            uma exclusão gravada enquanto a lista era lida fique de fora das
+            duas puxadas. O preço é o mesmo excluído sair de novo na puxada
+            seguinte, o que é inofensivo.
+          </p>
         </div>
       </div>
 
@@ -1717,9 +1820,29 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
         </div>
         <div class="ep-body">
           <p>
-            Pedido com número do Control <b>não pode ser excluído pela tela do
-            aplicativo</b> (nem pelo administrador): apagar de um lado só deixaria
-            o outro com um pedido fantasma. Quando o seu ERP exclui o pedido,
+            <b>A tela do aplicativo nunca apaga um pedido que o Control tem —
+            nem com número, nem solicitado</b> (nem pelo administrador): apagar
+            de um lado só deixaria o outro com um pedido fantasma. São duas
+            recusas: pedido <b>com número do Control</b>, a tela recusa com
+            <span class="st wr">409</span> <code>ORDER_HAS_ERP_NUMBER</code>; e
+            pedido <b>já solicitado ao Control e ainda sem número</b>, a tela
+            recusa com <span class="st wr">409</span>
+            <code>ORDER_REQUESTED_TO_ERP</code> — ele já saiu na fila
+            <code>GET /partner/v1/pedidos</code> e pode estar sendo gravado no
+            Control neste segundo. Quem quiser excluir precisa antes
+            <b>cancelar a solicitação</b> na tela; aí o pedido volta a ser um
+            aprovado comum e a exclusão passa.
+          </p>
+          <p>
+            Para você isso quer dizer uma coisa só: <b>pedido que some do
+            aplicativo sem passar por
+            <code>POST /partner/v1/pedidos/{id}/excluir</code> é um pedido que o
+            Control nunca recebeu.</b> Se ele estava no Control, ou a exclusão
+            veio de você, ou ele não foi excluído — foi cancelado (ver
+            <a href="#ep-cancelados">Pedidos cancelados no aplicativo</a>).
+          </p>
+          <p>
+            Quando o seu ERP exclui o pedido,
             avisa aqui — corpo <code>{ "motivo": "cliente desistiu" }</code>
             (opcional) — e o aplicativo exclui também, guardando uma cópia no
             histórico de excluídos com o nome do parceiro como quem excluiu e o
@@ -1750,9 +1873,116 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00</code></pre>
             </table>
           </div>
           <p class="t-mut">
-            O pedido excluído por aqui também aparece em
-            <code>GET /pedidos/excluidos</code>: o seu ERP deve ignorar o próprio
-            eco.
+            O pedido excluído por aqui aparece em
+            <code>GET /pedidos/excluidos</code> <b>só quando tinha número do
+            Control</b> (é o número na cópia que põe a linha na lista): o seu
+            ERP deve ignorar o próprio eco. O pedido que você excluiu por aviso
+            estando apenas solicitado, sem número confirmado, não deixa linha
+            em <code>/pedidos/excluidos</code> — você já sabe que ele sumiu,
+            porque foi você que pediu.
+          </p>
+        </div>
+      </div>
+
+      <h3 id="ep-cancelados">Pedidos cancelados no aplicativo</h3>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb">GET</span>
+          <span class="path">/partner/v1/pedidos/cancelados</span>
+        </div>
+        <div class="ep-body">
+          <p>
+            O financeiro e o administrador podem <b>cancelar</b> qualquer pedido
+            ainda não faturado, inclusive um que já tem número do Control. O
+            pedido cancelado sai da fila (<code>GET /pedidos</code>) e também da
+            reconciliação (<code>?incluir=todos</code>) — <b>some das duas
+            listas, e sumir não se distingue de "ainda não chegou"</b>. Esta
+            rota é o aviso explícito: chame-a na mesma rodada da fila e <b>não
+            fature o que aparecer aqui</b>.
+          </p>
+          <p>
+            <code>desde</code> é opcional e, quando vem, precisa de fuso
+            (<code>Z</code> ou <code>-03:00</code>) — sem fuso responde
+            <span class="st er">400</span> <code>INVALID_DESDE</code>. Fuso
+            positivo vai na URL como <code>%2B</code> (<code>+03:00</code> →
+            <code>%2B03:00</code>). A lista vem inteira, do mais antigo para o
+            mais novo, e o <code>desde</code> compara com a hora do
+            <b>cancelamento</b>, não com a do pedido. Exige o canal de pedidos
+            ligado para a API (<span class="st wr">409</span>
+            <code>CANAL_FECHADO</code>).
+          </p>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Requisição</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>GET /partner/v1/pedidos/cancelados
+GET /partner/v1/pedidos/cancelados?desde=2026-10-01T00:00:00-03:00</code></pre>
+          </div>
+          <div class="code">
+            <div class="code-bar">
+              <span class="code-lbl">Resposta 200</span>
+              <button class="copy" type="button">copiar</button>
+            </div>
+            <pre><code>{
+  <span class="k">"total"</span>: <span class="n">1</span>,
+  <span class="k">"servidor_hora"</span>: <span class="s">"2026-10-05T13:40:00.000Z"</span>,
+  <span class="k">"cancelados"</span>: [
+    {
+      <span class="k">"id"</span>: <span class="s">"d31b5083-…"</span>,
+      <span class="k">"numero"</span>: <span class="n">10231</span>,
+      <span class="k">"pedido_erp"</span>: <span class="s">"CS17379"</span>,
+      <span class="k">"cancelado_em"</span>: <span class="s">"2026-10-05T13:00:00+00:00"</span>,
+      <span class="k">"motivo"</span>: <span class="s">"CLIENTE CANCELOU"</span>,
+      <span class="k">"observacao"</span>: <span class="s">"a loja ligou pedindo para cancelar"</span>
+    }
+  ],
+  <span class="k">"avisos"</span>: []
+}</code></pre>
+          </div>
+          <div class="tw">
+            <table>
+              <thead>
+                <tr><th>Campo</th><th>O que é</th></tr>
+              </thead>
+              <tbody>
+                <tr><td><code>total</code></td><td>Quantos itens há em <code>cancelados</code>.</td></tr>
+                <tr><td><code>servidor_hora</code></td><td>A hora do aplicativo <b>ANTES</b> da consulta, menos 2 minutos de folga (ISO com fuso). Guarde-a e mande como <code>desde</code> na próxima chamada — a folga é o que garante que um cancelamento gravado durante a leitura não se perca entre as duas puxadas.</td></tr>
+                <tr><td><code>cancelados</code></td><td>A lista, do mais antigo para o mais novo. Pode vir vazia.</td></tr>
+                <tr><td><code>cancelados[].id</code></td><td>O <code>id</code> do pedido no aplicativo — o mesmo do <code>GET /pedidos</code>.</td></tr>
+                <tr><td><code>cancelados[].numero</code></td><td>O número do pedido no aplicativo (pode ser <code>null</code>).</td></tr>
+                <tr><td><code>cancelados[].pedido_erp</code></td><td>O número do Control. <code>null</code> quando o pedido foi solicitado e cancelado <b>antes</b> de você confirmar — nesse caso procure pelo <code>id</code>.</td></tr>
+                <tr><td><code>cancelados[].cancelado_em</code></td><td>Quando foi cancelado (ISO com fuso).</td></tr>
+                <tr><td><code>cancelados[].motivo</code></td><td>O texto do motivo <b>na hora</b> do cancelamento (o administrador pode renomear a lista depois, por isso guardamos o texto). Pode ser <code>null</code>.</td></tr>
+                <tr><td><code>cancelados[].observacao</code></td><td>O que quem cancelou escreveu, ou <code>null</code>.</td></tr>
+                <tr><td><code>avisos</code></td><td>Lista de frases em português, normalmente vazia. Quando vier preenchida, o servidor daquela marca ainda não tem um recurso e a lista <b>pode</b> ter vindo vazia ou incompleta por isso — leia a frase do aviso e não conclua "nenhum cancelado".</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="t-mut">
+            A lista só traz o pedido que o <b>Control pode ter</b>: com número
+            do Control, ou solicitado ao Control pelo financeiro. Nunca sai
+            cliente, peças, valor nem quem cancelou.
+          </p>
+          <div class="note warn">
+            <span class="note-t">Regra de ouro</span>
+            <p>
+              Pedido que aparece em <code>/pedidos/cancelados</code> nunca deve
+              ser faturado nem relançado. Se ele já tem nota no seu ERP, o
+              caminho é desfazer o faturamento lá e no aplicativo
+              (<code>POST /faturamento</code> com <code>"faturado": false</code>)
+              — não reabrir o pedido no aplicativo, que não tem volta de
+              cancelado.
+            </p>
+          </div>
+          <p class="t-mut">
+            Erros: os de sempre — <span class="st er">401</span>/<span class="st er">503</span>
+            na chave, <span class="st wr">409</span> <code>CANAL_FECHADO</code>,
+            <span class="st er">400</span> <code>INVALID_DESDE</code>,
+            <span class="st er">500</span> <code>INTERNAL_ERROR</code>. Como em
+            todas as leituras, um <span class="st er">500</span> nunca vira
+            lista vazia: na falha, tente na próxima rodada.
           </p>
         </div>
       </div>
@@ -3771,7 +4001,7 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
             <tr><td><span class="st er">503</span></td><td><code>PARTNER_API_DISABLED</code></td><td>todas</td><td>A integração ainda não foi liberada no servidor.</td></tr>
             <tr><td><span class="st er">401</span></td><td><code>PARTNER_UNAUTHORIZED</code></td><td>todas</td><td>Chave ausente ou errada no <code>X-API-Key</code> — inclusive a chave de uma marca na URL da outra.</td></tr>
             <tr><td><span class="st wr">409</span></td><td><code>CANAL_FECHADO</code></td><td>todas as rotas com canal</td><td>O canal da sua empresa não está ligado para a API (<code>canal</code>, <code>valor_atual</code>) — ver <a href="#canais">Canal por empresa</a>.</td></tr>
-            <tr><td><span class="st er">400</span></td><td><code>INVALID_DESDE</code></td><td>GET /pedidos, GET /pedidos/excluidos, GET /clientes, GET /representantes</td><td><code>desde</code> não é uma data ISO (fora do GET /pedidos, também sem fuso).</td></tr>
+            <tr><td><span class="st er">400</span></td><td><code>INVALID_DESDE</code></td><td>GET /pedidos, GET /pedidos/excluidos, GET /pedidos/cancelados, GET /clientes, GET /representantes</td><td><code>desde</code> não é uma data ISO <b>com fuso</b> — nas cinco rotas, desde 19/10/2026.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>MISSING_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Corpo sem <code>pedido_erp</code>, ou vazio.</td></tr>
             <tr><td><span class="st er">400</span></td><td><code>INVALID_PEDIDO_ERP</code></td><td>POST /confirmar, POST /conciliar</td><td>Número fora do formato (duas letras e até 10 dígitos).</td></tr>
             <tr><td><span class="st er">404</span></td><td><code>ORDER_NOT_FOUND</code></td><td>POST /confirmar, POST /conciliar, POST /excluir</td><td>Não há pedido com esse <code>id</code> na sua empresa.</td></tr>
@@ -3974,12 +4204,49 @@ http.send(confirma, HttpResponse.BodyHandlers.ofString());</code></pre>
         <code>cor</code> continua <code>"00001"</code>. E <code>observacoes</code>
         deixa de trazer a cor anotada para uma peça que saiu do pedido.
       </p>
+      <p>
+        <b>As mudanças de 19 de outubro de 2026</b> (ainda antes da primeira
+        chave; nenhum campo renomeado nem removido):
+      </p>
+      <ul>
+        <li>entrou <code>GET /partner/v1/pedidos/cancelados</code>, com
+            <code>total</code>, <code>servidor_hora</code>,
+            <code>cancelados</code> e <code>avisos</code> (ver
+            <a href="#ep-cancelados">Pedidos cancelados no aplicativo</a>).
+            Exige o canal de pedidos, como a fila;</li>
+        <li>o <code>desde</code> do <code>GET /pedidos</code> passou a
+            <b>exigir fuso</b>, como as demais rotas:
+            <code>?desde=2026-10-15T00:00:00</code> agora responde
+            <span class="st er">400</span> <code>INVALID_DESDE</code>. É a
+            única mudança que poderia quebrar uma chamada — e nenhuma chamada
+            foi feita ainda;</li>
+        <li><code>alterado_apos_importacao</code> passou a comparar também o
+            <b>cliente</b> do pedido; quando ele vier <code>true</code> por
+            isso, o bloco <code>cliente</code> da resposta já traz o cliente
+            novo e a nota tem de sair no CNPJ que vier ali;</li>
+        <li>a tela do aplicativo passou a recusar a exclusão do pedido
+            <b>solicitado</b> ao Control e ainda sem número
+            (<span class="st wr">409</span>
+            <code>ORDER_REQUESTED_TO_ERP</code>): nenhuma exclusão pela tela
+            alcança mais um pedido que o Control tem;</li>
+        <li>o <code>servidor_hora</code> de
+            <code>GET /pedidos/cancelados</code> e de
+            <code>GET /pedidos/excluidos</code> passou a ser tomado
+            <b>antes</b> da consulta, menos 2 minutos de folga — como já era o
+            dos <code>GET /clientes</code> e <code>GET /representantes</code>.
+            Guardá-lo e mandá-lo como <code>desde</code> na próxima chamada
+            deixou de poder perder um cancelamento gravado durante a leitura;</li>
+        <li>correção de texto, sem mudança de comportamento: o canal
+            <code>retrato</code> só aceita <code>carga</code> ou
+            <code>api</code>, e o <code>GET /pedidos/excluidos</code> lista só
+            o pedido excluído que tinha número do Control.</li>
+      </ul>
     </section>
   </main>
 </div>
 
 <footer>
-  <span>API de Parceiro · versão 1 · atualizado 22 set 2026 · documento público, sem chaves de acesso</span>
+  <span>API de Parceiro · versão 1 · atualizado 19 out 2026 · documento público, sem chaves de acesso</span>
   <span class="mono">setorxweb-production.up.railway.app · csbapi-production.up.railway.app</span>
 </footer>
 

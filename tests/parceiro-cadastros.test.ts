@@ -1607,8 +1607,10 @@ describe('o que mudou no app — listarClientesAlterados', () => {
         alterado_no_app: null,
       },
     ]);
-    // Sem a 049 a lista pode trazer o eco do próprio Control: fica dito.
-    expect(avisos.some((a) => a.includes('049'))).toBe(true);
+    // Sem a 049 a lista pode trazer o eco do próprio Control: fica dito — e
+    // a frase, que é contrato público, não cita migração do app.
+    expect(avisos.some((a) => a.includes('não sabe separar o que o próprio Control gravou'))).toBe(true);
+    expect(avisos.some((a) => /migra/i.test(a))).toBe(false);
     expect(fake.filtrosDe('customers', 'eq').map((f) => f.args)).toContainEqual(['company_id', EMPRESA]);
     expect(fake.filtrosDe('customers', 'gte').map((f) => f.args)).toEqual([['updated_at', '2026-09-16T00:00:00Z']]);
     expect(fake.filtrosDe('customers', 'order').map((f) => f.args[0])).toEqual(['updated_at', 'id']);

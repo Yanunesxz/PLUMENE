@@ -5,6 +5,7 @@ import {
   conciliarPedidoErp,
   contarConciliacao,
   listarExcluidosComNumero,
+  listarCanceladosDoControl,
 } from './partner.service.js';
 import {
   receberClientes,
@@ -21,9 +22,11 @@ import {
   anotarLote,
   autenticar,
   extrairLista,
-  momentoComFuso,
+  horaDaPuxada,
+  lerDesde,
   recusouPorCanal,
   responder,
+  CORPO_DESDE_INVALIDO,
   CORPO_NAO_ENCONTRADO,
   CORPO_ERRO_INTERNO,
 } from './partner.porta.js';
@@ -153,17 +156,18 @@ export async function partnerOrdersHandler(
   if (!partner) return;
   if (await recusouPorCanal(request, reply, partner.company_id, 'pedido_erp')) return;
 
-  const { desde, incluir } = request.query ?? {};
-  if (desde && Number.isNaN(Date.parse(desde))) {
-    await responder(request, reply, 400, {
-      error: 'Parâmetro "desde" deve ser uma data ISO (ex.: 2026-07-15T00:00:00Z)',
-      code: 'INVALID_DESDE',
-      statusCode: 400,
-    });
+  // O `desde` exige fuso, como nas outras rotas (revisão de 19/10/2026). Antes
+  // esta era a única que aceitava `2026-10-15T00:00:00` sem fuso: o Node lê o
+  // texto no fuso DO SERVIDOR (UTC no Railway) e o Control o escreve no de
+  // Brasília — a janela andava até 3 horas em silêncio, e o pedido mudado
+  // dentro dela não saía em puxada nenhuma. Ninguém chamou a rota ainda.
+  const desde = lerDesde(request.query);
+  if (desde === null) {
+    await responder(request, reply, 400, CORPO_DESDE_INVALIDO);
     return;
   }
 
-  const incluirImportados = incluir === 'todos';
+  const incluirImportados = request.query?.incluir === 'todos';
   const pedidos = await getPartnerOrders(partner.company_id, { desde, incluirImportados });
 
   anotarChamada(request, {
@@ -333,22 +337,70 @@ export async function partnerExcluidosHandler(
   const partner = await autenticar(request, reply);
   if (!partner) return;
 
-  const desde = typeof request.query?.desde === 'string' ? request.query.desde.trim() : undefined;
-  if (desde !== undefined && desde !== '' && !momentoComFuso(desde)) {
-    await responder(request, reply, 400, {
-      error: 'Parâmetro "desde" deve ser uma data ISO com fuso (ex.: 2026-09-15T00:00:00Z ou 2026-09-15T00:00:00-03:00)',
-      code: 'INVALID_DESDE',
-      statusCode: 400,
-    });
+  const desde = lerDesde(request.query);
+  if (desde === null) {
+    await responder(request, reply, 400, CORPO_DESDE_INVALIDO);
     return;
   }
 
-  const excluidos = await listarExcluidosComNumero(partner.company_id, desde || undefined);
+  // A hora ANTES da consulta, com folga (ver `horaDaPuxada`): a exclusão
+  // gravada enquanto a lista era lida sairia depois do `servidor_hora` e
+  // ficaria antes do `desde` da próxima puxada — nunca sairia.
+  const servidor_hora = horaDaPuxada();
+  const excluidos = await listarExcluidosComNumero(partner.company_id, desde);
   anotarChamada(request, { detalhe: { excluidos: excluidos.length } });
   await reply.send({
     total: excluidos.length,
-    servidor_hora: new Date().toISOString(),
+    servidor_hora,
     excluidos,
+  });
+}
+
+/**
+ * GET /partner/v1/pedidos/cancelados?desde=ISO — pedidos CANCELADOS no app que
+ * o Control pode ter (com número, ou solicitados).
+ *
+ * Existe porque cancelar (053) manda o pedido para 'rejected': ele some da
+ * fila e da reconciliação, e sumir não se distingue de "ainda não chegou" —
+ * sem esta lista o Control fatura um pedido que a fábrica já cancelou. Exige o
+ * canal de pedidos ligado, como as outras rotas da fila; os `avisos` dizem
+ * quando o banco da marca ainda não tem a migração.
+ */
+export async function partnerCanceladosHandler(
+  request: FastifyRequest<{ Querystring: { desde?: string } }>,
+  reply: FastifyReply,
+): Promise<void> {
+  const partner = await autenticar(request, reply);
+  if (!partner) return;
+  if (await recusouPorCanal(request, reply, partner.company_id, 'pedido_erp')) return;
+
+  const desde = lerDesde(request.query);
+  if (desde === null) {
+    await responder(request, reply, 400, CORPO_DESDE_INVALIDO);
+    return;
+  }
+
+  // A hora ANTES da consulta, com folga (ver `horaDaPuxada`). Aqui é o mais
+  // grave dos casos: o `cancelled_at` é carimbado antes de o UPDATE ser
+  // confirmado, então um cancelamento que espera trava ou rede confirma depois
+  // da leitura com uma hora anterior a ela. Com a hora tomada depois, ele não
+  // sairia nesta lista nem na próxima — e o Control faturaria um pedido já
+  // cancelado. O preço da folga é o mesmo cancelado sair duas vezes, o que é
+  // inofensivo: o Control só precisa não faturar.
+  const servidor_hora = horaDaPuxada();
+  const { cancelados, avisos } = await listarCanceladosDoControl(partner.company_id, desde);
+  anotarChamada(request, {
+    detalhe: {
+      desde: desde ?? null,
+      cancelados: cancelados.length,
+      ...(avisos.length > 0 ? { avisos: avisos.length } : {}),
+    },
+  });
+  await reply.send({
+    total: cancelados.length,
+    servidor_hora,
+    cancelados,
+    avisos,
   });
 }
 

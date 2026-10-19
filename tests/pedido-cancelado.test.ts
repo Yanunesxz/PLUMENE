@@ -222,6 +222,39 @@ describe('pedido já cancelado sem motivo (recusado antes da 053)', { timeout: 2
     expect(fake.filtrosDe('orders', 'eq').some((f) => f.args[0] === 'status' && f.args[1] === 'rejected')).toBe(true);
   });
 
+  it('informar o motivo NÃO regrava o `cancelled_at` — o cancelado_em diria a hora errada', async () => {
+    // O `cancelled_at` é a chave da ordem de GET /partner/v1/pedidos/cancelados
+    // e é ele que o `desde` compara: regravá-lo empurrava a linha para o fim
+    // da lista no meio de uma leitura paginada, e a da fronteira sumia.
+    const CANCELADO_EM = '2026-10-05T13:00:00+00:00';
+    const { app, fake } = await subirApp({
+      orders: pedido({ status: 'rejected', order_number: 14560, cancelled_at: CANCELADO_EM }),
+      order_cancel_reasons: { data: MOTIVO, error: null },
+    });
+    const res = await app.inject(cancelar(TOKEN_FINANCEIRO, { reason_id: MOTIVO_ID }));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado['cancelled_at']).toBe(CANCELADO_EM);
+    // O `updated_at`, esse sim, é de agora.
+    expect(gravado['updated_at']).not.toBe(CANCELADO_EM);
+  });
+
+  it('cancelado antes da 053 (sem `cancelled_at`) ganha a hora de agora ao informar o motivo', async () => {
+    const { app, fake } = await subirApp({
+      orders: pedido({ status: 'rejected', order_number: 14560, cancelled_at: null }),
+      order_cancel_reasons: { data: MOTIVO, error: null },
+    });
+    const res = await app.inject(cancelar(TOKEN_FINANCEIRO, { reason_id: MOTIVO_ID }));
+    await app.close();
+
+    expect(res.statusCode).toBe(200);
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado['cancelled_at']).toBe(gravado['updated_at']);
+    expect(typeof gravado['cancelled_at']).toBe('string');
+  });
+
   it('o representante não mexe no motivo de pedido já cancelado — 409', async () => {
     const { app, fake } = await subirApp({
       orders: pedido({ status: 'rejected' }),

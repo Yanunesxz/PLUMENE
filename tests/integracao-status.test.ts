@@ -85,10 +85,10 @@ const linhaDoRegistro = (over: Record<string, unknown>): RespostaTabela => ({
 
 /**
  * As rotas de ROTAS_DO_PARCEIRO, na ordem: a fila (posição 1) e o
- * faturamento (posição 7) já foram chamados; as outras nunca. O teste confere
+ * faturamento (posição 8) já foram chamados; as outras nunca. O teste confere
  * a ordem e o tamanho contra a lista do próprio módulo antes de usar as posições.
  */
-const TOTAL_DE_ROTAS = 19;
+const TOTAL_DE_ROTAS = 20;
 const FILA_CHAMADA = linhaDoRegistro({});
 const FATURAMENTO_CHAMADO = linhaDoRegistro({
   rota: '/partner/v1/faturamento',
@@ -101,7 +101,7 @@ const FATURAMENTO_CHAMADO = linhaDoRegistro({
   sem_mudanca: 0,
 });
 const POR_ROTA: RespostaTabela[] = Array.from({ length: TOTAL_DE_ROTAS }, (_, i) =>
-  i === 1 ? FILA_CHAMADA : i === 7 ? FATURAMENTO_CHAMADO : OK,
+  i === 1 ? FILA_CHAMADA : i === 8 ? FATURAMENTO_CHAMADO : OK,
 );
 /** A janela de rotas fora da lista: uma nova (uma rota que a lista não conhece) e uma conhecida (ignorada). */
 const JANELA: RespostaTabela = {
@@ -167,7 +167,7 @@ describe('lerEstadoDaIntegracao', () => {
       orders: [SONDA_OK, SONDA_OK, SONDA_OK, SONDA_OK, contagem(3), contagem(1), contagem(2), contagem(5)],
     });
     expect(ROTAS_DO_PARCEIRO[1]!.rota).toBe('/partner/v1/pedidos');
-    expect(ROTAS_DO_PARCEIRO[7]!.rota).toBe('/partner/v1/faturamento');
+    expect(ROTAS_DO_PARCEIRO[8]!.rota).toBe('/partner/v1/faturamento');
     expect(ROTAS_DO_PARCEIRO).toHaveLength(TOTAL_DE_ROTAS);
 
     const estado = await lerEstadoDaIntegracao(EMPRESA);
@@ -199,7 +199,7 @@ describe('lerEstadoDaIntegracao', () => {
       quando: '2026-09-16T13:59:00.000Z',
       http_status: 200,
     });
-    expect(estado.chamadas![7]).toMatchObject({
+    expect(estado.chamadas![8]).toMatchObject({
       rota: '/partner/v1/faturamento',
       quando: '2026-09-16T13:30:00.000Z',
       recebidos: 3,

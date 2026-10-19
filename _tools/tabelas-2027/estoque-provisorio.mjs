@@ -9,10 +9,16 @@
  * ⚠ É número inventado. O primeiro sync do ERP sobrescreve com o real.
  *
  * Uso:  node estoque-provisorio.mjs [--aplicar]
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_catalogo` da empresa não é
+ * 'carga'. Estoque é catálogo: com o canal ligado ele chega de verdade por
+ * /partner/v1/estoque, e inventar 100 peças por cima faria o representante
+ * vender o que não existe.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { exigirCanalDeCarga } from '../canal-de-carga.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..', '..');
@@ -36,6 +42,13 @@ const morra = (msg, erro) => {
   console.error(`✖ ${msg}${erro ? `: ${erro.message}` : ''}`);
   process.exit(1);
 };
+
+// ─── O canal do catálogo ─────────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: COMPANY_ID,
+  canais: ['catalogo'],
+  acao: 'O estoque provisório por aqui',
+});
 
 const { data: produtos, error: e1 } = await db
   .from('products')

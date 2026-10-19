@@ -23,12 +23,17 @@
  *   node _tools/importar-clientes.mjs "arquivo.xlsx" --aplicar   → grava
  *
  * ⚠️ Rode `pnpm backup` ANTES de --aplicar. Supabase Free não tem backup.
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_cadastro` da empresa não é
+ * 'carga'. Com o cadastro vindo do Control, esta planilha seria um segundo
+ * escritor em `customers` e a próxima carga desfaria o que ele mandou.
  */
 import { createRequire } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { clientesComWhatsappEditadoNoApp, linhaParaClienteExistente } from './importar-clientes-regras.mjs';
+import { exigirCanalDeCarga } from './canal-de-carga.mjs';
 
 const RAIZ = path.resolve(import.meta.dirname, '..');
 const ENV = path.join(RAIZ, 'apps/api/.env');
@@ -53,6 +58,15 @@ for (const linha of readFileSync(ENV, 'utf8').split(/\r?\n/)) {
 }
 const sb = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
+});
+
+// ─── O canal do cadastro ─────────────────────────────────────────────────────
+// Antes de ler a planilha: a prévia também para, senão fica a impressão de que
+// a carga ainda é o caminho.
+await exigirCanalDeCarga(sb, {
+  empresas: EMPRESA,
+  canais: ['cadastro'],
+  acao: 'A carga de clientes por planilha',
 });
 
 // ─── Normalização ────────────────────────────────────────────────────────────

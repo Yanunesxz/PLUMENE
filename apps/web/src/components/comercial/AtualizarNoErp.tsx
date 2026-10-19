@@ -50,7 +50,9 @@ interface Props {
  *
  * O cartão só aparece quando o pedido de hoje DIVERGE da fotografia do Control
  * — nas peças, no desconto, na condição de pagamento ou na observação, que são
- * as quatro coisas que a venda interna consegue mudar depois do lançamento.
+ * as quatro coisas que a venda interna consegue mudar depois do lançamento, e
+ * no CLIENTE, que o financeiro troca quando o rep mandou o pedido na loja
+ * errada (19/10/2026): aí a nota sairia no CNPJ anterior.
  *
  * O componente é montado com `key` na data da foto: foto nova, cartão novo, e
  * a lista "conferida" começa do zero.
@@ -180,6 +182,11 @@ export function AtualizarNoErp({
             )}
             {d.observacaoMudou && (
               <li className="py-1.5 text-sm text-warn-soft-foreground">A observação do pedido mudou</li>
+            )}
+            {d.clienteMudou && (
+              <li className="py-1.5 text-sm font-semibold text-warn-soft-foreground">
+                O pedido é de OUTRO cliente agora — no Control ele ainda está no cliente anterior
+              </li>
             )}
           </ul>
           {d.itens.mudou && (

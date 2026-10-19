@@ -1,6 +1,6 @@
 # API de Parceiro — Integração de Pedidos (v1)
 
-> **Atualizado 22 set 2026.** Contrato da fase 0 da integração com o Control,
+> **Atualizado 19 out 2026.** Contrato da fase 0 da integração com o Control,
 > com as decisões de 16/09: a fila é o que o financeiro **solicitou** ao
 > Control; o **CNPJ** é a chave do cliente entre os sistemas (cliente sem código
 > deixa de ser pendência — o Control cria e devolve o código); um pedido tem
@@ -13,6 +13,21 @@
 > "Estabilidade da v1", no fim). Em 22/09, o WhatsApp do cliente passou a ser
 > dado do app: o `POST /clientes` só preenche quem está sem, e o
 > `alterado_no_app` nunca traz `whatsapp`.
+>
+> **O que mudou em 19/10/2026** (ainda antes da primeira chave; nada renomeado
+> nem removido): entrou a rota `GET /partner/v1/pedidos/cancelados` — pedido
+> cancelado no app some da fila e da reconciliação, e é aqui que você descobre,
+> para não faturar um cancelado (seção 3f). O `desde` do `GET /pedidos` passou
+> a **exigir fuso**, como as demais rotas (`?desde=2026-10-15T00:00:00` agora
+> responde `400 INVALID_DESDE`). O `alterado_apos_importacao` passou a comparar
+> também o **cliente** do pedido, porque o financeiro pode trocar a loja de um
+> pedido que já está no Control. O `servidor_hora` dos `GET /pedidos/cancelados`
+> e `GET /pedidos/excluidos` passou a ser a hora de **antes** da consulta,
+> menos 2 minutos de folga, como já era o dos cadastros — guarde-o e mande como
+> `desde` na próxima chamada. E dois acertos de texto que estavam errados:
+> o canal `retrato` só aceita `carga` ou `api` (nunca `firebird`), e o
+> `GET /pedidos/excluidos` lista **só** o pedido excluído que tinha número do
+> Control.
 >
 > **Link para enviar ao parceiro:** https://setorx-web-web.vercel.app/api-parceiro
 > (site da Corpo Sensual). O site da PLUMENE serve a mesma página no mesmo
@@ -131,6 +146,8 @@ no banco do Control — o Firebird está aposentado):
   `alterado_apos_importacao`);
 - **os excluídos** — `GET /pedidos/excluidos`: pedidos apagados no aplicativo
   que já tinham número do Control;
+- **os cancelados** — `GET /pedidos/cancelados`: pedidos cancelados no
+  aplicativo que o Control pode ter, para você não faturar um cancelado;
 - **a conciliação** — `GET /conciliacao`: as contagens da fila e do passivo; e
   o `GET /status`, que diz quais canais estão ligados e se alguém pediu
   "sincronizar agora".
@@ -146,6 +163,7 @@ no banco do Control — o Firebird está aposentado):
 | `POST /partner/v1/pedidos/{id}/excluir` | O Control excluiu o pedido do lado dele e avisa; o app exclui também | pedidos |
 | `GET /partner/v1/conciliacao` | Só contagens, para conferir o passivo antes e depois de cada rodada | — |
 | `GET /partner/v1/pedidos/excluidos` | Pedidos excluídos no app que já tinham número do ERP | — |
+| `GET /partner/v1/pedidos/cancelados` | Pedidos cancelados no app que o Control pode ter (para não faturar um cancelado) | pedidos |
 | `POST /partner/v1/faturamento` | Informar o que foi faturado (com a nota e as peças) — fecha o ciclo | faturamento |
 | `POST /partner/v1/clientes` | O ERP envia os clientes (cadastro) | cadastro |
 | `POST /partner/v1/representantes` | O ERP envia os representantes (cadastro) | cadastro |
@@ -160,8 +178,8 @@ no banco do Control — o Firebird está aposentado):
 | `POST /partner/v1/sincronizacao` | O ERP avisa que rodou a passada que o `sincronizar_agora` pediu | — |
 
 Quatro chamadas fazem o ciclo do pedido (testar, buscar, confirmar, faturar);
-conciliar, conciliação, excluídos e excluir acertam o que aconteceu antes da
-integração ou fora dela; as de cadastro, catálogo e retrato rodam por conta
+conciliar, conciliação, excluídos, cancelados e excluir acertam o que aconteceu
+antes da integração ou fora dela; as de cadastro, catálogo e retrato rodam por conta
 própria, nos intervalos recomendados em "Fluxo recomendado". Mesma chave e
 mesma URL base dentro de cada marca. **O Control é a fonte de tudo que ele
 manda** — o app nunca conecta no banco do ERP.
@@ -177,7 +195,7 @@ para parar de lançar aquele dado à mão:
 
 | Canal | Rotas que dependem dele | Valor que libera a API |
 |---|---|---|
-| `pedido_erp` | `GET /pedidos`, `POST /confirmar`, `POST /conciliar`, `POST /pedidos/{id}/excluir` | `api` |
+| `pedido_erp` | `GET /pedidos`, `GET /pedidos/cancelados`, `POST /confirmar`, `POST /conciliar`, `POST /pedidos/{id}/excluir` | `api` |
 | `faturamento` | `POST /faturamento` | `api` |
 | `cadastro` | `POST /clientes`, `POST /representantes`, `GET /clientes?desde=`, `GET /representantes?desde=` | `api` |
 | `catalogo` | `POST /tabelas-preco`, `POST /condicoes-pagamento`, `POST /produtos`, `POST /precos`, `POST /estoque` | `api` |
@@ -216,6 +234,8 @@ gravado.
 `GET /status` mostra os cinco canais da sua empresa. `GET /status`,
 `GET /conciliacao`, `GET /pedidos/excluidos` e `POST /sincronizacao` funcionam
 com qualquer canal — são diagnóstico e controle, não dado.
+**`GET /pedidos/cancelados` não está nesse grupo:** ele exige o canal de
+pedidos ligado, como a própria fila (com o canal fechado, `409 CANAL_FECHADO`).
 
 **Toda chamada fica registrada** do nosso lado (rota, status HTTP, quantos
 registros chegaram, gravaram, ficaram iguais e foram ignorados, e os motivos) —
@@ -228,7 +248,7 @@ que aconteceu com o envio das 14h".
 
 | O quê | Rotas | Quando |
 |---|---|---|
-| **Fila de pedidos** | `GET /pedidos` → grava no Control → `POST /pedidos/{id}/confirmar` | **a cada 1 minuto** — o financeiro fica olhando a tela esperando o número |
+| **Fila de pedidos** | `GET /pedidos` → grava no Control → `POST /pedidos/{id}/confirmar`; e `GET /pedidos/cancelados?desde=` na mesma passada | **a cada 1 minuto** — o financeiro fica olhando a tela esperando o número (guarde o `servidor_hora` da resposta dos cancelados para mandar como `desde` na próxima) |
 | **Cadastros e alterações, nas duas mãos** | `POST /clientes`, `POST /representantes` (só o que mudou); `GET /clientes?desde=`, `GET /representantes?desde=`, `GET /pedidos?incluir=todos&desde=` | **a cada 5 minutos** |
 | **Faturamento** | `POST /faturamento` | **assim que a nota sair** (ou a cada 5 minutos) |
 | **Catálogo, preço e estoque** | `POST /tabelas-preco`, `/condicoes-pagamento`, `/produtos`, `/precos`, `/estoque` | **a cada 30 minutos** |
@@ -250,6 +270,8 @@ a cada 1 minuto — a fila:
        grava no ERP (gera o número interno, ex.: CS17379)
   3. POST /partner/v1/pedidos/{id}/confirmar  { "pedido_erp": "CS17379" }
        → o pedido sai da fila; a tela do financeiro mostra o número na hora
+  4. GET  /partner/v1/pedidos/cancelados?desde=<servidor_hora da vez passada>
+       → os cancelados no app; NÃO fature nenhum deles (guarde o servidor_hora)
 
 a cada 5 minutos — cadastros e alterações (as duas mãos):
   POST /partner/v1/clientes            { "clientes": [...] }          ← o que mudou no ERP
@@ -320,7 +342,8 @@ GET /partner/v1/status
 
 `canais` diz quais rotas estão ligadas para a API na sua empresa (ver "Canal por
 empresa"): `pedido_erp` é `manual`, `api` ou `sync_py`; `faturamento` é `manual`
-ou `api`; `cadastro`, `catalogo` e `retrato` são `carga`, `api` ou `firebird`.
+ou `api`; `cadastro` e `catalogo` são `carga`, `api` ou `firebird`; `retrato` é
+`carga` ou `api` (nunca `firebird` — o retrato nunca veio do Firebird).
 Só `api` libera a rota.
 
 `sincronizar_agora` (sempre booleano) é o botão "Pedir sincronização agora" da
@@ -347,7 +370,7 @@ para ver os canais.
 Sem chave ou com chave errada (inclusive a chave de uma marca na URL da outra, e
 a chave que ainda não foi cadastrada): `401 PARTNER_UNAUTHORIZED`. Integração
 ainda não liberada naquele servidor (nenhuma chave configurada):
-`503 PARTNER_API_DISABLED`. Vale para as dezenove rotas — chave errada responde
+`503 PARTNER_API_DISABLED`. Vale para as vinte rotas — chave errada responde
 `401` em qualquer uma delas, nunca `404`.
 
 ---
@@ -362,7 +385,7 @@ GET /partner/v1/pedidos?incluir=todos
 
 | Parâmetro | Opcional | Descrição |
 |---|---|---|
-| `desde` | sim | Só pedidos alterados (`atualizado_em`) a partir desta data/hora (ISO, de preferência com fuso). Use como marcador "data que eu puxei". Data inválida → `400 INVALID_DESDE`. |
+| `desde` | sim | Só pedidos alterados (`atualizado_em`) a partir desta data/hora (ISO **com fuso**). Use como marcador "data que eu puxei". Sem fuso ou fora do formato → `400 INVALID_DESDE`. |
 | `incluir=todos` | sim | Inclui também os já confirmados (`sent_erp`) e os já faturados. Sem ele, só a fila pendente. |
 
 **A fila pendente** (sem `incluir=todos`) é: situação `approved`, sem número do
@@ -372,6 +395,15 @@ tela do pedido). Pedido aprovado que ninguém mandou lançar, e pedido que já f
 faturado à mão no aplicativo, não entram na fila — aparecem só com
 `incluir=todos`. (Numa instalação onde a migração 049 ainda não rodou, a fila é
 a de antes: todo aprovado sem número e não faturado.)
+
+**O `desde` exige fuso (19/10/2026).** Esta era a última rota que aceitava
+`?desde=2026-10-15T00:00:00` sem fuso — e lia o texto no fuso do **servidor**,
+não no seu: a janela andava até 3 horas em silêncio e o pedido mudado dentro
+dela não saía em puxada nenhuma. Agora a regra é a mesma das outras rotas:
+`?desde=2026-10-15T00:00:00Z` ou `?desde=2026-10-15T00:00:00-03:00`; sem fuso
+responde `400 INVALID_DESDE`. Fuso positivo vai na URL como `%2B` (`+03:00` →
+`%2B03:00`). A mudança não quebra nada do seu lado — nenhuma chamada foi feita
+ainda.
 
 **Pedido que sai da fila depois de entregue:** enquanto o pedido não tem
 número, o financeiro pode **cancelar a solicitação** na tela do app. O pedido
@@ -399,14 +431,23 @@ exatamente a fila pendente. O resto não se importa:
 
 **Pedido editado depois da importação:** com `incluir=todos`, o campo
 `alterado_apos_importacao` diz se o pedido de hoje é **diferente do que o
-Control conhece** — peças, desconto, condição de pagamento ou observação. A
-comparação é com a foto que o app guarda quando o número do Control é gravado
-(e de novo quando alguém confirma na tela que atualizou no Control); **não** é a
-data de alteração do pedido, que o faturamento, as notas e a própria
-confirmação também mexem. `true` continua `true` até alguém confirmar a
-atualização na tela do app. `null` = sem número, ou pedido lançado antes de o
-app guardar a foto (não dá para comparar). Use `?incluir=todos&desde=` na
-rodada de 5 minutos para pegar essas alterações e espelhá-las no ERP.
+Control conhece** — peças, desconto, condição de pagamento, observação ou
+**cliente**. A comparação é com a foto que o app guarda quando o número do
+Control é gravado (e de novo quando alguém confirma na tela que atualizou no
+Control); **não** é a data de alteração do pedido, que o faturamento, as notas
+e a própria confirmação também mexem. `true` continua `true` até alguém
+confirmar a atualização na tela do app. `null` = sem número, ou pedido lançado
+antes de o app guardar a foto (não dá para comparar). Use
+`?incluir=todos&desde=` na rodada de 5 minutos para pegar essas alterações e
+espelhá-las no ERP.
+
+**Cliente trocado (19/10/2026):** o financeiro do app pode trocar a loja de um
+pedido que já está no Control — acontece quando o representante escolhe a loja
+errada. Nesse caso `alterado_apos_importacao` fica `true` e o bloco `cliente`
+do pedido já vem com o cliente NOVO (`chave`, `codigo_erp`, razão social). **A
+nota tem de sair no CNPJ que vier nesta resposta, não no do lançamento.** O
+app bloqueia a troca depois de o pedido ser faturado, então isto só chega antes
+da nota.
 
 **Não há paginação do seu lado:** a resposta traz todos os pedidos que casam com
 o filtro, em ordem de criação (`criado_em` e, no empate, `id`), e `total` é a
@@ -482,7 +523,7 @@ seguinte.
 | `observacoes` | texto ou null | Só o que o representante DIGITOU (a cor escolhida sai por item, em `itens[].observacao`; a cor anotada para peça que saiu do pedido não sai) |
 | `pedido_erp` | texto ou null | Número no ERP, na forma normalizada (ex.: `CS17379`). Nulo na fila; preenchido pela sua confirmação ou conciliação |
 | `solicitado_em` | data ISO ou null | Quando o financeiro clicou em "Lançar no Control". Na fila vem sempre preenchido; `null` no passivo, no pedido lançado à mão e em instalação sem a migração 049 |
-| `alterado_apos_importacao` | booleano ou null | O pedido está diferente do que o Control conhece (peças, desconto, condição, observação)? `null` sem número (na fila é sempre `null`) ou sem a foto do lançamento — ver "Pedido editado depois da importação" |
+| `alterado_apos_importacao` | booleano ou null | O pedido está diferente do que o Control conhece (peças, desconto, condição de pagamento, observação ou **cliente**)? `null` sem número (na fila é sempre `null`) ou sem a foto do lançamento — ver "Pedido editado depois da importação" |
 | `cliente.codigo_erp` | texto ou null | **Código do cliente no seu ERP** (campo CLIENTE). `null` quando o cliente nasceu no app e o Control ainda não devolveu o código |
 | `cliente.chave` | texto ou null | **A chave única do cliente entre os sistemas: o CNPJ/CPF só com dígitos.** É por ela que o seu ERP casa o cadastro. `null` quando o cadastro não tem documento, ou tem menos de 11 dígitos (aí vira a pendência `cliente sem CNPJ`) — a mesma régua do `POST /clientes`, que só casa a partir de 11 |
 | `cliente.novo_no_control` | booleano | `true` = o app não tem o código deste cliente no Control. **Crie o cadastro no ERP** (casando pela `chave`) e devolva o código pelo `POST /clientes` — não é pendência, o pedido é importável |
@@ -703,9 +744,25 @@ GET /partner/v1/pedidos/excluidos?desde=2026-09-15T00:00:00-03:00
 
 Pedido com número do ERP não pode mais ser excluído no aplicativo; esta lista
 traz os que foram excluídos **antes** dessa trava, para o seu ERP cancelar do
-lado dele. `desde` é opcional e, quando vem, precisa de fuso (`Z` ou `-03:00`) —
+lado dele.
+
+**Só entra aqui o pedido que tinha número do Control na hora da exclusão.**
+Pedido excluído no app **sem** número nunca aparece nesta lista — inclusive o
+que o próprio Control avisou por `POST /pedidos/{id}/excluir` sendo apenas
+solicitado (sem número confirmado): esse some do app e não deixa linha aqui.
+Para o pedido que sumiu e não está nesta lista, o caminho é a seção 3f: ou ele
+foi **cancelado** no app, ou ele nunca teve número.
+
+`desde` é opcional e, quando vem, precisa de fuso (`Z` ou `-03:00`) —
 sem fuso responde `400 INVALID_DESDE`. Fuso positivo vai na URL como `%2B`
 (`+03:00` → `%2B03:00`). A lista vem inteira, do mais antigo para o mais novo.
+
+**`servidor_hora` é a hora do app ANTES da consulta, menos 2 minutos de folga**
+(desde 19/10/2026; antes era tomada depois dela), como nos `GET /clientes` e
+`GET /representantes`. Guarde-a e mande como `desde` na próxima chamada: a
+folga é o que impede que uma exclusão gravada enquanto a lista era lida fique
+de fora das duas puxadas. O preço é o mesmo excluído sair de novo na puxada
+seguinte, o que é inofensivo.
 
 ```json
 {
@@ -729,9 +786,25 @@ Content-Type: application/json
 { "motivo": "cliente desistiu" }
 ```
 
-Pedido com número do Control **não pode ser excluído pela tela do app** (nem
-pelo administrador): apagar de um lado só deixaria o outro com um pedido
-fantasma. O caminho é este: quando o seu ERP exclui o pedido, avisa aqui e o
+**A tela do app nunca apaga um pedido que o Control tem — nem com número, nem
+solicitado** (nem pelo administrador): apagar de um lado só deixaria o outro
+com um pedido fantasma. São duas recusas:
+
+- pedido **com número do Control**: a tela recusa (`409 ORDER_HAS_ERP_NUMBER`);
+- pedido **já solicitado ao Control e ainda sem número**: a tela recusa
+  (`409 ORDER_REQUESTED_TO_ERP`) — ele já saiu na fila `GET /partner/v1/pedidos`
+  e pode estar sendo gravado no Control neste segundo. Quem quiser excluir
+  precisa antes **cancelar a solicitação** na tela; aí o pedido volta a ser um
+  aprovado comum e a exclusão passa (e o cancelamento da solicitação continua
+  valendo o que já estava escrito na seção 2: se você já importou, confirme —
+  o número vence o cancelamento).
+
+Para você isso quer dizer uma coisa só: **pedido que some do app sem passar por
+`POST /partner/v1/pedidos/{id}/excluir` é um pedido que o Control nunca
+recebeu.** Se ele estava no Control, ou a exclusão veio de você, ou ele não foi
+excluído — foi cancelado (seção 3f).
+
+O caminho da exclusão é este: quando o seu ERP exclui o pedido, avisa aqui e o
 app exclui também — guardando uma cópia no histórico de excluídos, com o nome
 do parceiro como quem excluiu, e o rastro `excluido` (origem `api`) com o
 `motivo` (opcional, até 500 caracteres). Exige o canal de pedidos ligado para a
@@ -754,8 +827,75 @@ mantém o pedido, fora da fila — do seu lado, nada a fazer.
 | `500` | `SEM_COPIA` | A cópia do histórico não gravou — **o pedido não foi apagado**; tente de novo |
 | `500` | `INTERNAL_ERROR` | O banco recusou apagar — tente de novo |
 
-O pedido excluído por aqui também aparece em `GET /pedidos/excluidos` (a cópia
-tem o número do Control): o seu ERP deve ignorar o próprio eco.
+O pedido excluído por aqui aparece em `GET /pedidos/excluidos` **só quando
+tinha número do Control** (é o número na cópia que põe a linha na lista): o seu
+ERP deve ignorar o próprio eco. O pedido que você excluiu por aviso estando
+apenas **solicitado**, sem número confirmado, não deixa linha em
+`/pedidos/excluidos` — você já sabe que ele sumiu, porque foi você que pediu.
+
+## 3f. Pedidos cancelados no app
+
+```
+GET /partner/v1/pedidos/cancelados
+GET /partner/v1/pedidos/cancelados?desde=2026-10-01T00:00:00-03:00
+```
+
+O financeiro e o administrador podem **cancelar** qualquer pedido ainda não
+faturado, inclusive um que já tem número do Control. O pedido cancelado sai da
+fila (`GET /pedidos`) e também da reconciliação (`?incluir=todos`) — **some das
+duas listas, e sumir não se distingue de "ainda não chegou"**. Esta rota é o
+aviso explícito: chame-a na mesma rodada da fila e **não fature o que aparecer
+aqui**.
+
+`desde` é opcional e, quando vem, precisa de fuso (`Z` ou `-03:00`) — sem fuso
+responde `400 INVALID_DESDE`. Fuso positivo vai na URL como `%2B` (`+03:00` →
+`%2B03:00`). A lista vem inteira, do mais antigo para o mais novo, e o `desde`
+compara com a hora do **cancelamento**, não com a do pedido. Exige o canal de
+pedidos ligado para a API (`409 CANAL_FECHADO`).
+
+```json
+{
+  "total": 1,
+  "servidor_hora": "2026-10-05T13:40:00.000Z",
+  "cancelados": [
+    {
+      "id": "d31b5083-…",
+      "numero": 10231,
+      "pedido_erp": "CS17379",
+      "cancelado_em": "2026-10-05T13:00:00+00:00",
+      "motivo": "CLIENTE CANCELOU",
+      "observacao": "a loja ligou pedindo para cancelar"
+    }
+  ],
+  "avisos": []
+}
+```
+
+| Campo | O que é |
+|---|---|
+| `total` | Quantos itens há em `cancelados` |
+| `servidor_hora` | A hora do app **ANTES** da consulta, menos 2 minutos de folga (ISO com fuso). Guarde-a e mande como `desde` na próxima chamada — a folga é o que garante que um cancelamento gravado durante a leitura não se perca entre as duas puxadas |
+| `cancelados` | A lista, do mais antigo para o mais novo. Pode vir vazia |
+| `cancelados[].id` | O `id` do pedido no app — o mesmo do `GET /pedidos` |
+| `cancelados[].numero` | O número do pedido no app (pode ser `null`) |
+| `cancelados[].pedido_erp` | O número do Control. `null` quando o pedido foi solicitado e cancelado **antes** de você confirmar — nesse caso procure pelo `id` |
+| `cancelados[].cancelado_em` | Quando foi cancelado (ISO com fuso) |
+| `cancelados[].motivo` | O texto do motivo **na hora** do cancelamento (o administrador pode renomear a lista depois, por isso guardamos o texto). Pode ser `null` |
+| `cancelados[].observacao` | O que quem cancelou escreveu, ou `null` |
+| `avisos` | Lista de frases em português, normalmente vazia. Quando vier preenchida, o servidor daquela marca ainda não tem um recurso e a lista **pode** ter vindo vazia ou incompleta por isso — leia a frase do aviso e não conclua "nenhum cancelado" |
+
+A lista só traz o pedido que o **Control pode ter**: com número do Control, ou
+solicitado ao Control pelo financeiro. Nunca sai cliente, peças, valor nem quem
+cancelou.
+
+**Regra de ouro:** pedido que aparece em `/pedidos/cancelados` nunca deve ser
+faturado nem relançado. Se ele já tem nota no seu ERP, o caminho é desfazer o
+faturamento lá e no app (`POST /faturamento` com `"faturado": false`) — não
+reabrir o pedido no app, que não tem volta de cancelado.
+
+Erros: os de sempre — `401`/`503` na chave, `409 CANAL_FECHADO`,
+`400 INVALID_DESDE`, `500 INTERNAL_ERROR`. Como em todas as leituras, um `500`
+nunca vira lista vazia: na falha, tente na próxima rodada.
 
 ---
 
@@ -1223,7 +1363,7 @@ Toda resposta de erro tem o formato `{ "error": "<mensagem>", "code":
 | `503` | `PARTNER_API_DISABLED` | todas | A integração ainda não foi liberada naquele servidor (nenhuma chave configurada) |
 | `401` | `PARTNER_UNAUTHORIZED` | todas | Chave ausente ou errada no `X-API-Key` — inclusive a chave de uma marca na URL da outra |
 | `409` | `CANAL_FECHADO` | todas as rotas com canal (ver "Canal por empresa") | O canal da sua empresa não está ligado para a API (`canal`, `valor_atual`) |
-| `400` | `INVALID_DESDE` | `GET /pedidos`, `GET /pedidos/excluidos`, `GET /clientes`, `GET /representantes` | `desde` não é uma data ISO (fora do `GET /pedidos`, também sem fuso) |
+| `400` | `INVALID_DESDE` | `GET /pedidos`, `GET /pedidos/excluidos`, `GET /pedidos/cancelados`, `GET /clientes`, `GET /representantes` | `desde` não é uma data ISO **com fuso** — nas cinco rotas, desde 19/10/2026 |
 | `400` | `MISSING_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Corpo sem `pedido_erp`, ou `pedido_erp` vazio / que não é texto (o corpo vazio é o caso de `INTERNAL_ERROR` 400, abaixo) |
 | `400` | `INVALID_PEDIDO_ERP` | `POST /confirmar`, `POST /conciliar` | Número fora do formato (duas letras e até 10 dígitos) |
 | `404` | `ORDER_NOT_FOUND` | `POST /confirmar`, `POST /conciliar`, `POST /excluir` | Não há pedido com esse `id` na sua empresa (inclusive `id` fora do formato UUID) |
@@ -1263,6 +1403,9 @@ curl -H "X-API-Key: SUA_CHAVE" "$BASE/partner/v1/status"
 
 # fila de pedidos
 curl -H "X-API-Key: SUA_CHAVE" "$BASE/partner/v1/pedidos"
+
+# os cancelados no app, na mesma passada (nao fature nenhum deles)
+curl -H "X-API-Key: SUA_CHAVE" "$BASE/partner/v1/pedidos/cancelados?desde=2026-10-05T13:00:00Z"
 
 # confirmar
 curl -X POST -H "X-API-Key: SUA_CHAVE" -H "Content-Type: application/json" \
@@ -2020,6 +2163,29 @@ bolinha do catálogo impresso — `"Cor 1"`, `"3M Cor 2 / 2G Cor 1"` — no luga
 planilha. Cor sem número no cadastro da peça continua saindo pelo nome. O campo
 `cor` continua `"00001"`. E `observacoes` deixa de trazer a cor anotada para
 uma peça que saiu do pedido.
+
+**As mudanças de 19/10/2026** (ainda antes da primeira chave; nenhum campo
+renomeado nem removido):
+
+- entrou `GET /partner/v1/pedidos/cancelados`, com `total`, `servidor_hora`,
+  `cancelados` e `avisos` (seção 3f). Exige o canal de pedidos, como a fila;
+- o `desde` do `GET /pedidos` passou a **exigir fuso**, como as demais rotas:
+  `?desde=2026-10-15T00:00:00` agora responde `400 INVALID_DESDE`. É a única
+  mudança que poderia quebrar uma chamada — e nenhuma chamada foi feita ainda;
+- `alterado_apos_importacao` passou a comparar também o **cliente** do pedido;
+  quando ele vier `true` por isso, o bloco `cliente` da resposta já traz o
+  cliente novo e a nota tem de sair no CNPJ que vier ali (seção 2);
+- a tela do app passou a recusar a exclusão do pedido **solicitado** ao Control
+  e ainda sem número (`409 ORDER_REQUESTED_TO_ERP`): nenhuma exclusão pela tela
+  alcança mais um pedido que o Control tem (seção 3e);
+- o `servidor_hora` de `GET /pedidos/cancelados` e de `GET /pedidos/excluidos`
+  passou a ser tomado **antes** da consulta, menos 2 minutos de folga — como já
+  era o dos `GET /clientes` e `GET /representantes`. Guardá-lo e mandá-lo como
+  `desde` na próxima chamada deixou de poder perder um cancelamento gravado
+  durante a leitura;
+- correção de texto, sem mudança de comportamento: o canal `retrato` só aceita
+  `carga` ou `api`, e o `GET /pedidos/excluidos` lista só o pedido excluído que
+  tinha número do Control.
 
 ## Dúvidas / suporte
 

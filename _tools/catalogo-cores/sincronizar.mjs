@@ -10,11 +10,20 @@
  *   node sincronizar.mjs refs.json cores.json [--aplicar]
  *
  * Sem --aplicar só mostra o que faria.
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_catalogo` não é 'carga' em
+ * ALGUMA das empresas que têm produto no banco — este script varre todas, não
+ * só a Corpo Sensual. O que trava é o passo 1/2: `products.active` chega do
+ * Control por /partner/v1/produtos, e esconder a peça aqui apagaria a decisão
+ * dele. As cores (product_colors) são dado só do app e continuam vindo do
+ * catálogo em PDF: para elas sozinhas existe o carregar.mjs ao lado, que não
+ * mexe em `active` e por isso não tem trava.
  */
 import { readFileSync } from 'node:fs';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { dirname, join, resolve } from 'node:path';
 import { montarCores } from './cores.mjs';
+import { exigirCanalDeCarga } from '../canal-de-carga.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..', '..');
@@ -58,6 +67,17 @@ for (let de = 0; ; de += 1000) {
   }
   produtos = produtos.concat(data);
   if (data.length < 1000) break;
+}
+
+// O canal do catálogo de cada empresa que apareceu na varredura: basta UMA com
+// o canal virado para o script inteiro recusar. (Banco sem produto nenhum não
+// tem canal a conferir — e também não tem o que sincronizar.)
+if (produtos.length > 0) {
+  await exigirCanalDeCarga(db, {
+    empresas: produtos.map((p) => p.company_id),
+    canais: ['catalogo'],
+    acao: 'A sincronia de catálogo por aqui',
+  });
 }
 
 const manter = produtos.filter((p) => noCatalogo.has(p.sku));

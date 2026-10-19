@@ -11,10 +11,15 @@
  * marca, grupo) em vez de duplicar. Foto e cor não vêm do ERP: são do catálogo.
  *
  * Uso:  node ajustes-catalogo.mjs [--aplicar]
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_catalogo` da empresa não é
+ * 'carga'. Produto, tamanho e preço chegam do Control por /partner/v1/produtos
+ * e /precos — cadastrar e desativar por aqui seria um segundo escritor.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { exigirCanalDeCarga } from '../canal-de-carga.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..', '..');
@@ -54,6 +59,13 @@ const morra = (msg, erro) => {
   console.error(`✖ ${msg}${erro ? `: ${erro.message}` : ''}`);
   process.exit(1);
 };
+
+// ─── O canal do catálogo ─────────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: COMPANY_ID,
+  canais: ['catalogo'],
+  acao: 'O acerto de catálogo por aqui',
+});
 
 // ─── Faixas de tamanho de cada SKU, direto do PDF ────────────────────────────
 const faixasPorSku = new Map(); // sku → Set(faixa)

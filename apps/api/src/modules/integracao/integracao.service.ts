@@ -49,6 +49,7 @@ export const ROTAS_DO_PARCEIRO: readonly RotaDoParceiro[] = [
   { metodo: 'POST', rota: '/partner/v1/pedidos/:id/conciliar', titulo: 'Conciliação do passivo' },
   { metodo: 'GET', rota: '/partner/v1/conciliacao', titulo: 'Contagens da conciliação' },
   { metodo: 'GET', rota: '/partner/v1/pedidos/excluidos', titulo: 'Pedidos excluídos no app' },
+  { metodo: 'GET', rota: '/partner/v1/pedidos/cancelados', titulo: 'Pedidos cancelados no app' },
   { metodo: 'POST', rota: '/partner/v1/pedidos/:id/excluir', titulo: 'Exclusão pelo Control' },
   { metodo: 'POST', rota: '/partner/v1/faturamento', titulo: 'Faturamento' },
   { metodo: 'POST', rota: '/partner/v1/clientes', titulo: 'Clientes (o Control manda)' },

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
+import { criarSupabaseFake, type Responder, type RespostaTabela } from './supabaseFake.js';
 
 /**
  * "ATUALIZAR NO ERP" (migração 046).
@@ -18,7 +18,7 @@ import { criarSupabaseFake, type RespostaTabela } from './supabaseFake.js';
  * em vez de um booleano que pode dessincronizar); e sem a 046 nada quebra.
  */
 
-async function carregarServico(respostas: Record<string, RespostaTabela | RespostaTabela[]>) {
+async function carregarServico(respostas: Record<string, RespostaTabela | RespostaTabela[] | Responder>) {
   const fake = criarSupabaseFake(respostas as never);
   vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
   const mod = await import('../apps/api/src/modules/orders/erpSync.service.js');
@@ -68,6 +68,83 @@ describe('registrarNoErp — a foto do que o Control conhece', () => {
     const { registrarNoErp, fake } = await carregarServico({ order_erp_sync: SEM_A_TABELA });
 
     expect(await registrarNoErp('o1', EMPRESA)).toBe('sem_tabela');
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+});
+
+describe('registrarClienteNaFoto — a troca de cliente numa foto que não guarda cliente', () => {
+  const CLIENTE_ANTIGO = 'cliente-1';
+  const SNAPSHOT_SEM_CLIENTE = { id: 'o1', total: 500, items: [{ quantity: 12 }] };
+  const CONFIRMADO_EM = '2026-10-01T10:00:00Z';
+
+  /**
+   * A foto que o banco devolve. A segunda resposta é a do UPDATE com
+   * `.select('order_id')`: `carimbadas` são as linhas que a trava por
+   * `confirmado_em` deixou passar — nenhuma quando a foto foi refeita no meio.
+   */
+  const fotoDoBanco = (
+    snapshot: Record<string, unknown> | null,
+    carimbadas: { order_id: string }[] = [{ order_id: 'o1' }],
+  ): Responder => (c) =>
+    c.umaLinha
+      ? { data: snapshot && { snapshot, confirmado_em: CONFIRMADO_EM }, error: null }
+      : { data: carimbadas, error: null };
+
+  it('carimba na foto o cliente que o Control conhece, para a diferença aparecer', async () => {
+    const { registrarClienteNaFoto, fake } = await carregarServico({
+      order_erp_sync: fotoDoBanco(SNAPSHOT_SEM_CLIENTE),
+    });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, CLIENTE_ANTIGO)).toBe('carimbada');
+    const gravado = fake.ultimaGravacao('order_erp_sync', 'update')?.valores as { snapshot: Record<string, unknown> };
+    expect(gravado.snapshot).toEqual({ ...SNAPSHOT_SEM_CLIENTE, customer_id: CLIENTE_ANTIGO });
+    // A trava: só grava por cima da MESMA foto que leu. Se alguém confirmou
+    // "já atualizei no Control" no meio, a foto nova já sabe o cliente de agora.
+    expect(fake.filtrosDe('order_erp_sync', 'eq').map((f) => f.args)).toContainEqual([
+      'confirmado_em',
+      CONFIRMADO_EM,
+    ]);
+  });
+
+  it('foto refeita no meio: a trava segura e a resposta NÃO é "carimbada"', async () => {
+    // Alguém confirmou "já atualizei no Control" entre a leitura e a gravação:
+    // a foto nova já conhece o cliente de agora e o UPDATE não pega linha
+    // nenhuma. Sem o `.select()` a função dizia 'carimbada' assim mesmo, e
+    // quem lesse o retorno para provar o carimbo não provava nada.
+    const { registrarClienteNaFoto } = await carregarServico({
+      order_erp_sync: fotoDoBanco(SNAPSHOT_SEM_CLIENTE, []),
+    });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, CLIENTE_ANTIGO)).toBe('foto_mais_nova');
+  });
+
+  it('foto que já diz um cliente não é tocada — ela é o que a fábrica tem na mão', async () => {
+    const { registrarClienteNaFoto, fake } = await carregarServico({
+      order_erp_sync: fotoDoBanco({ ...SNAPSHOT_SEM_CLIENTE, customer_id: CLIENTE_ANTIGO }),
+    });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, CLIENTE_ANTIGO)).toBe('nada_a_fazer');
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+
+  it('pedido que nunca foi ao Control (sem foto) não ganha foto nenhuma aqui', async () => {
+    const { registrarClienteNaFoto, fake } = await carregarServico({ order_erp_sync: fotoDoBanco(null) });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, CLIENTE_ANTIGO)).toBe('nada_a_fazer');
+    expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
+  });
+
+  it('pedido que estava sem cliente (vitrine) não tem o que carimbar, e nem pergunta pela tabela', async () => {
+    const { registrarClienteNaFoto, fake } = await carregarServico({ order_erp_sync: fotoDoBanco(SNAPSHOT_SEM_CLIENTE) });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, null)).toBe('nada_a_fazer');
+    expect(fake.filtrosDe('order_erp_sync')).toHaveLength(0);
+  });
+
+  it('sem a migração 046, a troca de cliente segue — só sem carimbo', async () => {
+    const { registrarClienteNaFoto, fake } = await carregarServico({ order_erp_sync: SEM_A_TABELA });
+
+    expect(await registrarClienteNaFoto('o1', EMPRESA, CLIENTE_ANTIGO)).toBe('sem_tabela');
     expect(fake.ultimaGravacao('order_erp_sync')).toBeUndefined();
   });
 });
@@ -281,6 +358,58 @@ describe('garantirFotoDoErp — os pedidos lançados antes da 046', () => {
   });
 });
 
+describe('divergenciaComOErp — a porta do cliente (troca de cliente, 19/10/2026)', () => {
+  const LOJA_ERRADA = 'cliente-1';
+  const LOJA_CERTA = 'cliente-2';
+  const peca = { product_id: 'p1', variant_id: null, quantity: 3, unit_price: 10, total: 30 };
+
+  it('o pedido é de outro cliente agora: acende, mesmo com as peças iguais', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    const d = divergenciaComOErp(
+      { items: [peca], customer_id: LOJA_ERRADA },
+      { items: [peca], customer_id: LOJA_CERTA },
+    );
+    expect(d.clienteMudou).toBe(true);
+    expect(d.mudou).toBe(true);
+    // E só o cliente — não inventa divergência nas outras portas.
+    expect(d.itens.mudou).toBe(false);
+    expect(d.desconto).toBeNull();
+  });
+
+  it('mesmo cliente dos dois lados não acende', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    const d = divergenciaComOErp(
+      { items: [peca], customer_id: LOJA_ERRADA },
+      { items: [peca], customer_id: LOJA_ERRADA },
+    );
+    expect(d.clienteMudou).toBe(false);
+    expect(d.mudou).toBe(false);
+  });
+
+  it('foto que não guarda cliente nenhum não acende sozinha — seria falso positivo em massa', async () => {
+    // A foto velha não tem o campo; o pedido de hoje tem cliente, como todo
+    // pedido tem. Comparar os dois como se a ausência fosse "sem cliente"
+    // acenderia o aviso em TODO pedido já lançado no dia do deploy.
+    const { divergenciaComOErp } = await import('@csb/shared');
+    expect(divergenciaComOErp({ items: [peca] }, { items: [peca], customer_id: LOJA_CERTA }).mudou).toBe(false);
+    expect(
+      divergenciaComOErp({ items: [peca], customer_id: null }, { items: [peca], customer_id: LOJA_CERTA }).mudou,
+    ).toBe(false);
+  });
+
+  it('pedido de hoje sem cliente, com a foto dizendo um: acende (o cliente saiu do pedido)', async () => {
+    const { divergenciaComOErp } = await import('@csb/shared');
+    expect(divergenciaComOErp({ items: [peca], customer_id: LOJA_ERRADA }, { items: [peca] }).clienteMudou).toBe(true);
+  });
+
+  it('a impressão do pedido muda com o cliente: a confirmação não engole a troca feita no meio', async () => {
+    const { assinaturaDoPedido } = await import('@csb/shared');
+    expect(assinaturaDoPedido({ items: [peca], customer_id: LOJA_ERRADA })).not.toBe(
+      assinaturaDoPedido({ items: [peca], customer_id: LOJA_CERTA }),
+    );
+  });
+});
+
 describe('divergenciaComOErp — as quatro portas', () => {
   const item = (quantity: number) => ({
     id: 'i1',
@@ -455,7 +584,7 @@ describe('confirmar com a lista que a Larissa conferiu IGUAL à do banco', () =>
 describe('garantirFotoDoErp — dúvida não é ausência', () => {
   const SOLUCO: RespostaTabela = { data: null, error: { message: 'fetch failed', code: '' } };
 
-  it('se não deu para perguntar se a tabela existe, a edição PARA (falhou), em vez de gravar sem foto', async () => {
+  it('se não deu para perguntar se a tabela existe, a resposta é "falhou" — nunca "sem_tabela"', async () => {
     const { garantirFotoDoErp, fake } = await carregarServico({ order_erp_sync: SOLUCO });
 
     expect(await garantirFotoDoErp({ id: 'o1', status: 'sent_erp' }, EMPRESA)).toBe('falhou');

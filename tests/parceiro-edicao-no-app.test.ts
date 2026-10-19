@@ -2233,7 +2233,7 @@ describe('o contrato publicado diz o que o código faz (revisão de 17/09/2026)'
     const doHtml = [...ler('apps/web/public/api-parceiro.html').matchAll(/atualizado (\d{1,2} [a-z]{3} \d{4})/g)].map(
       (m) => m[1],
     );
-    expect(doMd).toBe('22 set 2026');
+    expect(doMd).toBe('19 out 2026');
     expect(doHtml.length).toBeGreaterThanOrEqual(2);
     expect([...new Set(doHtml)]).toEqual([doMd]);
   });

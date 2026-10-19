@@ -328,6 +328,31 @@ export async function deleteOrderHandler(request: FastifyRequest, reply: Fastify
       });
       return;
     }
+    if (result.reason === 'solicitado_ao_erp') {
+      // A mensagem ensina a saída, porque ela existe e é de um clique:
+      // "Cancelar solicitação" tira o pedido da fila do Control (050). Mas só
+      // o financeiro e o admin têm esse clique (PATCH /cancelar-solicitacao e
+      // `podeCancelarSolicitacao`), e o DELETE aceita rep e gerente também —
+      // mandar o representante cancelar a solicitação era mandá-lo procurar um
+      // botão que a tela dele não tem (19/10/2026).
+      const podeCancelarSolicitacao = role === 'financeiro' || role === 'admin';
+      await reply.status(409).send({
+        error: podeCancelarSolicitacao
+          ? 'Este pedido já foi solicitado ao Control e pode estar sendo importado agora. Cancele a solicitação antes de excluir.'
+          : 'Este pedido já foi solicitado ao Control e pode estar sendo importado agora. Peça ao financeiro para cancelar a solicitação antes de excluir.',
+        code: 'ORDER_REQUESTED_TO_ERP',
+        statusCode: 409,
+      });
+      return;
+    }
+    if (result.reason === 'sem_resposta_do_banco') {
+      await reply.status(503).send({
+        error: 'Não deu para confirmar se este pedido foi solicitado ao Control. Nada foi excluído; tente de novo.',
+        code: 'SOLICITACAO_INDISPONIVEL',
+        statusCode: 503,
+      });
+      return;
+    }
     if (result.reason === 'sem_copia') {
       // A cópia para a aba "Excluídos" não gravou — o pedido fica onde está.
       await reply.status(500).send({

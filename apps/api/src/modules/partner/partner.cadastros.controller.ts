@@ -24,40 +24,19 @@ import {
   CORPO_ERRO_INTERNO,
   CORPO_NAO_ENCONTRADO,
   autenticar,
+  horaDaPuxada,
   lerDesde,
   recusouPorCanal,
   responder,
 } from './partner.porta.js';
 
 /**
- * Quanto o `servidor_hora` recua em relação à hora de antes da consulta.
- *
- * A hora de antes não basta (revisão de 17/09/2026): o `updated_at` de uma
- * gravação é carimbado ANTES de ela ser confirmada — a edição do cadastro
- * toma a hora da API e só então manda o UPDATE; a trigger da 013 usa o início
- * da transação, no relógio do banco. Um UPDATE que espera trava, fila do
- * PostgREST ou rede confirma DEPOIS de a puxada ter lido a lista, com um
- * `updated_at` ANTERIOR ao `servidor_hora` — e ficava de fora das duas
- * puxadas. Dois minutos cobrem essas esperas com sobra; o preço é o que mudou
- * nesse intervalo sair de novo na puxada seguinte, o que é inofensivo
- * (reenviar é `sem_mudanca`).
+ * A folga e a hora da puxada moraram aqui até 19/10/2026; hoje estão em
+ * partner.porta.ts, porque TODA rota `?desde=` do parceiro precisa delas — os
+ * excluídos e os cancelados ainda tomavam a hora DEPOIS da consulta. O
+ * reexport mantém o nome valendo para quem já o importava daqui.
  */
-export const FOLGA_DO_SERVIDOR_HORA_MS = 2 * 60_000;
-
-/**
- * O `servidor_hora` de uma puxada — o `desde` que o Control manda na próxima.
- *
- * Tomado ANTES da consulta (17/09/2026) e recuado pela folga acima. Antes era
- * tomado depois: uma edição gravada enquanto a lista era lida (com
- * `updated_at` entre o início da leitura e a resposta) não entrava nesta lista
- * e ficava antes do `desde` da próxima — nunca saía. Com a hora de antes, menos
- * a folga, o pior caso é a mesma mudança sair mais de uma vez, o que é
- * inofensivo. (A lista paginada pela chave — `buscarPelaChaveOuFalhar` — fecha
- * o outro furo: o cliente empurrado para uma página já lida.)
- */
-function horaDaPuxada(): string {
-  return new Date(Date.now() - FOLGA_DO_SERVIDOR_HORA_MS).toISOString();
-}
+export { FOLGA_DO_SERVIDOR_HORA_MS } from './partner.porta.js';
 
 /** GET /partner/v1/clientes?desde=ISO — os clientes que mudaram no app */
 export async function partnerClientesAlteradosHandler(

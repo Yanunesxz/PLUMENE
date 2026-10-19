@@ -1896,7 +1896,7 @@ export async function listarClientesAlterados(
   const avisos: string[] = [];
   if (!com049) {
     avisos.push(
-      'Sem a migração 049 a lista inclui também o que o próprio Control gravou nesta janela — reenviar é inofensivo (sem_mudanca).',
+      'Esta marca ainda não sabe separar o que o próprio Control gravou: a lista inclui também isso nesta janela — reenviar é inofensivo (sem_mudanca).',
     );
   }
   return { registros, avisos };

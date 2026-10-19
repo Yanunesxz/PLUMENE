@@ -227,6 +227,26 @@ export function faturaPeloControl(canais: CanaisDoPedido | null | undefined): bo
 }
 
 /**
+ * A tela ainda oferece a planilha do Control? Duas condições, e as duas têm
+ * de valer:
+ *
+ *   • a MARCA tem o formulário oficial (instalação de outra marca não tem —
+ *     `MARCA.exportaControl`, VITE_BRAND_CONTROL_EXPORT=false);
+ *   • o pedido NÃO entra no Control pela API. Com o canal na 'api' quem lança
+ *     é o programa da fábrica: se o financeiro ainda exportasse a planilha e
+ *     importasse à mão, o mesmo pedido entraria DUAS VEZES no Control.
+ *
+ * Sem os canais (offline, ou a API não leu) a tela é a de sempre: a planilha
+ * continua ali, que é como se trabalha enquanto o canal é manual.
+ */
+export function mostraPlanilhaDoControl(
+  canais: CanaisDoPedido | null | undefined,
+  marcaExporta: boolean,
+): boolean {
+  return marcaExporta && !lancaPeloControl(canais);
+}
+
+/**
  * A SÉRIE do número do Control desta marca: CS na Corpo Sensual, PL na
  * PLUMENE. É só para exemplo e sugestão na tela — quem cunha o número é o
  * Control. Marca que a tela não conhece usa a série do último número lançado

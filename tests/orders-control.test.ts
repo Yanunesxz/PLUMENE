@@ -147,6 +147,137 @@ describe('excluir pedido que já está no Control', () => {
   }, 60_000);
 });
 
+// ─── Excluir pedido com solicitação em aberto (049) ──────────────────────────
+//
+// Entre o clique em "Lançar no Control" e o número voltar, o pedido JÁ ESTÁ na
+// fila GET /partner/v1/pedidos — o Control pode estar gravando-o neste segundo.
+// Excluí-lo aqui deixaria lá um pedido órfão, que nem sairia em
+// /partner/v1/pedidos/excluidos (essa lista só traz quem tinha número). A saída
+// é de um clique e a mensagem a ensina: cancelar a solicitação primeiro.
+
+describe('excluir pedido solicitado ao Control e ainda sem número', () => {
+  const SOLICITADO_EM = '2026-10-19T12:00:00.000Z';
+  const pedido = (extra: Record<string, unknown> = {}) => ({
+    data: {
+      id: 'o1',
+      order_number: 5,
+      status: 'approved',
+      rep_id: REP,
+      invoiced: false,
+      erp_order_id: null,
+      erp_requested_at: SOLICITADO_EM,
+      erp_requested_by: 'fin-1',
+      ...extra,
+    },
+    error: null,
+  });
+  const GRAVOU = { data: [{ id: 'o1' }], error: null };
+
+  it('é recusado para todos, sem cópia e sem DELETE — e a coluna da 049 foi pedida', async () => {
+    const { deleteOrder, fake } = await servicoDePedidos({ orders: pedido() });
+
+    expect(await deleteOrder('o1', EMPRESA, 'adm-1', 'admin', 'Admin Teste')).toEqual({
+      ok: false,
+      reason: 'solicitado_ao_erp',
+    });
+    expect(fake.ultimaGravacao('orders', 'delete')).toBeUndefined();
+    expect(fake.ultimaGravacao('deleted_orders', 'insert')).toBeUndefined();
+    expect(fake.filtrosDe('orders', 'select')[0]?.args[0]).toContain('erp_requested_at');
+  });
+
+  it('cancelada a solicitação, o mesmo pedido é excluído', async () => {
+    const semSolicitacao = pedido({ erp_requested_at: null, erp_requested_by: null });
+    const { cancelarSolicitacaoAoErp, deleteOrder, fake } = await servicoDePedidos({
+      orders: [pedido(), VAZIO, GRAVOU, semSolicitacao],
+    });
+
+    expect((await cancelarSolicitacaoAoErp('o1', EMPRESA, { id: 'fin-1', nome: 'Financeiro Teste' })).ok).toBe(true);
+    expect(await deleteOrder('o1', EMPRESA, 'fin-1', 'financeiro', 'Financeiro Teste')).toEqual({ ok: true });
+    expect(fake.ultimaGravacao('deleted_orders', 'insert')).toBeDefined();
+    expect(fake.ultimaGravacao('orders', 'delete')).toBeDefined();
+  });
+
+  it('pedido que nunca foi solicitado é excluído como sempre foi', async () => {
+    const { deleteOrder, fake } = await servicoDePedidos(
+      { orders: pedido({ erp_requested_at: null, erp_requested_by: null }) },
+      [...FORA_DO_ASSUNTO, 'deleted_orders'],
+    );
+
+    expect(await deleteOrder('o1', EMPRESA, 'adm-1', 'admin')).toEqual({ ok: true });
+    expect(fake.ultimaGravacao('orders', 'delete')).toBeDefined();
+  });
+
+  it('banco sem a 049: exclui como antes e nem pede a coluna que não existe', async () => {
+    const { deleteOrder, fake } = await servicoDePedidos(
+      // Sem a 049 o pedido nem tem a chave: é a PLUMENE de hoje.
+      { orders: { data: { id: 'o1', rep_id: REP, invoiced: false, erp_order_id: null }, error: null } },
+      [...FORA_DO_ASSUNTO, 'deleted_orders', 'orders.erp_requested_at'],
+    );
+
+    expect(await deleteOrder('o1', EMPRESA, 'adm-1', 'admin')).toEqual({ ok: true });
+    expect(fake.ultimaGravacao('orders', 'delete')).toBeDefined();
+    const colunas = String(fake.filtrosDe('orders', 'select')[0]?.args[0]);
+    expect(colunas).toContain('erp_order_id');
+    expect(colunas).not.toContain('erp_requested_at');
+  });
+
+  it('sonda sem resposta não vira "não existe": nada é excluído e a resposta é "tente de novo"', async () => {
+    const fake = criarSupabaseFake({ orders: pedido() } as never);
+    vi.doMock('../apps/api/src/config/supabase.js', () => ({ supabase: fake.cliente }));
+    vi.doMock('../apps/api/src/lib/detectarColuna.js', () => ({
+      detectar: async () => true,
+      detectarOuFalhar: async () => true,
+      detectarComCerteza: async (t: string, c?: string) =>
+        t === 'orders' && c === 'erp_requested_at' ? 'nao_sei' : 'existe',
+      esquecerDeteccoes: () => {},
+    }));
+    const { deleteOrder } = await import('../apps/api/src/modules/orders/orders.service.js');
+
+    expect(await deleteOrder('o1', EMPRESA, 'adm-1', 'admin')).toEqual({ ok: false, reason: 'sem_resposta_do_banco' });
+    expect(fake.gravacoes).toEqual([]);
+  });
+
+  it('a rota responde 409 ORDER_REQUESTED_TO_ERP ensinando a cancelar a solicitação', async () => {
+    const { app, fake } = await subirApp({ orders: pedido() });
+    try {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: '/orders/o1',
+        headers: { authorization: `Bearer ${TOKEN_ADMIN}` },
+      });
+      expect(res.statusCode).toBe(409);
+      const corpo = res.json() as { code: string; error: string };
+      expect(corpo.code).toBe('ORDER_REQUESTED_TO_ERP');
+      expect(corpo.error).toMatch(/[Cc]ancele a solicitação/);
+      expect(fake.gravacoes).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+
+  it('para o representante, a frase manda pedir ao financeiro — ele não tem o botão', async () => {
+    // O DELETE aceita rep e gerente; o PATCH /cancelar-solicitacao, não. A
+    // frase de antes mandava o representante procurar um botão que a tela
+    // dele nunca mostra (19/10/2026).
+    const { app, fake } = await subirApp({ orders: pedido() });
+    try {
+      const res = await app.inject({
+        method: 'DELETE',
+        url: '/orders/o1',
+        headers: { authorization: `Bearer ${TOKEN_REP}` },
+      });
+      expect(res.statusCode).toBe(409);
+      const corpo = res.json() as { code: string; error: string };
+      expect(corpo.code).toBe('ORDER_REQUESTED_TO_ERP');
+      expect(corpo.error).toMatch(/[Pp]eça ao financeiro/);
+      expect(corpo.error).not.toMatch(/^Cancele|\. Cancele/);
+      expect(fake.gravacoes).toEqual([]);
+    } finally {
+      await app.close();
+    }
+  }, 60_000);
+});
+
 // ─── Lançar no ERP pela tela ─────────────────────────────────────────────────
 
 describe('lançar no ERP pela tela', () => {

@@ -175,9 +175,12 @@ export async function garantirFotoDoErp(
 ): Promise<'guardada' | 'ja_tinha' | 'nao_lancado' | 'sem_tabela' | 'falhou'> {
   if (order.status !== 'sent_erp') return 'nao_lancado';
 
-  // "Não existe" e "não deu para perguntar" são coisas diferentes aqui: sem a
-  // tabela, a edição segue como antes da 046; com um soluço de rede, a edição
-  // PARA — gravar sem a foto apagaria esta mudança do aviso para sempre.
+  // "Não existe" e "não deu para perguntar" continuam sendo coisas diferentes:
+  // sem a tabela a resposta é 'sem_tabela' (a edição segue como antes da 046),
+  // com soluço de rede é 'falhou'. Quem chama é que decide — e desde
+  // 23/09/2026 todos decidem seguir e registrar no log ("não pode travar nada
+  // agora", Yan), tanto nas edições quanto na troca de cliente. O que se perde
+  // numa falha é o aviso daquela mudança.
   const tabela = await detectarComCerteza('order_erp_sync', 'order_id');
   if (tabela === 'nao_existe') return 'sem_tabela';
   if (tabela === 'nao_sei') {
@@ -217,6 +220,78 @@ export async function garantirFotoDoErp(
     return 'falhou';
   }
   return 'guardada';
+}
+
+/**
+ * A TROCA DE CLIENTE NUMA FOTO QUE NÃO GUARDA CLIENTE (19/10/2026).
+ *
+ * A comparação com a foto só acusa a troca de cliente quando a foto diz QUEM o
+ * Control conhece — foto sem cliente nenhum não acusa nada, de propósito, para
+ * não acender o aviso em todo pedido já lançado de uma vez
+ * (`divergenciaComOErp`, em shared).
+ *
+ * Então a troca carimba na própria foto o cliente que o Control conhece — o
+ * ANTIGO, o que estava no pedido até um instante atrás. A partir daí a
+ * diferença aparece mesmo numa foto tirada antes de o cliente entrar na conta.
+ *
+ * Foto que já diz um cliente NÃO é tocada: ela é o que a fábrica tem na mão, e
+ * reescrevê-la apagaria a divergência que esta troca acabou de criar.
+ *
+ * Nunca derruba quem chamou: quando isto roda, o cliente do pedido já foi
+ * gravado. O que se perde numa falha é o aviso, e isso fica no log.
+ */
+export async function registrarClienteNaFoto(
+  order_id: string,
+  company_id: string,
+  cliente_antigo: string | null,
+): Promise<'carimbada' | 'nada_a_fazer' | 'foto_mais_nova' | 'sem_tabela' | 'falhou'> {
+  // Pedido que estava sem cliente (vitrine, 014): não há cliente velho para
+  // carimbar. A foto seguinte já sai com o cliente novo dentro.
+  if (!cliente_antigo) return 'nada_a_fazer';
+  if (!(await detectarTabela())) return 'sem_tabela';
+
+  const { data, error } = await supabase
+    .from('order_erp_sync')
+    .select('snapshot, confirmado_em')
+    .eq('order_id', order_id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (error) {
+    console.error(`[046] falha ao ler a foto do pedido ${order_id} para carimbar o cliente: ${error.message}`);
+    return 'falhou';
+  }
+  const linha = data as { snapshot: unknown; confirmado_em: string } | null;
+  // Sem foto o pedido nunca foi ao Control (ou a foto não saiu): nada a marcar.
+  if (!linha || !linha.snapshot || typeof linha.snapshot !== 'object' || Array.isArray(linha.snapshot)) {
+    return 'nada_a_fazer';
+  }
+  const snapshot = linha.snapshot as Record<string, unknown>;
+  if (snapshot.customer_id) return 'nada_a_fazer';
+
+  // `confirmado_em` é a trava: se uma foto NOVA foi tirada entre a leitura e
+  // esta gravação (alguém confirmou "já atualizei no Control"), ela já conhece
+  // o cliente de agora e não pode ser sobrescrita pela foto velha de memória.
+  //
+  // O `.select()` não é enfeite: sem ele o supabase-js devolve `error: null`
+  // tanto quando carimbou quanto quando a trava barrou (zero linhas), e a
+  // função dizia 'carimbada' nos dois casos — quem lesse o retorno para provar
+  // o carimbo não provava nada. Mesmo padrão de `cancelarSolicitacaoAoErp` e
+  // de `excluirPedidoPeloControl`.
+  const { data: carimbadas, error: erroDaGravacao } = await supabase
+    .from('order_erp_sync')
+    .update({ snapshot: { ...snapshot, customer_id: cliente_antigo } })
+    .eq('order_id', order_id)
+    .eq('company_id', company_id)
+    .eq('confirmado_em', linha.confirmado_em)
+    .select('order_id');
+  if (erroDaGravacao) {
+    console.error(`[046] falha ao carimbar o cliente na foto do pedido ${order_id}: ${erroDaGravacao.message}`);
+    return 'falhou';
+  }
+  // Ninguém afetado: a trava segurou, porque a foto foi refeita no meio. Ela
+  // já conhece o cliente de agora — nada a fazer, e não é falha.
+  if (!Array.isArray(carimbadas) || carimbadas.length === 0) return 'foto_mais_nova';
+  return 'carimbada';
 }
 
 /**

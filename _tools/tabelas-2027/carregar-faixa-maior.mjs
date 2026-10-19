@@ -18,10 +18,15 @@
  *
  * Uso:  node carregar-faixa-maior.mjs [--aplicar]
  * Sem --aplicar só mostra o que faria.
+ *
+ * TRAVA (048): recusa rodar quando `companies.canal_catalogo` da empresa não é
+ * 'carga'. `product_prices.price_larger` é preço, e preço passa a chegar do
+ * Control por /partner/v1/precos.
  */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { exigirCanalDeCarga } from '../canal-de-carga.mjs';
 
 const AQUI = dirname(fileURLToPath(import.meta.url));
 const RAIZ = join(AQUI, '..', '..');
@@ -52,6 +57,13 @@ const CHAVE_DA_TABELA = {
   'TABELA 02 - 2027': '02',
   'TABELA 03 - 2027': '03',
 };
+
+// ─── 0. O canal do catálogo ──────────────────────────────────────────────────
+await exigirCanalDeCarga(db, {
+  empresas: COMPANY_ID,
+  canais: ['catalogo'],
+  acao: 'A carga da faixa maior por aqui',
+});
 
 // ─── 1. A coluna existe? ─────────────────────────────────────────────────────
 const { error: semColuna } = await db.from('product_prices').select('price_larger').limit(1);

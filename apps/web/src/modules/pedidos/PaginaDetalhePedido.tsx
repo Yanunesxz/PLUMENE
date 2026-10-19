@@ -460,6 +460,23 @@ export function PaginaDetalhePedido() {
     }
   };
 
+  /**
+   * O botão "Cancelar solicitação", num lugar só: ele aparece debaixo do
+   * "Lançar no Control" e, desde 19/10/2026, também sozinho no pedido que
+   * deixou de estar aceito (ver o bloco do cancelado na fila).
+   */
+  const botaoCancelarSolicitacao = (
+    <Button
+      variant="outline"
+      className="mt-2 w-full text-danger"
+      disabled={cancelandoSolicitacao || !isOnline}
+      onClick={() => void cancelarSolicitacao()}
+    >
+      <X className="h-4 w-4" strokeWidth={2.5} />
+      {cancelandoSolicitacao ? 'Cancelando…' : 'Cancelar solicitação'}
+    </Button>
+  );
+
   const abrirLancamento = async () => {
     setLancando(true);
     setErroDoLancamento(null);
@@ -979,15 +996,18 @@ export function PaginaDetalhePedido() {
   );
 
   // O pedido de hoje no recorte que vai para o Control: peças, desconto,
-  // condição e observação — o mesmo que a foto do lançamento guarda.
+  // condição, observação e cliente — o mesmo que a foto do lançamento guarda.
+  // O cliente PRECISA estar aqui: a foto guarda o dela, e um pedido de hoje
+  // sem cliente nenhum acenderia o aviso de troca em todo pedido lançado.
   const pedidoHoje = useMemo<PedidoParaComparar>(
     () => ({
       items: itensComRef,
       discount_percent: order?.discount_percent ?? null,
       payment_condition_id: order?.payment_condition_id ?? null,
       notes: order?.notes ?? null,
+      customer_id: order?.customer_id ?? null,
     }),
-    [itensComRef, order?.discount_percent, order?.payment_condition_id, order?.notes],
+    [itensComRef, order?.discount_percent, order?.payment_condition_id, order?.notes, order?.customer_id],
   );
 
   // A cor escolhida mora nas linhas "0015 3M azul" das notas (o item vai
@@ -1171,6 +1191,11 @@ export function PaginaDetalhePedido() {
       await db.orders.delete(id);
       navigate('/orders');
     } catch (err) {
+      // Recusa por estar no Control — com número, ou com solicitação em aberto
+      // (049): recarrega para a tela mostrar o estado de agora. É de lá que sai
+      // o "Cancelar solicitação", a saída que a mensagem ensina.
+      const codigo = (err as { code?: string }).code;
+      if (codigo === 'ORDER_HAS_ERP_NUMBER' || codigo === 'ORDER_REQUESTED_TO_ERP') void recarregarPedido();
       window.alert(err instanceof Error ? err.message : 'Erro ao excluir pedido');
       setDeleting(false);
     }
@@ -1541,17 +1566,25 @@ export function PaginaDetalhePedido() {
                   {pelaApi ? (order.erp_requested_at ? 'Conferir no Control' : 'Lançar no Control') : 'Lançar no ERP'}
                 </Button>
                 {/* Solicitado e ainda sem número: dá para tirar da fila do Control. */}
-                {podeCancelarSolicitacao(user?.role, order) && (
-                  <Button
-                    variant="outline"
-                    className="mt-2 w-full text-danger"
-                    disabled={cancelandoSolicitacao || !isOnline}
-                    onClick={() => void cancelarSolicitacao()}
-                  >
-                    <X className="h-4 w-4" strokeWidth={2.5} />
-                    {cancelandoSolicitacao ? 'Cancelando…' : 'Cancelar solicitação'}
-                  </Button>
-                )}
+                {podeCancelarSolicitacao(user?.role, order) && botaoCancelarSolicitacao}
+              </div>
+            )}
+
+          {/* O PEDIDO QUE SAIU DE "ACEITO" E FICOU NA FILA DO CONTROL
+              (19/10/2026). O bloco de cima só aparece em pedido 'approved', e
+              cancelar o pedido (053) o manda para 'rejected' sem limpar a
+              solicitação. O resultado: a exclusão recusava com 409 "cancele a
+              solicitação antes de excluir" e não havia botão nenhum que
+              fizesse isso — o pedido ficava impossível de excluir pelo app.
+              A regra de quem pode é a mesma de sempre (financeiro e admin). */}
+          {!podeLancarNoErp(user?.role, order.status, order.invoiced) &&
+            podeCancelarSolicitacao(user?.role, order) && (
+              <div className="rounded-xl border border-primary/30 bg-primary-soft p-4">
+                <p className="mb-3 text-sm text-foreground">
+                  Este pedido não está mais aceito, mas continua na fila do Control. Tire-o da fila —
+                  é isso que libera excluí-lo aqui.
+                </p>
+                {botaoCancelarSolicitacao}
               </div>
             )}
 
