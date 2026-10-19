@@ -179,7 +179,7 @@ export function PaginaDashboard() {
     <div className="space-y-6 p-4 md:p-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Dashboard</h1>
+          <h1 className="titulo text-[26px] leading-none text-foreground md:text-[32px]">Metas</h1>
           <p className="mt-1 text-sm text-muted-foreground">Metas e desempenho dos representantes.</p>
         </div>
         <Select
