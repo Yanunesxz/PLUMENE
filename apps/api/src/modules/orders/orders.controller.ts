@@ -5,6 +5,7 @@ import {
   createOrder,
   updateOrderStatus,
   setOrderInvoiced,
+  setOrderInactive,
   setOrderDiscount,
   setOrderItems,
   setOrderPayment,
@@ -32,6 +33,7 @@ import {
   avisarDecisaoAoRep,
   avisarMesaDaRecusa,
   avisarFaturadoAoRep,
+  avisarPedidoInativoAoRep,
   avisarPedidoMudouNoErp,
 } from '../push/push.avisos.js';
 import { parseBody } from '../../lib/validation.js';
@@ -39,6 +41,7 @@ import {
   createOrderSchema,
   updateOrderStatusSchema,
   setInvoicedSchema,
+  setInactiveSchema,
   setDiscountSchema,
   setOrderItemsSchema,
   setPaymentSchema,
@@ -373,6 +376,15 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
     por_nome: name ?? null,
   });
   if (!r.ok) {
+    // Pedido inativo (055) não se fatura pela tela: reative antes.
+    if (r.reason === 'pedido_inativo') {
+      await reply.status(409).send({
+        error: 'Este pedido está marcado como inativo — reative o pedido antes de faturar.',
+        code: 'PEDIDO_INATIVO',
+        statusCode: 409,
+      });
+      return;
+    }
     if (r.reason === 'faturamento_pelo_control') {
       await reply.status(409).send({
         error: 'O faturamento deste pedido vem do Control pela integração — o botão manual está desligado nesta empresa.',
@@ -408,6 +420,67 @@ export async function setInvoicedHandler(request: FastifyRequest, reply: Fastify
   if (body.invoiced && r.mudou) avisarFaturadoAoRep(company_id, r.order, sub);
 
   await reply.send({ data: r.order });
+}
+
+/**
+ * PATCH /orders/:id/inativo { inactive, note? } — o carimbo "Pedido inativo"
+ * (055) e o desfazer. Financeiro e admin (a rota confere); a regra de QUANDO
+ * é `podeInativarPedido` (shared), a mesma que esconde o botão na tela.
+ */
+export async function setInactiveHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  const { company_id, role, sub, name } = request.user;
+  const { id } = request.params as { id: string };
+  const body = await parseBody(setInactiveSchema, request.body, reply);
+  if (!body) return;
+
+  const r = await setOrderInactive(id, company_id, body.inactive, {
+    role,
+    por: sub,
+    por_nome: name ?? null,
+    note: body.note,
+  });
+  if (r.ok) {
+    // O representante fica sabendo que o pedido saiu da bonificação — só no
+    // CARIMBO de verdade: nunca no reativar, nunca no recarimbo.
+    if (body.inactive && r.mudou) avisarPedidoInativoAoRep(company_id, r.order, sub);
+    await reply.send({ data: r.order });
+    return;
+  }
+  const respostas = {
+    not_found: { status: 404, code: 'NOT_FOUND', error: 'Pedido não encontrado' },
+    forbidden: { status: 403, code: 'FORBIDDEN', error: 'Você não pode marcar este pedido como inativo' },
+    status_nao_permite: {
+      status: 409,
+      code: 'STATUS_NAO_PERMITE',
+      // Vale nos dois sentidos (16/10/2026): o cancelado não se inativa nem se
+      // reativa — já está fora da bonificação, e o carimbo não o devolve a nada.
+      error:
+        'Só pedido aprovado pelo financeiro (ou já lançado no Control) pode ser marcado como inativo ou reativado — o cancelado já está fora da bonificação',
+    },
+    ja_faturado: {
+      status: 409,
+      code: 'JA_FATURADO',
+      error: 'Pedido faturado não se inativa — desfature o pedido antes',
+    },
+    nao_esta_inativo: {
+      status: 409,
+      code: 'NAO_ESTA_INATIVO',
+      error: 'Este pedido não está marcado como inativo — não há o que reativar',
+    },
+    sem_migracao: {
+      status: 503,
+      code: 'MIGRACAO_PENDENTE',
+      error: 'A migração 055 ainda não rodou neste banco — marcar pedido inativo ainda não funciona aqui',
+    },
+    banco_indisponivel: {
+      status: 503,
+      code: 'BANCO_INDISPONIVEL',
+      error: 'Não deu para falar com o banco agora. Nada foi alterado — tente de novo em instantes.',
+    },
+    erro: { status: 500, code: 'UPDATE_FAILED', error: 'Não foi possível gravar o carimbo — tente de novo' },
+  } as const;
+  const resp = respostas[r.reason];
+  await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
 }
 
 export async function setDiscountHandler(request: FastifyRequest, reply: FastifyReply): Promise<void> {

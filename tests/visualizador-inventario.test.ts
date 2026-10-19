@@ -56,8 +56,9 @@ const PAPEL = 'visualizador';
 // nova derruba estes três — e é esse o momento de conferir se ela tem
 // `requireRole` e se o papel ficou de fora. Ao acrescentar, suba o número.
 const QUANTOS_ROUTERS = 14;
-const QUANTAS_ROTAS = 106;
-const QUANTAS_ESCRITAS = 56;
+// 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
+const QUANTAS_ROTAS = 107;
+const QUANTAS_ESCRITAS = 57;
 
 describe('inventário: o leitor de routers está funcionando', () => {
   // Sem estas âncoras, um erro na expressão regular esvaziaria a lista e o

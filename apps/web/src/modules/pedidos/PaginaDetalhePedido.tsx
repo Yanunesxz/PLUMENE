@@ -46,6 +46,7 @@ import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
+import { InativarPedido } from '../../components/comercial/InativarPedido.js';
 import { TrocarClienteDoPedido } from '../../components/comercial/TrocarClienteDoPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import {
@@ -56,6 +57,9 @@ import {
   ehSoLeitura,
   podeCancelarPedido,
   podeInformarMotivo,
+  podeInativarPedido,
+  podeReativarPedido,
+  exibeCarimboInativo,
   podeTrocarClienteDoPedido,
 } from '@csb/shared';
 import type {
@@ -180,6 +184,50 @@ export function PaginaDetalhePedido() {
     : 'forbidden';
   // Pedido já cancelado (inclusive o recusado antes da 053, sem porquê).
   const soOMotivo = !!order && podeInformarMotivo(order, user?.role);
+
+  // ─── Pedido inativo (055) ──────────────────────────────────────────────────
+  // O carimbo de quem foi aprovado e depois o Control inativou: fica na lista,
+  // sai da bonificação. Financeiro e admin marcam e desmarcam; o representante
+  // só vê. A regra é a mesma da API (shared) — o botão não aparece onde a
+  // rota vai negar.
+  const [inativando, setInativando] = useState(false);
+  const [salvandoInativo, setSalvandoInativo] = useState(false);
+  const podeInativar = !!order && podeInativarPedido(order, user?.role) === 'ok';
+  const podeReativar = !!order && podeReativarPedido(order, user?.role) === 'ok';
+
+  const mudarInativo = async (inactive: boolean, note?: string) => {
+    if (!id || !token || salvandoInativo) return;
+    setSalvandoInativo(true);
+    try {
+      await api.patch<ApiResponse<Order>>(`/orders/${id}/inativo`, { inactive, ...(note ? { note } : {}) }, token);
+      setInativando(false);
+      // Relê o pedido inteiro: a resposta crua não traz o nome de quem inativou.
+      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      setOrder(r.data);
+      // O cache do aparelho alimenta a lista e a meta do representante: sem
+      // isto a régua dele só mudaria no próximo GET /orders (como o faturado
+      // da lista faz com db.orders.put).
+      await db.orders
+        .update(id, {
+          inactive: r.data.inactive ?? inactive,
+          inactive_at: r.data.inactive_at ?? null,
+          inactive_by: r.data.inactive_by ?? null,
+          inactive_note: r.data.inactive_note ?? null,
+        })
+        .catch(() => {});
+      setToast({
+        message: inactive ? 'Pedido marcado como inativo — saiu da bonificação do mês.' : 'Pedido reativado.',
+        type: 'success',
+      });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível mudar o carimbo do pedido.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoInativo(false);
+    }
+  };
 
   // ─── Trocar o cliente do pedido (rep escolheu a loja errada, 08/10/2026) ──
   const podeTrocarCliente =
@@ -1399,6 +1447,9 @@ export function PaginaDetalhePedido() {
                     em {new Date(order.invoiced_at).toLocaleDateString('pt-BR')}
                   </span>
                 )}
+                {/* O carimbo da 055, ao lado do faturado: outra marca, não
+                    status. No cancelado ele some — a mesma regra da lista. */}
+                {exibeCarimboInativo(order) && <Badge variant="gray">Pedido inativo</Badge>}
               </span>
               {/* Com o faturamento vindo do Control pela API (048/049), o botão
                   manual some para TODOS — o carimbo chega sozinho, com a nota. */}
@@ -1408,8 +1459,9 @@ export function PaginaDetalhePedido() {
                 </span>
               ) : (
                 canInvoice &&
-                // Pedido cancelado não se fatura (053) — o desmarcar segue valendo.
-                (order.invoiced ? podeDesmarcar : order.status !== 'rejected') && (
+                // Pedido cancelado (053) e pedido inativo (055) não se faturam —
+                // a API recusa os dois; o desmarcar segue valendo.
+                (order.invoiced ? podeDesmarcar : order.status !== 'rejected' && !order.inactive) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -1580,6 +1632,40 @@ export function PaginaDetalhePedido() {
                 <p className="mt-1 text-[11px] text-subtle">
                   Cancelado{order.cancelled_by_name ? ` por ${order.cancelled_by_name}` : ''} em{' '}
                   {new Date(order.cancelled_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Pedido inativo (055): quem, quando e a observação — e o desfazer
+              para o financeiro/admin. O representante vê, não mexe; a loja
+              não vê; no cancelado o bloco some (o carimbo fica só no rastro). */}
+          {exibeCarimboInativo(order) && !ehLoja && (
+            <div className="rounded-xl border border-border bg-muted/40 p-4">
+              <div className="flex items-start justify-between gap-3">
+                <p className="text-sm font-semibold text-foreground">Pedido inativo</p>
+                {podeReativar && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={salvandoInativo}
+                    onClick={() => void mudarInativo(false)}
+                  >
+                    {salvandoInativo ? 'Reativando…' : 'Reativar pedido'}
+                  </Button>
+                )}
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Aprovado e depois inativado — fica fora da bonificação do mês. O pedido continua na
+                lista como estava.
+              </p>
+              {order.inactive_note && (
+                <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">“{order.inactive_note}”</p>
+              )}
+              {order.inactive_at && (
+                <p className="mt-1 text-[11px] text-subtle">
+                  Inativado{order.inactive_by_name ? ` por ${order.inactive_by_name}` : ''} em{' '}
+                  {new Date(order.inactive_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
                 </p>
               )}
             </div>
@@ -1921,6 +2007,20 @@ export function PaginaDetalhePedido() {
             </Button>
           )}
 
+          {/* Inativar (055): o Control inativou um pedido já aprovado — o
+              financeiro carimba aqui e ele sai da bonificação. */}
+          {!ehLoja && podeInativar && (
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full"
+              disabled={salvandoInativo}
+              onClick={() => setInativando(true)}
+            >
+              Inativar pedido
+            </Button>
+          )}
+
           {!order.invoiced && !ehLoja && podeAprovar && (
             <Button
               variant="outline"
@@ -2009,6 +2109,16 @@ export function PaginaDetalhePedido() {
           onConfirmar={(m) => void cancelarComMotivo(m)}
           onFechar={() => setCancelandoPedido(false)}
           soOMotivo={soOMotivo}
+        />
+      )}
+
+      {inativando && order && (
+        <InativarPedido
+          numero={order.order_number}
+          cliente={nomeDoComprador(order, custName)}
+          ocupado={salvandoInativo}
+          onConfirmar={(note) => void mudarInativo(true, note)}
+          onFechar={() => setInativando(false)}
         />
       )}
 

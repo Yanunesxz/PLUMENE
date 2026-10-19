@@ -15,7 +15,7 @@ import {
   type NivelDoAlerta,
 } from '../lib/alertas.js';
 import { jaInstalouNesteAparelho } from '../lib/instalarApp.js';
-import { contaParaAMeta } from '@csb/shared';
+import { somaParaAMetaDoMes } from '@csb/shared';
 import type { ApiResponse, TarefaDoRep, ShowcaseLink, StoreInvite } from '@csb/shared';
 
 /**
@@ -189,22 +189,10 @@ export function useAlertas(): Alertas {
         varejo: c.varejo === true,
         inativo: c.inativo === true,
       })),
-      meta:
-        faixas.length > 0
-          ? {
-              enviado: (orders ?? [])
-                .filter((o) => {
-                  const d = new Date(o.created_at);
-                  return (
-                    d.getFullYear() === agora.getFullYear() &&
-                    d.getMonth() === agora.getMonth() &&
-                    contaParaAMeta(o.status)
-                  );
-                })
-                .reduce((s, o) => s + (o.total ?? 0), 0),
-              faixas,
-            }
-          : null,
+      // O que a fábrica APROVOU do que ele enviou no mês (Yan, 15/10/2026):
+      // pelo mês do envio; inativo (055) e cancelado fora. A mesma conta da
+      // Minha Área — status + carimbo, em shared.
+      meta: faixas.length > 0 ? { enviado: somaParaAMetaDoMes(orders ?? [], agora), faixas } : null,
       tarefas,
       agora,
     });

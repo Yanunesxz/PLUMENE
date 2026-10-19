@@ -14,6 +14,7 @@ import {
   createOrderHandler,
   updateStatusHandler,
   setInvoicedHandler,
+  setInactiveHandler,
   setDiscountHandler,
   setItemsHandler,
   setPaymentHandler,
@@ -205,5 +206,15 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
       ],
     },
     setInvoicedHandler,
+  );
+  // "Pedido inativo" (055): o carimbo de quem foi aprovado e depois o Control
+  // inativou — sai da bonificação, fica na lista. Financeiro e admin, os
+  // mesmos de Faturado menos a venda interna (ela não inativa). Sem a tecla
+  // do gerente de propósito: gerente não entra. QUANDO pode é
+  // `podeInativarPedido` (shared), no service.
+  fastify.patch(
+    '/orders/:id/inativo',
+    { preHandler: [authenticate, requireRole(['financeiro', 'admin'])] },
+    setInactiveHandler,
   );
 }

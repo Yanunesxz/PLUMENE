@@ -167,6 +167,31 @@ describe('avisos do fluxo', () => {
     expect(enviadas).toHaveLength(1);
     expect(JSON.parse(enviadas[0]!.corpo).title).toContain('#10');
   });
+
+  // O carimbo "Pedido inativo" (055): o dono fica sabendo que o pedido saiu da
+  // bonificação, como fica do faturado — e, como lá, não de si mesmo.
+  it('o "Pedido inativo" chega no dono do pedido e diz que ele saiu da bonificação', async () => {
+    const { avisos } = await carregar({
+      push_subscriptions: { data: [LINHA], error: null },
+    });
+    avisos.avisarPedidoInativoAoRep(EMPRESA, { id: 'p1', order_number: 10, rep_id: 'u1' }, 'larissa');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(enviadas).toHaveLength(1);
+    const corpo = JSON.parse(enviadas[0]!.corpo) as { title: string; body: string; url: string };
+    expect(corpo.title).toContain('#10');
+    expect(corpo.title).toMatch(/inativo/);
+    expect(corpo.body).toMatch(/bonificação/);
+    expect(corpo.url).toContain('p1');
+  });
+
+  it('quem inativa o PRÓPRIO pedido (admin que também vende) não recebe aviso de si mesmo', async () => {
+    const { avisos } = await carregar({
+      push_subscriptions: { data: [LINHA], error: null },
+    });
+    avisos.avisarPedidoInativoAoRep(EMPRESA, { id: 'p1', order_number: 10, rep_id: 'u1' }, 'u1');
+    await new Promise((r) => setTimeout(r, 10));
+    expect(enviadas).toHaveLength(0);
+  });
 });
 
 /**

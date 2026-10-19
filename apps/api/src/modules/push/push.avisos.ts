@@ -9,6 +9,7 @@
  *   pedido vai para a fábrica     → a MESA (gerente, admin, financeiro)
  *   fábrica aceita ou recusa      → o REPRESENTANTE dono
  *   pedido faturado               → o REPRESENTANTE dono
+ *   pedido marcado como inativo   → o REPRESENTANTE dono (saiu da bonificação)
  *   cadastro de cliente alterado  → FINANCEIRO e admin (atualizar no Control)
  */
 import { rotulosDosCamposAlterados, vaiParaOControl } from '@csb/shared';
@@ -199,6 +200,28 @@ export function avisarFaturadoAoRep(
     enviarParaUsuarios(company_id, [pedido.rep_id], {
       title: `${nomeDoPedido(pedido)} faturado`,
       body: 'A nota saiu. Toque para ver o pedido.',
+      url: rota(pedido),
+      tag: `pedido-${pedido.id}`,
+    }),
+  );
+}
+
+/**
+ * Pedido marcado como INATIVO (055): aprovado e depois inativado no Control —
+ * saiu da bonificação do mês. O dono fica sabendo, como fica do faturado. Só
+ * no carimbo de verdade (nunca no reativar); quem marcou o próprio pedido não
+ * recebe aviso de si mesmo.
+ */
+export function avisarPedidoInativoAoRep(
+  company_id: string,
+  pedido: PedidoParaAviso,
+  quemInativou: string,
+): void {
+  if (pedido.rep_id === quemInativou) return;
+  engolir(
+    enviarParaUsuarios(company_id, [pedido.rep_id], {
+      title: `${nomeDoPedido(pedido)} marcado como inativo`,
+      body: 'O pedido saiu da bonificação do mês. Toque para ver.',
       url: rota(pedido),
       tag: `pedido-${pedido.id}`,
     }),

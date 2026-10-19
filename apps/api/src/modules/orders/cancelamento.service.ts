@@ -1,5 +1,6 @@
 import { supabase } from '../../config/supabase.js';
 import { detectar } from '../../lib/detectarColuna.js';
+import { nomeDoUsuario } from '../../lib/nomeDoUsuario.js';
 import { podeCancelarPedido, podeInformarMotivo, type MotivoDeCancelamento, type PodeCancelar } from '@csb/shared';
 import type { AuthRole, Order } from '@csb/shared';
 
@@ -172,9 +173,11 @@ export async function cancelarPedido(
   return { ok: true, order: data as unknown as Order, soOMotivo };
 }
 
-/** O nome de quem cancelou, para o detalhe do pedido dizer "por Larissa". */
+/**
+ * O nome de quem cancelou, para o detalhe do pedido dizer "por Larissa".
+ * A leitura em si está em lib/nomeDoUsuario.ts, compartilhada com o carimbo
+ * "Pedido inativo" (055).
+ */
 export async function nomeDeQuemCancelou(user_id: string | null | undefined): Promise<string | null> {
-  if (!user_id) return null;
-  const { data } = await supabase.from('users').select('name').eq('id', user_id).maybeSingle();
-  return (data as { name: string } | null)?.name ?? null;
+  return nomeDoUsuario(user_id);
 }

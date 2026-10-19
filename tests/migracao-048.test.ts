@@ -106,14 +106,15 @@ describe('migração 048', () => {
 
   it('as listas do rastro são as do código', () => {
     // A 049 recriou o CHECK de tipo com a lista daqui mais três acontecimentos,
-    // e a 050 recriou o da 049 com 'solicitacao_cancelada': a fonte da lista de
-    // TIPOS passou a ser a 050 (tests/migracao-049.test.ts e
-    // tests/migracao-050.test.ts conferem a sucessão). A daqui continua sendo o
-    // começo da do código. A origem do evento e a origem do número continuam
-    // vindo desta migração.
+    // a 050 recriou o da 049 com 'solicitacao_cancelada' e a 055 recriou o da
+    // 050 com os dois tipos do carimbo "Pedido inativo": a fonte da lista de
+    // TIPOS passou a ser a 055 (tests/migracao-049/050/055.test.ts conferem a
+    // sucessão). A daqui e a da 050 continuam sendo o começo da do código. A
+    // origem do evento e a origem do número continuam vindo desta migração.
     const da048 = listaDoCheck(MIGRACAO, 'chk_order_erp_events_tipo');
     expect(TIPOS_DE_EVENTO_ERP.slice(0, da048.length)).toEqual(da048);
-    expect(listaDoCheck(MIGRACAO_050, 'chk_order_erp_events_tipo')).toEqual([...TIPOS_DE_EVENTO_ERP]);
+    const da050 = listaDoCheck(MIGRACAO_050, 'chk_order_erp_events_tipo');
+    expect(TIPOS_DE_EVENTO_ERP.slice(0, da050.length)).toEqual(da050);
     expect(listaDoCheck(MIGRACAO, 'chk_order_erp_events_origem')).toEqual([...ORIGENS_DE_EVENTO_ERP]);
     expect(listaDoCheck(MIGRACAO, 'chk_orders_erp_order_source')).toEqual([...ORIGENS_DO_NUMERO]);
   });
