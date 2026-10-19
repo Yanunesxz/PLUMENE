@@ -42,7 +42,7 @@ import type { TarefaDoRep } from '@csb/shared';
 import { usePermissao } from '../../hooks/usePermissao.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
-import { contaParaAMeta, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
+import { somaParaAMetaDoMes, type Order, type CustomerListItem, type ApiResponse } from '@csb/shared';
 import { ReguaDaMeta } from '../../components/comercial/ReguaDaMeta.js';
 import { CadastrosAlteradosParaOControl } from '../../components/comercial/CadastrosAlteradosParaOControl.js';
 import { useMinhaMeta } from '../../hooks/useMinhaMeta.js';
@@ -219,11 +219,11 @@ export function PaginaMinhaArea() {
       .reduce((s, o) => s + valorDaVenda(o), 0);
     const faturadoTotal = invoiced.reduce((s, o) => s + valorDaVenda(o), 0);
     return {
-      // A bonificação conta o que ele ENVIOU no mês, não o que a fábrica já
-      // faturou — são coisas diferentes, e o aviso da fábrica é explícito.
-      enviadoNoMes: list
-        .filter((o) => thisMonth(o.created_at) && contaParaAMeta(o.status))
-        .reduce((s, o) => s + (o.total ?? 0), 0),
+      // A bonificação conta o que a fábrica APROVOU do que ele enviou no mês
+      // (Yan, 15/10/2026) — pelo mês do ENVIO, não do aceite nem da nota.
+      // Pedido inativo (055) e cancelado ficam fora. A conta é a de shared
+      // (status + carimbo), a mesma dos Alertas.
+      enviadoNoMes: somaParaAMetaDoMes(list, now),
       faturadoMes,
       faturadoTotal,
       // Fechamento do mês passado: valor, quantidade e a janela que o esconde.
@@ -396,7 +396,9 @@ export function PaginaMinhaArea() {
           diferentes — foi confusão de verdade na tela da Simone (01/09/2026). */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <MetricCard icon={Receipt} tint="brand" value={formatBRL(m.faturadoMes)} label="Faturado no mês" />
-        <MetricCard icon={TrendingUp} tint="green" value={formatBRL(m.enviadoNoMes)} label="Enviado no mês" />
+        {/* "Na meta" e não "Aprovado": para o representante, "Aprovado" já é o
+            faturado (statusDoCliente) — e este número é o da bonificação. */}
+        <MetricCard icon={TrendingUp} tint="green" value={formatBRL(m.enviadoNoMes)} label="Na meta do mês" />
         <MetricCard icon={Users} tint="brand" value={String(clientes)} label="Meus clientes" />
         <MetricCard icon={ShoppingCart} tint="brand" value={String(m.pedidosMes)} label="Pedidos no mês" />
       </div>

@@ -8,6 +8,14 @@ import { ORDER_STATUS, type OrderStatus } from './orderStatus.js';
  *   "TODOS OS PEDIDOS ENVIADOS ENTRE AS DATAS 01 A 31 DE CADA MÊS SERÃO SOMADOS
  *    E, ATINGINDO A META, SERÁ BONIFICADO DA SEGUINTE FORMA."
  *
+ * Desde 15/10/2026 o "pedidos enviados" do aviso se lê como "os APROVADOS do
+ * que foi enviado no mês". Regra do Yan, nas palavras dele: "a bonificação é
+ * de todos os pedidos que a Larissa aprovar; todos pedidos aprovados pela
+ * fábrica viram bonificação. Mas o pedido pode ter o carimbo de inativo como o
+ * de faturado: se o pedido for aprovado e depois inativado a pessoa não recebe
+ * a bonificação." O MÊS continua sendo o do ENVIO (`created_at`): enviado
+ * 30/09 e aprovado 02/10 conta em setembro. Ver `pedidoContaParaAMeta`.
+ *
  * É um degrau só, não uma soma: quem envia R$ 160.000 leva o bônus da faixa mais
  * alta que alcançou, e não a soma de todas.
  *
@@ -70,15 +78,22 @@ export function normalizarFaixas(faixas: readonly Partial<FaixaDeBonus>[]): Faix
 }
 
 /**
- * O que conta como "pedido enviado".
+ * Os STATUS que contam para a bonificação: o que o financeiro já APROVOU.
  *
- * O que saiu da mão do representante: já foi para a fila do gerente, foi
- * aprovado ou já está no ERP. Fica de fora o rascunho, o pedido que a loja
- * mandou e ele ainda não olhou (`pending_rep`) — esse não é dele ainda — e o
- * recusado, que o aviso manda estornar de qualquer jeito.
+ * Regra do Yan (15/10/2026): "todos pedidos aprovados pela fábrica viram
+ * bonificação". Até então a fila do financeiro (`pending_approval`) também
+ * contava — era "o que saiu da mão do representante"; desde essa data o pedido
+ * enviado e ainda não aprovado NÃO conta, só depois do aceite. Ficam dentro o
+ * aprovado, o já lançado no Control e o lançado com problema no ERP
+ * (`error_erp` é aprovado com problema, não recusado). Ficam fora o rascunho,
+ * a triagem da loja (`pending_rep`), a fila e o cancelado (`rejected`).
+ *
+ * É a mesma lista dos pedidos que podem ganhar o carimbo "Pedido inativo"
+ * (055): só sai da bonificação quem estava dentro dela.
+ *
+ * Quase sempre quer-se `pedidoContaParaAMeta`, que olha o carimbo também.
  */
 export const STATUS_QUE_CONTAM_PARA_A_META: readonly OrderStatus[] = [
-  ORDER_STATUS.PENDING_APPROVAL,
   ORDER_STATUS.APPROVED,
   ORDER_STATUS.SENT_ERP,
   ORDER_STATUS.ERROR_ERP,
@@ -86,6 +101,50 @@ export const STATUS_QUE_CONTAM_PARA_A_META: readonly OrderStatus[] = [
 
 export function contaParaAMeta(status: OrderStatus): boolean {
   return STATUS_QUE_CONTAM_PARA_A_META.includes(status);
+}
+
+/** O que a conta da meta precisa saber de um pedido. */
+export interface PedidoParaAMeta {
+  status: OrderStatus;
+  /**
+   * O carimbo "Pedido inativo" (migração 055). Ausente ou nulo = não está
+   * inativo — sem a 055 a coluna nem vem, e ninguém está inativo.
+   */
+  inactive?: boolean | null | undefined;
+}
+
+/**
+ * O PEDIDO conta para a bonificação?
+ *
+ * Status aprovado E sem o carimbo "Pedido inativo". Yan (15/10/2026): "se o
+ * pedido for aprovado e depois inativado a pessoa não recebe a bonificação".
+ * Toda tela que soma a meta passa por aqui — não por `contaParaAMeta(status)`
+ * sozinho, que não enxerga o carimbo.
+ */
+export function pedidoContaParaAMeta(pedido: PedidoParaAMeta): boolean {
+  return contaParaAMeta(pedido.status) && pedido.inactive !== true;
+}
+
+/**
+ * A soma do mês para a régua: os pedidos ENVIADOS no mês de `referencia`
+ * (`created_at`, mês e ano no fuso do aparelho) que contam, pelo total do
+ * pedido. É a conta que a Minha Área e os Alertas mostram — uma só, para a
+ * promessa da tela ser a mesma do fechamento.
+ */
+export function somaParaAMetaDoMes(
+  pedidos: readonly (PedidoParaAMeta & { created_at: string; total?: number | null | undefined })[],
+  referencia: Date = new Date(),
+): number {
+  const mes = referencia.getMonth();
+  const ano = referencia.getFullYear();
+  let soma = 0;
+  for (const pedido of pedidos) {
+    const enviadoEm = new Date(pedido.created_at);
+    if (enviadoEm.getMonth() !== mes || enviadoEm.getFullYear() !== ano) continue;
+    if (!pedidoContaParaAMeta(pedido)) continue;
+    soma += pedido.total ?? 0;
+  }
+  return soma;
 }
 
 /** A faixa já garantida com o total enviado — ou `null` antes da primeira. */

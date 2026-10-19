@@ -53,6 +53,16 @@ export const setInvoicedSchema = z.object({
 });
 
 /**
+ * O carimbo "Pedido inativo" (055) e o desfazer. `note` só faz sentido ao
+ * marcar (ao reativar é ignorada); é a observação de quem marcou — curta, é
+ * um "por quê" e não um relatório.
+ */
+export const setInactiveSchema = z.object({
+  inactive: z.boolean(),
+  note: z.string().trim().max(500).optional(),
+});
+
+/**
  * O desconto que o representante dá no pedido inteiro.
  *
  * Duas casas porque o formulário do Control aceita fração (o DESC % dele é

@@ -4,6 +4,7 @@ import {
   FAIXAS_PADRAO,
   competenciaDe,
   contaParaAMeta,
+  pedidoContaParaAMeta,
   faixaAlcancada,
   faixasVigentes,
   normalizarFaixas,
@@ -50,20 +51,30 @@ describe('faixas de bônus', () => {
   });
 });
 
-describe('o que conta como pedido enviado', () => {
-  it('conta o que saiu da mão dele', () => {
-    expect(contaParaAMeta(ORDER_STATUS.PENDING_APPROVAL)).toBe(true);
+describe('o que conta para a bonificação (regra do Yan, 15/10/2026)', () => {
+  it('conta o que a fábrica já APROVOU: aprovado, lançado e lançado com problema no ERP', () => {
     expect(contaParaAMeta(ORDER_STATUS.APPROVED)).toBe(true);
     expect(contaParaAMeta(ORDER_STATUS.SENT_ERP)).toBe(true);
+    // `error_erp` é aprovado com problema no ERP, não recusado.
+    expect(contaParaAMeta(ORDER_STATUS.ERROR_ERP)).toBe(true);
   });
 
-  it('não conta rascunho, triagem da loja nem recusado', () => {
+  it('a fila do financeiro NÃO conta mais — "só depois de aprovado" (antes de 15/10/2026 contava)', () => {
+    expect(contaParaAMeta(ORDER_STATUS.PENDING_APPROVAL)).toBe(false);
+  });
+
+  it('não conta rascunho, triagem da loja nem cancelado', () => {
     // `pending_rep` é pedido que a LOJA montou e ele ainda nem olhou: contar
     // isso deixaria a meta subir sozinha, sem ele ter feito nada.
     expect(contaParaAMeta(ORDER_STATUS.PENDING_REP)).toBe(false);
     expect(contaParaAMeta(ORDER_STATUS.DRAFT)).toBe(false);
     // O aviso manda estornar pedido cancelado; recusado nunca entra.
     expect(contaParaAMeta(ORDER_STATUS.REJECTED)).toBe(false);
+  });
+
+  it('o pedido inativo (055) sai da conta mesmo aprovado — tests/pedido-inativo.test.ts cobre o resto', () => {
+    expect(pedidoContaParaAMeta({ status: ORDER_STATUS.APPROVED, inactive: true })).toBe(false);
+    expect(pedidoContaParaAMeta({ status: ORDER_STATUS.APPROVED })).toBe(true);
   });
 });
 

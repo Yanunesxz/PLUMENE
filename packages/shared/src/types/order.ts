@@ -99,6 +99,20 @@ export interface Order {
   cancelled_by?: string | null;
   /** Nome de quem cancelou — resolvido pela API no detalhe do pedido. */
   cancelled_by_name?: string | null;
+  /**
+   * Pedido INATIVO (migração 055): aprovado pelo financeiro e depois inativado
+   * no Control. NÃO é status — o pedido continua na lista, no status que
+   * tinha — mas sai da bonificação do mês do envio. Marcado à mão pelo
+   * financeiro/admin (PATCH /orders/:id/inativo), reativável. Ausente antes da
+   * 055 e no cache offline antigo: ninguém está inativo.
+   */
+  inactive?: boolean;
+  inactive_at?: string | null;
+  inactive_by?: string | null;
+  /** Nome de quem inativou — resolvido pela API no detalhe do pedido. */
+  inactive_by_name?: string | null;
+  /** A observação de quem inativou (opcional, até 500 letras). */
+  inactive_note?: string | null;
   created_by: string;
   approved_by: string | null;
   created_at: string;

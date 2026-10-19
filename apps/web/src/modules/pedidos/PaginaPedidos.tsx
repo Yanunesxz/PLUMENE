@@ -26,7 +26,7 @@ import {
   type CanaisDoPedido,
 } from '../../lib/pedido.js';
 import { PedidosExcluidos } from './PedidosExcluidos.js';
-import { ehSoLeitura } from '@csb/shared';
+import { ehSoLeitura, exibeCarimboInativo } from '@csb/shared';
 import type {
   Order,
   Customer,
@@ -717,9 +717,17 @@ export function PaginaPedidos() {
                       </span>
                     )}
                   </span>
-                  <Badge variant={seloDoPedido(order, user?.role).variante}>
-                    {seloDoPedido(order, user?.role).texto}
-                  </Badge>
+                  <span className="flex shrink-0 flex-wrap items-center justify-end gap-1">
+                    {/* O carimbo da 055 ao lado do selo: o pedido continua no
+                        status que tinha, só saiu da bonificação. É controle
+                        interno da bonificação — a loja não vê (o detalhe
+                        também esconde dela), e no cancelado ele some
+                        (16/10/2026). */}
+                    {!ehLoja && exibeCarimboInativo(order) && <Badge variant="gray">Pedido inativo</Badge>}
+                    <Badge variant={seloDoPedido(order, user?.role).variante}>
+                      {seloDoPedido(order, user?.role).texto}
+                    </Badge>
+                  </span>
                 </div>
                 {/* Na loja, o comprador é sempre ela mesma — repetir o próprio
                     nome em todo cartão só ocupa espaço. */}
@@ -746,7 +754,9 @@ export function PaginaPedidos() {
                         ? ` em ${new Date(order.invoiced_at).toLocaleDateString('pt-BR')}`
                         : ''}
                     </p>
-                  ) : !faturadoPeloControl && (order.status === 'approved' || order.status === 'sent_erp') ? (
+                  ) : !faturadoPeloControl &&
+                    !order.inactive &&
+                    (order.status === 'approved' || order.status === 'sent_erp') ? (
                     <button
                       type="button"
                       disabled={faturando === order.id}

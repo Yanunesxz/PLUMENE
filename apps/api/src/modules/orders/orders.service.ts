@@ -4,6 +4,7 @@ import { guardarOriginal, lerOriginal } from './pedidoOriginal.service.js';
 import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.js';
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { nomeDeQuemCancelou } from './cancelamento.service.js';
+import { nomeDoUsuario } from '../../lib/nomeDoUsuario.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -18,6 +19,9 @@ import type {
 } from '@csb/shared';
 import {
   ORDER_STATUS_FLOW,
+  STATUS_QUE_CONTAM_PARA_A_META,
+  podeInativarPedido,
+  podeReativarPedido,
   precoDoTamanho,
   apenasLinhasDeCor,
   juntarObservacao,
@@ -136,6 +140,8 @@ export async function getOrderById(
   if (sincronia) pedido.erp_sync = sincronia;
   // Cancelado com motivo (053): quem cancelou, pelo nome.
   if (pedido.cancelled_by) pedido.cancelled_by_name = await nomeDeQuemCancelou(pedido.cancelled_by);
+  // Pedido inativo (055): quem inativou, pelo nome — o mesmo caminho do 053.
+  if (pedido.inactive_by) pedido.inactive_by_name = await nomeDoUsuario(pedido.inactive_by);
   // As notas que o Control informou, com as peças de cada uma (048): é o
   // "como foi faturado" de verdade. Sem a 048, lista vazia.
   pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
@@ -1618,7 +1624,10 @@ export type FaturadoResult =
       /** `false` = o pedido já estava assim; nada foi gravado nem avisado. */
       mudou: boolean;
     }
-  | { ok: false; reason: 'not_found' | 'faturamento_pelo_control' | 'canal_indisponivel' | 'erro' };
+  | {
+      ok: false;
+      reason: 'not_found' | 'pedido_inativo' | 'faturamento_pelo_control' | 'canal_indisponivel' | 'erro';
+    };
 
 /**
  * O botão manual de faturado (e o desfazer).
@@ -1653,6 +1662,14 @@ export async function setOrderInvoiced(
   };
   const atual = await lerPedido();
   if (!atual) return { ok: false, reason: 'not_found' };
+
+  // Pedido INATIVO (055) não se fatura pela tela: o carimbo diz que o Control
+  // o tirou do caminho — "reative antes". Só no carimbar (o desfazer segue
+  // livre) e ANTES do canal e da idempotência: não é caso de canal, é caso de
+  // "não há o que faturar". A API de Parceiro (POST /partner/v1/faturamento)
+  // não passa por aqui e continua carimbando: se o Control faturou, faturou
+  // (decisão de 15/10/2026 — bloquear só a tela).
+  if (invoiced && atual.inactive === true) return { ok: false, reason: 'pedido_inativo' };
 
   // O canal vale para todo pedido. Banco que não responde não carimba: um
   // soluço não pode reabrir o botão com o canal na API. Mas também não vira
@@ -1692,6 +1709,11 @@ export async function setOrderInvoiced(
   if (opcoes.somenteDoRep) query = query.eq('rep_id', opcoes.somenteDoRep);
   // Dois toques ao mesmo tempo: só o primeiro carimba (e só ele avisa o rep).
   if (invoiced) query = query.or('invoiced.is.null,invoiced.eq.false');
+  // E um "Inativar" que caia entre a leitura e o UPDATE não deixa pedido
+  // inativo faturado. O filtro só entra com a 055 (a chave vem no `*`).
+  if (invoiced && Object.prototype.hasOwnProperty.call(atual, 'inactive')) {
+    query = query.or('inactive.is.null,inactive.eq.false');
+  }
 
   const { data, error } = await query.select().maybeSingle();
   if (error) {
@@ -1745,6 +1767,128 @@ export async function setOrderInvoiced(
       });
     }
   }
+  return { ok: true, order, mudou: true };
+}
+
+export type InativoResult =
+  | {
+      ok: true;
+      order: Order;
+      /** `false` = o pedido já estava assim; nada foi gravado nem avisado. */
+      mudou: boolean;
+    }
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'sem_migracao'
+        | 'banco_indisponivel'
+        | 'forbidden'
+        | 'status_nao_permite'
+        | 'ja_faturado'
+        | 'nao_esta_inativo'
+        | 'erro';
+    };
+
+/**
+ * O carimbo "PEDIDO INATIVO" (migração 055) e o desfazer.
+ *
+ * Pedido do Yan (15/10/2026): "o pedido pode ter o carimbo de inativo como o
+ * de faturado: se o pedido for aprovado e depois inativado a pessoa não recebe
+ * a bonificação". É outra marca, como Faturado — não muda status, não é
+ * cancelar (053): o pedido continua na lista e sai da bonificação do mês.
+ *
+ * - Quem pode e quando é `podeInativarPedido`/`podeReativarPedido` (shared):
+ *   financeiro e admin; só pedido aprovado/lançado (a lista que conta para a
+ *   meta) e não faturado — faturado responde "desfature antes".
+ * - Recarimbo (já inativo) não grava nada e não avisa o representante de novo.
+ *   Reativar o que não está inativo é recusado.
+ * - Sem a 055 nada é gravado: a sonda da coluna vem antes de tudo, e um
+ *   soluço do banco não vira "migração pendente".
+ * - Deixa o rastro em order_erp_events ('pedido_inativado'/'pedido_reativado'),
+ *   como o Faturado deixa; a observação vai em `motivo`.
+ */
+export async function setOrderInactive(
+  id: string,
+  company_id: string,
+  inactive: boolean,
+  opcoes: {
+    /** O papel de quem apertou — a mesma regra da tela decide. */
+    role: AuthRole;
+    /** Quem apertou o botão — fica na coluna e no rastro. */
+    por: string;
+    por_nome?: string | null;
+    /** A observação de quem marcou (só ao inativar). */
+    note?: string | null | undefined;
+  },
+): Promise<InativoResult> {
+  // A 055 rodou? Sonda que não responde não pode virar "migração pendente"
+  // (o financeiro leria "ainda não funciona" por um soluço de rede).
+  const coluna = await detectarComCerteza('orders', 'inactive');
+  if (coluna === 'nao_sei') return { ok: false, reason: 'banco_indisponivel' };
+  if (coluna === 'nao_existe') return { ok: false, reason: 'sem_migracao' };
+
+  const lerPedido = async (): Promise<(Order & Record<string, unknown>) | null> => {
+    const resposta = await supabase.from('orders').select('*').eq('id', id).eq('company_id', company_id).maybeSingle();
+    return (resposta.data as (Order & Record<string, unknown>) | null) ?? null;
+  };
+  const atual = await lerPedido();
+  if (!atual) return { ok: false, reason: 'not_found' };
+
+  if (inactive) {
+    const acesso = podeInativarPedido(atual, opcoes.role);
+    // Já inativo: o pedido está como pedido — nada a gravar, nada a avisar.
+    if (acesso === 'ja_inativo') return { ok: true, order: atual, mudou: false };
+    if (acesso === 'faturado') return { ok: false, reason: 'ja_faturado' };
+    if (acesso !== 'ok') return { ok: false, reason: acesso };
+  } else {
+    const acesso = podeReativarPedido(atual, opcoes.role);
+    if (acesso !== 'ok') return { ok: false, reason: acesso };
+  }
+
+  const agora = new Date().toISOString();
+  const nota = inactive ? opcoes.note?.trim() || null : null;
+  const patch = inactive
+    ? { inactive: true, inactive_at: agora, inactive_by: opcoes.por, inactive_note: nota, updated_at: agora }
+    : { inactive: false, inactive_at: null, inactive_by: null, inactive_note: null, updated_at: agora };
+
+  let query = supabase.from('orders').update(patch).eq('id', id).eq('company_id', company_id);
+  if (inactive) {
+    // Só se o pedido CONTINUA como foi lido: aprovado/lançado, não faturado e
+    // ainda não inativo. Dois toques gravam um só (e um só avisa o rep); um
+    // faturado que caia entre a leitura e o UPDATE não vira inativo.
+    query = query
+      .in('status', [...STATUS_QUE_CONTAM_PARA_A_META])
+      .or('invoiced.is.null,invoiced.eq.false')
+      .or('inactive.is.null,inactive.eq.false');
+  } else {
+    query = query.eq('inactive', true);
+  }
+
+  const { data, error } = await query.select().maybeSingle();
+  if (error) {
+    console.error(`[inativo] falha ao gravar o carimbo do pedido ${id}: ${error.message}`);
+    return { ok: false, reason: 'erro' };
+  }
+  if (!data) {
+    // O outro toque (ou a nota) chegou antes: o pedido está como está.
+    const agoraLido = await lerPedido();
+    return agoraLido ? { ok: true, order: agoraLido, mudou: false } : { ok: false, reason: 'not_found' };
+  }
+
+  const order = data as Order;
+  await registrarEventoErp({
+    company_id,
+    order_id: id,
+    order_number: order.order_number ?? atual.order_number ?? null,
+    tipo: inactive ? 'pedido_inativado' : 'pedido_reativado',
+    origem: 'tela',
+    por: opcoes.por,
+    por_nome: opcoes.por_nome ?? null,
+    motivo: nota,
+    antes: { inactive: atual.inactive === true, inactive_at: atual.inactive_at ?? null },
+    depois: { inactive, inactive_at: inactive ? (order.inactive_at ?? agora) : null },
+  });
   return { ok: true, order, mudou: true };
 }
 

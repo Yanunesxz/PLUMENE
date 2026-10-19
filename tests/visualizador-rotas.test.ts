@@ -405,7 +405,8 @@ describe('visualizador NÃO ESCREVE', () => {
  * vazia). Aqui não se lê nada: PERGUNTA-SE À APLICAÇÃO. Rota nova de escrita
  * entra no barrido sozinha, no dia em que for registrada.
  */
-const QUANTAS_ESCRITAS_COM_GUARDA = 51;
+// 055: PATCH /orders/:id/inativo (financeiro/admin) entrou com guarda.
+const QUANTAS_ESCRITAS_COM_GUARDA = 52;
 
 /** `/customers/:id/varejo` → `/customers/<uuid>/varejo`. */
 const comParametros = (caminho: string) =>

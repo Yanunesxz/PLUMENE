@@ -10,9 +10,11 @@ import { formatBRLCurto } from '../../lib/utils.js';
 /**
  * Onde o representante está na bonificação do mês.
  *
- * O número grande é o que ele JÁ ENVIOU, e ele sobe ao longo do mês: quem
- * acompanha todo dia quer ver a conta crescer, não uma dívida diminuindo. O
- * quanto falta fica logo abaixo, na linha que também diz quanto isso paga.
+ * O número grande é o que a fábrica JÁ APROVOU do que ele enviou no mês
+ * (regra do Yan, 15/10/2026: "todos pedidos aprovados pela fábrica viram
+ * bonificação"; inativo e cancelado ficam fora), e ele sobe ao longo do mês:
+ * quem acompanha todo dia quer ver a conta crescer, não uma dívida diminuindo.
+ * O quanto falta fica logo abaixo, na linha que também diz quanto isso paga.
  *
  * O desenho é uma régua: linha de tinta com entalhe em cada degrau e uma seta
  * marcando a posição. Barra de progresso arredondada mostraria uma porcentagem,
@@ -62,14 +64,14 @@ export function ReguaDaMeta({
         ) : null}
       </div>
 
-      {/* O número que sobe: o enviado acumulado no mês. Ele fica sozinho na
-          linha, com "enviados" de rodapé — a frase do que falta vem embaixo, e
+      {/* O número que sobe: o aprovado acumulado do mês. Ele fica sozinho na
+          linha, com "aprovados" de rodapé — a frase do que falta vem embaixo, e
           não emendada, senão o valor do bônus sobra órfão na quebra. */}
       <p className="flex flex-wrap items-baseline gap-x-2">
         <span className="titulo tnum text-[28px] leading-none text-foreground md:text-[34px]">
           {formatBRLCurto(enviadoNoMes)}
         </span>
-        <span className="text-sm text-muted-foreground">enviados</span>
+        <span className="text-sm text-muted-foreground">aprovados</span>
       </p>
       <p className="mt-1.5 text-sm text-muted-foreground">
         {proxima ? (
@@ -166,8 +168,9 @@ export function ReguaDaMeta({
       </div>
 
       <p className="mt-4 border-t border-border pt-3 text-[11px] leading-relaxed text-subtle">
-        Soma os pedidos que você enviou entre os dias 01 e 31. Vale um degrau só, o mais alto que
-        você alcançar. Pedido cancelado ou alterado sai da conta.
+        Soma os pedidos que você enviou entre os dias 01 e 31 e que a fábrica aprovou (o aceite do
+        financeiro, antes da nota). Vale um degrau só, o mais alto que você alcançar. Pedido inativo
+        ou cancelado fica fora da conta.
       </p>
     </section>
   );

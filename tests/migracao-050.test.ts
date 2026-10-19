@@ -19,7 +19,8 @@ import { TIPOS_DE_EVENTO_ERP } from '../apps/api/src/modules/orders/eventosErp.s
  *   • customer_id e juntado_em não têm chave estrangeira: o rastro sobrevive à
  *     exclusão do cliente e à do cadastro que ficou;
  *   • o CHECK de tipo do rastro é a lista da 049 mais 'solicitacao_cancelada',
- *     e é a lista inteira que o código grava (a fonte passou a ser esta).
+ *     e é o começo da lista que o código grava (a 055 recriou o CHECK com os
+ *     dois tipos do carimbo "Pedido inativo" no fim; a fonte passou a ser ela).
  */
 
 const ler = (rel: string) => readFileSync(path.resolve(__dirname, '..', rel), 'utf8').replace(/\r\n/g, '\n');
@@ -190,11 +191,14 @@ describe('migração 050', () => {
     expect(semComentarios(MIGRACAO)).toContain('ALTER TABLE deleted_customers ENABLE ROW LEVEL SECURITY;');
   });
 
-  it("o CHECK de tipo do rastro é a lista da 049 mais 'solicitacao_cancelada', e é a do código", () => {
+  it("o CHECK de tipo do rastro é a lista da 049 mais 'solicitacao_cancelada', e é o começo da do código", () => {
     const da049 = listaDoCheck(MIGRACAO_049, 'chk_order_erp_events_tipo');
     const da050 = listaDoCheck(MIGRACAO, 'chk_order_erp_events_tipo');
     expect(da050).toEqual([...da049, TIPO_NOVO]);
-    expect(da050).toEqual([...TIPOS_DE_EVENTO_ERP]);
+    // A 055 recriou este CHECK com 'pedido_inativado' e 'pedido_reativado' no
+    // fim: a lista inteira do código é a dela (tests/migracao-055.test.ts), e
+    // a daqui é o começo — nenhum tipo da 050 saiu nem mudou de lugar.
+    expect(TIPOS_DE_EVENTO_ERP.slice(0, da050.length)).toEqual(da050);
     expect(new Set(da050).size).toBe(da050.length);
     // A origem do evento não muda: a 050 não recria essa trava.
     expect(() => listaDoCheck(MIGRACAO, 'chk_order_erp_events_origem')).toThrow();

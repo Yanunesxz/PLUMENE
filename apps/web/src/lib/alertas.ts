@@ -354,9 +354,11 @@ export function montarAlertas(e: EntradasDosAlertas): Alerta[] {
       titulo: proxima
         ? `Régua da meta: faltam ${formatBRL(proxima.meta - e.meta.enviado)}`
         : 'Meta do mês batida! 🎉',
+      // "Aprovou", não "enviou" (15/10/2026): conta o que a fábrica aprovou
+      // do que ele enviou no mês; inativo e cancelado ficam fora.
       detalhe: proxima
-        ? `Você enviou ${formatBRL(e.meta.enviado)} no mês. Próxima faixa: ${formatBRL(proxima.meta)} (bônus de ${formatBRL(proxima.bonus)}). O mês fecha em ${diasParaFechar} dia${diasParaFechar === 1 ? '' : 's'}.`
-        : `${formatBRL(e.meta.enviado)} enviados — todas as faixas do mês alcançadas.`,
+        ? `A fábrica aprovou ${formatBRL(e.meta.enviado)} do que você enviou no mês. Próxima faixa: ${formatBRL(proxima.meta)} (bônus de ${formatBRL(proxima.bonus)}). O mês fecha em ${diasParaFechar} dia${diasParaFechar === 1 ? '' : 's'}.`
+        : `${formatBRL(e.meta.enviado)} aprovados — todas as faixas do mês alcançadas.`,
       acao: { rotulo: 'Ver a régua', tipo: 'ir', para: '/minha-area' },
     });
   }

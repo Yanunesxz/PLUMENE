@@ -76,8 +76,16 @@ packages/shared/src/
 │   ├── sincroniaErp.ts   → o que o Control conhece do pedido x o pedido de hoje (046)
 │   ├── valorMinimo.ts    → o pedido mínimo da condição (049, payment_conditions.valor_minimo):
 │   │                       avisoDeValorMinimo — só AVISA, nem a tela nem o servidor bloqueiam
-│   └── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
-│                           (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
+│   ├── pedidoOriginal.ts → o pedido original x o faturado (044): usa os itens das notas ativas
+│   │                       (048) quando eles chegam e, sem eles, NÃO diz "nenhuma peça cortada"
+│   ├── cancelamento.ts   → quem cancela com motivo (053) e quando: podeCancelarPedido,
+│   │                       podeInformarMotivo, os motivos iniciais do Yan
+│   ├── trocaDeCliente.ts → quem troca o cliente do pedido (08/10/2026): financeiro/admin até
+│   │                       faturar, o rep dono só antes da fábrica
+│   └── pedidoInativo.ts  → quem marca/desmarca "Pedido inativo" (055) e quando
+│                           (podeInativarPedido / podeReativarPedido — o cancelado não entra
+│                           nem sai) e se o carimbo aparece na tela (exibeCarimboInativo); a
+│                           mesma regra da tela e da API
 ├── cadastro/
 │   ├── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
 │   │                       GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
@@ -206,7 +214,7 @@ apps/api/src/
 │                                   com o NOTIFY)
 │       ├── 052_cliente_inativo.sql → customers.inativo/inativo_motivo/inativo_nota/inativo_marcado_por/inativo_marcado_em/inativo_origem (a aba "Inativos": não compra mais, sai da régua; motivo de lista fechada com as chaves do CRM; controle interno, não vai ao Control)
 │       ├── 053_pedido_cancelado.sql → order_cancel_reasons (motivos que o admin mantém, nascem os 4 do Yan) + orders.cancel_reason_id/cancel_reason_label/cancel_note/cancelled_at/cancelled_by (cancelar pedido com motivo; status vai a rejected, aba "Cancelados")
-│       └── 054_perfil_visualizador.sql → recria o CHECK de users.role com 'visualizador' (o login que vê tudo e não
+│       ├── 054_perfil_visualizador.sql → recria o CHECK de users.role com 'visualizador' (o login que vê tudo e não
 │                                   altera nada, pedido do Yan em 15/10/2026). Mesmo padrão da 038 (DO $$ que acha o
 │                                   CHECK por pg_get_constraintdef e recria chk_users_role); idempotente, termina com
 │                                   NOTIFY pgrst. Sem ela o admin escolhe "Visualizador" na tela de Logins e o banco
@@ -214,6 +222,16 @@ apps/api/src/
 │                                   _tools/SQL-PARA-RODAR-054.sql; conferência em _tools/conferir-054.mjs (CHECK não se
 │                                   lê por GET: o script prova indireto, achando um login já gravado com o papel, e
 │                                   imprime o SELECT do SQL Editor quando ainda não existe nenhum).
+│       └── 055_pedido_inativo.sql → orders.inactive/inactive_at/inactive_by (FK SET NULL)/inactive_note + índice parcial
+│                                   idx_orders_inativos (company_id) WHERE inactive + CHECK de order_erp_events.tipo com
+│                                   pedido_inativado/pedido_reativado. O carimbo "Pedido inativo" (Yan, 15/10/2026: "se o
+│                                   pedido for aprovado e depois inativado a pessoa não recebe a bonificação"): outra marca,
+│                                   como Faturado — não é status, não é cancelar; financeiro/admin marcam e desmarcam
+│                                   (PATCH /orders/:id/inativo); o pedido fica na lista e sai da bonificação do mês do envio.
+│                                   Sem ela a leitura segue (ninguém está inativo) e o carimbo responde 503
+│                                   MIGRACAO_PENDENTE. SQL para os dois bancos em _tools/SQL-PARA-RODAR-055.sql (DEPOIS da
+│                                   050; termina com o NOTIFY); conferir com node _tools/conferir-055.mjs. Depois dela, NÃO
+│                                   rerodar a 048, a 049 nem a 050
 │                                   É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
@@ -240,7 +258,9 @@ apps/api/src/
 │   │                       GET /products (erro virava `colors: []` por cima do cache do app)
 │   ├── validation.ts     → parseBody(schema zod, body, reply): o 400 padronizado
 │   ├── email.ts          → e-mail de confirmação do pedido (Gmail; sem env vira no-op)
-│   └── tokens.ts         → tokens dos links de convite/vitrine (só o SHA-256 vai ao banco)
+│   ├── tokens.ts         → tokens dos links de convite/vitrine (só o SHA-256 vai ao banco)
+│   └── nomeDoUsuario.ts  → nome do usuário pelo id (quem cancelou 053 / quem inativou 055): o
+│                           pedido guarda só o id, o GET /orders/:id resolve o nome
 │
 ├── modules/              → FEATURES — cada uma tem o trio router → controller → service
 │   ├── access/           → convite da loja, vitrine temporária e a área da loja
@@ -277,13 +297,16 @@ apps/api/src/
 │   │                       gerente; a fila da Minha área), POST /customers/:id/alteracoes/confirmar
 │   │                       { ids } ("Já atualizei no Control", financeiro/admin; só os ids vistos
 │   │                       e ainda pendentes) e as leituras/marcações em lote da API de Parceiro
-│   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, e as
+│   ├── orders/           → GET/POST /orders, /:id, /status, /invoice, PATCH /orders/:id/inativo
+│   │                       (o carimbo "Pedido inativo" da 055: financeiro/admin; só pedido
+│   │                       aprovado/lançado e não faturado, o cancelado nem entra nem sai;
+│   │                       faturar pedido inativo → 409 PEDIDO_INATIVO), e as
 │   │                       alterações em aberto: /desconto, /items, /pagamento
 │   │                       (rep nos próprios; gerente em tudo até virar nota).
 │   │                       eventosErp.service.ts → registrarEventoErp (order_erp_events) e
 │   │                       gravarOrigemDoNumero (erp_order_source no update do número), 048;
-│   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 050 (a da 048 + 3 da 049
-│   │                       + solicitacao_cancelada)
+│   │                       TIPOS_DE_EVENTO_ERP é a lista do CHECK da 055 (a da 048 + 3 da 049
+│   │                       + solicitacao_cancelada da 050 + pedido_inativado/pedido_reativado)
 │   │                       notasDoPedido.service.ts → notas fiscais e peças faturadas (048):
 │   │                       lerNotasDoPedido (GET /orders/:id → `notas`, com a ativa e o
 │   │                       histórico), detectarNotas, cancelarNotasAtivas (desfazer o
@@ -545,6 +568,9 @@ _tools/
 │                                    (idempotente; só troca o CHECK, não mexe em linha nenhuma; termina com o NOTIFY).
 │                                    Conferir depois com node _tools/conferir-054.mjs (sem argumento mede os dois) — e
 │                                    o CHECK em si só se lê no SQL Editor, com o SELECT que o script imprime
+├── SQL-PARA-RODAR-055.sql         → a 055 (pedido inativo: orders.inactive/_at/_by/_note + CHECK do rastro) para colar
+│                                    nos DOIS bancos, DEPOIS da 050 (idempotente; termina com o NOTIFY). Conferir depois
+│                                    com node _tools/conferir-055.mjs (sem argumento mede os dois)
 ├── SQL-PARA-RODAR-051.sql         → a 051 (customer_changes) para colar nos DOIS bancos (idempotente; termina com o
 │                                    NOTIFY). Conferir depois com node _tools/conferir-051.mjs (sem argumento mede os dois)
 ├── SQL-PARA-RODAR-050.sql         → a 050 para colar nos DOIS bancos, DEPOIS da 049 (termina com o NOTIFY).
@@ -563,7 +589,7 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-048, conferir-049, conferir-050 e conferir-051 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048, conferir-049, conferir-050, conferir-051 e conferir-055 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 └── backup.mjs, importar-*.mjs, faturar-retroativo.mjs, reprecificar-pedidos-abertos.mjs
                  → cargas e consertos pontuais direto no Supabase (fora do app).

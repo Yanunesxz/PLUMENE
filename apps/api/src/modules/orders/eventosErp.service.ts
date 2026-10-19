@@ -22,16 +22,17 @@ import { detectar } from '../../lib/detectarColuna.js';
 
 /**
  * Os tipos aceitos pelo CHECK de order_erp_events.tipo. A lista do banco é a
- * da 050 (que recriou o CHECK da 049 — a da 048 com três acontecimentos a
- * mais — com 'solicitacao_cancelada') e esta precisam ser as mesmas
- * (tests/migracao-050.test.ts confere a lista inteira; os testes da 048 e da
- * 049 conferem que as delas são o começo desta). Os três da 049 só existem no
- * banco depois dela, e 'solicitacao_cancelada' só depois da 050: gravar um
- * tipo antes da migração dele é recusado pelo CHECK e vira 'falhou' (fica no
- * console, nunca derruba quem chamou). 'excluido_pelo_erp' continua na lista
- * (é a do banco), mas a exclusão avisada pelo Control grava 'excluido' com
- * origem 'api' — decisão 12, e o rastro não depende da 049 (revisão de
- * 16/09/2026).
+ * da 055 (que recriou o CHECK da 050 — a da 049, que é a da 048 com três
+ * acontecimentos a mais, com 'solicitacao_cancelada' — com os dois tipos do
+ * carimbo "Pedido inativo") e esta precisam ser as mesmas
+ * (tests/migracao-055.test.ts confere a lista inteira; os testes da 048, da
+ * 049 e da 050 conferem que as delas são o começo desta). Os três da 049 só
+ * existem no banco depois dela, 'solicitacao_cancelada' só depois da 050 e
+ * os dois do carimbo só depois da 055: gravar um tipo antes da migração dele
+ * é recusado pelo CHECK e vira 'falhou' (fica no console, nunca derruba quem
+ * chamou). 'excluido_pelo_erp' continua na lista (é a do banco), mas a
+ * exclusão avisada pelo Control grava 'excluido' com origem 'api' — decisão
+ * 12, e o rastro não depende da 049 (revisão de 16/09/2026).
  */
 export const TIPOS_DE_EVENTO_ERP = [
   'numero_gravado',
@@ -53,6 +54,11 @@ export const TIPOS_DE_EVENTO_ERP = [
   // 050: o financeiro tirou da fila do Control um pedido solicitado que ainda
   // não tinha número (PATCH /orders/:id/cancelar-solicitacao).
   'solicitacao_cancelada',
+  // 055 (15/10/2026): o carimbo "Pedido inativo" — aprovado e depois inativado
+  // no Control, fora da bonificação — posto e tirado pela tela
+  // (PATCH /orders/:id/inativo). A observação de quem marcou vai em `motivo`.
+  'pedido_inativado',
+  'pedido_reativado',
 ] as const;
 export type TipoEventoErp = (typeof TIPOS_DE_EVENTO_ERP)[number];
 
@@ -80,6 +86,9 @@ export const CAMPOS_DO_RASTRO = [
   'invoiced',
   'invoiced_at',
   'invoiced_total',
+  // O carimbo "Pedido inativo" (055): o antes/depois de inativar e reativar.
+  'inactive',
+  'inactive_at',
   'numero',
   'serie',
   'chave',

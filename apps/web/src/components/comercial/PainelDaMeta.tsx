@@ -255,13 +255,13 @@ export function PainelDaMeta({
           </div>
         </div>
 
-        {/* A régua de verdade, com um exemplo de quanto ele já enviou — o gerente
-            vê onde os degraus caem antes de salvar. */}
+        {/* A régua de verdade, com um exemplo de quanto a fábrica já aprovou do
+            que ele enviou — o gerente vê onde os degraus caem antes de salvar. */}
         <div>
           <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
             Como {repNome.split(' ')[0]} vai ver{' '}
             <span className="normal-case tracking-normal text-subtle">
-              — exemplo, não é o que ele enviou
+              — exemplo, não é o que foi aprovado dele
             </span>
           </p>
           {faixas.length > 0 ? (
