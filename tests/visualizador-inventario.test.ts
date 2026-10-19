@@ -58,7 +58,8 @@ const PAPEL = 'visualizador';
 const QUANTOS_ROUTERS = 14;
 // 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
 // Parceiro: +1 rota de leitura — GET /partner/v1/pedidos/cancelados.
-const QUANTAS_ROTAS = 108;
+// Dashboard: +1 rota de leitura — GET /reps/metas (metas da equipe, 19/10/2026).
+const QUANTAS_ROTAS = 109;
 const QUANTAS_ESCRITAS = 57;
 
 describe('inventário: o leitor de routers está funcionando', () => {
