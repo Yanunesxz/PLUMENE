@@ -48,6 +48,7 @@ import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
 import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
 import { InativarPedido } from '../../components/comercial/InativarPedido.js';
 import { TrocarClienteDoPedido } from '../../components/comercial/TrocarClienteDoPedido.js';
+import { TrocarTabelaDoPedido } from '../../components/comercial/TrocarTabelaDoPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import {
   precoDoTamanho,
@@ -61,9 +62,12 @@ import {
   podeReativarPedido,
   exibeCarimboInativo,
   podeTrocarClienteDoPedido,
+  podeTrocarTabelaDoPedido,
+  pedidoJaLancadoNoControl,
 } from '@csb/shared';
 import type {
   ResultadoDaTrocaDeCliente,
+  ResultadoDaTrocaDeTabela,
   Order,
   OrderWithItems,
   ApiResponse,
@@ -235,6 +239,45 @@ export function PaginaDetalhePedido() {
   const [trocandoCliente, setTrocandoCliente] = useState(false);
   const [salvandoTroca, setSalvandoTroca] = useState(false);
   const [erroDaTroca, setErroDaTroca] = useState<string | null>(null);
+
+  // ─── Trocar a TABELA do pedido já feito (27/10/2026) ──────────────────────
+  // Financeiro e admin até faturar; a venda interna no próprio pedido até o
+  // financeiro lançar. O representante comum não vê o botão.
+  const podeTrocarTabela =
+    !!order && podeTrocarTabelaDoPedido(order, user?.role, user?.id, user?.venda_interna) === 'ok';
+  const [trocandoTabela, setTrocandoTabela] = useState(false);
+  const [salvandoTabela, setSalvandoTabela] = useState(false);
+  const [erroDaTabela, setErroDaTabela] = useState<string | null>(null);
+
+  const trocarTabela = async (price_table_id: string) => {
+    if (!id || !token || salvandoTabela) return;
+    setSalvandoTabela(true);
+    setErroDaTabela(null);
+    try {
+      const res = await api.patch<ApiResponse<OrderWithItems> & { meta?: ResultadoDaTrocaDeTabela }>(
+        `/orders/${id}/tabela`,
+        { price_table_id },
+        token,
+      );
+      // Relê o pedido inteiro: itens e total mudaram.
+      const r = await api.get<ApiResponse<OrderWithItems>>(`/orders/${id}`, token);
+      setOrder(r.data);
+      await db.orders
+        .update(id, { price_table_id, total: r.data.total })
+        .catch(() => {});
+      setTrocandoTabela(false);
+      setToast({
+        message: res.meta?.ja_no_control
+          ? 'Tabela trocada — acerte o preço no Control também.'
+          : 'Tabela trocada e preços recalculados.',
+        type: 'success',
+      });
+    } catch (err) {
+      setErroDaTabela(err instanceof Error ? err.message : 'Não foi possível trocar a tabela.');
+    } finally {
+      setSalvandoTabela(false);
+    }
+  };
 
   const trocarCliente = async (customer_id: string) => {
     if (!id || !token || salvandoTroca) return;
@@ -1281,6 +1324,18 @@ export function PaginaDetalhePedido() {
                     trocar cliente
                   </button>
                 )}
+                {podeTrocarTabela && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setErroDaTabela(null);
+                      setTrocandoTabela(true);
+                    }}
+                    className="shrink-0 text-xs font-semibold text-muted-foreground underline hover:text-foreground"
+                  >
+                    trocar tabela
+                  </button>
+                )}
               </span>
               {zapDoComprador && (
                 <a
@@ -2166,6 +2221,20 @@ export function PaginaDetalhePedido() {
           erro={erroDaTroca}
           onConfirmar={(c) => void trocarCliente(c)}
           onFechar={() => setTrocandoCliente(false)}
+        />
+      )}
+
+      {trocandoTabela && order && token && (
+        <TrocarTabelaDoPedido
+          orderId={order.id}
+          token={token}
+          numero={order.order_number}
+          tabelaAtualId={order.price_table_id}
+          jaNoControl={pedidoJaLancadoNoControl(order)}
+          ocupado={salvandoTabela}
+          erro={erroDaTabela}
+          onConfirmar={(t) => void trocarTabela(t)}
+          onFechar={() => setTrocandoTabela(false)}
         />
       )}
 

@@ -8,6 +8,7 @@ import {
   editarMotivoHandler,
 } from './cancelamento.controller.js';
 import { trocarClienteHandler } from './trocaDeCliente.controller.js';
+import { trocarTabelaHandler, tabelasParaTrocarHandler } from './trocaDeTabela.controller.js';
 import {
   listOrders,
   getOrder,
@@ -133,6 +134,20 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     '/orders/:id/cliente',
     { preHandler: [authenticate, requireRole(['rep', 'admin', 'financeiro'])] },
     trocarClienteHandler,
+  );
+  // Trocar a TABELA de preço do pedido já feito (27/10/2026): financeiro e
+  // admin até faturar; a venda interna no próprio pedido até o financeiro
+  // lançar. Quem pode é a regra `podeTrocarTabelaDoPedido` (shared). A
+  // GET lista as tabelas que ela pode escolher.
+  fastify.patch(
+    '/orders/:id/tabela',
+    { preHandler: [authenticate, requireRole(['rep', 'admin', 'financeiro'])] },
+    trocarTabelaHandler,
+  );
+  fastify.get(
+    '/orders/tabelas-para-trocar',
+    { preHandler: [authenticate, requireRole(['rep', 'admin', 'financeiro'])] },
+    tabelasParaTrocarHandler,
   );
   // Os motivos: todo mundo que cancela lê; só o admin cria, renomeia e desativa.
   // O visualizador lê a lista porque é ela que dá o nome do motivo no pedido
