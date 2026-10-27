@@ -23,12 +23,14 @@ import {
   podeInativarPedido,
   podeReativarPedido,
   precoDoTamanho,
+  podeTrocarTabelaDoPedido,
+  pedidoJaLancadoNoControl,
   apenasLinhasDeCor,
   juntarObservacao,
   normalizarNumeroErp,
   numeroErpValido,
 } from '@csb/shared';
-import type { AuthRole, OrderSource } from '@csb/shared';
+import type { AuthRole, OrderSource, PodeTrocarTabela, ResultadoDaTrocaDeTabela } from '@csb/shared';
 
 /**
  * O canal da empresa para uma ação da TELA, com desfecho próprio quando o
@@ -1057,6 +1059,185 @@ export async function setOrderItems(
     .maybeSingle();
 
   return { ok: true, order: (atualizado ?? { ...o, total, items: novos }) as OrderWithItems };
+}
+
+export type TrocaDeTabelaResult =
+  | ({ ok: true; order: OrderWithItems } & ResultadoDaTrocaDeTabela)
+  | {
+      ok: false;
+      reason:
+        | 'not_found'
+        | 'sem_coluna'
+        | 'price_not_found'
+        | 'save_failed'
+        | 'original_nao_guardado'
+        | Exclude<PodeTrocarTabela, 'ok'>;
+    };
+
+/**
+ * TROCAR A TABELA DE PREÇO DO PEDIDO já feito (Yan, 27/10/2026). Quem pode e
+ * até quando: `podeTrocarTabelaDoPedido` (shared) — financeiro e admin até
+ * faturar; a venda interna no próprio pedido até o financeiro lançar no
+ * Control.
+ *
+ * Reprecifica os itens pela tabela nova com a MESMA régua do `setOrderItems`
+ * (preço nunca vem do aparelho; faixa maior do EG/48-54 inclusive), mantendo
+ * quantidades e desconto. Com `simular`, só calcula — é a prévia da tela, que
+ * mostra quanto o total muda antes de confirmar. Se algum produto não tem
+ * preço na tabela nova, nada muda.
+ *
+ * Antes de gravar: a foto do que o representante fechou (044) e, no pedido já
+ * lançado, a do que o Control conhece (046) — a foto que falha NÃO trava a
+ * troca (ordem de 23/09/2026).
+ */
+export async function trocarTabelaDoPedido(
+  id: string,
+  company_id: string,
+  quem: { id: string; role: AuthRole; venda_interna?: boolean },
+  price_table_id: string,
+  simular = false,
+): Promise<TrocaDeTabelaResult> {
+  const { data: lido } = await supabase
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  if (!lido) return { ok: false, reason: 'not_found' };
+  const o = lido as unknown as OrderWithItems;
+
+  const acesso = podeTrocarTabelaDoPedido(o, quem.role, quem.id, quem.venda_interna);
+  if (acesso !== 'ok') return { ok: false, reason: acesso };
+
+  // `orders.price_table_id` é da migração 025.
+  if (!(await detectarColunaDaTabela())) return { ok: false, reason: 'sem_coluna' };
+
+  // A tabela nova (da empresa, ativa) é conferida pelo CONTROLADOR: este
+  // arquivo nunca consulta `price_tables` — a tabela gravada num pedido não
+  // depende de ela estar ativa (tests/tabela-inativa.test.ts).
+
+  const antes = o.price_table_id ?? null;
+  const jaNoControl = pedidoJaLancadoNoControl(o);
+  const totalAntes = Number(o.total ?? 0);
+  const itens = o.items ?? [];
+
+  // A mesma tabela (duplo toque): nada a gravar.
+  if (antes === price_table_id) {
+    return {
+      ok: true,
+      order: o,
+      tabela_antes: antes,
+      tabela_depois: price_table_id,
+      total_antes: totalAntes,
+      total_depois: totalAntes,
+      mudou: false,
+      ja_no_control: jaNoControl,
+    };
+  }
+
+  const productIds = [...new Set(itens.map((i) => i.product_id))];
+  const variantIds = [...new Set(itens.map((i) => i.variant_id).filter((v): v is string => !!v))];
+  const [priceMap, sizeMap] = await Promise.all([getPriceMap(price_table_id, productIds), getSizeMap(variantIds)]);
+
+  let novos: Array<{
+    order_id: string;
+    product_id: string;
+    variant_id: string | null;
+    quantity: number;
+    unit_price: number;
+    total: number;
+  }>;
+  try {
+    novos = itens.map((item) => {
+      const preco = priceMap.get(item.product_id);
+      if (preco === undefined) throw new Error('PRICE_NOT_FOUND');
+      const unit_price = precoDoTamanho(
+        item.variant_id ? sizeMap.get(item.variant_id) : null,
+        preco.price,
+        preco.price_larger,
+      );
+      if (unit_price == null) throw new Error('PRICE_NOT_FOUND');
+      return {
+        order_id: id,
+        product_id: item.product_id,
+        variant_id: item.variant_id ?? null,
+        quantity: item.quantity,
+        unit_price,
+        total: Number((item.quantity * unit_price).toFixed(2)),
+      };
+    });
+  } catch {
+    return { ok: false, reason: 'price_not_found' };
+  }
+
+  const bruto = novos.reduce((s, n) => s + n.total, 0);
+  const pct = Number(o.discount_percent ?? 0);
+  const totalDepois = Number((bruto * (1 - pct / 100)).toFixed(2));
+
+  const resultado = {
+    tabela_antes: antes,
+    tabela_depois: price_table_id,
+    total_antes: totalAntes,
+    total_depois: totalDepois,
+    ja_no_control: jaNoControl,
+  };
+  if (simular) return { ok: true, order: o, mudou: false, ...resultado };
+
+  const original = await guardarOriginal(o, 'edicao', quem.id);
+  if (original === 'falhou') return { ok: false, reason: 'original_nao_guardado' };
+  await fotoDoErpSemTravar(o, company_id);
+
+  // O pedido primeiro, e só se ele continua trocável: o faturamento (ou o
+  // lançamento, para a venda interna) chegando no meio não passa por cima.
+  let gravar = supabase
+    .from('orders')
+    .update({ price_table_id, total: totalDepois, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .neq('status', 'rejected')
+    .or('invoiced.is.null,invoiced.eq.false');
+  if (quem.role === 'rep') gravar = gravar.neq('status', 'sent_erp').is('erp_order_id', null);
+  const { data: gravado, error: eOrd } = await gravar.select('id').maybeSingle();
+  if (eOrd || !gravado) return { ok: false, reason: eOrd ? 'save_failed' : quem.role === 'rep' ? 'ja_lancado' : 'faturado' };
+
+  // Os itens: guarda os antigos, apaga, insere os novos; se falhar no meio,
+  // repõe os antigos e a tabela/total de antes (divergência nunca fica calada).
+  const { data: antigos } = await supabase.from('order_items').select('*').eq('order_id', id);
+  const desfazer = async () => {
+    if (antigos && antigos.length > 0) await supabase.from('order_items').insert(antigos);
+    await supabase
+      .from('orders')
+      .update({ price_table_id: antes, total: totalAntes, updated_at: new Date().toISOString() })
+      .eq('id', id)
+      .eq('company_id', company_id);
+  };
+  const { error: eDel } = await supabase.from('order_items').delete().eq('order_id', id);
+  if (eDel) {
+    await desfazer();
+    return { ok: false, reason: 'save_failed' };
+  }
+  const { error: eIns } = await supabase.from('order_items').insert(novos);
+  if (eIns) {
+    await desfazer();
+    return { ok: false, reason: 'save_failed' };
+  }
+
+  console.info(
+    `[troca-tabela] pedido ${o.order_number ?? id}: tabela ${antes ?? '-'} -> ${price_table_id}, total ${totalAntes} -> ${totalDepois}, por ${quem.id} (${quem.role})`,
+  );
+
+  const { data: atualizado } = await supabase
+    .from('orders')
+    .select('*, items:order_items(*)')
+    .eq('id', id)
+    .eq('company_id', company_id)
+    .maybeSingle();
+  return {
+    ok: true,
+    order: (atualizado ?? { ...o, price_table_id, total: totalDepois, items: novos }) as OrderWithItems,
+    mudou: true,
+    ...resultado,
+  };
 }
 
 export type PagamentoResult =

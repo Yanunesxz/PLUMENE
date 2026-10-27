@@ -59,8 +59,8 @@ const QUANTOS_ROUTERS = 14;
 // 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
 // Parceiro: +1 rota de leitura — GET /partner/v1/pedidos/cancelados.
 // Dashboard: +1 rota de leitura — GET /reps/metas (metas da equipe, 19/10/2026).
-const QUANTAS_ROTAS = 109;
-const QUANTAS_ESCRITAS = 57;
+const QUANTAS_ROTAS = 111; // +2: PATCH /orders/:id/tabela e GET /orders/tabelas-para-trocar (27/10/2026)
+const QUANTAS_ESCRITAS = 58;
 
 describe('inventário: o leitor de routers está funcionando', () => {
   // Sem estas âncoras, um erro na expressão regular esvaziaria a lista e o

@@ -189,6 +189,28 @@ export function avisarClienteTrocadoAoRep(
   );
 }
 
+/**
+ * A tabela de preço do pedido foi trocada por outra pessoa (27/10/2026): o
+ * total mudou, e o dono precisa saber antes de falar o valor errado ao cliente.
+ */
+export function avisarTabelaTrocadaAoRep(
+  company_id: string,
+  pedido: PedidoParaAviso,
+  nomeDaTabela: string,
+  totalDepois: number,
+  quemTrocou: string,
+): void {
+  if (pedido.rep_id === quemTrocou) return;
+  engolir(
+    enviarParaUsuarios(company_id, [pedido.rep_id], {
+      title: `${nomeDoPedido(pedido)}: tabela trocada`,
+      body: `O pedido agora está na ${nomeDaTabela} — total R$ ${totalDepois.toFixed(2).replace('.', ',')}.`,
+      url: rota(pedido),
+      tag: `pedido-${pedido.id}`,
+    }),
+  );
+}
+
 /** A nota saiu — a notícia que o representante mais espera. */
 export function avisarFaturadoAoRep(
   company_id: string,
