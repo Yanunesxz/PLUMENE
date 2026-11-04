@@ -51,11 +51,12 @@ describe('o papel existe e tem nome', () => {
   });
 
   it('a lista de papéis gerenciáveis segue a ordem da tela', () => {
-    // Gerente | Financeiro | Relacionamento | Visualizador | Administrador.
+    // Gerente | Financeiro | Relacionamento | SAC | Visualizador | Administrador.
     expect([...PAPEIS_GERENCIAVEIS]).toEqual([
       'manager',
       'financeiro',
       'relacionamento',
+      'sac',
       'visualizador',
       'admin',
     ]);

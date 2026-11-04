@@ -70,7 +70,7 @@ export async function repsRouter(fastify: FastifyInstance): Promise<void> {
     {
       preHandler: [
         authenticate,
-        requireRole(['rep', 'manager', 'admin', 'financeiro', 'visualizador']),
+        requireRole(['rep', 'manager', 'admin', 'financeiro', 'visualizador', 'sac']),
       ],
     },
     minhasPriceTablesHandler,

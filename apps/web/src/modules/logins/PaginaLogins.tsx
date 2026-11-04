@@ -29,6 +29,7 @@ const GRUPOS: Array<{ papel: UserRole; titulo: string }> = [
   { papel: 'manager', titulo: 'Gerentes' },
   { papel: 'financeiro', titulo: 'Financeiro' },
   { papel: 'relacionamento', titulo: 'Relacionamento' },
+  { papel: 'sac', titulo: 'SAC' },
   { papel: 'visualizador', titulo: 'Visualizadores' },
   { papel: 'rep', titulo: 'Representantes' },
   { papel: 'store', titulo: 'Lojas' },

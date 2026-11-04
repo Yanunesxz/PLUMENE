@@ -1,4 +1,5 @@
 import type { AuthRole } from '../constants/userRole.js';
+import { vendeEmNomeProprio } from '../constants/userRole.js';
 import type { OrderStatus } from '../constants/orderStatus.js';
 
 /**
@@ -6,8 +7,8 @@ import type { OrderStatus } from '../constants/orderStatus.js';
  *
  * Yan (30/09/2026): "qualquer pessoa pode cancelar, mas quando chegar na
  * Larissa ela é quem coloca". Então:
- *   - representante e gerente cancelam enquanto o pedido ainda NÃO chegou ao
- *     financeiro — rascunho e triagem;
+ *   - representante, SAC (056) e gerente cancelam enquanto o pedido ainda NÃO
+ *     chegou ao financeiro — rascunho e triagem;
  *   - a venda interna cancela o próprio pedido até faturar (ela é o financeiro
  *     das vendas dela);
  *   - financeiro e admin cancelam qualquer pedido até faturar — inclusive o
@@ -37,7 +38,9 @@ export function podeCancelarPedido(
 
   const antesDoFinanceiro = pedido.status === 'draft' || pedido.status === 'pending_rep';
 
-  if (papel === 'rep') {
+  // Quem vende em nome próprio — o representante e o SAC (056) — cancela o
+  // PRÓPRIO pedido enquanto ele não chegou ao financeiro.
+  if (vendeEmNomeProprio(papel)) {
     if (pedido.rep_id !== user_id) return 'forbidden';
     if (vendaInterna) return 'ok';
     return antesDoFinanceiro ? 'ok' : 'com_o_financeiro';

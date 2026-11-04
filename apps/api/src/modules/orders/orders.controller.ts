@@ -208,7 +208,9 @@ export async function createOrderHandler(request: FastifyRequest, reply: Fastify
   // O financeiro também monta pedido ("pode acrescentar os pedidos", Yan
   // 14/08/2026). Ele não tem tabela própria: o preço vem do cadastro do
   // cliente, sem cair para tabela de ninguém.
-  if (role === 'financeiro' && body.customer_id) {
+  // O SAC (056) monta pedido do mesmo jeito: sem tabela própria, o preço é o
+  // do cadastro do cliente — e sem cair para tabela de ninguém.
+  if ((role === 'financeiro' || role === 'sac') && body.customer_id) {
     tabela = (await tabelaDaLoja(body.customer_id, null)) ?? tabela;
   }
 
@@ -513,6 +515,19 @@ export async function setDiscountHandler(request: FastifyRequest, reply: Fastify
   const { id } = request.params as { id: string };
   const body = await parseBody(setDiscountSchema, request.body, reply);
   if (!body) return;
+
+  // A % é a palavra do REPRESENTANTE (029). O SAC (056) monta e altera o
+  // pedido, mas desconto não é dele — nem na montagem (o createOrderHandler
+  // descarta o campo de quem não é rep) nem depois. O escritório segue como
+  // antes: o gerente altera o pedido do representante, desconto incluído.
+  if (role === 'sac') {
+    await reply.status(403).send({
+      error: 'O desconto é do representante — o SAC monta o pedido sem desconto',
+      code: 'FORBIDDEN_ROLE',
+      statusCode: 403,
+    });
+    return;
+  }
 
   const result = await setOrderDiscount(
     id,

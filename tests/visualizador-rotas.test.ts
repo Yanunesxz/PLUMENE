@@ -524,8 +524,10 @@ describe('antes de rodar a 054, a tela DIZ que falta o SQL', () => {
     expect(corpo.code).toBe('MIGRACAO_PENDENTE');
     expect(corpo.statusCode).toBe(503);
     // A frase tem de dizer O QUE FAZER — é a diferença entre esta mensagem e
-    // "Não foi possível concluir a operação".
-    expect(corpo.error).toContain('054');
+    // "Não foi possível concluir a operação". Aponta para o SQL MAIS NOVO dos
+    // papéis (a 056 recria o CHECK com todos, visualizador incluído) e diz
+    // QUAL papel o banco recusou.
+    expect(corpo.error).toContain('SQL-PARA-RODAR-056');
     expect(corpo.error).toMatch(/Visualizador/);
   });
 

@@ -33,12 +33,19 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
   // encaminhar. Escrever cadastro continua fora do alcance dela.
   // O VISUALIZADOR (054, 15/10/2026) entra em toda LEITURA desta tela e em
   // nenhuma escrita: "ve cliente (…) ve tudo tudo mas nao altera nada".
+  // O SAC (056, 04/11/2026) lê a carteira inteira ("ver todos os clientes") e
+  // CADASTRA cliente novo — só isso: nada de editar, trocar tabela ou marcar.
   const leitura = {
     preHandler: [
       authenticate,
-      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'visualizador']),
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'visualizador', 'sac']),
     ],
   };
+  // CADASTRAR cliente novo: quem vende — e o SAC (Yan: "vai ver criar
+  // cliente"), que cadastra com qualquer tabela ATIVA da empresa (o resolvedor
+  // em reps.service o trata como o escritório). Trocar a tabela de um cliente
+  // que já existe segue só com `escrita`: não foi pedido para o SAC.
+  const cadastra = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'sac'])] };
   const escrita = { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin'])] };
 
   fastify.get('/customers', leitura, listCustomers);
@@ -55,7 +62,7 @@ export async function customersRouter(fastify: FastifyInstance): Promise<void> {
     alteracoesPendentesHandler,
   );
   fastify.get('/customers/:id', leitura, getCustomerHandler);
-  fastify.post('/customers', escrita, createCustomerHandler);
+  fastify.post('/customers', cadastra, createCustomerHandler);
   // Só a tabela de preço. Edição de cadastro é outro assunto, com outros riscos.
   fastify.patch('/customers/:id', escrita, trocarTabelaDoClienteHandler);
   // Editar o cadastro (Yan, 17/09/2026; migração 051): rep e venda interna na

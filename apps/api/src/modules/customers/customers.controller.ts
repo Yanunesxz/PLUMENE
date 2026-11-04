@@ -101,7 +101,10 @@ export async function getCustomerHandler(request: FastifyRequest, reply: Fastify
       role === 'admin' ||
       role === 'financeiro' ||
       role === 'relacionamento' ||
-      role === 'visualizador',
+      role === 'visualizador' ||
+      // O SAC (056, 04/11/2026) também: "ver todos os clientes" é a ficha de
+      // qualquer carteira, não só a lista.
+      role === 'sac',
   });
 
   if (!cliente) {

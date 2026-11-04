@@ -102,7 +102,8 @@ describe('inventário: o leitor de routers está funcionando', () => {
   it('lê os papéis de uma const de opções do próprio arquivo', () => {
     // `decideOPedido` é declarado no alto do orders.router e usado em 7 rotas.
     const status = TODAS.find((r) => r.id === 'orders/orders.router.ts#PATCH /orders/:id/status');
-    expect(status?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro']);
+    // 056: o SAC entrou (manda o próprio rascunho à fábrica).
+    expect(status?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'sac']);
   });
 
   it('lê os papéis escritos no próprio registro', () => {
@@ -240,7 +241,8 @@ describe('toda rota de escrita tem requireRole', () => {
 
   it('as duas escritas que eram furo agora têm papel', () => {
     const pedido = TODAS.find((r) => r.id === 'orders/orders.router.ts#POST /orders');
-    expect(pedido?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest']);
+    // 056: o SAC monta pedido.
+    expect(pedido?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest', 'sac']);
 
     for (const rota of ['assinar', 'desassinar', 'teste']) {
       const push = TODAS.find((r) => r.id === `push/push.router.ts#POST /push/${rota}`);

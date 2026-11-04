@@ -56,6 +56,7 @@ import {
   semLinhasDeCor,
   minimoDaCondicao,
   ehSoLeitura,
+  vendeEmNomeProprio,
   podeCancelarPedido,
   podeInformarMotivo,
   podeInativarPedido,
@@ -657,13 +658,15 @@ export function PaginaDetalhePedido() {
     !!order &&
     !order.invoiced &&
     isOnline &&
-    (user?.role === 'rep'
+    (vendeEmNomeProprio(user?.role)
       ? // Até a fábrica DECIDIR: o pedido do rep nasce direto na fila, e é lá
         // que ele corrige o que acabou de passar. Aprovado, fecha a mão dele —
         // exceto na VENDA INTERNA, que carimba o próprio faturamento: enquanto
         // o carimbo não vem, o pedido é dela para ajustar, em qualquer estado
         // (inclusive já na fábrica). O `!order.invoiced` lá em cima é o teto.
-        (user.venda_interna === true && order.rep_id === user.id) ||
+        // O SAC (056) entra pelo mesmo ramo: o pedido é dele enquanto está
+        // com ele — e a API confere o dono (`podeMexerNoPedido`).
+        (user?.venda_interna === true && order.rep_id === user?.id) ||
         order.status === 'draft' ||
         order.status === 'pending_rep' ||
         order.status === 'pending_approval'
@@ -674,7 +677,9 @@ export function PaginaDetalhePedido() {
           // O rascunho do PRÓPRIO gerente — o alheio é montagem privada do rep.
           (order.status === 'draft' && order.rep_id === user.id)));
 
-  const podeDarDesconto = podeMudarPedido;
+  // A % é do representante (029): o SAC (056) altera o pedido, mas o desconto
+  // não é dele — a API recusa o PATCH com 403, e o campo some daqui.
+  const podeDarDesconto = podeMudarPedido && user?.role !== 'sac';
 
   /** Soma dos itens, sem desconto — é o "Valor Parcial" do formulário. */
   const bruto = (order?.items ?? []).reduce((s, i) => s + (i.total ?? 0), 0);

@@ -54,10 +54,13 @@ packages/shared/src/
 │   └── order.ts          → Order, OrderItem, OrderWithItems, CreateOrderRequest, tipos de sync
 ├── constants/            → uniões + rótulos PT
 │   ├── userRole.ts       → 'admin' | 'manager' | 'rep' | 'store' | 'financeiro' | 'relacionamento' |
-│   │                       'visualizador' + labels. As listas que a regra usa: PAPEIS_DA_FABRICA (quem
+│   │                       'visualizador' | 'sac' + labels. As listas que a regra usa: PAPEIS_DA_FABRICA (quem
 │   │                       MEXE em pedido de qualquer rep), PAPEIS_QUE_LEEM_O_ESCRITORIO (os mesmos +
 │   │                       visualizador, que só LÊ), SO_LEITURA/ehSoLeitura (054: vê tudo, não altera
-│   │                       nada) e PAPEIS_GERENCIAVEIS/ehPapelGerenciavel (os papéis que o admin cria
+│   │                       nada), PAPEIS_QUE_VENDEM_EM_NOME_PROPRIO/vendeEmNomeProprio (rep e SAC, 056:
+│   │                       o pedido nasce em nome dele e ele só vê os seus — é o que orders.service e
+│   │                       podeCancelarPedido consultam onde antes diziam role === 'rep') e
+│   │                       PAPEIS_GERENCIAVEIS/ehPapelGerenciavel (os papéis que o admin cria
 │   │                       na tela de Logins — uma lista só, antes estava escrita à mão em cinco lugares)
 │   ├── permissoes.ts     → teclas do gerente. temPermissao = quem ENTRA (deixa passar quem não é
 │   │                       gerente, de propósito: é o que mantém a triagem do rep);
@@ -222,7 +225,7 @@ apps/api/src/
 │                                   _tools/SQL-PARA-RODAR-054.sql; conferência em _tools/conferir-054.mjs (CHECK não se
 │                                   lê por GET: o script prova indireto, achando um login já gravado com o papel, e
 │                                   imprime o SELECT do SQL Editor quando ainda não existe nenhum).
-│       └── 055_pedido_inativo.sql → orders.inactive/inactive_at/inactive_by (FK SET NULL)/inactive_note + índice parcial
+│       ├── 055_pedido_inativo.sql → orders.inactive/inactive_at/inactive_by (FK SET NULL)/inactive_note + índice parcial
 │                                   idx_orders_inativos (company_id) WHERE inactive + CHECK de order_erp_events.tipo com
 │                                   pedido_inativado/pedido_reativado. O carimbo "Pedido inativo" (Yan, 15/10/2026: "se o
 │                                   pedido for aprovado e depois inativado a pessoa não recebe a bonificação"): outra marca,
@@ -232,6 +235,13 @@ apps/api/src/
 │                                   MIGRACAO_PENDENTE. SQL para os dois bancos em _tools/SQL-PARA-RODAR-055.sql (DEPOIS da
 │                                   050; termina com o NOTIFY); conferir com node _tools/conferir-055.mjs. Depois dela, NÃO
 │                                   rerodar a 048, a 049 nem a 050
+│       └── 056_perfil_sac.sql → recria o CHECK de users.role com 'sac' (o atendimento: monta pedido para qualquer
+│                                   cliente em nome próprio e vê só os seus, lê a carteira inteira e cadastra cliente
+│                                   novo — pedido do Yan em 04/11/2026). Mesmo padrão da 054; idempotente, termina com
+│                                   NOTIFY pgrst. Sem ela o admin escolhe "SAC" na tela de Logins e a API responde 503
+│                                   MIGRACAO_PENDENTE dizendo qual papel o banco recusou e qual SQL colar. SQL para os
+│                                   dois bancos em _tools/SQL-PARA-RODAR-056.sql; conferência em _tools/conferir-056.mjs
+│                                   (a mesma prova indireta da 054: acha um login já gravado com o papel)
 │                                   É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
@@ -355,7 +365,7 @@ apps/api/src/
 │   │                       teclas do gerente (só admin entra; o visualizador LÊ a lista).
 │   │                       Papel que o banco recusa (CHECK chk_users_role, 23514) não é 500:
 │   │                       vira 503 MIGRACAO_PENDENTE dizendo qual SQL falta — é o estado
-│   │                       normal enquanto o código já subiu e a 054 não foi colada
+│   │                       normal enquanto o código já subiu e o SQL dos papéis (hoje a 056) não foi colado
 │   ├── reps/             → GET/POST/PATCH /reps + GET /price-tables (gerente/admin). As listas
 │   │                       /price-tables e /price-tables/minhas trazem só as ATIVAS no Control;
 │   │                       ?incluir_inativas=1 traz também as desligadas (com active=false), para a
@@ -589,6 +599,10 @@ _tools/
 │                                    (idempotente; só troca o CHECK, não mexe em linha nenhuma; termina com o NOTIFY).
 │                                    Conferir depois com node _tools/conferir-054.mjs (sem argumento mede os dois) — e
 │                                    o CHECK em si só se lê no SQL Editor, com o SELECT que o script imprime
+├── SQL-PARA-RODAR-056.sql         → a 056 (papel 'sac' no CHECK de users.role) para colar nos DOIS bancos (idempotente;
+│                                    só troca o CHECK, não mexe em linha nenhuma; termina com o NOTIFY). Conferir depois
+│                                    com node _tools/conferir-056.mjs (sem argumento mede os dois) — e o CHECK em si só
+│                                    se lê no SQL Editor, com o SELECT que o script imprime
 ├── SQL-PARA-RODAR-055.sql         → a 055 (pedido inativo: orders.inactive/_at/_by/_note + CHECK do rastro) para colar
 │                                    nos DOIS bancos, DEPOIS da 050 (idempotente; termina com o NOTIFY). Conferir depois
 │                                    com node _tools/conferir-055.mjs (sem argumento mede os dois)

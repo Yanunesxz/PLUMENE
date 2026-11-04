@@ -40,10 +40,12 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // pagamento), e é por isso que o visualizador cabe nela: "ele pode ver tudo
   // so nao pode alterar nada" (Yan, 15/10/2026). Se algum dia uma escrita for
   // pendurada aqui, tests/visualizador-inventario.test.ts quebra.
+  // O SAC (056, 04/11/2026) entra aqui e em `montaPedido`: ele monta pedido e
+  // lê os PRÓPRIOS — o service filtra por rep_id, como para o representante.
   const daFabricaOuLoja = {
     preHandler: [
       authenticate,
-      requireRole(['rep', 'manager', 'admin', 'store', 'financeiro', 'visualizador']),
+      requireRole(['rep', 'manager', 'admin', 'store', 'financeiro', 'visualizador', 'sac']),
     ],
   };
   // Quem MONTA pedido. Até 15/10/2026 esta rota tinha só `authenticate` —
@@ -55,7 +57,7 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   const montaPedido = {
     preHandler: [
       authenticate,
-      requireRole(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest']),
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest', 'sac']),
     ],
   };
   // Mexer no ciclo do pedido é de quem vende. Quem compra não muda status nem
@@ -68,7 +70,10 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   const decideOPedido = {
     preHandler: [
       authenticate,
-      requireRole(['rep', 'manager', 'admin', 'financeiro']),
+      // O SAC (056) passa por aqui para mandar o PRÓPRIO rascunho à fábrica e
+      // mexer nele enquanto está com ele; o service o trata como o rep
+      // (`vendeEmNomeProprio`) — aprovar, recusar e lançar continuam fora.
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'sac']),
       requirePermission('aprovar_pedidos'),
     ],
   };
@@ -124,7 +129,7 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // (shared) — rep e gerente antes do financeiro, financeiro/admin até faturar.
   fastify.patch(
     '/orders/:id/cancelar',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro'])] },
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'financeiro', 'sac'])] },
     cancelarPedidoHandler,
   );
   // Trocar o CLIENTE do pedido (rep escolheu a loja errada). Quem pode é a
@@ -157,7 +162,7 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
     {
       preHandler: [
         authenticate,
-        requireRole(['rep', 'manager', 'admin', 'financeiro', 'visualizador']),
+        requireRole(['rep', 'manager', 'admin', 'financeiro', 'visualizador', 'sac']),
       ],
     },
     listarMotivosHandler,

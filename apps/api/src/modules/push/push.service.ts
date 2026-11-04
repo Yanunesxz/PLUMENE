@@ -188,7 +188,7 @@ export async function resolverPublico(
         ? ['store']
         : publico === 'escritorio'
           ? ['manager', 'financeiro']
-          : ['rep', 'store', 'manager', 'admin', 'financeiro', 'relacionamento'];
+          : ['rep', 'store', 'manager', 'admin', 'financeiro', 'relacionamento', 'sac'];
   const { data } = await supabase
     .from('users')
     .select('id')

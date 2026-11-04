@@ -50,8 +50,14 @@ export async function listProducts(request: FastifyRequest, reply: FastifyReply)
   // do financeiro: ele não tem tabela própria no token, então a régua de
   // comprador (onlyPriced) devolveria catálogo VAZIO — "ve (…) produto ve tudo
   // tudo". Só leitura: o estoque e a consulta por tabela não gravam nada.
+  // O SAC (056) entra pelo motivo do financeiro: sem tabela própria no token,
+  // e precisando reprecificar o carrinho na tabela do cliente que escolheu.
   const canChooseTable =
-    role === 'manager' || role === 'admin' || role === 'financeiro' || role === 'visualizador';
+    role === 'manager' ||
+    role === 'admin' ||
+    role === 'financeiro' ||
+    role === 'visualizador' ||
+    role === 'sac';
   if (price_table_id && !canChooseTable) {
     const permitida = role === 'rep' && (await repPodeUsarTabela(company_id, sub, price_table_id));
     if (!permitida) {

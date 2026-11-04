@@ -30,6 +30,24 @@ export const USER_ROLE = {
    * botão escondido na tela.
    */
   VISUALIZADOR: 'visualizador',
+  /**
+   * SAC (migração 056). Pedido do Yan, 04/11/2026: "cria um login pra SAC por
+   * favor, no SAC vai poder criar pedido, ver todos os clientes, e vai ver
+   * criar cliente".
+   *
+   * O atendimento: monta pedido para QUALQUER cliente da empresa (o preço é o
+   * do cadastro do cliente — ele não tem tabela própria, como o financeiro),
+   * lê a carteira inteira e cadastra cliente novo com qualquer tabela ativa.
+   * O pedido nasce em nome DELE, em rascunho, e segue o ciclo do
+   * representante: ele manda para a fábrica, altera peças, condição e
+   * observação enquanto o pedido está com ele, cancela antes do financeiro —
+   * e vê SÓ os próprios (ver PAPEIS_QUE_VENDEM_EM_NOME_PROPRIO).
+   *
+   * Fora do alcance: desconto (a % é do representante), aprovar, faturar,
+   * lançar no Control, editar cadastro, trocar tabela de cliente, tarefas,
+   * representantes, painel, logins.
+   */
+  SAC: 'sac',
 } as const;
 
 export type UserRole = (typeof USER_ROLE)[keyof typeof USER_ROLE];
@@ -52,6 +70,7 @@ export const USER_ROLE_LABELS: Record<UserRole, string> = {
   financeiro: 'Financeiro',
   relacionamento: 'Relacionamento',
   visualizador: 'Visualizador',
+  sac: 'SAC',
 };
 
 /**
@@ -94,8 +113,26 @@ export const ehSoLeitura = (papel: AuthRole | null | undefined): boolean =>
   papel != null && SO_LEITURA.includes(papel);
 
 /**
- * Os papéis que o admin cria na tela de Logins (migração 054 acrescentou o
- * visualizador). Representante nasce em `/reps` e loja nasce por convite — por
+ * Quem vende EM NOME PRÓPRIO: o pedido nasce com `rep_id` = ele, ele só vê os
+ * seus, manda o próprio rascunho para a fábrica e mexe nele enquanto está com
+ * ele. É o representante — e o SAC (056), que monta pedido pelo telefone para
+ * qualquer cliente mas não é escritório: não decide, não fatura, não lança.
+ *
+ * É a lista que `getOrders`, `getOrderById`, `podeMexerNoPedido`,
+ * `updateOrderStatus`, `deleteOrder` e `podeCancelarPedido` consultam onde
+ * antes diziam `role === 'rep'`. O que é SÓ do representante — desconto,
+ * venda interna, triagem da loja, carteira pelo código do Control — continua
+ * dizendo 'rep'.
+ */
+export const PAPEIS_QUE_VENDEM_EM_NOME_PROPRIO: readonly AuthRole[] = ['rep', 'sac'];
+
+/** Este papel vende em nome próprio? (ver PAPEIS_QUE_VENDEM_EM_NOME_PROPRIO) */
+export const vendeEmNomeProprio = (papel: AuthRole | null | undefined): boolean =>
+  papel != null && PAPEIS_QUE_VENDEM_EM_NOME_PROPRIO.includes(papel);
+
+/**
+ * Os papéis que o admin cria na tela de Logins (a 054 acrescentou o
+ * visualizador; a 056, o SAC). Representante nasce em `/reps` e loja nasce por convite — por
  * isso nem um nem outro aparece aqui.
  *
  * Uma lista só: antes o mesmo conjunto estava escrito à mão em cinco lugares
@@ -107,6 +144,7 @@ export const PAPEIS_GERENCIAVEIS = [
   'manager',
   'financeiro',
   'relacionamento',
+  'sac',
   'visualizador',
   'admin',
 ] as const satisfies readonly UserRole[];

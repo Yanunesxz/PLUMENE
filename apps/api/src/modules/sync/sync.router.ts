@@ -11,9 +11,11 @@ export async function syncRouter(fastify: FastifyInstance): Promise<void> {
   // Sync offline → Supabase (pedidos criados offline pelo app).
   // O visitante da vitrine fica de fora: ele não tem app instalado nem fila, e
   // por aqui ele criaria pedido sem o nome e o WhatsApp que o fechamento exige.
+  // O SAC (056) monta pedido e, portanto, pode ter fila offline: entra como o
+  // representante (o pedido sobe em nome dele, na tabela do cliente).
   fastify.post(
     '/sync',
-    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'store'])] },
+    { preHandler: [authenticate, requireRole(['rep', 'manager', 'admin', 'store', 'sac'])] },
     syncHandler,
   );
 

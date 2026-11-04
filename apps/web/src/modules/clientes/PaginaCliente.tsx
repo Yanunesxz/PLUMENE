@@ -937,6 +937,9 @@ export function PaginaCliente() {
             desligada no Control (podeTrocarTabelaDoCliente). */}
         {podeTrocarTabelaDoCliente(todasAsTabelas, cliente.price_table_id) &&
           user?.role !== 'financeiro' &&
+          // O SAC (056) cadastra com tabela, mas não troca a de quem já existe
+          // (PATCH /customers/:id não o aceita) — o botão daria 403.
+          user?.role !== 'sac' &&
           !ehSoLeitura(user?.role) && (
             <Button variant="outline" size="sm" onClick={() => setTrocando(true)}>
               Trocar

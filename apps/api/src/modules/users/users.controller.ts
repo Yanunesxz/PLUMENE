@@ -1,5 +1,5 @@
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type { CriarUsuarioRequest, AtualizarUsuarioRequest } from '@csb/shared';
+import type { CriarUsuarioRequest, AtualizarUsuarioRequest, UserRole } from '@csb/shared';
 import { PAPEIS_GERENCIAVEIS, USER_ROLE_LABELS } from '@csb/shared';
 import {
   listUsuarios,
@@ -16,6 +16,20 @@ import {
  */
 const AVISO_MIGRACAO =
   'Salvo, mas as permissões NÃO foram gravadas: a migração 022 ainda não foi aplicada no banco.';
+
+/**
+ * O banco recusou o PAPEL (CHECK de users.role, 23514): a frase diz QUAL papel
+ * e qual SQL colar. O SQL mais novo recria o CHECK com TODOS os papéis (a 054
+ * trouxe o visualizador, a 056 o SAC), então apontar sempre para o último está
+ * certo — e tira a frase do número fixo em que ela ficou presa na 054.
+ */
+const SQL_DOS_PAPEIS = '_tools/SQL-PARA-RODAR-056.sql';
+
+function fraseDaMigracao(papel: string | undefined): string {
+  const nome =
+    papel && papel in USER_ROLE_LABELS ? `o papel ${USER_ROLE_LABELS[papel as UserRole]}` : 'este papel';
+  return `O banco ainda não aceita ${nome}. Cole ${SQL_DOS_PAPEIS} no SQL Editor dos dois bancos e tente de novo. Nada foi criado nem alterado.`;
+}
 
 const RESPOSTA: Record<MotivoUsuario, { status: number; code: string; error: string }> = {
   nao_encontrado: { status: 404, code: 'NOT_FOUND', error: 'Login não encontrado.' },
@@ -52,8 +66,8 @@ const RESPOSTA: Record<MotivoUsuario, { status: number; code: string; error: str
   migracao_pendente: {
     status: 503,
     code: 'MIGRACAO_PENDENTE',
-    error:
-      'O banco ainda não aceita o papel Visualizador. Cole _tools/SQL-PARA-RODAR-054.sql no SQL Editor dos dois bancos e tente de novo. Nada foi criado nem alterado.',
+    // O padrão, sem papel; os handlers passam a frase com o papel recusado.
+    error: fraseDaMigracao(undefined),
   },
   erro: { status: 500, code: 'ERRO', error: 'Não foi possível concluir a operação.' },
 };
@@ -91,7 +105,7 @@ export async function criarUsuarioHandler(
 
   const r = await criarUsuario(request.user.company_id, body);
   if (!r.ok) {
-    await recusar(reply, r.motivo);
+    await recusar(reply, r.motivo, r.motivo === 'migracao_pendente' ? fraseDaMigracao(r.papel) : undefined);
     return;
   }
   await reply.status(201).send({
@@ -109,7 +123,7 @@ export async function atualizarUsuarioHandler(
 
   const r = await atualizarUsuario(company_id, sub, id, request.body as AtualizarUsuarioRequest);
   if (!r.ok) {
-    await recusar(reply, r.motivo);
+    await recusar(reply, r.motivo, r.motivo === 'migracao_pendente' ? fraseDaMigracao(r.papel) : undefined);
     return;
   }
   await reply.send({
