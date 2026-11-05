@@ -25,6 +25,8 @@ export * from './pedidos/cancelamento.js';
 export * from './pedidos/pedidoInativo.js';
 export * from './pedidos/trocaDeCliente.js';
 export * from './pedidos/trocaDeTabela.js';
+export * from './pedidos/mexerNoPedido.js';
+export * from './pedidos/fracionamento.js';
 export * from './pedidos/desempenho.js';
 export * from './cadastro/documento.js';
 export * from './cadastro/endereco.js';

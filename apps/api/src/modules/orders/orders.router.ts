@@ -9,6 +9,7 @@ import {
 } from './cancelamento.controller.js';
 import { trocarClienteHandler } from './trocaDeCliente.controller.js';
 import { trocarTabelaHandler, tabelasParaTrocarHandler } from './trocaDeTabela.controller.js';
+import { fracionarHandler, dataDeEnvioHandler } from './fracionamento.controller.js';
 import {
   listOrders,
   getOrder,
@@ -185,6 +186,14 @@ export async function ordersRouter(fastify: FastifyInstance): Promise<void> {
   // A observação livre (o recado do rep) segue o MESMO portão — para a venda
   // interna, vale até o carimbo do faturamento em qualquer estado.
   fastify.patch('/orders/:id/observacao', decideOPedido, setNotesHandler);
+  // FRACIONAR em entregas (057, 05/11/2026): o pedido vira N pedidos ligados,
+  // cada um com a sua data de envio. O MESMO portão de mexer nas peças — "todos
+  // podem, mesma regra: passou pra frente não pode ser alterado, se foi
+  // faturado não pode ser alterado" (Yan). Quem pode e até quando é
+  // `podeFracionarPedido` (shared), no service.
+  fastify.post('/orders/:id/fracionar', decideOPedido, fracionarHandler);
+  // A data de envio de uma entrega, enquanto ela ainda pode ser alterada.
+  fastify.patch('/orders/:id/data-de-envio', decideOPedido, dataDeEnvioHandler);
   // Corrigir o número do Control digitado errado no lançamento — de quem lança
   // (financeiro; admin como válvula), e só antes de a nota sair.
   fastify.patch(

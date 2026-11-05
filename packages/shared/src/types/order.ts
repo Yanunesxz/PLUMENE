@@ -3,6 +3,7 @@ import type { OrderSource } from './access.js';
 import type { PedidoOriginal } from '../pedidos/pedidoOriginal.js';
 import type { SincroniaComOErp } from '../pedidos/sincroniaErp.js';
 import type { SolicitacaoErp } from './control.js';
+import type { FracionamentoDoPedido } from '../pedidos/fracionamento.js';
 
 export interface OrderItem {
   id: string;
@@ -113,6 +114,20 @@ export interface Order {
   inactive_by_name?: string | null;
   /** A observação de quem inativou (opcional, até 500 letras). */
   inactive_note?: string | null;
+  /**
+   * Pedido FRACIONADO em entregas (migração 057). Cada entrega é um pedido
+   * próprio; todas levam o mesmo `split_group_id` (o id do pedido que foi
+   * fracionado, que vira a entrega 1). `split_index` é a posição (1…N) e
+   * `split_count` em quantas entregas o pedido foi fracionado. `ship_date` é
+   * a data de envio da entrega ("AAAA-MM-DD"). Ausentes antes da 057 e no
+   * cache offline antigo: ninguém é fracionado.
+   */
+  split_group_id?: string | null;
+  split_index?: number | null;
+  split_count?: number | null;
+  ship_date?: string | null;
+  split_at?: string | null;
+  split_by?: string | null;
   created_by: string;
   approved_by: string | null;
   created_at: string;
@@ -215,6 +230,13 @@ export interface OrderWithItems extends Order {
    * WhatsApp; ausente = cache offline ou API antiga (a tela usa a cópia local).
    */
   customer_whatsapp?: string | null;
+  /**
+   * As entregas do pedido fracionado (migração 057), montadas pela API no
+   * GET /orders/:id: em que entrega este pedido está, quem fracionou e as
+   * outras entregas do grupo — é o que dá os botões para ir de uma à outra.
+   * Ausente em pedido que não foi fracionado e no cache offline.
+   */
+  fracionamento?: FracionamentoDoPedido | null;
 }
 
 // ─── Pedido excluído (aba do admin) ──────────────────────────────────────────

@@ -406,7 +406,8 @@ describe('visualizador NÃO ESCREVE', () => {
  * entra no barrido sozinha, no dia em que for registrada.
  */
 // 055: PATCH /orders/:id/inativo (financeiro/admin) entrou com guarda.
-const QUANTAS_ESCRITAS_COM_GUARDA = 53;
+// 057: POST /orders/:id/fracionar e PATCH /orders/:id/data-de-envio, idem.
+const QUANTAS_ESCRITAS_COM_GUARDA = 55;
 
 /** `/customers/:id/varejo` → `/customers/<uuid>/varejo`. */
 const comParametros = (caminho: string) =>

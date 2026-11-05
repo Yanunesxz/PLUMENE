@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy, Send, Link2 } from 'lucide-react';
+import { ArrowLeft, Package, WifiOff, MessageCircle, Trash2, Check, X, Pencil, Minus, Plus, Copy, Send, Link2, Split } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -49,6 +49,8 @@ import { CancelarPedido } from '../../components/comercial/CancelarPedido.js';
 import { InativarPedido } from '../../components/comercial/InativarPedido.js';
 import { TrocarClienteDoPedido } from '../../components/comercial/TrocarClienteDoPedido.js';
 import { TrocarTabelaDoPedido } from '../../components/comercial/TrocarTabelaDoPedido.js';
+import { FracionarPedido } from '../../components/comercial/FracionarPedido.js';
+import { EntregasDoPedido } from '../../components/comercial/EntregasDoPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
 import {
   precoDoTamanho,
@@ -65,6 +67,8 @@ import {
   podeTrocarClienteDoPedido,
   podeTrocarTabelaDoPedido,
   pedidoJaLancadoNoControl,
+  podeFracionarPedido,
+  podeMudarDataDeEnvio,
 } from '@csb/shared';
 import type {
   ResultadoDaTrocaDeCliente,
@@ -76,6 +80,8 @@ import type {
   ProductWithPrice,
   SincroniaComOErp,
   PedidoParaComparar,
+  EntregaPedida,
+  FracionamentoDoPedido,
 } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
@@ -277,6 +283,110 @@ export function PaginaDetalhePedido() {
       setErroDaTabela(err instanceof Error ? err.message : 'Não foi possível trocar a tabela.');
     } finally {
       setSalvandoTabela(false);
+    }
+  };
+
+  // ─── Fracionar em entregas (057, 05/11/2026) ──────────────────────────────
+  // O pedido que a fábrica manda em mais de uma data vira N pedidos ligados,
+  // cada um com a sua data de envio. O portão é o de mexer nas peças
+  // (`podeFracionarPedido`, shared — o mesmo que a API usa); online, porque
+  // fracionar vale para todo mundo e não entra na fila offline.
+  const [fracionando, setFracionando] = useState(false);
+  const [salvandoFracionamento, setSalvandoFracionamento] = useState(false);
+  const [erroDoFracionamento, setErroDoFracionamento] = useState<string | null>(null);
+  const [salvandoDataDeEnvio, setSalvandoDataDeEnvio] = useState(false);
+  const podeFracionar =
+    !!order &&
+    isOnline &&
+    podeAprovar &&
+    // Uma peça só não tem como ir em duas entregas.
+    order.items.reduce((s, i) => s + i.quantity, 0) >= 2 &&
+    order.items.every((i) => !!i.id) &&
+    podeFracionarPedido(order, user?.role, user?.id, user?.venda_interna === true) === 'ok';
+  const podeMudarEnvio =
+    !!order &&
+    isOnline &&
+    podeAprovar &&
+    podeMudarDataDeEnvio(order, user?.role, user?.id, user?.venda_interna === true) === 'ok';
+
+  // As entregas do grupo. Online a API manda o bloco pronto; no cache do
+  // aparelho (sem rede) ele é montado com as entregas que a lista já baixou —
+  // o aviso e os botões continuam aparecendo.
+  const grupoDoPedido = order?.split_group_id ?? null;
+  const entregasNoAparelho = useLiveQuery(
+    () => (grupoDoPedido ? db.orders.filter((o) => o.split_group_id === grupoDoPedido).toArray() : []),
+    [grupoDoPedido],
+  );
+  const fracionamento = useMemo<FracionamentoDoPedido | null>(() => {
+    if (!order?.split_group_id) return null;
+    if (order.fracionamento) return order.fracionamento;
+    const locais = entregasNoAparelho && entregasNoAparelho.length > 0 ? entregasNoAparelho : [order];
+    return {
+      grupo: order.split_group_id,
+      indice: order.split_index ?? 0,
+      total_de_entregas: order.split_count ?? 0,
+      ship_date: order.ship_date ?? null,
+      fracionado_em: order.split_at ?? null,
+      fracionado_por_nome: null,
+      entregas: [...locais]
+        .sort((a, b) => (a.split_index ?? 0) - (b.split_index ?? 0))
+        .map((o) => ({
+          id: o.id,
+          order_number: o.order_number ?? null,
+          indice: o.split_index ?? 0,
+          ship_date: o.ship_date ?? null,
+          status: o.status,
+          invoiced: o.invoiced === true,
+          total: o.total ?? null,
+          erp_order_id: o.erp_order_id ?? null,
+        })),
+    };
+  }, [order, entregasNoAparelho]);
+
+  const fracionar = async (entregas: EntregaPedida[]) => {
+    if (!id || !token || !order || salvandoFracionamento) return;
+    setSalvandoFracionamento(true);
+    setErroDoFracionamento(null);
+    try {
+      const res = await api.post<ApiResponse<{ order: Order; entregas: Order[] }>>(
+        `/orders/${id}/fracionar`,
+        { entregas },
+        token,
+      );
+      // O cache do aparelho alimenta a lista: as entregas novas entram já, com
+      // o nome do cliente que o pedido de origem tinha, e a de origem encolhe.
+      const nome = order.customer_name ? { customer_name: order.customer_name } : {};
+      await db.orders.bulkPut(res.data.entregas.map((e) => ({ ...e, ...nome }))).catch(() => {});
+      setFracionando(false);
+      await recarregarPedido();
+      setToast({
+        message: `Pedido fracionado em ${res.data.entregas.length} entregas — cada uma virou um pedido.`,
+        type: 'success',
+      });
+    } catch (err) {
+      setErroDoFracionamento(err instanceof Error ? err.message : 'Não foi possível fracionar o pedido.');
+    } finally {
+      setSalvandoFracionamento(false);
+    }
+  };
+
+  const mudarDataDeEnvio = async (ship_date: string) => {
+    if (!id || !token || salvandoDataDeEnvio) return;
+    setSalvandoDataDeEnvio(true);
+    try {
+      const res = await api.patch<ApiResponse<Order>>(`/orders/${id}/data-de-envio`, { ship_date }, token);
+      const gravada = res.data.ship_date ?? ship_date;
+      await db.orders.update(id, { ship_date: gravada }).catch(() => {});
+      // Relê o pedido inteiro: a data também aparece no botão da entrega.
+      await recarregarPedido();
+      setToast({ message: 'Data de envio atualizada.', type: 'success' });
+    } catch (err) {
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível mudar a data de envio.',
+        type: 'error',
+      });
+    } finally {
+      setSalvandoDataDeEnvio(false);
     }
   };
 
@@ -1520,6 +1630,23 @@ export function PaginaDetalhePedido() {
               </button>
             )}
 
+            {/* Fracionar em entregas (057): a fábrica vai mandar em mais de uma
+                data. Some depois de fracionado — aí o aviso das entregas, logo
+                abaixo deste cartão, é quem manda. */}
+            {podeFracionar && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErroDoFracionamento(null);
+                  setFracionando(true);
+                }}
+                className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-lg border border-input text-sm font-medium text-foreground transition-colors hover:bg-sunken"
+              >
+                <Split className="h-4 w-4" strokeWidth={2.5} />
+                Fracionar em entregas
+              </button>
+            )}
+
             <div className={`mt-3 items-center justify-between gap-2 border-t border-border pt-3 ${ehLoja ? 'hidden' : 'flex'}`}>
               <span className="flex items-center gap-2">
                 {order.invoiced ? (
@@ -1563,6 +1690,23 @@ export function PaginaDetalhePedido() {
               )}
             </div>
           </div>
+
+          {/* Pedido fracionado (057): o aviso, a data de envio desta entrega e
+              um botão para cada entrega do grupo. A loja também vê — é a
+              mercadoria dela chegando em mais de uma data. */}
+          {fracionamento && (
+            <EntregasDoPedido
+              // Outra entrega aberta = cartão novo: a edição da data recomeça.
+              key={order.id}
+              fracionamento={fracionamento}
+              atualId={order.id}
+              papel={user?.role}
+              podeMudarData={podeMudarEnvio}
+              salvandoData={salvandoDataDeEnvio}
+              onMudarData={(d) => void mudarDataDeEnvio(d)}
+              onAbrir={(outro) => navigate(`/orders/${outro}`)}
+            />
+          )}
 
           {/* O desconto fica ACIMA da decisão: é a última coisa que se ajusta
               antes de decidir — o rep no que está com ele, o gerente em tudo
@@ -1766,6 +1910,19 @@ export function PaginaDetalhePedido() {
 
           {/* Veio assim, foi faturado assado (044). Só aparece quando há o
               que comparar — e para quem trabalha o pedido, não para a loja. */}
+          {/* A cópia do original é de ANTES do fracionamento (057): o que saiu
+              para as outras entregas apareceria abaixo como peça cortada. O
+              aviso diz que não foi — a comparação continua a de sempre. */}
+          {order.original &&
+            !ehLoja &&
+            order.split_at &&
+            Date.parse(order.original.guardado_em) < Date.parse(order.split_at) && (
+              <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-xs text-muted-foreground">
+                Este pedido foi fracionado depois da cópia abaixo: parte das peças que aparecem como
+                retiradas está nas outras entregas, não foi cortada.
+              </p>
+            )}
+
           {order.original && !ehLoja && (
             <PedidoOriginal
               original={order.original}
@@ -2240,6 +2397,26 @@ export function PaginaDetalhePedido() {
           erro={erroDaTabela}
           onConfirmar={(t) => void trocarTabela(t)}
           onFechar={() => setTrocandoTabela(false)}
+        />
+      )}
+
+      {fracionando && order && (
+        <FracionarPedido
+          numero={order.order_number}
+          itens={itensOrdenados.map((i) => ({
+            id: i.id,
+            sku: prodMap.get(i.product_id)?.sku ?? '—',
+            nome: prodMap.get(i.product_id)?.name ?? '',
+            tamanho: (i.variant_id && variantSize.get(i.variant_id)) || '—',
+            quantity: i.quantity,
+            unit_price: i.unit_price,
+          }))}
+          descontoPercentual={Number(order.discount_percent ?? 0)}
+          jaNoControl={pedidoJaLancadoNoControl(order)}
+          ocupado={salvandoFracionamento}
+          erro={erroDoFracionamento}
+          onConfirmar={(entregas) => void fracionar(entregas)}
+          onFechar={() => setFracionando(false)}
         />
       )}
 

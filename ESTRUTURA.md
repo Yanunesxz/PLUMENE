@@ -85,10 +85,21 @@ packages/shared/src/
 │   │                       podeInformarMotivo, os motivos iniciais do Yan
 │   ├── trocaDeCliente.ts → quem troca o cliente do pedido (08/10/2026): financeiro/admin até
 │   │                       faturar, o rep dono só antes da fábrica
-│   └── pedidoInativo.ts  → quem marca/desmarca "Pedido inativo" (055) e quando
-│                           (podeInativarPedido / podeReativarPedido — o cancelado não entra
-│                           nem sai) e se o carimbo aparece na tela (exibeCarimboInativo); a
-│                           mesma regra da tela e da API
+│   ├── pedidoInativo.ts  → quem marca/desmarca "Pedido inativo" (055) e quando
+│   │                       (podeInativarPedido / podeReativarPedido — o cancelado não entra
+│   │                       nem sai) e se o carimbo aparece na tela (exibeCarimboInativo); a
+│   │                       mesma regra da tela e da API
+│   ├── mexerNoPedido.ts  → podeMexerNoPedido: o portão ÚNICO de mexer no pedido em aberto (peças,
+│   │                       desconto, condição, observação e fracionar) — rep/SAC no próprio enquanto
+│   │                       está com ele, escritório até lançar no Control, venda interna no próprio até
+│   │                       faturar. Morava no orders.service.ts; veio para cá em 05/11/2026
+│   └── fracionamento.ts  → FRACIONAR o pedido em entregas (057): podeFracionarPedido /
+│                           podeMudarDataDeEnvio (a regra de mexer no pedido), dividirEmPartesIguais (a
+│                           separação automática: a sobra roda entre as entregas, que terminam com o
+│                           mesmo nº de peças ±1), conferirDistribuicao (toda peça em uma entrega, toda
+│                           entrega com peça e data — a mesma conta na tela e na API),
+│                           repartirObservacao (as linhas de cor "0015 6M azul" repartidas com a
+│                           quantidade de cada entrega) e os rótulos ("Entrega 1/3")
 ├── cadastro/
 │   ├── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
 │   │                       GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
@@ -235,13 +246,25 @@ apps/api/src/
 │                                   MIGRACAO_PENDENTE. SQL para os dois bancos em _tools/SQL-PARA-RODAR-055.sql (DEPOIS da
 │                                   050; termina com o NOTIFY); conferir com node _tools/conferir-055.mjs. Depois dela, NÃO
 │                                   rerodar a 048, a 049 nem a 050
-│       └── 056_perfil_sac.sql → recria o CHECK de users.role com 'sac' (o atendimento: monta pedido para qualquer
+│       ├── 056_perfil_sac.sql → recria o CHECK de users.role com 'sac' (o atendimento: monta pedido para qualquer
 │                                   cliente em nome próprio e vê só os seus, lê a carteira inteira e cadastra cliente
 │                                   novo — pedido do Yan em 04/11/2026). Mesmo padrão da 054; idempotente, termina com
 │                                   NOTIFY pgrst. Sem ela o admin escolhe "SAC" na tela de Logins e a API responde 503
 │                                   MIGRACAO_PENDENTE dizendo qual papel o banco recusou e qual SQL colar. SQL para os
 │                                   dois bancos em _tools/SQL-PARA-RODAR-056.sql; conferência em _tools/conferir-056.mjs
 │                                   (a mesma prova indireta da 054: acha um login já gravado com o papel)
+│       └── 057_fracionamento_de_pedidos.sql → orders.split_group_id (o grupo = o id do pedido fracionado, SEM FK)/
+│                                   split_index/split_count/ship_date/split_at/split_by (FK SET NULL) + trava
+│                                   chk_orders_fracionamento + índices parciais idx_orders_fracionados e
+│                                   idx_orders_entrega_unica (uma entrega por posição). FRACIONAR o pedido em
+│                                   entregas (Yan, 05/11/2026: o pedido que no Control sai em três, cada um com a
+│                                   sua data de saída e a sua nota): cada entrega é um PEDIDO próprio (número,
+│                                   status, número do Control e faturamento próprios), ligadas pelo grupo; o
+│                                   pedido de origem vira a entrega 1. Não mexe no CHECK do rastro — roda em
+│                                   qualquer ordem. Sem ela a leitura segue (ninguém é fracionado) e fracionar
+│                                   responde 503 MIGRACAO_PENDENTE. SQL para os dois bancos em
+│                                   _tools/SQL-PARA-RODAR-057.sql (termina com o NOTIFY); conferir com
+│                                   node _tools/conferir-057.mjs
 │                                   É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
@@ -361,6 +384,19 @@ apps/api/src/
 │   │                       foto antes de gravar e carimba nela o cliente antigo depois
 │   │                       paymentConditions.service.ts → GET das condições; com a 049 traz
 │   │                       valor_minimo (detectar), que a tela usa só para AVISAR
+│   │                       fracionamento.service.ts → FRACIONAR em entregas (057, 05/11/2026):
+│   │                       POST /orders/:id/fracionar { entregas: [{ ship_date, itens }] } — o
+│   │                       mesmo portão de mexer nas peças (decideOPedido + podeFracionarPedido).
+│   │                       O pedido de origem é MARCADO como entrega 1 (UPDATE condicional), as
+│   │                       entregas novas nascem com as peças delas e SÓ ENTÃO ele encolhe;
+│   │                       qualquer falha desfaz. Nada é reprecificado; as novas herdam cliente,
+│   │                       rep, tabela, condição, desconto e a DATA do pedido (a meta do mês não
+│   │                       muda), e a que nasce de pedido já lançado nasce 'approved'. Avisa por
+│   │                       push o dono e, com o pedido já na fábrica, financeiro e admin.
+│   │                       PATCH /orders/:id/data-de-envio { ship_date } muda a data de uma
+│   │                       entrega; lerFracionamento monta o bloco `fracionamento` do
+│   │                       GET /orders/:id (as entregas do grupo, para os botões da tela).
+│   │                       Sem a 057: 503 MIGRACAO_PENDENTE
 │   ├── users/            → /usuarios — o admin controla TODOS os logins e as
 │   │                       teclas do gerente (só admin entra; o visualizador LÊ a lista).
 │   │                       Papel que o banco recusa (CHECK chk_users_role, 23514) não é 500:
@@ -528,6 +564,10 @@ apps/web/
     │                        LancarNoErp, AtualizarNoErp, ConfirmarFaturamento, SeletorDeTabela
     │                        (nunca oferece tabela inativa), AvisoDeValorMinimo (o pedido mínimo
     │                        da condição; só avisa), PedidoOriginal (o original x o faturado, peça por peça),
+    │                        FracionarPedido (a janela: quantas entregas, a data de cada uma e as
+    │                        peças já separadas em partes iguais, ajustáveis — a entrega 1 fica com
+    │                        o resto), EntregasDoPedido (o aviso "Pedido fracionado · Entrega 2 de
+    │                        3" com um botão por entrega do grupo e a data de envio),
     │                        grade.ts (ordem dos tamanhos)
     │
     ├── store/            → estado global (Zustand)
@@ -552,7 +592,9 @@ apps/web/
     │   ├── exclusaoDeCliente.ts → as contas e frases do diálogo "Excluir cliente"
     │   ├── exportOrders.ts → gera a planilha do Control (32 linhas por arquivo,
     │   │                   o excedente vai num .zip) e entrega por download ou
-    │   │                   pela folha de compartilhamento do iPhone
+    │   │                   pela folha de compartilhamento do iPhone. Pedido
+    │   │                   fracionado (057) leva "ENTREGA 2/3 - ENVIO 23/10/2026."
+    │   │                   no rodapé de toda folha (marcaDaEntrega)
     │   └── planilha/     → o formulário oficial da fábrica
     │       ├── colunas.ts      → tamanho → coluna, e o SISTEMA de grade que
     │       │                     impede uma linha de misturar "XG" com "48"
@@ -595,6 +637,10 @@ _tools/
 │   │                Também grava no catálogo: mesmas travas do sync.py
 │   │                (ERP_SYNC_PY_LIBERADO=sim + canal_catalogo='firebird'); --dry-run é livre
 │   └── fbembed25_x64/ (não versionada) → as DLLs do Firebird ficam AQUI, ao lado do script
+├── SQL-PARA-RODAR-057.sql         → a 057 (fracionamento: orders.split_group_id/split_index/split_count/ship_date/
+│                                    split_at/split_by + trava + dois índices parciais) para colar nos DOIS bancos
+│                                    (idempotente; não depende de outra migração; termina com o NOTIFY). Conferir
+│                                    depois com node _tools/conferir-057.mjs (sem argumento mede os dois)
 ├── SQL-PARA-RODAR-054.sql         → a 054 (papel 'visualizador' no CHECK de users.role) para colar nos DOIS bancos
 │                                    (idempotente; só troca o CHECK, não mexe em linha nenhuma; termina com o NOTIFY).
 │                                    Conferir depois com node _tools/conferir-054.mjs (sem argumento mede os dois) — e
@@ -624,7 +670,7 @@ _tools/
 ├── SQL-PARA-RODAR-041-NA-PLUMENE.sql → JÁ APLICADO. Obsoleto; pode ser removido depois.
 ├── conferir-*.mjs → medem o ESTADO DO BANCO (o que está aplicado de fato), não o arquivo:
 │                    conferir-pendencias (quais migrações rodaram; aceita a raiz da PLUMENE),
-│                    conferir-046, conferir-048, conferir-049, conferir-050, conferir-051 e conferir-055 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
+│                    conferir-046, conferir-048, conferir-049, conferir-050, conferir-051, conferir-055 e conferir-057 (GET com limit=0, nunca HEAD), conferir-fila-e-tabelas (pedidos parados, tabelas sem
 │                    erp_code, reps sem código do ERP) e os demais diagnósticos pontuais
 ├── canal-de-carga.mjs → a trava de canal dos scripts, num lugar só (19/10/2026).
 │                        Dez scripts a importam: as cargas de CADASTRO, de CATÁLOGO e de

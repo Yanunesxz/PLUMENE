@@ -5,6 +5,7 @@ import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.j
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { nomeDeQuemCancelou } from './cancelamento.service.js';
 import { nomeDoUsuario } from '../../lib/nomeDoUsuario.js';
+import { lerFracionamento } from './fracionamento.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -30,6 +31,7 @@ import {
   normalizarNumeroErp,
   numeroErpValido,
   vendeEmNomeProprio,
+  podeMexerNoPedido as podeMexerNoPedidoAberto,
 } from '@csb/shared';
 import type { AuthRole, OrderSource, PodeTrocarTabela, ResultadoDaTrocaDeTabela } from '@csb/shared';
 
@@ -148,6 +150,12 @@ export async function getOrderById(
   if (pedido.cancelled_by) pedido.cancelled_by_name = await nomeDeQuemCancelou(pedido.cancelled_by);
   // Pedido inativo (055): quem inativou, pelo nome — o mesmo caminho do 053.
   if (pedido.inactive_by) pedido.inactive_by_name = await nomeDoUsuario(pedido.inactive_by);
+  // Pedido fracionado (057): em que entrega ele está e quais são as outras —
+  // é o que dá o aviso e os botões "ir para a entrega 2". Só consulta quando o
+  // pedido tem grupo; sem a 057 a coluna nem vem.
+  if (pedido.split_group_id) {
+    pedido.fracionamento = await lerFracionamento(pedido, company_id, role, rep_id, customer_id);
+  }
   // As notas que o Control informou, com as peças de cada uma (048): é o
   // "como foi faturado" de verdade. Sem a 048, lista vazia.
   pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
@@ -867,40 +875,18 @@ async function fotoDoErpSemTravar(o: Pick<Order, 'id' | 'status'>, company_id: s
   }
 }
 
+/**
+ * O portão de "mexer no pedido em aberto". A regra mora no shared desde
+ * 05/11/2026 (`podeMexerNoPedido`), porque o fracionamento precisa da MESMA na
+ * tela; aqui fica só o nome que as edições deste arquivo já usavam.
+ */
 function podeMexerNoPedido(
   o: Order,
   role: AuthRole,
   user_id: string,
   vendaInterna = false,
 ): 'ok' | 'forbidden' | 'tarde_demais' {
-  // Antes do teto geral: para a venda interna, no PRÓPRIO pedido, o único
-  // teto é o faturamento — ela é quem carimba, então é ela quem fecha a porta.
-  if (role === 'rep' && vendaInterna && o.rep_id === user_id) {
-    return o.invoiced ? 'tarde_demais' : 'ok';
-  }
-  if (o.invoiced || o.status === 'sent_erp' || o.status === 'rejected' || o.status === 'error_erp') {
-    return 'tarde_demais';
-  }
-  // O representante — e o SAC (056), que vende em nome próprio — mexe no
-  // PRÓPRIO pedido enquanto ele está com ele: rascunho, triagem e a fila.
-  if (vendeEmNomeProprio(role)) {
-    if (o.rep_id !== user_id) return 'forbidden';
-    return o.status === 'draft' || o.status === 'pending_rep' || o.status === 'pending_approval'
-      ? 'ok'
-      : 'tarde_demais';
-  }
-  // O financeiro altera como o gerente — inclusive o já APROVADO, que é a mesa
-  // dele ("alterar os pedidos mandados mesmo pela fábrica", Yan 14/08/2026).
-  // O teto é o mesmo de todos, lá em cima: faturou ou foi pro ERP, ninguém mexe.
-  if (role === 'manager' || role === 'admin' || role === 'financeiro') {
-    // Rascunho alheio fica de fora (é a montagem privada do representante) —
-    // mas o gerente que monta pedido também nasce em rascunho, e o dele é dele.
-    if (o.status === 'draft') return o.rep_id === user_id ? 'ok' : 'tarde_demais';
-    return o.status === 'pending_rep' || o.status === 'pending_approval' || o.status === 'approved'
-      ? 'ok'
-      : 'tarde_demais';
-  }
-  return 'forbidden';
+  return podeMexerNoPedidoAberto(o, role, user_id, vendaInterna);
 }
 
 export interface ItemEditado {

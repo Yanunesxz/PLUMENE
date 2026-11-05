@@ -10,9 +10,10 @@
  *   fábrica aceita ou recusa      → o REPRESENTANTE dono
  *   pedido faturado               → o REPRESENTANTE dono
  *   pedido marcado como inativo   → o REPRESENTANTE dono (saiu da bonificação)
+ *   pedido fracionado em entregas → o REPRESENTANTE dono e, se já está na fábrica, a MESA
  *   cadastro de cliente alterado  → FINANCEIRO e admin (atualizar no Control)
  */
-import { rotulosDosCamposAlterados, vaiParaOControl } from '@csb/shared';
+import { dataDeEnvioPorExtenso, rotulosDosCamposAlterados, vaiParaOControl } from '@csb/shared';
 import { enviarParaUsuarios, enviarParaPapeis, type AvisoPush } from './push.service.js';
 
 /** O que os avisos precisam saber de um pedido. */
@@ -248,6 +249,41 @@ export function avisarPedidoInativoAoRep(
       tag: `pedido-${pedido.id}`,
     }),
   );
+}
+
+/**
+ * Pedido FRACIONADO em entregas (057). "Todos podem, mas tem que ser avisado
+ * quando é fracionado" (Yan, 05/11/2026): o dono do pedido fica sabendo, e a
+ * mesa (financeiro e admin) também quando o pedido já está na fábrica — antes
+ * disso ela ainda nem viu o pedido. Quem fracionou não recebe aviso de si
+ * mesmo. O corpo diz o número e a data de cada entrega.
+ */
+export function avisarPedidoFracionado(
+  company_id: string,
+  pedido: PedidoParaAviso & { status?: string },
+  entregas: ReadonlyArray<{ order_number?: number | null; ship_date?: string | null }>,
+  quemFracionou: string,
+): void {
+  const lista = entregas
+    .map((e) => {
+      const data = dataDeEnvioPorExtenso(e.ship_date);
+      return `#${e.order_number ?? '?'}${data ? ` (${data})` : ''}`;
+    })
+    .join(', ');
+  const aviso: AvisoPush = {
+    title: `${nomeDoPedido(pedido)} fracionado em ${entregas.length} entregas`,
+    body: `Entregas: ${lista}. Toque para ver.`,
+    url: rota(pedido),
+    tag: `pedido-${pedido.id}`,
+  };
+  if (pedido.rep_id !== quemFracionou) {
+    engolir(enviarParaUsuarios(company_id, [pedido.rep_id], aviso));
+  }
+  const naFabrica =
+    pedido.status === 'pending_approval' || pedido.status === 'approved' || pedido.status === 'sent_erp';
+  if (naFabrica) {
+    engolir(enviarParaPapeis(company_id, ['financeiro', 'admin'], aviso, quemFracionou));
+  }
 }
 
 /**
