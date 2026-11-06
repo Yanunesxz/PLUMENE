@@ -58,8 +58,10 @@ export async function minhasPriceTablesHandler(
   // O visualizador (054, 15/10/2026) recebe TODAS: ele não tem conjunto
   // próprio, e pelo ramo do representante a lista sairia vazia — aí o seletor
   // de tabela do catálogo dele simplesmente desapareceria da tela.
+  // O SAC (056) idem: o cadastro de cliente dele escolhe entre TODAS as ativas
+  // (ver resolverTabelaEscolhida), então o seletor precisa recebê-las.
   const tables =
-    role === 'manager' || role === 'admin' || role === 'visualizador'
+    role === 'manager' || role === 'admin' || role === 'visualizador' || role === 'sac'
       ? await listPriceTables(company_id, opcoes)
       : await listRepPriceTables(company_id, sub, opcoes);
   await reply.send({ data: tables });

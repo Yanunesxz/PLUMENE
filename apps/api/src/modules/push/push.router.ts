@@ -22,10 +22,12 @@ export async function pushRouter(fastify: FastifyInstance): Promise<void> {
   // dispara envio), então o visualizador escreveria por aqui. A lista é a de
   // sempre MENOS o visualizador: ele não trabalha fila nenhuma, logo não tem
   // aviso de fluxo para receber ("so nao pode alterar nada").
+  // O SAC (056) entra: o pedido nasce em nome dele, então "aprovado",
+  // "recusado", "faturado" e "cancelado" chegam para ele como para o rep.
   const recebeAviso = {
     preHandler: [
       authenticate,
-      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'store', 'guest']),
+      requireRole(['rep', 'manager', 'admin', 'financeiro', 'relacionamento', 'store', 'guest', 'sac']),
     ],
   };
 

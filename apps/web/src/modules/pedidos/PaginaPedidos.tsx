@@ -27,7 +27,7 @@ import {
   type CanaisDoPedido,
 } from '../../lib/pedido.js';
 import { PedidosExcluidos } from './PedidosExcluidos.js';
-import { ehSoLeitura, exibeCarimboInativo } from '@csb/shared';
+import { ehSoLeitura, exibeCarimboInativo, rotuloDaEntrega } from '@csb/shared';
 import type {
   Order,
   Customer,
@@ -753,6 +753,12 @@ export function PaginaPedidos() {
                         também esconde dela), e no cancelado ele some
                         (16/10/2026). */}
                     {!ehLoja && exibeCarimboInativo(order) && <Badge variant="gray">Pedido inativo</Badge>}
+                    {/* Pedido fracionado (057): qual entrega é esta. Todos
+                        veem — a loja inclusive, é a mercadoria dela em mais
+                        de uma data. */}
+                    {order.split_group_id && (
+                      <Badge variant="brand">{rotuloDaEntrega(order.split_index, order.split_count)}</Badge>
+                    )}
                     <Badge variant={seloDoPedido(order, user?.role).variante}>
                       {seloDoPedido(order, user?.role).texto}
                     </Badge>

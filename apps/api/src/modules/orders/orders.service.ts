@@ -5,6 +5,7 @@ import { cancelarNotasAtivas, lerNotasDoPedido } from './notasDoPedido.service.j
 import { registrarNoErp, lerSincronia, garantirFotoDoErp, atualizarNumeroNaFoto } from './erpSync.service.js';
 import { nomeDeQuemCancelou } from './cancelamento.service.js';
 import { nomeDoUsuario } from '../../lib/nomeDoUsuario.js';
+import { lerFracionamento } from './fracionamento.service.js';
 import { buscarTudo } from '../../lib/paginacao.js';
 import { enviarConfirmacaoDoPedido } from './pedidoEmail.js';
 import { condicaoValida, detectarColunaDaCondicao } from './paymentConditions.service.js';
@@ -29,6 +30,8 @@ import {
   juntarObservacao,
   normalizarNumeroErp,
   numeroErpValido,
+  vendeEmNomeProprio,
+  podeMexerNoPedido as podeMexerNoPedidoAberto,
 } from '@csb/shared';
 import type { AuthRole, OrderSource, PodeTrocarTabela, ResultadoDaTrocaDeTabela } from '@csb/shared';
 
@@ -79,7 +82,9 @@ export async function getOrders(
     // 15/10/2026) veem pedido de TODOS os representantes, que é o que a regra
     // do Yan pede ("pode ver tudo so nao pode alterar nada"). Quem não pode
     // chegar aqui é barrado pelo `requireRole` da rota.
-    if (role === 'rep') query = query.eq('rep_id', rep_id);
+    // Quem vende em nome próprio — o representante e o SAC (056) — vê só os
+    // SEUS: o SAC monta pedido para qualquer cliente, mas não é escritório.
+    if (vendeEmNomeProprio(role)) query = query.eq('rep_id', rep_id);
     // A loja enxerga por CLIENTE, não por representante: são os pedidos dela,
     // tenha quem tiver montado (ela mesma ou o representante).
     if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
@@ -121,7 +126,8 @@ export async function getOrderById(
 
   // Representante só acessa os próprios pedidos (gerente, admin e o
   // visualizador da 054 veem todos — o detalhe é leitura).
-  if (role === 'rep' && rep_id) query = query.eq('rep_id', rep_id);
+  // O SAC (056) idem: o detalhe é só dos pedidos dele.
+  if (vendeEmNomeProprio(role) && rep_id) query = query.eq('rep_id', rep_id);
   // Loja só acessa os pedidos do cliente que ela representa.
   if (role === 'store') query = query.eq('customer_id', customer_id ?? '');
 
@@ -144,6 +150,12 @@ export async function getOrderById(
   if (pedido.cancelled_by) pedido.cancelled_by_name = await nomeDeQuemCancelou(pedido.cancelled_by);
   // Pedido inativo (055): quem inativou, pelo nome — o mesmo caminho do 053.
   if (pedido.inactive_by) pedido.inactive_by_name = await nomeDoUsuario(pedido.inactive_by);
+  // Pedido fracionado (057): em que entrega ele está e quais são as outras —
+  // é o que dá o aviso e os botões "ir para a entrega 2". Só consulta quando o
+  // pedido tem grupo; sem a 057 a coluna nem vem.
+  if (pedido.split_group_id) {
+    pedido.fracionamento = await lerFracionamento(pedido, company_id, role, rep_id, customer_id);
+  }
   // As notas que o Control informou, com as peças de cada uma (048): é o
   // "como foi faturado" de verdade. Sem a 048, lista vazia.
   pedido.notas = await lerNotasDoPedido(pedido.id, company_id);
@@ -682,7 +694,8 @@ export async function deleteOrder(
     erp_order_id?: string | null;
     erp_requested_at?: string | null;
   };
-  if (role === 'rep' && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
+  // Representante e SAC (056) só apagam o próprio pedido.
+  if (vendeEmNomeProprio(role) && o.rep_id !== rep_id) return { ok: false, reason: 'forbidden' };
   if (o.invoiced) return { ok: false, reason: 'invoiced' };
   // Pedido com número do Control já existe LÁ (integração, fase 0). Apagar aqui
   // deixaria o Control com um pedido que o app não conhece mais — e o
@@ -862,38 +875,18 @@ async function fotoDoErpSemTravar(o: Pick<Order, 'id' | 'status'>, company_id: s
   }
 }
 
+/**
+ * O portão de "mexer no pedido em aberto". A regra mora no shared desde
+ * 05/11/2026 (`podeMexerNoPedido`), porque o fracionamento precisa da MESMA na
+ * tela; aqui fica só o nome que as edições deste arquivo já usavam.
+ */
 function podeMexerNoPedido(
   o: Order,
   role: AuthRole,
   user_id: string,
   vendaInterna = false,
 ): 'ok' | 'forbidden' | 'tarde_demais' {
-  // Antes do teto geral: para a venda interna, no PRÓPRIO pedido, o único
-  // teto é o faturamento — ela é quem carimba, então é ela quem fecha a porta.
-  if (role === 'rep' && vendaInterna && o.rep_id === user_id) {
-    return o.invoiced ? 'tarde_demais' : 'ok';
-  }
-  if (o.invoiced || o.status === 'sent_erp' || o.status === 'rejected' || o.status === 'error_erp') {
-    return 'tarde_demais';
-  }
-  if (role === 'rep') {
-    if (o.rep_id !== user_id) return 'forbidden';
-    return o.status === 'draft' || o.status === 'pending_rep' || o.status === 'pending_approval'
-      ? 'ok'
-      : 'tarde_demais';
-  }
-  // O financeiro altera como o gerente — inclusive o já APROVADO, que é a mesa
-  // dele ("alterar os pedidos mandados mesmo pela fábrica", Yan 14/08/2026).
-  // O teto é o mesmo de todos, lá em cima: faturou ou foi pro ERP, ninguém mexe.
-  if (role === 'manager' || role === 'admin' || role === 'financeiro') {
-    // Rascunho alheio fica de fora (é a montagem privada do representante) —
-    // mas o gerente que monta pedido também nasce em rascunho, e o dele é dele.
-    if (o.status === 'draft') return o.rep_id === user_id ? 'ok' : 'tarde_demais';
-    return o.status === 'pending_rep' || o.status === 'pending_approval' || o.status === 'approved'
-      ? 'ok'
-      : 'tarde_demais';
-  }
-  return 'forbidden';
+  return podeMexerNoPedidoAberto(o, role, user_id, vendaInterna);
 }
 
 export interface ItemEditado {
@@ -2138,8 +2131,9 @@ export async function updateOrderStatus(
 
   const row = current as { status: Order['status']; rep_id: string; erp_order_id?: string | null };
 
-  // Representante só mexe no status dos próprios pedidos (ex.: enviar para aprovação).
-  if (role === 'rep' && row.rep_id !== approverId) {
+  // Representante — e o SAC (056) — só mexe no status dos próprios pedidos
+  // (ex.: enviar para aprovação).
+  if (vendeEmNomeProprio(role) && row.rep_id !== approverId) {
     throw new Error('FORBIDDEN_NOT_OWNER');
   }
 
@@ -2148,7 +2142,9 @@ export async function updateOrderStatus(
   // A palavra final sobre vender continua sendo do gerente — por isso `approved`
   // nunca sai da mão dele, e recusar fora da triagem seria o representante
   // derrubando um pedido que o gerente já tem na mesa.
-  if (role === 'rep') {
+  // O SAC (056) entra no mesmo ramo: manda o próprio rascunho para a fábrica
+  // e nada mais — `vendaInterna` é sempre falso para ele.
+  if (vendeEmNomeProprio(role)) {
     // VENDA INTERNA aprova o PRÓPRIO rascunho: o balcão não passa pela fila da
     // fábrica (migração 031). Só do rascunho — o resto do ciclo segue igual.
     const aprovandoVendaInterna =

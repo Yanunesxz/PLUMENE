@@ -42,7 +42,8 @@ function recusouOPapel(error: { code?: string; message?: string } | null): boole
 
 export type ResultadoUsuario =
   | { ok: true; usuario: UsuarioListItem; teclas_ignoradas?: boolean }
-  | { ok: false; motivo: MotivoUsuario; pedidos?: number };
+  /** `papel`: o que o banco recusou (migracao_pendente), para a frase dizer qual. */
+  | { ok: false; motivo: MotivoUsuario; pedidos?: number; papel?: string };
 
 export type ResultadoExclusao =
   | { ok: true; clientes_sem_representante: number }
@@ -58,9 +59,10 @@ const ORDEM_PAPEL: Record<UserRole, number> = {
   manager: 1,
   financeiro: 2,
   relacionamento: 3,
-  visualizador: 4,
-  rep: 5,
-  store: 6,
+  sac: 4,
+  visualizador: 5,
+  rep: 6,
+  store: 7,
 };
 
 /**
@@ -194,7 +196,7 @@ export async function criarUsuario(
 
   if (recusouOPapel(error)) {
     console.error('[users] o banco não aceita o papel', body.role, '— falta a migração:', error?.message);
-    return { ok: false, motivo: 'migracao_pendente' };
+    return { ok: false, motivo: 'migracao_pendente', papel: body.role };
   }
   if (error || !data) {
     console.error('[users] falha ao criar login:', error?.code, error?.message);
@@ -287,7 +289,11 @@ export async function atualizarUsuario(
     // `error?.`: `recusouOPapel` não é type guard, então o TypeScript não sabe
     // que aqui `error` nunca é nulo — e `pnpm verify` parava no typecheck.
     console.error('[users] o banco não aceita o papel', update['role'], '— falta a migração:', error?.message);
-    return { ok: false, motivo: 'migracao_pendente' };
+    return {
+      ok: false,
+      motivo: 'migracao_pendente',
+      ...(typeof update['role'] === 'string' ? { papel: update['role'] } : {}),
+    };
   }
   if (error) {
     console.error('[users] falha ao atualizar login:', error.code, error.message);

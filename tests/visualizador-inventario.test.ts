@@ -59,8 +59,10 @@ const QUANTOS_ROUTERS = 14;
 // 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
 // Parceiro: +1 rota de leitura — GET /partner/v1/pedidos/cancelados.
 // Dashboard: +1 rota de leitura — GET /reps/metas (metas da equipe, 19/10/2026).
-const QUANTAS_ROTAS = 111; // +2: PATCH /orders/:id/tabela e GET /orders/tabelas-para-trocar (27/10/2026)
-const QUANTAS_ESCRITAS = 58;
+// 057 (fracionamento, 05/11/2026): +2 rotas, +2 escritas — POST /orders/:id/fracionar e
+// PATCH /orders/:id/data-de-envio, as duas no portão de mexer no pedido (decideOPedido).
+const QUANTAS_ROTAS = 113; // 111 em 27/10/2026 (PATCH /orders/:id/tabela e GET /orders/tabelas-para-trocar)
+const QUANTAS_ESCRITAS = 60;
 
 describe('inventário: o leitor de routers está funcionando', () => {
   // Sem estas âncoras, um erro na expressão regular esvaziaria a lista e o
@@ -102,7 +104,8 @@ describe('inventário: o leitor de routers está funcionando', () => {
   it('lê os papéis de uma const de opções do próprio arquivo', () => {
     // `decideOPedido` é declarado no alto do orders.router e usado em 7 rotas.
     const status = TODAS.find((r) => r.id === 'orders/orders.router.ts#PATCH /orders/:id/status');
-    expect(status?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro']);
+    // 056: o SAC entrou (manda o próprio rascunho à fábrica).
+    expect(status?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'sac']);
   });
 
   it('lê os papéis escritos no próprio registro', () => {
@@ -240,7 +243,8 @@ describe('toda rota de escrita tem requireRole', () => {
 
   it('as duas escritas que eram furo agora têm papel', () => {
     const pedido = TODAS.find((r) => r.id === 'orders/orders.router.ts#POST /orders');
-    expect(pedido?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest']);
+    // 056: o SAC monta pedido.
+    expect(pedido?.papeis).toEqual(['rep', 'manager', 'admin', 'financeiro', 'store', 'guest', 'sac']);
 
     for (const rota of ['assinar', 'desassinar', 'teste']) {
       const push = TODAS.find((r) => r.id === `push/push.router.ts#POST /push/${rota}`);

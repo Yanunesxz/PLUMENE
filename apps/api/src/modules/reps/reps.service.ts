@@ -254,8 +254,10 @@ export async function resolverTabelaEscolhida(
   escolhida: string | null | undefined,
 ): Promise<TabelaResolvida> {
   // Gerente e admin atribuem qualquer tabela ATIVA da empresa — são eles que
-  // definem o conjunto dos outros.
-  if (role === 'manager' || role === 'admin') {
+  // definem o conjunto dos outros. O SAC (056) também: ele não tem conjunto
+  // próprio (não é representante), e pelo ramo de baixo o cadastro dele
+  // nasceria SEM tabela — e o pedido para esse cliente cairia em "sem preço".
+  if (role === 'manager' || role === 'admin' || role === 'sac') {
     if (!escolhida) return { ok: true, price_table_id: null };
     const escolhivel = await tabelaEscolhivelDaEmpresa(escolhida, company_id);
     return escolhivel

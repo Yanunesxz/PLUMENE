@@ -61,6 +61,9 @@ function MinhaArea() {
   // avisos, gerar relatório, dar OK em tarefa, sincronizar a fila offline — e
   // ele "nao altera nada" (Yan, 15/10/2026). O Painel é a leitura equivalente.
   if (papel === 'visualizador') return <Navigate to="/dashboard" replace />;
+  // O SAC (056) não tem "minha área": a tela é a do representante (metas,
+  // bonificação, triagem de loja) e nada disso é dele. Os pedidos dele são.
+  if (papel === 'sac') return <Navigate to="/orders" replace />;
   return <PaginaMinhaArea />;
 }
 
@@ -116,7 +119,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             // `POST /orders`: quem monta pedido. O visualizador não entra —
             // sem isto ele montaria o carrinho inteiro para tomar 403 no envio.
             path: 'orders/new',
-            element: <PrivateRoute roles={['rep', 'manager', 'admin', 'financeiro', 'store']} />,
+            element: <PrivateRoute roles={['rep', 'manager', 'admin', 'financeiro', 'store', 'sac']} />,
             children: [{ index: true, element: <PaginaNovoPedido /> }],
           },
           { path: 'orders/:id', element: <PaginaDetalhePedido /> },

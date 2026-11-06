@@ -4,6 +4,7 @@ import { preencherModelo, type ClienteDaFolha } from './planilha/modeloOficial.j
 import {
   coresPorSkuParaOControl,
   coresSemNumeroParaOControl,
+  dataDeEnvioPorExtenso,
   observacaoGeralParaOControl,
 } from '@csb/shared';
 import type { NumeroDaTabela } from './planilha/tabela.js';
@@ -135,6 +136,19 @@ interface ArquivoGerado {
 }
 
 /**
+ * "ENTREGA 2/3 - ENVIO 23/10/2026." — o que o rodapé da planilha diz de um
+ * pedido fracionado (057). Vazio no pedido que não foi fracionado: a planilha
+ * dele sai exatamente como sempre saiu.
+ */
+export function marcaDaEntrega(
+  pedido: Pick<OrderWithItems, 'split_group_id' | 'split_index' | 'split_count' | 'ship_date'>,
+): string {
+  if (!pedido.split_group_id || !pedido.split_index || !pedido.split_count) return '';
+  const envio = dataDeEnvioPorExtenso(pedido.ship_date);
+  return `ENTREGA ${pedido.split_index}/${pedido.split_count}${envio ? ` - ENVIO ${envio}` : ''}.`;
+}
+
+/**
  * Um pedido vira um arquivo — ou vários, quando não cabe em 32 linhas.
  */
 async function gerarArquivosDoPedido(
@@ -248,11 +262,17 @@ async function gerarArquivosDoPedido(
     );
   }
 
+  const entrega = marcaDaEntrega(pedido);
+
   return folhas.map((folha, indice) => {
     // O rodapé marca a página ("PÁGINA 01.") e leva os recados do rep. Só na
     // primeira página, como no modelo da fábrica; as demais levam só o número.
     const pagina = `PÁGINA ${String(indice + 1).padStart(2, '0')}.`;
-    const observacao = indice === 0 && notasDoRep ? `${pagina} ${notasDoRep}` : pagina;
+    // Pedido fracionado (057): a entrega e a data de envio vão no rodapé de
+    // TODA folha — é a "Data Saída" que quem lança preenche no Control, e cada
+    // entrega é um pedido próprio lá.
+    const marca = entrega ? `${pagina} ${entrega}` : pagina;
+    const observacao = indice === 0 && notasDoRep ? `${marca} ${notasDoRep}` : marca;
 
     const { arquivo, refsDesconhecidas } = preencherModelo(modelo, {
       linhas: folha,

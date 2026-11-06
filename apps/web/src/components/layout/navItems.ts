@@ -88,6 +88,19 @@ const relacionamentoItems: NavItem[] = [
 ];
 
 /**
+ * O SAC (056). Pedido do Yan, 04/11/2026: "no SAC vai poder criar pedido, ver
+ * todos os clientes, e vai ver criar cliente". Três telas, e só elas: o
+ * catálogo (para montar o pedido), os pedidos DELE e a carteira inteira. Sem
+ * "Minha área" (é a do representante: metas, bonificação, triagem de loja),
+ * sem Painel, sem Atividades, sem Acessos.
+ */
+const sacItems: NavItem[] = [
+  { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
+  { to: '/orders', label: 'Pedidos', icon: ClipboardList },
+  { to: '/customers', label: 'Clientes', icon: Users },
+];
+
+/**
  * O VISUALIZADOR (054). Pedido do Yan, 15/10/2026: "ele pode ver tudo so nao
  * pode alterar nada (…) ve cliente, produto ve tudo tudo mas nao altera nada".
  *
@@ -122,6 +135,9 @@ export function navItemsForRole(
   }
   if (role === 'financeiro') return financeiroItems;
   if (role === 'relacionamento') return relacionamentoItems;
+  // O SAC (056): três telas — antes do `return repItems` do fim, senão ele
+  // herdaria Minha área, Alertas e Acessos do representante.
+  if (role === 'sac') return sacItems;
   // Antes do `return repItems` do fim, que é o que o papel desconhecido pega:
   // sem este ramo o visualizador ganharia o menu do REPRESENTANTE inteiro
   // (Minha área com fila de triagem, Alertas e Acessos).

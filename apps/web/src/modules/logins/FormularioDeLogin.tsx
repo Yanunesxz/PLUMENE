@@ -94,9 +94,9 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
 
         {!papelFixo && (
           <Campo label="Papel" obrigatorio>
-            {/* Gerente | Financeiro | Relacionamento | Visualizador |
+            {/* Gerente | Financeiro | Relacionamento | SAC | Visualizador |
                 Administrador — na ordem de PAPEIS_GERENCIAVEIS. Quebra linha
-                em vez de dividir a largura: com cinco papéis, "Relacionamento"
+                em vez de dividir a largura: com seis papéis, "Relacionamento"
                 e "Administrador" não cabem lado a lado num celular. */}
             <div className="flex flex-wrap gap-2">
               {PAPEIS_GERENCIAVEIS.map((papel) => (
@@ -123,6 +123,13 @@ export function FormularioDeLogin({ editando, salvando, erro, onSalvar, onCancel
                 Vê tudo e não altera nada: pedidos de todos os representantes, clientes de todas as
                 carteiras, catálogo, painel e esta lista de logins. Nenhum botão de salvar, aprovar,
                 faturar, importar ou excluir aparece para ele.
+              </p>
+            )}
+            {form.role === 'sac' && (
+              <p className="text-xs text-muted-foreground">
+                Atendimento: monta pedido para qualquer cliente (o preço é o do cadastro do cliente),
+                vê a carteira inteira e cadastra cliente novo. Vê só os próprios pedidos; não dá
+                desconto, não aprova, não fatura e não edita cadastro.
               </p>
             )}
           </Campo>
