@@ -5,8 +5,8 @@ import { useSyncExternalStore } from 'react';
  *
  * Começa igual ao aparelho (sem `data-theme` no <html>, o CSS segue o
  * `prefers-color-scheme`). A pessoa pode fixar Claro ou Escuro; a escolha fica
- * no localStorage com a chave "tema" e é aplicada pelo script de uma linha do
- * index.html ANTES de a tela aparecer — por isso não pisca ao abrir.
+ * no localStorage com a chave "tema" e é aplicada pelo `public/tema.js`, chamado no <head> do
+ * index.html, ANTES de a tela aparecer — por isso não pisca ao abrir.
  */
 export type EscolhaDeTema = '' | 'light' | 'dark';
 

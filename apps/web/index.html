@@ -10,10 +10,9 @@
     <meta name="color-scheme" content="light dark" />
     <meta name="theme-color" content="#FFFFFF" media="(prefers-color-scheme: light)" />
     <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)" />
-    <!-- Tema escolhido pela pessoa, aplicado antes de a tela aparecer (não pisca). -->
-    <script>
-      try { var t = localStorage.getItem("tema"); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
-    </script>
+    <!-- Tema escolhido pela pessoa, aplicado antes de a tela aparecer (não pisca).
+         Arquivo à parte (public/tema.js) para a CSP não liberar script na página. -->
+    <script src="/tema.js"></script>
     <meta name="description" content="Plataforma comercial para representantes Corpo Sensual" />
     <title>Representantes Corpo Sensual</title>
   </head>
