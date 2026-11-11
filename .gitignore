@@ -71,3 +71,34 @@ _tools/firebird-reader/
 
 # Backups do banco: contem dados de cliente e hash de senha. Nunca versionar.
 backups/
+
+# ── Padrão SystemDesing v0.5.2 (templates/.gitignore) ────────────────────────
+# Segredos: qualquer .env.* fica fora, menos os modelos e o .env.production do
+# web (só tem variáveis VITE_ públicas da marca, lidas no build da Vercel).
+.env.*
+!.env.example
+!apps/web/.env.production
+# Certificado digital (A1 da NF-e), chaves e certificados
+*.pfx
+*.p12
+*.pem
+*.key
+
+# Python
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Dados locais (planilhas exportadas, dumps, logs)
+*.csv
+*.xlsx
+*.sqlite
+*.db
+*.dump
+*.sql.gz
+backup/
+# ...menos os modelos da planilha oficial que a exportação preenche (vão no app).
+!apps/web/public/modelos/*.xlsx
