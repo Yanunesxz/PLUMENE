@@ -2,7 +2,7 @@
 
 Atualizado em 01/10/2026.
 
-## Padrão visual: SystemDesing v0.2.0
+## Padrão visual: SystemDesing v0.5.2
 
 - Sistema de **cliente**: Corpo Sensual (cor principal: preto do monograma; a
   PLUMENE, que roda o mesmo código, também segue o padrão com a cor dela —
@@ -22,7 +22,7 @@ Feito sem trocar nenhuma classe de tela, para não quebrar nada em produção:
   #B3121F` (claro) e `#3FB950 / #D29922 / #FF7B72` (escuro).
 - **Tema claro e escuro**: começa igual ao aparelho; lua/sol na barra do topo
   (celular) e no canto do usuário do menu lateral (computador) — e só ali,
-  pedido do Yan (01/10/2026). Chave `tema` no localStorage; script de uma linha
+  pedido do Yan (01/10/2026). Chave `tema` no localStorage; `public/tema.js` chamado
   no `index.html` (não pisca). Logo invertida no escuro.
 - Cores fixas que quebravam no escuro trocadas por token (`text-white`,
   `bg-white`, `bg-gray-800` em botão de perigo, toast, faixa de reconexão,
@@ -30,12 +30,29 @@ Feito sem trocar nenhuma classe de tela, para não quebrar nada em produção:
 - Sem a linha "Criado por Yan Nunes": o Yan pediu para tirar (01/10/2026).
 - `index.html`: `color-scheme` e `theme-color` claro/escuro.
 
+### Segurança da v0.5.2 — no ar com o PR `claude/padrao-v0.5.2` (11/11/2026)
+
+- `apps/web/vercel.json` com os cabeçalhos do padrão e **CSP**: só o próprio
+  site, a API no Railway, ViaCEP e o Supabase (fotos). Domínio novo chamado do
+  navegador entra na CSP no mesmo PR que o usa.
+- Nada de script dentro do HTML: tema em `public/tema.js`, script da página
+  `/api-parceiro` em `public/api-parceiro.js`.
+- CI (`.github/workflows/ci.yml`): tipos, lint, testes, build, `pnpm audit`,
+  gitleaks e trava de chave com prefixo `VITE_`. Dependabot ligado.
+- Falta: atualizar os pacotes com falha alta/crítica que o `pnpm audit` acusa
+  (a maior parte na API: fastify, @fastify/jwt, zod, nodemailer; no web, o
+  `xlsx`, que não tem correção no npm) — até lá o passo do CI fica vermelho.
+- Falta (regra da v0.4.1): a tela de trabalho está travada em `max-w-6xl`
+  (`AppLayout.tsx` e vitrine pública). Destravar e conferir tela por tela em
+  1280px e 1920px.
+
 ### Etapa 2 — falta (cada item é um PR, tela por tela)
 
 - **Tailwind 3 → 4** com o bloco `@theme` do padrão (apaga a paleta crua e
   renomeia as classes de cor). Mexe em todas as telas de uma vez: fazer em
   worktree, conferir tela por tela, e só então subir.
-- Carregar `tokens.css` e `componentes.css` do jsDelivr @v0.2.0 (o
+- Carregar `tokens.css` e `componentes.css` do jsDelivr @v0.5.2 (linhas com
+  `integrity` e `crossorigin` no PADRAO-YAN-NUNES.md, seção 5) (o
   `componentes.css` estiliza `body` e `h1–h4` globalmente — junto com a etapa
   acima).
 - Casca com `.yn-sidebar`, `.yn-nav`, `.yn-tabbar` (menu recolhível no

@@ -2,7 +2,7 @@
 
 Plataforma web comercial para representantes de vendas — catálogo, pedidos e painel gerencial com suporte offline-first.
 
-**Padrão: SystemDesing v0.2.0** (etapa 1 aplicada: fonte, cores, tema claro e escuro — ver [ESTADO.md](ESTADO.md) e [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md)).
+**Padrão: [SystemDesing v0.5.2](https://github.com/Yanunesxz/SystemDesing/tree/v0.5.2)** (etapa 1 aplicada: fonte, cores, tema claro e escuro; segurança da v0.5.2: cabeçalhos e CSP na Vercel, CI — ver [ESTADO.md](ESTADO.md) e [PADRAO-YAN-NUNES.md](PADRAO-YAN-NUNES.md)).
 
 ## Visão Geral
 
