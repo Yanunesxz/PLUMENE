@@ -1,0 +1,21 @@
+# A partir do templates/dependabot.yml do padrão SystemDesing v0.5.2.
+# Abre um PR por semana com as atualizações dos pacotes e das ações do CI.
+# O PR passa pelo CI e é revisado como qualquer outro. Atualização de segurança chega na hora, fora da semana.
+version: 2
+updates:
+  # Monorepo pnpm: o lockfile único (pnpm-lock.yaml) fica na raiz e cobre apps/web, apps/api e packages/shared.
+  - package-ecosystem: npm   # vale para npm e pnpm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: America/Sao_Paulo
+    open-pull-requests-limit: 5
+    groups:
+      atualizacoes-menores:
+        update-types: [minor, patch]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
