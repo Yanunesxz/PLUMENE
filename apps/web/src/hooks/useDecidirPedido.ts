@@ -16,11 +16,14 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
   const { token } = useAuthStore();
   const [decidindo, setDecidindo] = useState<string | null>(null);
 
-  /** `extra`: o que o passo precisa além do status — o número do Control ao lançar. */
+  /**
+   * `extra`: o que o passo precisa além do status — o número do Control ao
+   * lançar, ou `sem_numero` quando o financeiro marca lançado sem ele.
+   */
   const decidir = async (
     orderId: string,
     status: OrderStatus,
-    extra?: { erp_order_id?: string },
+    extra?: { erp_order_id?: string; sem_numero?: boolean },
   ): Promise<boolean> => {
     if (!token || decidindo) return false;
 

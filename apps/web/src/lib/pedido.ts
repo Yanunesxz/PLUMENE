@@ -197,6 +197,20 @@ export function podeLancarNoErp(
   return status === 'approved' && !invoiced && (papel === 'financeiro' || papel === 'admin');
 }
 
+/**
+ * "Marcar lançado" sem o número do Control (Yan, 12/11/2026): o financeiro
+ * recebe pedido por outros meios, a numeração do Control não segue a do app,
+ * e o pedido já lançado lá ficava preso em "A lançar". Só o FINANCEIRO — nem o
+ * admin (a API recusa os outros). Pedido já solicitado ao Control (049) não:
+ * esse espera o número que o próprio Control devolve.
+ */
+export function podeMarcarLancadoSemNumero(
+  papel: AuthRole | undefined,
+  pedido: Pick<Order, 'status'> & { invoiced?: boolean | null; erp_requested_at?: string | null },
+): boolean {
+  return papel === 'financeiro' && pedido.status === 'approved' && !pedido.invoiced && !pedido.erp_requested_at;
+}
+
 // ─── A integração com o Control (048/049) ────────────────────────────────────
 
 /**

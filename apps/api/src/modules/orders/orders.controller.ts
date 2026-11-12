@@ -890,7 +890,12 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       id,
       company_id,
       approverId,
-      { status: body.status, notes: body.notes ?? '', ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}) },
+      {
+        status: body.status,
+        notes: body.notes ?? '',
+        ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}),
+        ...(body.sem_numero === true ? { sem_numero: true } : {}),
+      },
       role,
       request.user.venda_interna === true,
       request.user.name ?? null,
@@ -950,6 +955,14 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
         error: 'Nesta empresa o pedido é solicitado ao Control — use "Lançar no Control", sem digitar número. Atualize o app se o botão não aparecer.',
         code: 'LANCAMENTO_PELO_CONTROL',
         statusCode: 409,
+      });
+      return;
+    }
+    if (err instanceof Error && err.message === 'SEM_NUMERO_SO_FINANCEIRO') {
+      await reply.status(403).send({
+        error: 'Marcar como lançado sem o número do Control é só do financeiro',
+        code: 'FORBIDDEN',
+        statusCode: 403,
       });
       return;
     }

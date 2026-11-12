@@ -25,6 +25,7 @@ import {
   copiarTexto,
   mensagemDaCopiaAoRepresentante,
   podeLancarNoErp,
+  podeMarcarLancadoSemNumero,
   lancaPeloControl,
   faturaPeloControl,
   serieDoControl,
@@ -42,6 +43,7 @@ import { SeletorTamanho, type PickedSize } from '../../components/comercial/Sele
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
+import { ConfirmarLancado } from '../../components/comercial/ConfirmarLancado.js';
 import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
@@ -473,12 +475,16 @@ export function PaginaDetalhePedido() {
 
   const handleDecisao = async (
     status: OrderStatus,
-    extra?: { erp_order_id?: string },
+    extra?: { erp_order_id?: string; sem_numero?: boolean },
   ): Promise<boolean> => {
     if (!id || !order) return false;
     const deu = await decidir(id, status, extra);
     if (deu) {
-      mudarPedido((atual) => ({ ...atual, status, ...(extra ?? {}) }));
+      mudarPedido((atual) => ({
+        ...atual,
+        status,
+        ...(extra?.erp_order_id ? { erp_order_id: extra.erp_order_id } : {}),
+      }));
       // Lançar no ERP cria a foto do que o Control conhece (046) lá no servidor:
       // a tela precisa dela para o aviso existir se o pedido mudar depois.
       if (status === 'sent_erp') void recarregarPedido();
@@ -663,6 +669,16 @@ export function PaginaDetalhePedido() {
     ultimaRecusa.current = null;
     if (await handleDecisao('sent_erp', { erp_order_id: numeroErp })) setLancando(false);
     else setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
+  };
+
+  // ─── Marcar lançado SEM o número (só o financeiro, 12/11/2026) ─────────────
+  // O pedido já está no Control, chegou lá por outro caminho, e a numeração de
+  // lá não segue a do app: passa para "A faturar" com o número vazio. A
+  // recusa da API (papel, canal na API) vira toast — o diálogo fecha igual.
+  const [confirmandoLancado, setConfirmandoLancado] = useState(false);
+  const marcarLancadoSemNumero = async () => {
+    await handleDecisao('sent_erp', { sem_numero: true });
+    setConfirmandoLancado(false);
   };
 
   // ─── Corrigir o número do Control (financeiro/admin, antes da nota) ────────
@@ -1769,6 +1785,18 @@ export function PaginaDetalhePedido() {
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                   {pelaApi ? (order.erp_requested_at ? 'Conferir no Control' : 'Lançar no Control') : 'Lançar no ERP'}
                 </Button>
+                {/* Já está no Control e o número de lá não está à mão: só o
+                    FINANCEIRO marca lançado sem ele (Yan, 12/11/2026). */}
+                {!pelaApi && podeMarcarLancadoSemNumero(user?.role, order) && (
+                  <Button
+                    variant="outline"
+                    className="mt-2 w-full"
+                    disabled={decidindo !== null}
+                    onClick={() => setConfirmandoLancado(true)}
+                  >
+                    Já foi lançado — sem número
+                  </Button>
+                )}
                 {/* Solicitado e ainda sem número: dá para tirar da fila do Control. */}
                 {podeCancelarSolicitacao(user?.role, order) && botaoCancelarSolicitacao}
               </div>
@@ -2319,6 +2347,17 @@ export function PaginaDetalhePedido() {
             // "Fechar e esperar": a espera segue (a consulta continua); o resto volta ao início.
             setEspera((atual) => (atual.estado === 'aguardando' ? atual : { estado: 'parado' }));
           }}
+        />
+      )}
+
+      {confirmandoLancado && order && (
+        <ConfirmarLancado
+          numero={order.order_number}
+          cliente={nomeDoComprador(order, custName)}
+          total={order.total}
+          ocupado={decidindo !== null}
+          onConfirmar={() => void marcarLancadoSemNumero()}
+          onCancelar={() => setConfirmandoLancado(false)}
         />
       )}
 

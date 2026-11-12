@@ -348,6 +348,12 @@ export interface UpdateOrderStatusRequest {
    * e a numeração ("CS17379"). Obrigatório nesse passo; quem cunha é o ERP.
    */
   erp_order_id?: string;
+  /**
+   * Ao LANÇAR (sent_erp): o pedido já está no Control, mas sem o número aqui.
+   * Só o financeiro (Yan, 12/11/2026): ele recebe pedido por outros meios e a
+   * numeração do Control não segue a do app. Com número digitado, é ignorado.
+   */
+  sem_numero?: boolean;
 }
 
 export interface OfflineSyncOrder extends CreateOrderRequest {

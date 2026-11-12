@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   decisaoDoPedido,
   podeLancarNoErp,
+  podeMarcarLancadoSemNumero,
   seloDoPedido,
   lancaPeloControl,
   faturaPeloControl,
@@ -97,6 +98,20 @@ describe('quem vê o botão "Lançar no ERP"', () => {
     expect(podeLancarNoErp('rep', 'approved', false)).toBe(false);
     expect(podeLancarNoErp('financeiro', 'pending_approval', false)).toBe(false);
     expect(podeLancarNoErp('financeiro', 'approved', true)).toBe(false);
+  });
+
+  it('marcar lançado SEM o número é só do financeiro, no aprovado sem nota e sem solicitação', () => {
+    const aprovado = { status: 'approved' as const, invoiced: false, erp_requested_at: null };
+    expect(podeMarcarLancadoSemNumero('financeiro', aprovado)).toBe(true);
+    // "APENAS para o financeiro" (Yan, 12/11/2026) — nem o admin.
+    expect(podeMarcarLancadoSemNumero('admin', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('manager', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('rep', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, status: 'pending_approval' })).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, status: 'sent_erp' })).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, invoiced: true })).toBe(false);
+    // Solicitado ao Control (049): o número vem de lá.
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, erp_requested_at: '2026-11-12T10:00:00Z' })).toBe(false);
   });
 });
 

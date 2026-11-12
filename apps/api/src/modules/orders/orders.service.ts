@@ -2192,6 +2192,16 @@ export async function updateOrderStatus(
     update.approved_by = approverId;
   }
 
+  // LANÇAR SEM NÚMERO (Yan, 12/11/2026): o financeiro recebe pedido por
+  // outros meios, a numeração do Control não segue a do app, e o pedido que
+  // já está lá ficava preso em "A lançar" por falta de um número que ela não
+  // tinha como achar. Só o FINANCEIRO marca — nem o admin. O app continua sem
+  // inventar número: o pedido passa a "A faturar" com o campo vazio.
+  const lancandoSemNumero = body.status === 'sent_erp' && body.sem_numero === true && !body.erp_order_id?.trim();
+  if (lancandoSemNumero && role !== 'financeiro') {
+    throw new Error('SEM_NUMERO_SO_FINANCEIRO');
+  }
+
   // LANÇAR exige o número que o Control deu ao pedido (Yan, 10/09/2026: "toda
   // vez que ela for lançar tem que carregar e seguir o padrão da fábrica"). O
   // app nunca inventa esse número; e um número do Control é de UM pedido só.
@@ -2210,20 +2220,24 @@ export async function updateOrderStatus(
       throw new Error(body.erp_order_id?.trim() ? 'CANAL_API' : 'LANCAMENTO_PELO_CONTROL');
     }
 
-    const numero = normalizarNumeroErp(body.erp_order_id);
-    if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
-    const { data: dono } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('company_id', company_id)
-      .eq('erp_order_id', numero)
-      .neq('id', id)
-      .limit(1);
-    if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
-    update.erp_order_id = numero;
-    update.synced_at = new Date().toISOString();
-    // De onde veio o número: do lançamento na tela, por quem (048).
-    await gravarOrigemDoNumero(update, 'lancamento', approverId);
+    if (!lancandoSemNumero) {
+      const numero = normalizarNumeroErp(body.erp_order_id);
+      if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
+      const { data: dono } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('company_id', company_id)
+        .eq('erp_order_id', numero)
+        .neq('id', id)
+        .limit(1);
+      if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
+      update.erp_order_id = numero;
+      update.synced_at = new Date().toISOString();
+      // De onde veio o número: do lançamento na tela, por quem (048).
+      await gravarOrigemDoNumero(update, 'lancamento', approverId);
+    }
+    // Sem número, `synced_at` fica como está: é por ele que o "último lançado"
+    // sugere o próximo número, e este pedido não tem número nenhum.
   }
 
   if (body.notes) {
@@ -2260,6 +2274,8 @@ export async function updateOrderStatus(
       origem: 'tela',
       por: approverId,
       por_nome,
+      // O CHECK da 055 não tem um tipo próprio para isto; o motivo diz.
+      ...(lancandoSemNumero ? { motivo: 'Marcado como lançado no Control sem o número' } : {}),
       antes: { erp_order_id: row.erp_order_id ?? null, status: row.status },
       depois: { erp_order_id: update.erp_order_id ?? null, status: 'sent_erp' },
     });

@@ -213,6 +213,43 @@ describe('quem decide o pedido na fila', () => {
     ).rejects.toThrow('ERP_NUMBER_REQUIRED');
   });
 
+  // "Pedido lançado" sem o número (Yan, 12/11/2026): ela recebe pedido por
+  // outros meios e a numeração do Control não segue a do app.
+  it('o financeiro marca como lançado SEM o número — vai para sent_erp com o campo vazio', async () => {
+    const semNumero = { data: { id: 'o1', status: 'sent_erp', rep_id: REP, erp_order_id: null }, error: null };
+    const { updateOrderStatus, fake } = await carregarServico({ orders: [aprovado, aprovado, semNumero] });
+    const r = await updateOrderStatus(
+      'o1',
+      EMPRESA,
+      'fin-1',
+      { status: 'sent_erp', notes: '', sem_numero: true },
+      'financeiro',
+    );
+    expect(r?.status).toBe('sent_erp');
+    const gravado = fake.ultimaGravacao('orders', 'update')?.valores as Record<string, unknown>;
+    expect(gravado.status).toBe('sent_erp');
+    expect(gravado).not.toHaveProperty('erp_order_id');
+    // Sem número, o "último lançado" não pode passar a apontar para ele.
+    expect(gravado).not.toHaveProperty('synced_at');
+  });
+
+  it('lançar sem número é SÓ do financeiro — nem o admin', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [aprovado] });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'adm-1', { status: 'sent_erp', notes: '', sem_numero: true }, 'admin'),
+    ).rejects.toThrow('SEM_NUMERO_SO_FINANCEIRO');
+  });
+
+  it('o gerente e o representante continuam barrados antes de tudo', async () => {
+    const { updateOrderStatus } = await carregarServico({ orders: [aprovado, aprovado] });
+    await expect(
+      updateOrderStatus('o1', EMPRESA, 'ger-1', { status: 'sent_erp', notes: '', sem_numero: true }, 'manager'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
+    await expect(
+      updateOrderStatus('o1', EMPRESA, REP, { status: 'sent_erp', notes: '', sem_numero: true }, 'rep'),
+    ).rejects.toThrow('FORBIDDEN_ROLE');
+  });
+
   it('número do Control que já é de outro pedido é recusado', async () => {
     const { updateOrderStatus } = await carregarServico({
       orders: [aprovado, aprovado, { data: [{ id: 'o2' }], error: null }],
