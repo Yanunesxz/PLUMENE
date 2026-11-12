@@ -55,14 +55,16 @@ const PAPEL = 'visualizador';
 // `>= 35` um erro no leitor podia engolir quinze rotas e ninguém notava. Rota
 // nova derruba estes três — e é esse o momento de conferir se ela tem
 // `requireRole` e se o papel ficou de fora. Ao acrescentar, suba o número.
-const QUANTOS_ROUTERS = 14;
+// 058 (cashback, 12/11/2026): +1 router (cashback/cashback.router.ts), +6 rotas, +2 escritas
+// (POST e DELETE /cashback/pedidos/:id/uso).
+const QUANTOS_ROUTERS = 15;
 // 055 (pedido inativo): +1 rota, +1 escrita — PATCH /orders/:id/inativo.
 // Parceiro: +1 rota de leitura — GET /partner/v1/pedidos/cancelados.
 // Dashboard: +1 rota de leitura — GET /reps/metas (metas da equipe, 19/10/2026).
 // 057 (fracionamento, 05/11/2026): +2 rotas, +2 escritas — POST /orders/:id/fracionar e
 // PATCH /orders/:id/data-de-envio, as duas no portão de mexer no pedido (decideOPedido).
-const QUANTAS_ROTAS = 113; // 111 em 27/10/2026 (PATCH /orders/:id/tabela e GET /orders/tabelas-para-trocar)
-const QUANTAS_ESCRITAS = 60;
+const QUANTAS_ROTAS = 119; // 111 em 27/10/2026 (PATCH /orders/:id/tabela e GET /orders/tabelas-para-trocar)
+const QUANTAS_ESCRITAS = 62;
 
 describe('inventário: o leitor de routers está funcionando', () => {
   // Sem estas âncoras, um erro na expressão regular esvaziaria a lista e o

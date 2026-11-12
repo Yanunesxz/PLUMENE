@@ -28,6 +28,7 @@ import { usersRouter } from './modules/users/users.router.js';
 import { pushRouter } from './modules/push/push.router.js';
 import { iaRouter } from './modules/ia/ia.router.js';
 import { integracaoRouter } from './modules/integracao/integracao.router.js';
+import { cashbackRouter } from './modules/cashback/cashback.router.js';
 
 export async function buildApp(): Promise<FastifyInstance> {
   const server = Fastify({
@@ -121,6 +122,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await server.register(tarefasRouter);
   await server.register(iaRouter);
   await server.register(integracaoRouter);
+  await server.register(cashbackRouter);
 
   return server;
 }

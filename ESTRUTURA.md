@@ -100,6 +100,13 @@ packages/shared/src/
 │                           entrega com peça e data — a mesma conta na tela e na API),
 │                           repartirObservacao (as linhas de cor "0015 6M azul" repartidas com a
 │                           quantidade de cada entrega) e os rótulos ("Entrega 1/3")
+├── cashback/
+│   └── cashback.ts       → CASHBACK DA VENDA INTERNA (058): CASHBACK_PERCENTUAL (3), CASHBACK_VALIDADE_DIAS
+│                           (90, contados do FATURAMENTO), creditoDoPedido (faturado, da venda interna, desde
+│                           o início, nem cancelado nem inativo; base = valor da nota), montarExtrato (o uso
+│                           consome o crédito que vence antes; o que sobra depois dos 90 dias se perde),
+│                           linhaDoCashback ("Utilizado R$ 30,00 do cashback", sem espaço especial),
+│                           observacaoComCashback/SemCashback, veAreaDeCashback e podeUsarCashback
 ├── cadastro/
 │   ├── codigoErp.ts      → codigoMiolo (para CASAR: "#02225" = "2225") e codigoCanonico (para
 │   │                       GRAVAR: "779" → "00779"). A mesma regra de public.codigo_miolo (048);
@@ -253,7 +260,7 @@ apps/api/src/
 │                                   MIGRACAO_PENDENTE dizendo qual papel o banco recusou e qual SQL colar. SQL para os
 │                                   dois bancos em _tools/SQL-PARA-RODAR-056.sql; conferência em _tools/conferir-056.mjs
 │                                   (a mesma prova indireta da 054: acha um login já gravado com o papel)
-│       └── 057_fracionamento_de_pedidos.sql → orders.split_group_id (o grupo = o id do pedido fracionado, SEM FK)/
+│       ├── 057_fracionamento_de_pedidos.sql → orders.split_group_id (o grupo = o id do pedido fracionado, SEM FK)/
 │                                   split_index/split_count/ship_date/split_at/split_by (FK SET NULL) + trava
 │                                   chk_orders_fracionamento + índices parciais idx_orders_fracionados e
 │                                   idx_orders_entrega_unica (uma entrega por posição). FRACIONAR o pedido em
@@ -265,6 +272,17 @@ apps/api/src/
 │                                   responde 503 MIGRACAO_PENDENTE. SQL para os dois bancos em
 │                                   _tools/SQL-PARA-RODAR-057.sql (termina com o NOTIFY); conferir com
 │                                   node _tools/conferir-057.mjs
+│       └── 058_cashback.sql → companies.cashback_inicio (DEFAULT now(): só pedido faturado a partir daqui gera
+│                                   crédito) + cashback_usos (id, company_id FK CASCADE, order_id FK CASCADE e
+│                                   UNIQUE = um uso por pedido, valor > 0, usado_em, usado_por FK SET NULL,
+│                                   usado_por_nome; RLS). CASHBACK DA VENDA INTERNA (Yan, 12/11/2026): o cliente
+│                                   ganha 3% do valor FATURADO de cada pedido da venda interna, válido 90 dias a
+│                                   partir do faturamento; o vendedor interno abate no próximo pedido e a linha
+│                                   "Utilizado R$ X do cashback" vai na observação (planilha e API do Control). O
+│                                   CRÉDITO não é gravado — é lido dos pedidos faturados; só o USO fica aqui. O
+│                                   cliente do uso é o do pedido (troca de cliente e junção levam junto). Sem ela
+│                                   a área responde 503 MIGRACAO_PENDENTE e os cartões somem. SQL para os dois
+│                                   bancos em _tools/SQL-PARA-RODAR-058.sql (termina com o NOTIFY)
 │                                   É A ÚLTIMA: o próximo número se combina por mensagem antes do commit
 │
 ├── middleware/
@@ -296,6 +314,13 @@ apps/api/src/
 │                           pedido guarda só o id, o GET /orders/:id resolve o nome
 │
 ├── modules/              → FEATURES — cada uma tem o trio router → controller → service
+│   ├── cashback/         → CASHBACK DA VENDA INTERNA (058): GET /cashback/clientes (a área), /clientes/:id
+│   │                       (extrato), /pedidos/:id (o cartão do pedido), /meu (a loja) e POST/DELETE
+│   │                       /cashback/pedidos/:id/uso (venda interna, financeiro, admin; a janela é a de
+│   │                       mexer na observação — podeMexerNoPedido). Só LÊ os pedidos faturados: nenhum
+│   │                       caminho de faturamento chama o cashback. Leituras "OuFalhar" (saldo é dinheiro:
+│   │                       banco sem resposta = 503, nunca saldo pela metade). Usar grava o uso e então a
+│   │                       observação (falhou = desfaz o uso); desfazer tira a linha e então apaga o uso
 │   ├── access/           → convite da loja, vitrine temporária e a área da loja
 │   │                       (invites, showcase, loja.service = GET /minha-area)
 │   ├── auth/             → login, refresh (auth.service tem findUserByEmail, buildAuthPayload)
@@ -537,6 +562,10 @@ apps/web/
     │   │                                 canal api o "Lançar" SOLICITA ao Control e espera o número;
     │   │                                 "Cancelar solicitação" enquanto o número não chega
     │   │                                 [financeiro/admin])
+    │   ├── cashback/PaginaCashback     → a área Cashback (058): saldo por cliente, o que vence em 15 dias,
+    │   │                                 extrato [venda interna, gerente, admin, financeiro, visualizador].
+    │   │                                 Os cartões CartaoCashbackDoPedido (no detalhe do pedido: "Usar
+    │   │                                 cashback") e CartaoCashbackDaLoja (Minha área da loja) moram aqui
     │   ├── integracao/PaginaIntegracao → estado da integração com o Control e o botão
     │   │                                 "Pedir sincronização agora" [financeiro/gerente/admin];
     │   │                                 "pedido expirado" depois de 15 min sem o Control responder

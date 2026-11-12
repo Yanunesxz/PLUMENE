@@ -30,6 +30,7 @@ const PaginaMinhaAreaLoja = lazy(() => import('../modules/loja/PaginaMinhaAreaLo
 const PaginaAtividades = lazy(() => import('../modules/atividades/PaginaAtividades.js').then((m) => ({ default: m.PaginaAtividades })));
 const PaginaAlertas = lazy(() => import('../modules/alertas/PaginaAlertas.js').then((m) => ({ default: m.PaginaAlertas })));
 const PaginaIntegracao = lazy(() => import('../modules/integracao/PaginaIntegracao.js').then((m) => ({ default: m.PaginaIntegracao })));
+const PaginaCashback = lazy(() => import('../modules/cashback/PaginaCashback.js').then((m) => ({ default: m.PaginaCashback })));
 // A vitrine carrega o catálogo inteiro para um visitante anônimo — só desce
 // quando alguém abre o link.
 const PaginaVitrine = lazy(() => import('../modules/publico/PaginaVitrine.js').then((m) => ({ default: m.PaginaVitrine })));
@@ -197,6 +198,14 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
             path: 'integracao',
             element: <PrivateRoute roles={['manager', 'admin', 'financeiro', 'visualizador']} />,
             children: [{ index: true, element: <AoCarregar><PaginaIntegracao /></AoCarregar> }],
+          },
+          {
+            // O cashback da venda interna (058). O `rep` passa aqui porque a
+            // venda interna É um rep; o representante comum a própria tela
+            // manda para "sem acesso" (veAreaDeCashback), e a API dá 403.
+            path: 'cashback',
+            element: <PrivateRoute roles={['rep', 'manager', 'admin', 'financeiro', 'visualizador']} />,
+            children: [{ index: true, element: <AoCarregar><PaginaCashback /></AoCarregar> }],
           },
         ],
       },

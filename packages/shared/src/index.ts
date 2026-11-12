@@ -33,3 +33,4 @@ export * from './cadastro/endereco.js';
 export * from './cadastro/codigoErp.js';
 export * from './cadastro/edicao.js';
 export * from './carteira/regua.js';
+export * from './cashback/cashback.js';

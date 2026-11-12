@@ -55,6 +55,7 @@ import { TrocarTabelaDoPedido } from '../../components/comercial/TrocarTabelaDoP
 import { FracionarPedido } from '../../components/comercial/FracionarPedido.js';
 import { EntregasDoPedido } from '../../components/comercial/EntregasDoPedido.js';
 import { AvisoDeValorMinimo } from '../../components/comercial/AvisoDeValorMinimo.js';
+import { CartaoCashbackDoPedido } from '../cashback/CartaoCashbackDoPedido.js';
 import {
   precoDoTamanho,
   coresPorSku,
@@ -2287,6 +2288,10 @@ export function PaginaDetalhePedido() {
               )}
             </div>
           )}
+
+          {/* Cashback do cliente (058): cartão à parte, só fala com /cashback.
+              Usar escreve "Utilizado R$ X do cashback" na observação acima. */}
+          {!ehLoja && <CartaoCashbackDoPedido orderId={order.id} onMudou={() => void recarregarPedido()} />}
 
           {/* Cancelar com motivo (053) — quando não há o "Recusar" da fila,
               que já abre a mesma janela. */}
