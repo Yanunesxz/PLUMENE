@@ -25,6 +25,8 @@ import {
   copiarTexto,
   mensagemDaCopiaAoRepresentante,
   podeLancarNoErp,
+  podeMarcarLancadoSemNumero,
+  pedidoEmUsoDaRecusa,
   lancaPeloControl,
   faturaPeloControl,
   serieDoControl,
@@ -42,6 +44,7 @@ import { SeletorTamanho, type PickedSize } from '../../components/comercial/Sele
 import { SearchSelect } from '../../components/interface/SearchSelect.js';
 import { CampoDesconto } from '../../components/comercial/CampoDesconto.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
+import { ConfirmarLancado } from '../../components/comercial/ConfirmarLancado.js';
 import { LancarNoErp, type EsperaPeloControl } from '../../components/comercial/LancarNoErp.js';
 import { PedidoOriginal } from '../../components/comercial/PedidoOriginal.js';
 import { AtualizarNoErp } from '../../components/comercial/AtualizarNoErp.js';
@@ -82,6 +85,7 @@ import type {
   PedidoParaComparar,
   EntregaPedida,
   FracionamentoDoPedido,
+  PedidoComONumeroErp,
 } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
@@ -462,8 +466,15 @@ export function PaginaDetalhePedido() {
   // mostra o motivo real (número repetido, canal na API) em vez de um genérico.
   const ultimaRecusa = useRef<string | null>(null);
   const lerUltimaRecusa = (): string | null => ultimaRecusa.current;
-  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) => {
-    if (erro) ultimaRecusa.current = mensagem;
+  // O número digitado já é de outro pedido: qual é (12/11/2026). O diálogo
+  // de lançar e o de corrigir oferecem abri-lo.
+  const ultimoPedidoEmUso = useRef<PedidoComONumeroErp | null>(null);
+  const [pedidoEmUso, setPedidoEmUso] = useState<PedidoComONumeroErp | null>(null);
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro, causa) => {
+    if (erro) {
+      ultimaRecusa.current = mensagem;
+      ultimoPedidoEmUso.current = pedidoEmUsoDaRecusa(causa);
+    }
     setToast({ message: mensagem, type: erro ? 'error' : 'success' });
   });
 
@@ -473,12 +484,16 @@ export function PaginaDetalhePedido() {
 
   const handleDecisao = async (
     status: OrderStatus,
-    extra?: { erp_order_id?: string },
+    extra?: { erp_order_id?: string; sem_numero?: boolean },
   ): Promise<boolean> => {
     if (!id || !order) return false;
     const deu = await decidir(id, status, extra);
     if (deu) {
-      mudarPedido((atual) => ({ ...atual, status, ...(extra ?? {}) }));
+      mudarPedido((atual) => ({
+        ...atual,
+        status,
+        ...(extra?.erp_order_id ? { erp_order_id: extra.erp_order_id } : {}),
+      }));
       // Lançar no ERP cria a foto do que o Control conhece (046) lá no servidor:
       // a tela precisa dela para o aviso existir se o pedido mudar depois.
       if (status === 'sent_erp') void recarregarPedido();
@@ -634,6 +649,7 @@ export function PaginaDetalhePedido() {
   const abrirLancamento = async () => {
     setLancando(true);
     setErroDoLancamento(null);
+    setPedidoEmUso(null);
     // Canal na API: nada de último número nem sugestão — o diálogo só solicita.
     // Se já estava solicitado, ele abre no "conferir agora".
     if (pelaApi) {
@@ -661,8 +677,23 @@ export function PaginaDetalhePedido() {
     // diálogo fica aberto COM o que ela digitou — jogar o número fora e
     // reabrir com a sugestão de novo é o caminho curto para carimbar o errado.
     ultimaRecusa.current = null;
+    ultimoPedidoEmUso.current = null;
+    setPedidoEmUso(null);
     if (await handleDecisao('sent_erp', { erp_order_id: numeroErp })) setLancando(false);
-    else setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
+    else {
+      setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
+      setPedidoEmUso(ultimoPedidoEmUso.current);
+    }
+  };
+
+  // ─── Marcar lançado SEM o número (só o financeiro, 12/11/2026) ─────────────
+  // O pedido já está no Control, chegou lá por outro caminho, e a numeração de
+  // lá não segue a do app: passa para "A faturar" com o número vazio. A
+  // recusa da API (papel, canal na API) vira toast — o diálogo fecha igual.
+  const [confirmandoLancado, setConfirmandoLancado] = useState(false);
+  const marcarLancadoSemNumero = async () => {
+    await handleDecisao('sent_erp', { sem_numero: true });
+    setConfirmandoLancado(false);
   };
 
   // ─── Corrigir o número do Control (financeiro/admin, antes da nota) ────────
@@ -674,6 +705,7 @@ export function PaginaDetalhePedido() {
     if (!id || !token) return;
     setSalvandoNumero(true);
     setErroDaCorrecao(null);
+    setPedidoEmUso(null);
     try {
       const res = await api.patch<ApiResponse<{ erp_order_id: string }>>(
         `/orders/${id}/numero-erp`,
@@ -686,6 +718,7 @@ export function PaginaDetalhePedido() {
       setToast({ message: `Número corrigido para ${res.data.erp_order_id}.`, type: 'success' });
     } catch (err) {
       setErroDaCorrecao(err instanceof Error ? err.message : 'Não foi possível corrigir.');
+      setPedidoEmUso(pedidoEmUsoDaRecusa(err));
     } finally {
       setSalvandoNumero(false);
     }
@@ -1401,6 +1434,7 @@ export function PaginaDetalhePedido() {
                         type="button"
                         onClick={() => {
                           setErroDaCorrecao(null);
+                          setPedidoEmUso(null);
                           setCorrigindoNumero(true);
                         }}
                         className="text-[10px] font-semibold text-muted-foreground underline hover:text-foreground"
@@ -1769,6 +1803,18 @@ export function PaginaDetalhePedido() {
                   <Check className="h-4 w-4" strokeWidth={2.5} />
                   {pelaApi ? (order.erp_requested_at ? 'Conferir no Control' : 'Lançar no Control') : 'Lançar no ERP'}
                 </Button>
+                {/* Já está no Control e o número de lá não está à mão: só o
+                    FINANCEIRO marca lançado sem ele (Yan, 12/11/2026). */}
+                {!pelaApi && podeMarcarLancadoSemNumero(user?.role, order) && (
+                  <Button
+                    variant="outline"
+                    className="mt-2 w-full"
+                    disabled={decidindo !== null}
+                    onClick={() => setConfirmandoLancado(true)}
+                  >
+                    Já foi lançado — sem número
+                  </Button>
+                )}
                 {/* Solicitado e ainda sem número: dá para tirar da fila do Control. */}
                 {podeCancelarSolicitacao(user?.role, order) && botaoCancelarSolicitacao}
               </div>
@@ -2305,6 +2351,7 @@ export function PaginaDetalhePedido() {
           carregandoUltimo={carregandoUltimo}
           ocupado={decidindo !== null}
           erro={erroDoLancamento}
+          pedidoEmUso={pedidoEmUso}
           exemplo={exemploDoNumero}
           espera={espera}
           onSolicitar={() => void solicitarAoControl()}
@@ -2322,6 +2369,17 @@ export function PaginaDetalhePedido() {
         />
       )}
 
+      {confirmandoLancado && order && (
+        <ConfirmarLancado
+          numero={order.order_number}
+          cliente={nomeDoComprador(order, custName)}
+          total={order.total}
+          ocupado={decidindo !== null}
+          onConfirmar={() => void marcarLancadoSemNumero()}
+          onCancelar={() => setConfirmandoLancado(false)}
+        />
+      )}
+
       {corrigindoNumero && order && (
         <LancarNoErp
           modo="corrigir"
@@ -2331,6 +2389,7 @@ export function PaginaDetalhePedido() {
           carregandoUltimo={false}
           ocupado={salvandoNumero}
           erro={erroDaCorrecao}
+          pedidoEmUso={pedidoEmUso}
           exemplo={exemploDoNumero}
           onConfirmar={(n) => void corrigirNumero(n)}
           onCancelar={() => setCorrigindoNumero(false)}

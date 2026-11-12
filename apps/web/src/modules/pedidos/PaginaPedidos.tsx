@@ -12,6 +12,7 @@ import { Skeleton } from '../../components/interface/Skeleton.js';
 import { Button, buttonVariants } from '../../components/interface/Button.js';
 import { Toast } from '../../components/interface/Toast.js';
 import { ConfirmarFaturamento } from '../../components/comercial/ConfirmarFaturamento.js';
+import { ConfirmarLancado } from '../../components/comercial/ConfirmarLancado.js';
 import { cn, formatBRL } from '../../lib/utils.js';
 import { MARCA } from '../../lib/marca.js';
 import { exportarPedidosParaControl } from '../../lib/exportOrders.js';
@@ -20,9 +21,11 @@ import { numeroDaTabela, type NumeroDaTabela } from '../../lib/planilha/tabela.j
 import { useMinhasTabelas } from '../../hooks/useMinhasTabelas.js';
 import {
   faturaPeloControl,
+  lancaPeloControl,
   mostraPlanilhaDoControl,
   nomeDoComprador,
   origemParaExibir,
+  podeMarcarLancadoSemNumero,
   seloDoPedido,
   type CanaisDoPedido,
 } from '../../lib/pedido.js';
@@ -196,6 +199,41 @@ export function PaginaPedidos() {
       });
     } finally {
       setFaturando(null);
+    }
+  };
+
+  // "Marcar lançado" sem o número do Control — só o FINANCEIRO (Yan,
+  // 12/11/2026). O pedido já está no Control, chegou lá por outro caminho e a
+  // numeração de lá não segue a do app: sai de "A lançar" e vai para "A
+  // faturar". Com o canal de pedidos na API o número vem do próprio Control, e
+  // o botão some (a API recusa do mesmo jeito).
+  const [marcandoLancado, setMarcandoLancado] = useState<string | null>(null);
+  const [confirmandoLancado, setConfirmandoLancado] = useState<Order | null>(null);
+  const lancadoPeloControl = lancaPeloControl(canais);
+
+  const marcarLancado = async (order: Order) => {
+    if (!token || marcandoLancado) return;
+    setMarcandoLancado(order.id);
+    try {
+      const res = await api.patch<ApiResponse<Order>>(
+        `/orders/${order.id}/status`,
+        { status: 'sent_erp', sem_numero: true },
+        token,
+      );
+      await db.orders.update(order.id, { status: res.data.status, updated_at: res.data.updated_at });
+      setConfirmandoLancado(null);
+      setToast({
+        message: `Pedido #${order.order_number ?? ''} marcado como lançado — agora está em "A faturar".`,
+        type: 'success',
+      });
+    } catch (err) {
+      setConfirmandoLancado(null);
+      setToast({
+        message: err instanceof Error ? err.message : 'Não foi possível marcar como lançado.',
+        type: 'error',
+      });
+    } finally {
+      setMarcandoLancado(null);
     }
   };
   // A aba "Excluídos" (040) é auditoria — e auditar é o trabalho do
@@ -805,6 +843,24 @@ export function PaginaPedidos() {
                       {faturando === order.id ? 'Marcando…' : 'Marcar faturado'}
                     </button>
                   ) : null)}
+                {/* A mesa do financeiro: o pedido que já está no Control sai
+                    de "A lançar" sem precisar do número de lá. */}
+                {!escolhendoParaExportar &&
+                  !lancadoPeloControl &&
+                  podeMarcarLancadoSemNumero(user?.role, order) && (
+                    <button
+                      type="button"
+                      disabled={marcandoLancado === order.id}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setConfirmandoLancado(order);
+                      }}
+                      className="mt-2 rounded-lg border border-primary/40 px-2.5 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary-soft disabled:opacity-50"
+                    >
+                      {marcandoLancado === order.id ? 'Marcando…' : 'Marcar lançado'}
+                    </button>
+                  )}
               </>
             );
 
@@ -856,7 +912,18 @@ export function PaginaPedidos() {
         />
       )}
 
-      {toast && <Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
+      {confirmandoLancado && (
+        <ConfirmarLancado
+          numero={confirmandoLancado.order_number}
+          cliente={nomeDoComprador(confirmandoLancado, customerName)}
+          total={confirmandoLancado.total}
+          ocupado={marcandoLancado === confirmandoLancado.id}
+          onConfirmar={() => void marcarLancado(confirmandoLancado)}
+          onCancelar={() => setConfirmandoLancado(null)}
+        />
+      )}
+
+      {toast &&<Toast message={toast.message} type={toast.type} onDone={() => setToast(null)} />}
     </div>
   );
 }

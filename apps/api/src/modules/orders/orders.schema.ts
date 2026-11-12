@@ -46,6 +46,9 @@ export const updateOrderStatusSchema = z.object({
     .max(12)
     .optional()
     .refine((v) => v == null || v === '' || numeroErpValido(v), 'Número do Control inválido — são duas letras e a numeração, ex.: CS17379'),
+  // "Marcar lançado" sem o número do Control — só o financeiro; quem confere
+  // o papel é o service.
+  sem_numero: z.boolean().optional(),
 });
 
 export const setInvoicedSchema = z.object({

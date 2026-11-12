@@ -2,6 +2,8 @@ import { describe, it, expect } from 'vitest';
 import {
   decisaoDoPedido,
   podeLancarNoErp,
+  podeMarcarLancadoSemNumero,
+  pedidoEmUsoDaRecusa,
   seloDoPedido,
   lancaPeloControl,
   faturaPeloControl,
@@ -98,6 +100,20 @@ describe('quem vê o botão "Lançar no ERP"', () => {
     expect(podeLancarNoErp('financeiro', 'pending_approval', false)).toBe(false);
     expect(podeLancarNoErp('financeiro', 'approved', true)).toBe(false);
   });
+
+  it('marcar lançado SEM o número é só do financeiro, no aprovado sem nota e sem solicitação', () => {
+    const aprovado = { status: 'approved' as const, invoiced: false, erp_requested_at: null };
+    expect(podeMarcarLancadoSemNumero('financeiro', aprovado)).toBe(true);
+    // "APENAS para o financeiro" (Yan, 12/11/2026) — nem o admin.
+    expect(podeMarcarLancadoSemNumero('admin', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('manager', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('rep', aprovado)).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, status: 'pending_approval' })).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, status: 'sent_erp' })).toBe(false);
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, invoiced: true })).toBe(false);
+    // Solicitado ao Control (049): o número vem de lá.
+    expect(podeMarcarLancadoSemNumero('financeiro', { ...aprovado, erp_requested_at: '2026-11-12T10:00:00Z' })).toBe(false);
+  });
 });
 
 describe('decisaoDoPedido com a tecla de aprovar', () => {
@@ -130,5 +146,30 @@ describe('decisaoDoPedido com a tecla de aprovar', () => {
   it('a loja continua sem decidir nada', () => {
     expect(decisaoDoPedido('store', 'pending_approval')).toBeNull();
     expect(decisaoDoPedido('store', 'pending_rep')).toBeNull();
+  });
+});
+
+describe('o número do Control que já é de outro pedido (12/11/2026)', () => {
+  it('a recusa traz QUAL pedido — o diálogo oferece abri-lo', () => {
+    const recusa = Object.assign(new Error('Este número do Control já está no pedido #14890 (LOJA DA ANA)'), {
+      code: 'ERP_NUMBER_IN_USE',
+      corpo: { pedido_em_uso: { id: 'o2', numero: 14890, cliente: 'LOJA DA ANA' } },
+    });
+    expect(pedidoEmUsoDaRecusa(recusa)).toEqual({ id: 'o2', numero: 14890, cliente: 'LOJA DA ANA' });
+  });
+
+  it('API antiga, outra recusa ou erro de rede: sem pedido, fica só a frase', () => {
+    expect(pedidoEmUsoDaRecusa(new Error('sem rede'))).toBeNull();
+    expect(pedidoEmUsoDaRecusa({ corpo: { code: 'ERP_NUMBER_REQUIRED' } })).toBeNull();
+    expect(pedidoEmUsoDaRecusa({ corpo: { pedido_em_uso: { numero: 1 } } })).toBeNull();
+    expect(pedidoEmUsoDaRecusa(undefined)).toBeNull();
+  });
+
+  it('sem número do app nem cliente, vem o id — o link ainda abre', () => {
+    expect(pedidoEmUsoDaRecusa({ corpo: { pedido_em_uso: { id: 'o9', numero: null, cliente: '' } } })).toEqual({
+      id: 'o9',
+      numero: null,
+      cliente: null,
+    });
   });
 });

@@ -17,6 +17,7 @@ import type {
   PedidoExcluido,
   CreateOrderRequest,
   UpdateOrderStatusRequest,
+  PedidoComONumeroErp,
 } from '@csb/shared';
 import {
   ORDER_STATUS_FLOW,
@@ -271,6 +272,51 @@ function recusouOStatus(error: { code?: string; message?: string } | null): bool
 
 /** Postgres: violação de índice único. */
 const CHAVE_DUPLICADA = '23505';
+
+/**
+ * O número do Control digitado já é de OUTRO pedido. Leva junto qual é —
+ * "tem outro pedido com o mesmo número e eu quero ver qual é e mudar" (Yan,
+ * 12/11/2026). `pedido` é null quando não deu para achá-lo (a corrida que só o
+ * índice único da 042 pegou e a releitura não trouxe).
+ */
+export class NumeroErpEmUso extends Error {
+  constructor(readonly pedido: PedidoComONumeroErp | null) {
+    super('ERP_NUMBER_IN_USE');
+  }
+}
+
+/**
+ * O outro pedido desta empresa que já usa `numero` — null quando está livre.
+ * Falha de leitura conta como livre, como sempre contou: quem segura a
+ * duplicata de verdade é o índice único da 042, na gravação.
+ */
+export async function pedidoComONumeroErp(
+  company_id: string,
+  numero: string,
+  id: string,
+): Promise<PedidoComONumeroErp | null> {
+  // `*` de propósito: `order_number` (009/012) é opcional no resto do código.
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, customer:customers(name)')
+    .eq('company_id', company_id)
+    .eq('erp_order_id', numero)
+    .neq('id', id)
+    .limit(1);
+  if (error) {
+    console.error(`[numero] falha ao conferir quem usa ${numero}: ${error.message}`);
+    return null;
+  }
+  const dono = (Array.isArray(data) ? data[0] : undefined) as
+    | { id: string; order_number?: number | null; guest_name?: string | null; customer?: { name?: string | null } | null }
+    | undefined;
+  if (!dono) return null;
+  return {
+    id: dono.id,
+    numero: dono.order_number ?? null,
+    cliente: dono.customer?.name?.trim() || dono.guest_name?.trim() || null,
+  };
+}
 
 /** O pedido que já nasceu deste `local_id`, se houver. */
 async function pedidoDoLocalId(
@@ -1293,7 +1339,8 @@ export async function setOrderPayment(
 
 export type CorrigirNumeroErpResult =
   | { ok: true; erp_order_id: string }
-  | { ok: false; motivo: 'not_found' | 'formato' | 'em_uso' | 'nao_lancado' | 'ja_faturado' | 'erro' };
+  | { ok: false; motivo: 'em_uso'; pedido_em_uso: PedidoComONumeroErp | null }
+  | { ok: false; motivo: 'not_found' | 'formato' | 'nao_lancado' | 'ja_faturado' | 'erro' };
 
 /**
  * Corrige o número do Control de um pedido já lançado.
@@ -1345,14 +1392,8 @@ export async function corrigirNumeroErp(
   // está gravado segue e grava — é a normalização chegando.
   if (o.erp_order_id === numero) return { ok: true, erp_order_id: numero };
 
-  const { data: dono } = await supabase
-    .from('orders')
-    .select('id')
-    .eq('company_id', company_id)
-    .eq('erp_order_id', numero)
-    .neq('id', id)
-    .limit(1);
-  if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
+  const dono = await pedidoComONumeroErp(company_id, numero, id);
+  if (dono) return { ok: false, motivo: 'em_uso', pedido_em_uso: dono };
 
   // A correção é um dos quatro escritores do número: fica dito no pedido (048).
   const patch = await gravarOrigemDoNumero(
@@ -1366,7 +1407,8 @@ export async function corrigirNumeroErp(
     .eq('id', id)
     .eq('company_id', company_id);
   if (error) {
-    return { ok: false, motivo: (error as { code?: string }).code === CHAVE_DUPLICADA ? 'em_uso' : 'erro' };
+    if ((error as { code?: string }).code !== CHAVE_DUPLICADA) return { ok: false, motivo: 'erro' };
+    return { ok: false, motivo: 'em_uso', pedido_em_uso: await pedidoComONumeroErp(company_id, numero, id) };
   }
   // A foto do que o Control conhece passa a apontar o número certo (046).
   await atualizarNumeroNaFoto(id, company_id, numero);
@@ -2192,6 +2234,16 @@ export async function updateOrderStatus(
     update.approved_by = approverId;
   }
 
+  // LANÇAR SEM NÚMERO (Yan, 12/11/2026): o financeiro recebe pedido por
+  // outros meios, a numeração do Control não segue a do app, e o pedido que
+  // já está lá ficava preso em "A lançar" por falta de um número que ela não
+  // tinha como achar. Só o FINANCEIRO marca — nem o admin. O app continua sem
+  // inventar número: o pedido passa a "A faturar" com o campo vazio.
+  const lancandoSemNumero = body.status === 'sent_erp' && body.sem_numero === true && !body.erp_order_id?.trim();
+  if (lancandoSemNumero && role !== 'financeiro') {
+    throw new Error('SEM_NUMERO_SO_FINANCEIRO');
+  }
+
   // LANÇAR exige o número que o Control deu ao pedido (Yan, 10/09/2026: "toda
   // vez que ela for lançar tem que carregar e seguir o padrão da fábrica"). O
   // app nunca inventa esse número; e um número do Control é de UM pedido só.
@@ -2210,20 +2262,18 @@ export async function updateOrderStatus(
       throw new Error(body.erp_order_id?.trim() ? 'CANAL_API' : 'LANCAMENTO_PELO_CONTROL');
     }
 
-    const numero = normalizarNumeroErp(body.erp_order_id);
-    if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
-    const { data: dono } = await supabase
-      .from('orders')
-      .select('id')
-      .eq('company_id', company_id)
-      .eq('erp_order_id', numero)
-      .neq('id', id)
-      .limit(1);
-    if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
-    update.erp_order_id = numero;
-    update.synced_at = new Date().toISOString();
-    // De onde veio o número: do lançamento na tela, por quem (048).
-    await gravarOrigemDoNumero(update, 'lancamento', approverId);
+    if (!lancandoSemNumero) {
+      const numero = normalizarNumeroErp(body.erp_order_id);
+      if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
+      const dono = await pedidoComONumeroErp(company_id, numero, id);
+      if (dono) throw new NumeroErpEmUso(dono);
+      update.erp_order_id = numero;
+      update.synced_at = new Date().toISOString();
+      // De onde veio o número: do lançamento na tela, por quem (048).
+      await gravarOrigemDoNumero(update, 'lancamento', approverId);
+    }
+    // Sem número, `synced_at` fica como está: é por ele que o "último lançado"
+    // sugere o próximo número, e este pedido não tem número nenhum.
   }
 
   if (body.notes) {
@@ -2242,7 +2292,9 @@ export async function updateOrderStatus(
   // quem chega depois bate no índice único da 042. Vira o mesmo 409 da leitura
   // — a Larissa vê "já está em outro pedido" em vez de um erro cru.
   if (error && (error as { code?: string }).code === CHAVE_DUPLICADA) {
-    throw new Error('ERP_NUMBER_IN_USE');
+    throw new NumeroErpEmUso(
+      update.erp_order_id ? await pedidoComONumeroErp(company_id, update.erp_order_id, id) : null,
+    );
   }
   if (error || !data) return null;
 
@@ -2260,6 +2312,8 @@ export async function updateOrderStatus(
       origem: 'tela',
       por: approverId,
       por_nome,
+      // O CHECK da 055 não tem um tipo próprio para isto; o motivo diz.
+      ...(lancandoSemNumero ? { motivo: 'Marcado como lançado no Control sem o número' } : {}),
       antes: { erp_order_id: row.erp_order_id ?? null, status: row.status },
       depois: { erp_order_id: update.erp_order_id ?? null, status: 'sent_erp' },
     });

@@ -12,12 +12,31 @@ import {
   setOrderNotes,
   ultimoNumeroErp,
   corrigirNumeroErp,
+  NumeroErpEmUso,
   solicitarLancamentoNoErp,
   cancelarSolicitacaoAoErp,
   deleteOrder,
   listDeletedOrders,
 } from './orders.service.js';
 import type { OrigemPedido } from './orders.service.js';
+import type { PedidoComONumeroErp } from '@csb/shared';
+
+/**
+ * O 409 do número do Control repetido, dizendo QUAL pedido já o usa — "tem
+ * outro pedido com o mesmo número e eu quero ver qual é e mudar" (Yan,
+ * 12/11/2026). O `pedido_em_uso` vai junto para a tela abrir o pedido.
+ */
+function corpoDoNumeroEmUso(pedido: PedidoComONumeroErp | null) {
+  const qual = pedido
+    ? `no pedido #${pedido.numero ?? pedido.id.slice(0, 8)}${pedido.cliente ? ` (${pedido.cliente})` : ''}`
+    : 'em outro pedido';
+  return {
+    error: `Este número do Control já está ${qual} — confira no Control qual dos dois é o certo`,
+    code: 'ERP_NUMBER_IN_USE',
+    statusCode: 409,
+    ...(pedido ? { pedido_em_uso: pedido } : {}),
+  };
+}
 import { pedirAtualizacao, confirmarAtualizacao } from './erpSync.service.js';
 import { lerCanais } from '../../lib/canais.js';
 import { tabelaDaLoja } from '../catalog/catalog.controller.js';
@@ -752,12 +771,15 @@ export async function corrigirNumeroErpHandler(
   }
   const respostas = {
     formato: { status: 422, error: 'Número do Control inválido — são duas letras e a numeração, ex.: CS17379', code: 'ERP_NUMBER_INVALID' },
-    em_uso: { status: 409, error: 'Este número do Control já está em outro pedido', code: 'ERP_NUMBER_IN_USE' },
     nao_lancado: { status: 409, error: 'Só dá para corrigir o número de um pedido já lançado no ERP', code: 'NAO_LANCADO' },
     ja_faturado: { status: 409, error: 'O pedido já foi faturado — o número agora é o da nota e não muda', code: 'JA_FATURADO' },
     not_found: { status: 404, error: 'Pedido não encontrado', code: 'NOT_FOUND' },
     erro: { status: 500, error: 'Não foi possível corrigir o número', code: 'UPDATE_FAILED' },
   } as const;
+  if (r.motivo === 'em_uso') {
+    await reply.status(409).send(corpoDoNumeroEmUso(r.pedido_em_uso));
+    return;
+  }
   const resp = respostas[r.motivo];
   await reply.status(resp.status).send({ error: resp.error, code: resp.code, statusCode: resp.status });
 }
@@ -890,7 +912,12 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       id,
       company_id,
       approverId,
-      { status: body.status, notes: body.notes ?? '', ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}) },
+      {
+        status: body.status,
+        notes: body.notes ?? '',
+        ...(body.erp_order_id ? { erp_order_id: body.erp_order_id } : {}),
+        ...(body.sem_numero === true ? { sem_numero: true } : {}),
+      },
       role,
       request.user.venda_interna === true,
       request.user.name ?? null,
@@ -953,6 +980,14 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       });
       return;
     }
+    if (err instanceof Error && err.message === 'SEM_NUMERO_SO_FINANCEIRO') {
+      await reply.status(403).send({
+        error: 'Marcar como lançado sem o número do Control é só do financeiro',
+        code: 'FORBIDDEN',
+        statusCode: 403,
+      });
+      return;
+    }
     if (err instanceof Error && err.message === 'ERP_NUMBER_REQUIRED') {
       await reply.status(422).send({
         error: 'Informe o número que o Control deu ao pedido (duas letras e a numeração, ex.: CS17379)',
@@ -962,11 +997,7 @@ export async function updateStatusHandler(request: FastifyRequest, reply: Fastif
       return;
     }
     if (err instanceof Error && err.message === 'ERP_NUMBER_IN_USE') {
-      await reply.status(409).send({
-        error: 'Este número do Control já está em outro pedido — confira no ERP',
-        code: 'ERP_NUMBER_IN_USE',
-        statusCode: 409,
-      });
+      await reply.status(409).send(corpoDoNumeroEmUso(err instanceof NumeroErpEmUso ? err.pedido : null));
       return;
     }
     if (err instanceof Error && err.message === 'INVALID_STATUS_TRANSITION') {
