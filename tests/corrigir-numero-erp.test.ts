@@ -44,11 +44,30 @@ describe('corrigirNumeroErp', () => {
     const { corrigirNumeroErp, fake } = await carregarServico([
       { data: LANCADO, error: null },
       VAZIO,
-      { data: [{ id: 'o2' }], error: null }, // o número novo é do o2
+      // o número novo é do o2 — e a recusa diz QUAL é (12/11/2026)
+      { data: [{ id: 'o2', order_number: 14890, customer: { name: 'LOJA DA ANA' } }], error: null },
     ]);
 
-    expect(await corrigirNumeroErp('o1', 'empresa-1', 'CS17380')).toEqual({ ok: false, motivo: 'em_uso' });
+    expect(await corrigirNumeroErp('o1', 'empresa-1', 'CS17380')).toEqual({
+      ok: false,
+      motivo: 'em_uso',
+      pedido_em_uso: { id: 'o2', numero: 14890, cliente: 'LOJA DA ANA' },
+    });
     expect(fake.ultimaGravacao('orders', 'update')).toBeUndefined();
+  });
+
+  it('pedido de visitante: o nome que aparece é o do visitante', async () => {
+    const { corrigirNumeroErp } = await carregarServico([
+      { data: LANCADO, error: null },
+      VAZIO,
+      { data: [{ id: 'o3', order_number: 14891, customer: null, guest_name: ' Maria ' }], error: null },
+    ]);
+
+    expect(await corrigirNumeroErp('o1', 'empresa-1', 'CS17380')).toEqual({
+      ok: false,
+      motivo: 'em_uso',
+      pedido_em_uso: { id: 'o3', numero: 14891, cliente: 'Maria' },
+    });
   });
 
   it('não mexe no pedido já faturado', async () => {

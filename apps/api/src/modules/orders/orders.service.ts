@@ -17,6 +17,7 @@ import type {
   PedidoExcluido,
   CreateOrderRequest,
   UpdateOrderStatusRequest,
+  PedidoComONumeroErp,
 } from '@csb/shared';
 import {
   ORDER_STATUS_FLOW,
@@ -271,6 +272,51 @@ function recusouOStatus(error: { code?: string; message?: string } | null): bool
 
 /** Postgres: violação de índice único. */
 const CHAVE_DUPLICADA = '23505';
+
+/**
+ * O número do Control digitado já é de OUTRO pedido. Leva junto qual é —
+ * "tem outro pedido com o mesmo número e eu quero ver qual é e mudar" (Yan,
+ * 12/11/2026). `pedido` é null quando não deu para achá-lo (a corrida que só o
+ * índice único da 042 pegou e a releitura não trouxe).
+ */
+export class NumeroErpEmUso extends Error {
+  constructor(readonly pedido: PedidoComONumeroErp | null) {
+    super('ERP_NUMBER_IN_USE');
+  }
+}
+
+/**
+ * O outro pedido desta empresa que já usa `numero` — null quando está livre.
+ * Falha de leitura conta como livre, como sempre contou: quem segura a
+ * duplicata de verdade é o índice único da 042, na gravação.
+ */
+export async function pedidoComONumeroErp(
+  company_id: string,
+  numero: string,
+  id: string,
+): Promise<PedidoComONumeroErp | null> {
+  // `*` de propósito: `order_number` (009/012) é opcional no resto do código.
+  const { data, error } = await supabase
+    .from('orders')
+    .select('*, customer:customers(name)')
+    .eq('company_id', company_id)
+    .eq('erp_order_id', numero)
+    .neq('id', id)
+    .limit(1);
+  if (error) {
+    console.error(`[numero] falha ao conferir quem usa ${numero}: ${error.message}`);
+    return null;
+  }
+  const dono = (Array.isArray(data) ? data[0] : undefined) as
+    | { id: string; order_number?: number | null; guest_name?: string | null; customer?: { name?: string | null } | null }
+    | undefined;
+  if (!dono) return null;
+  return {
+    id: dono.id,
+    numero: dono.order_number ?? null,
+    cliente: dono.customer?.name?.trim() || dono.guest_name?.trim() || null,
+  };
+}
 
 /** O pedido que já nasceu deste `local_id`, se houver. */
 async function pedidoDoLocalId(
@@ -1293,7 +1339,8 @@ export async function setOrderPayment(
 
 export type CorrigirNumeroErpResult =
   | { ok: true; erp_order_id: string }
-  | { ok: false; motivo: 'not_found' | 'formato' | 'em_uso' | 'nao_lancado' | 'ja_faturado' | 'erro' };
+  | { ok: false; motivo: 'em_uso'; pedido_em_uso: PedidoComONumeroErp | null }
+  | { ok: false; motivo: 'not_found' | 'formato' | 'nao_lancado' | 'ja_faturado' | 'erro' };
 
 /**
  * Corrige o número do Control de um pedido já lançado.
@@ -1345,14 +1392,8 @@ export async function corrigirNumeroErp(
   // está gravado segue e grava — é a normalização chegando.
   if (o.erp_order_id === numero) return { ok: true, erp_order_id: numero };
 
-  const { data: dono } = await supabase
-    .from('orders')
-    .select('id')
-    .eq('company_id', company_id)
-    .eq('erp_order_id', numero)
-    .neq('id', id)
-    .limit(1);
-  if ((dono ?? []).length > 0) return { ok: false, motivo: 'em_uso' };
+  const dono = await pedidoComONumeroErp(company_id, numero, id);
+  if (dono) return { ok: false, motivo: 'em_uso', pedido_em_uso: dono };
 
   // A correção é um dos quatro escritores do número: fica dito no pedido (048).
   const patch = await gravarOrigemDoNumero(
@@ -1366,7 +1407,8 @@ export async function corrigirNumeroErp(
     .eq('id', id)
     .eq('company_id', company_id);
   if (error) {
-    return { ok: false, motivo: (error as { code?: string }).code === CHAVE_DUPLICADA ? 'em_uso' : 'erro' };
+    if ((error as { code?: string }).code !== CHAVE_DUPLICADA) return { ok: false, motivo: 'erro' };
+    return { ok: false, motivo: 'em_uso', pedido_em_uso: await pedidoComONumeroErp(company_id, numero, id) };
   }
   // A foto do que o Control conhece passa a apontar o número certo (046).
   await atualizarNumeroNaFoto(id, company_id, numero);
@@ -2223,14 +2265,8 @@ export async function updateOrderStatus(
     if (!lancandoSemNumero) {
       const numero = normalizarNumeroErp(body.erp_order_id);
       if (!numero || !numeroErpValido(numero)) throw new Error('ERP_NUMBER_REQUIRED');
-      const { data: dono } = await supabase
-        .from('orders')
-        .select('id')
-        .eq('company_id', company_id)
-        .eq('erp_order_id', numero)
-        .neq('id', id)
-        .limit(1);
-      if ((dono ?? []).length > 0) throw new Error('ERP_NUMBER_IN_USE');
+      const dono = await pedidoComONumeroErp(company_id, numero, id);
+      if (dono) throw new NumeroErpEmUso(dono);
       update.erp_order_id = numero;
       update.synced_at = new Date().toISOString();
       // De onde veio o número: do lançamento na tela, por quem (048).
@@ -2256,7 +2292,9 @@ export async function updateOrderStatus(
   // quem chega depois bate no índice único da 042. Vira o mesmo 409 da leitura
   // — a Larissa vê "já está em outro pedido" em vez de um erro cru.
   if (error && (error as { code?: string }).code === CHAVE_DUPLICADA) {
-    throw new Error('ERP_NUMBER_IN_USE');
+    throw new NumeroErpEmUso(
+      update.erp_order_id ? await pedidoComONumeroErp(company_id, update.erp_order_id, id) : null,
+    );
   }
   if (error || !data) return null;
 

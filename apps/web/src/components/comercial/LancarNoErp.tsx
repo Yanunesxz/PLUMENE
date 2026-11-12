@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ClipboardCheck, PartyPopper } from 'lucide-react';
+import type { PedidoComONumeroErp } from '@csb/shared';
 import { Button } from '../interface/Button.js';
 import { Spinner } from '../interface/Spinner.js';
 import { normalizarNumeroErp, numeroErpValido, proximoNumeroErp, seguemAOrdem } from '@csb/shared';
@@ -39,6 +41,11 @@ interface Props {
   atual?: string | null;
   /** O que a API respondeu ao recusar — o diálogo fica aberto mostrando. */
   erro?: string | null;
+  /**
+   * O número digitado já é deste outro pedido: o diálogo oferece abri-lo
+   * (Yan, 12/11/2026 — "quero ver qual é e mudar"). Abrir fecha o diálogo.
+   */
+  pedidoEmUso?: PedidoComONumeroErp | null;
   /** O exemplo do número na série desta marca ("CS17379" / "PL02672"). */
   exemplo?: string;
   /** Modo 'solicitar': onde a espera está. */
@@ -90,6 +97,7 @@ export function LancarNoErp({
   modo = 'lancar',
   atual,
   erro,
+  pedidoEmUso = null,
   exemplo = 'CS17379',
   espera = { estado: 'parado' },
   onConfirmar,
@@ -227,6 +235,15 @@ export function LancarNoErp({
               <p className="mt-1.5 rounded-lg bg-danger-soft px-2.5 py-1.5 text-xs text-danger-soft-foreground">
                 {erro}
               </p>
+            )}
+            {erro && pedidoEmUso && (
+              <Link
+                to={`/orders/${pedidoEmUso.id}`}
+                onClick={onCancelar}
+                className="mt-1.5 inline-block text-xs font-semibold text-primary underline hover:text-foreground"
+              >
+                Abrir o pedido #{pedidoEmUso.numero ?? pedidoEmUso.id.slice(0, 8)}
+              </Link>
             )}
             {!solicitando && numero && !valido && (
               <p className="mt-1 text-xs text-danger">Formato: duas letras e números, ex.: {exemplo}.</p>

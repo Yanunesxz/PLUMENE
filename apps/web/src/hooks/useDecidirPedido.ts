@@ -12,7 +12,10 @@ import type { ApiResponse, Order, OrderStatus } from '@csb/shared';
  * sem isso o pedido continua aparecendo na fila até a próxima sincronização, e
  * quem decidiu clica de novo achando que não funcionou.
  */
-export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) => void) {
+export function useDecidirPedido(
+  /** `causa`: o erro da API, quando falhou — quem chama lê o corpo da recusa. */
+  aoTerminar?: (mensagem: string, erro: boolean, causa?: unknown) => void,
+) {
   const { token } = useAuthStore();
   const [decidindo, setDecidindo] = useState<string | null>(null);
 
@@ -54,7 +57,7 @@ export function useDecidirPedido(aoTerminar?: (mensagem: string, erro: boolean) 
       );
       return true;
     } catch (err) {
-      aoTerminar?.(err instanceof Error ? err.message : 'Não foi possível decidir agora.', true);
+      aoTerminar?.(err instanceof Error ? err.message : 'Não foi possível decidir agora.', true, err);
       return false;
     } finally {
       setDecidindo(null);

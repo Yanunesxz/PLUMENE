@@ -250,13 +250,28 @@ describe('quem decide o pedido na fila', () => {
     ).rejects.toThrow('FORBIDDEN_ROLE');
   });
 
-  it('número do Control que já é de outro pedido é recusado', async () => {
-    const { updateOrderStatus } = await carregarServico({
-      orders: [aprovado, aprovado, { data: [{ id: 'o2' }], error: null }],
+  it('número do Control que já é de outro pedido é recusado — dizendo QUAL pedido', async () => {
+    const { updateOrderStatus, NumeroErpEmUso } = await carregarServico({
+      orders: [
+        aprovado,
+        aprovado,
+        { data: [{ id: 'o2', order_number: 14890, customer: { name: 'LOJA DA ANA' } }], error: null },
+      ],
     });
-    await expect(
-      updateOrderStatus('o1', EMPRESA, 'fin-1', { status: 'sent_erp', notes: '', erp_order_id: 'CS17379' }, 'financeiro'),
-    ).rejects.toThrow('ERP_NUMBER_IN_USE');
+    const recusa = await updateOrderStatus(
+      'o1',
+      EMPRESA,
+      'fin-1',
+      { status: 'sent_erp', notes: '', erp_order_id: 'CS17379' },
+      'financeiro',
+    ).catch((e: unknown) => e);
+    expect(recusa).toBeInstanceOf(NumeroErpEmUso);
+    expect((recusa as Error).message).toBe('ERP_NUMBER_IN_USE');
+    expect((recusa as InstanceType<typeof NumeroErpEmUso>).pedido).toEqual({
+      id: 'o2',
+      numero: 14890,
+      cliente: 'LOJA DA ANA',
+    });
   });
 
   it('o gerente ainda TRIA o pedido de quem sumiu (pending_rep → fila)', async () => {

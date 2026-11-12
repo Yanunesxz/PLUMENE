@@ -26,6 +26,7 @@ import {
   mensagemDaCopiaAoRepresentante,
   podeLancarNoErp,
   podeMarcarLancadoSemNumero,
+  pedidoEmUsoDaRecusa,
   lancaPeloControl,
   faturaPeloControl,
   serieDoControl,
@@ -84,6 +85,7 @@ import type {
   PedidoParaComparar,
   EntregaPedida,
   FracionamentoDoPedido,
+  PedidoComONumeroErp,
 } from '@csb/shared';
 
 /** Uma linha do pedido em edição. O preço é só ilustração — o servidor refaz. */
@@ -464,8 +466,15 @@ export function PaginaDetalhePedido() {
   // mostra o motivo real (número repetido, canal na API) em vez de um genérico.
   const ultimaRecusa = useRef<string | null>(null);
   const lerUltimaRecusa = (): string | null => ultimaRecusa.current;
-  const { decidir, decidindo } = useDecidirPedido((mensagem, erro) => {
-    if (erro) ultimaRecusa.current = mensagem;
+  // O número digitado já é de outro pedido: qual é (12/11/2026). O diálogo
+  // de lançar e o de corrigir oferecem abri-lo.
+  const ultimoPedidoEmUso = useRef<PedidoComONumeroErp | null>(null);
+  const [pedidoEmUso, setPedidoEmUso] = useState<PedidoComONumeroErp | null>(null);
+  const { decidir, decidindo } = useDecidirPedido((mensagem, erro, causa) => {
+    if (erro) {
+      ultimaRecusa.current = mensagem;
+      ultimoPedidoEmUso.current = pedidoEmUsoDaRecusa(causa);
+    }
     setToast({ message: mensagem, type: erro ? 'error' : 'success' });
   });
 
@@ -640,6 +649,7 @@ export function PaginaDetalhePedido() {
   const abrirLancamento = async () => {
     setLancando(true);
     setErroDoLancamento(null);
+    setPedidoEmUso(null);
     // Canal na API: nada de último número nem sugestão — o diálogo só solicita.
     // Se já estava solicitado, ele abre no "conferir agora".
     if (pelaApi) {
@@ -667,8 +677,13 @@ export function PaginaDetalhePedido() {
     // diálogo fica aberto COM o que ela digitou — jogar o número fora e
     // reabrir com a sugestão de novo é o caminho curto para carimbar o errado.
     ultimaRecusa.current = null;
+    ultimoPedidoEmUso.current = null;
+    setPedidoEmUso(null);
     if (await handleDecisao('sent_erp', { erp_order_id: numeroErp })) setLancando(false);
-    else setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
+    else {
+      setErroDoLancamento(lerUltimaRecusa() ?? 'O número não foi aceito — confira no Control e tente de novo.');
+      setPedidoEmUso(ultimoPedidoEmUso.current);
+    }
   };
 
   // ─── Marcar lançado SEM o número (só o financeiro, 12/11/2026) ─────────────
@@ -690,6 +705,7 @@ export function PaginaDetalhePedido() {
     if (!id || !token) return;
     setSalvandoNumero(true);
     setErroDaCorrecao(null);
+    setPedidoEmUso(null);
     try {
       const res = await api.patch<ApiResponse<{ erp_order_id: string }>>(
         `/orders/${id}/numero-erp`,
@@ -702,6 +718,7 @@ export function PaginaDetalhePedido() {
       setToast({ message: `Número corrigido para ${res.data.erp_order_id}.`, type: 'success' });
     } catch (err) {
       setErroDaCorrecao(err instanceof Error ? err.message : 'Não foi possível corrigir.');
+      setPedidoEmUso(pedidoEmUsoDaRecusa(err));
     } finally {
       setSalvandoNumero(false);
     }
@@ -1417,6 +1434,7 @@ export function PaginaDetalhePedido() {
                         type="button"
                         onClick={() => {
                           setErroDaCorrecao(null);
+                          setPedidoEmUso(null);
                           setCorrigindoNumero(true);
                         }}
                         className="text-[10px] font-semibold text-muted-foreground underline hover:text-foreground"
@@ -2333,6 +2351,7 @@ export function PaginaDetalhePedido() {
           carregandoUltimo={carregandoUltimo}
           ocupado={decidindo !== null}
           erro={erroDoLancamento}
+          pedidoEmUso={pedidoEmUso}
           exemplo={exemploDoNumero}
           espera={espera}
           onSolicitar={() => void solicitarAoControl()}
@@ -2370,6 +2389,7 @@ export function PaginaDetalhePedido() {
           carregandoUltimo={false}
           ocupado={salvandoNumero}
           erro={erroDaCorrecao}
+          pedidoEmUso={pedidoEmUso}
           exemplo={exemploDoNumero}
           onConfirmar={(n) => void corrigirNumero(n)}
           onCancelar={() => setCorrigindoNumero(false)}

@@ -1,4 +1,11 @@
-import type { AuthRole, Order, OrderSource, OrderStatus, StatusDoCliente } from '@csb/shared';
+import type {
+  AuthRole,
+  Order,
+  OrderSource,
+  OrderStatus,
+  PedidoComONumeroErp,
+  StatusDoCliente,
+} from '@csb/shared';
 import {
   ORDER_STATUS_LABELS,
   STATUS_DO_CLIENTE_LABELS,
@@ -209,6 +216,23 @@ export function podeMarcarLancadoSemNumero(
   pedido: Pick<Order, 'status'> & { invoiced?: boolean | null; erp_requested_at?: string | null },
 ): boolean {
   return papel === 'financeiro' && pedido.status === 'approved' && !pedido.invoiced && !pedido.erp_requested_at;
+}
+
+/**
+ * O pedido que já usa o número do Control, tirado da recusa da API
+ * (409 ERP_NUMBER_IN_USE, `pedido_em_uso`) — para o diálogo oferecer "Abrir o
+ * pedido #N" (Yan, 12/11/2026). Qualquer outra recusa, ou a API antiga que
+ * não manda o pedido, dá null: o diálogo fica só com a frase.
+ */
+export function pedidoEmUsoDaRecusa(erro: unknown): PedidoComONumeroErp | null {
+  const corpo = (erro as { corpo?: Record<string, unknown> } | null | undefined)?.corpo;
+  const p = corpo?.['pedido_em_uso'] as Partial<PedidoComONumeroErp> | null | undefined;
+  if (!p || typeof p.id !== 'string' || !p.id) return null;
+  return {
+    id: p.id,
+    numero: typeof p.numero === 'number' ? p.numero : null,
+    cliente: typeof p.cliente === 'string' && p.cliente ? p.cliente : null,
+  };
 }
 
 // ─── A integração com o Control (048/049) ────────────────────────────────────
