@@ -27,7 +27,6 @@ import { Toast } from '../../components/interface/Toast.js';
 import { CartaoDecisao } from '../../components/comercial/CartaoDecisao.js';
 import { CartaoInstalar } from '../../components/interface/CartaoInstalar.js';
 import { CartaoAtualizar } from '../../components/interface/CartaoAtualizar.js';
-import { CartaoLimparCache } from '../../components/interface/CartaoLimparCache.js';
 import { CartaoAvisos } from '../../components/interface/CartaoAvisos.js';
 import { decisaoDoPedido } from '../../lib/pedido.js';
 import { situacaoDoCliente, reguaDaCarteira } from '../../lib/carteira.js';
@@ -53,8 +52,8 @@ import {
   type ClienteComAlteracaoPendente,
 } from '@csb/shared';
 
-// Suporte por WhatsApp — o número vem da configuração da marca (na Corpo
-// Sensual é o gerente comercial, que controla senhas e acessos).
+// Suporte por WhatsApp — o número vem da configuração da marca. O botão diz
+// "Falar com o suporte", sem cargo nem nome de pessoa (pedido do Yan, 12/11/2026).
 const suporteWhatsappUrl = (nome: string) =>
   `https://wa.me/${MARCA.suporteWhatsapp}?text=${encodeURIComponent(
     `Olá! Sou ${nome || 'representante'} e preciso de ajuda no app ${MARCA.nome}.`,
@@ -534,8 +533,6 @@ export function PaginaMinhaArea() {
 
       <CartaoAtualizar />
 
-      <CartaoLimparCache />
-
       <section>
         <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
           Sincronização
@@ -611,7 +608,7 @@ export function PaginaMinhaArea() {
               <MessageCircle className="h-5 w-5" strokeWidth={2} />
             </span>
             <span className="min-w-0">
-              <span className="block text-sm font-medium text-foreground">Falar com o gerente comercial</span>
+              <span className="block text-sm font-medium text-foreground">Falar com o suporte</span>
               <span className="block text-xs text-muted-foreground">
                 Senha, acesso ou dúvidas · WhatsApp {MARCA.suporteWhatsappLabel}
               </span>

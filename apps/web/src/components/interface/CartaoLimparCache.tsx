@@ -5,8 +5,9 @@ import { Button } from './Button.js';
 import { Spinner } from './Spinner.js';
 
 /**
- * "Limpar cache" — na Minha Área e na página /limpar-cache (que abre até sem
- * login, para o aparelho que travou). Pede confirmação: a recarga tira a
+ * "Limpar cache" — só na página /limpar-cache (que abre até sem login, para o
+ * aparelho que travou; o link vai pelo WhatsApp). Saiu da Minha Área em
+ * 12/11/2026, a pedido do Yan. Pede confirmação: a recarga tira a
  * pessoa da tela em que está. Ver `limparCache.ts` para o que sai e o que fica.
  */
 export function CartaoLimparCache() {
