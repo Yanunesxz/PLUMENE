@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { db } from '../../offline/db.js';
 import { api } from '../../services/api.js';
+import { CartaoCashbackDaLoja } from '../cashback/CartaoCashbackDaLoja.js';
 import { useAuthStore } from '../../store/authStore.js';
 import { useOnlineStatus } from '../../hooks/useOnlineStatus.js';
 import { useCartStore } from '../../store/cartStore.js';
@@ -244,6 +245,9 @@ export function PaginaMinhaAreaLoja() {
           </div>
         </div>
       )}
+
+      {/* O cashback da venda interna (058): some sozinho para quem nunca ganhou. */}
+      <CartaoCashbackDaLoja />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Cartao icon={Package} tint="brand" valor={String(resumo.total_pecas)} rotulo="Peças compradas" />

@@ -407,7 +407,8 @@ describe('visualizador NÃO ESCREVE', () => {
  */
 // 055: PATCH /orders/:id/inativo (financeiro/admin) entrou com guarda.
 // 057: POST /orders/:id/fracionar e PATCH /orders/:id/data-de-envio, idem.
-const QUANTAS_ESCRITAS_COM_GUARDA = 55;
+// 058: +2 (POST e DELETE /cashback/pedidos/:id/uso).
+const QUANTAS_ESCRITAS_COM_GUARDA = 57;
 
 /** `/customers/:id/varejo` → `/customers/<uuid>/varejo`. */
 const comParametros = (caminho: string) =>

@@ -1,4 +1,4 @@
-import { BarChart3, ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing, Cable } from 'lucide-react';
+import { BarChart3, ShoppingBag, ClipboardList, Users, LayoutDashboard, Contact, Gauge, UploadCloud, KeyRound, Store, ShieldCheck, CalendarClock, BellRing, Cable, Wallet } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { temPermissao } from '@csb/shared';
 import type { UserRole, PermissaoGerente } from '@csb/shared';
@@ -21,6 +21,13 @@ export interface NavItem {
   /** Tecla do gerente que abre esta tela. Sem isto, todo gerente vê o item. */
   permissao?: PermissaoGerente;
 }
+
+/**
+ * A área Cashback (058; Yan, 12/11/2026): o cashback que a venda interna passa
+ * aos clientes. O representante comum não vê — `navItemsForRole` só a põe no
+ * menu do rep quando ele é de venda interna.
+ */
+const cashbackItem: NavItem = { to: '/cashback', label: 'Cashback', icon: Wallet };
 
 const repItems: NavItem[] = [
   { to: '/minha-area', label: 'Minha área', short: 'Área', icon: Gauge, fila: 'triagem' },
@@ -51,6 +58,7 @@ const managerItems: NavItem[] = [
   // Representantes, pedido do Yan. Sem tecla: o gerente sem a de gerenciar
   // representantes continua vendo as metas (é leitura).
   { to: '/desempenho', label: 'Metas', icon: BarChart3 },
+  cashbackItem,
   { to: '/acessos', label: 'Acessos', icon: KeyRound },
   // Importar era exclusiva do admin — que continua vendo sempre, porque tecla
   // não se aplica a ele. O gerente só vê se o admin ligar a dele.
@@ -74,6 +82,7 @@ const financeiroItems: NavItem[] = [
   { to: '/orders', label: 'Pedidos', icon: ClipboardList, fila: 'aprovacao' },
   { to: '/catalog', label: 'Catálogo', icon: ShoppingBag },
   { to: '/customers', label: 'Clientes', icon: Users },
+  cashbackItem,
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
   // É a mesa dele que espera o número do Control: aqui ele vê se o Control
   // está chegando e pede uma passada agora.
@@ -120,6 +129,7 @@ const visualizadorItems: NavItem[] = [
   { to: '/customers', label: 'Clientes', short: 'Client.', icon: Users },
   { to: '/representantes', label: 'Representantes', short: 'Reps', icon: Contact },
   { to: '/desempenho', label: 'Metas', icon: BarChart3 },
+  cashbackItem,
   { to: '/atividades', label: 'Atividades', short: 'Ativ.', icon: CalendarClock },
   { to: '/integracao', label: 'Integração', short: 'Control', icon: Cable },
   { to: '/logins', label: 'Logins', icon: ShieldCheck },
@@ -128,6 +138,7 @@ const visualizadorItems: NavItem[] = [
 export function navItemsForRole(
   role: UserRole | undefined,
   permissions?: PermissaoGerente[] | null,
+  vendaInterna = false,
 ): NavItem[] {
   const daFabrica = role === 'admin' ? adminItems : role === 'manager' ? managerItems : null;
   if (daFabrica && role) {
@@ -143,5 +154,11 @@ export function navItemsForRole(
   // (Minha área com fila de triagem, Alertas e Acessos).
   if (role === 'visualizador') return visualizadorItems;
   if (role === 'store') return storeItems;
+  // A venda interna (031) é rep com um interruptor: ganha o Cashback logo
+  // depois de Clientes.
+  if (vendaInterna) {
+    const i = repItems.findIndex((item) => item.to === '/customers') + 1;
+    return [...repItems.slice(0, i), cashbackItem, ...repItems.slice(i)];
+  }
   return repItems;
 }

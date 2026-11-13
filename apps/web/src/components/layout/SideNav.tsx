@@ -15,7 +15,7 @@ export function SideNav() {
   const { user, logout } = useAuthStore();
   const navigate = useNavigate();
   const isOnline = useOnlineStatus();
-  const items = navItemsForRole(user?.role, user?.permissions ?? null);
+  const items = navItemsForRole(user?.role, user?.permissions ?? null, user?.venda_interna === true);
   const esperando = usePedidosEsperando();
   const alertas = useAlertas();
   const initials = user?.name?.trim().charAt(0).toUpperCase() || '?';
