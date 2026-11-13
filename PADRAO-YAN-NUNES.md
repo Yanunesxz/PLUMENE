@@ -1,8 +1,8 @@
 # Padrão Yan Nunes — instruções para a IA
 
-> **Para a IA que recebeu este arquivo:** você vai criar ou alterar um sistema, site ou tela da **YAN NUNES — Sistemas & Consultoria**. Siga tudo o que está aqui. Se o pedido conflitar com uma regra, avise e pergunte antes de seguir; não improvise.
+> **Para a IA que recebeu este arquivo:** você vai criar ou alterar um sistema, site ou tela da **YAN NUNES — Sistemas & Consultoria**. Siga tudo o que está aqui: o **processo de criação** (seção 0), o visual, os dados, a segurança e a comunicação. Se o pedido conflitar com uma regra, avise e pergunte antes de seguir; não improvise.
 >
-> Versão **0.2.0** · Fonte oficial: https://github.com/Yanunesxz/SystemDesing · Vitrine: https://systemdesing.vercel.app
+> Versão **0.5.2** · Fonte oficial: https://github.com/Yanunesxz/SystemDesing · Vitrine: https://systemdesing.vercel.app
 
 ---
 
@@ -19,8 +19,36 @@ Pergunte só o que **não** estiver claro no pedido:
    - CRM comercial: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/main/docs/dominios/crm.md
    - Atendimento / SAC: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/main/docs/dominios/atendimento.md
    - Loja e marketplaces: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/main/docs/dominios/ecommerce.md
+6. **Perfil do sistema** (decide quais regras da seção 11 valem):
+   - tem página aberta ao público, sem login?
+   - vende ou cobra online?
+   - usa rastreamento (Pixel, Analytics, Tag Manager, Hotjar)?
+   - guarda dado pessoal?
 
 **Stack padrão** (use se o pedido não disser outra): React + Vite + TypeScript `strict` + Tailwind 4 + `lucide-react` + Supabase (Postgres com RLS, Auth, Storage privado, Edge Functions), front na Vercel. API própria em Node + Fastify só quando houver integração pesada. Testes com Vitest.
+
+### O processo de criação (siga nesta ordem)
+
+Todo projeto novo passa por estas fases. Cada uma termina num **portão**: não pule.
+
+| Fase | O que você entrega | Portão: só segue quando... |
+|---|---|---|
+| 1. Entender | Problema em uma frase, quem usa, perfil, número de sucesso (hoje e meta), o que fica fora | O dono aprova o resumo (modelo 1 da seção 8) |
+| 2. Desenhar | Tarefas principais com o caminho mais curto; telas com carregando, vazio, erro, sem dados e sucesso; **protótipo no modo demonstração**, sem banco | Quem vai usar faz a tarefa principal no celular, sem ajuda |
+| 3. Modelar | Tabelas, status, papéis, RLS e integrações (seções 9 e 10) | RLS testada com um usuário de cada papel |
+| 4. Construir | O sistema, em partes pequenas: tema claro e escuro, responsivo, aba Diagnóstico e crédito desde o começo | Build e testes verdes; telas em 375, 768, 1280 e 1920px, claro e escuro |
+| 5. Conferir | Diagnóstico, teste com gente de verdade e teste do que dá errado (sem internet, clique duplo, mais de 1.000 linhas, integração fora) | Checklist da seção 12 completo |
+| 6. Entregar | Publicado, acesso de administrador com o dono, vídeo de até 5 min por papel, canal de suporte | O dono confirma por escrito (modelo 5 da seção 8) |
+| 7. Acompanhar | Número de sucesso medido em 2 e em 4 semanas | Resultado enviado ao dono (modelo 6) |
+
+**Como você (IA) trabalha:**
+- Pergunte o que falta da fase 1 e devolva o resumo para aprovar.
+- Proponha telas e dados (fases 2 e 3) e espere aprovação antes de criar banco ou integração.
+- Em Lovable, v0 ou Bolt, a primeira entrega é só o protótipo da fase 2.
+- Construa em partes pequenas, com uma decisão importante registrada em `docs/decisoes/`.
+- Termine com o checklist da seção 12, dizendo o que falta sem esconder nada.
+
+Detalhes de cada fase: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/docs/00-processo-de-criacao.md
 
 ---
 
@@ -118,9 +146,9 @@ Se a cor do cliente sumir no fundo preto do tema escuro (contraste abaixo de 3:1
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400..700&display=swap">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Yanunesxz/SystemDesing@v0.2.0/ui/tokens.css">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Yanunesxz/SystemDesing@v0.2.0/ui/componentes.css">
-<script src="https://cdn.jsdelivr.net/npm/lucide@1.49.0/dist/umd/lucide.min.js" defer></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Yanunesxz/SystemDesing@v0.5.2/ui/tokens.css" integrity="sha384-CntIL5+VFHhMLSIPa6bBBjZThJtoXIy2PwHwZyfau9/yfXVkTLRTDMIflDZrdgu5" crossorigin="anonymous">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/Yanunesxz/SystemDesing@v0.5.2/ui/componentes.css" integrity="sha384-vYFiffANZ/l6ogxf+jSzVQEz+6O6TpScqr79TefOEQ56g7l3Kmp5Zq1eMwuePE7w" crossorigin="anonymous">
+<script src="https://cdn.jsdelivr.net/npm/lucide@1.49.0/dist/umd/lucide.min.js" integrity="sha384-7mWwAGEOOlxvEBR+Mpy0eVhGL+9abGHkZtVoTs+dvrWkI5g00lyMaAxRIK+rqXGt" crossorigin="anonymous" defer></script>
 <script>addEventListener("DOMContentLoaded", () => lucide.createIcons());</script>
 
 <!-- Só em sistema de cliente: -->
@@ -130,6 +158,8 @@ Se a cor do cliente sumir no fundo preto do tema escuro (contraste abaixo de 3:1
 ```
 
 > Se os links do jsDelivr não carregarem, copie os dois CSS do **Anexo** deste documento para arquivos do projeto.
+
+> **Não tire o `integrity` nem o `crossorigin`.** O `integrity` é a impressão digital do arquivo desta versão: se alguém mudar o arquivo no CDN, o navegador recusa em vez de carregar. Script ou CSS de qualquer CDN entra assim: versão fixa, `integrity` e `crossorigin="anonymous"`. Nunca `@latest` nem sem versão.
 
 ### Regras de código
 
@@ -148,7 +178,7 @@ Todo sistema tem a mesma casca. Quem usa um sistema da Yan Nunes acha tudo no me
 │ marca     [⇤] │ .yn-topbar   [☰]  título            ação  [☾]  │
 │ [empresa ▾]   ├───────────────────────────────────────────────┤
 │               │ .yn-content                                   │
-│ .yn-nav       │   o conteúdo da tela (até 1280px de largura)  │
+│ .yn-nav       │   o conteúdo da tela (usa a largura toda)     │
 │  Visão geral  │                                               │
 │  Pedidos  (3) │                                               │
 │  CADASTROS    │                                               │
@@ -170,7 +200,7 @@ Todo sistema tem a mesma casca. Quem usa um sistema da Yan Nunes acha tudo no me
 | Coluna principal | `.yn-main` | Tudo à direita do menu | Sempre |
 | Faixa no topo | `.yn-banner` | Modo demonstração, sem internet, versão nova, integração parada | Só quando acontece |
 | Barra do topo | `.yn-topbar` | Botão do menu (`.yn-nav-toggle`, só aparece no celular), título (`.yn-eyebrow` + `h1`), a ação principal e o botão de tema | Sempre |
-| Conteúdo | `.yn-content` | A tela em si, em grade com 24px entre blocos | Sempre |
+| Conteúdo | `.yn-content` | A tela em si, em grade com 24px entre blocos. Usa toda a largura que sobra ao lado do menu; formulário e texto usam `.yn-content--narrow` (960px) | Sempre |
 | Crédito | `.yn-credit` | "Criado por Yan Nunes", uma linha pequena | Sistema de cliente |
 | Abas embaixo | `.yn-tabbar` | Menu do celular no modelo abas | Modelo abas |
 
@@ -244,7 +274,7 @@ Todo sistema tem a mesma casca. Quem usa um sistema da Yan Nunes acha tudo no me
       </button>
     </header>
 
-    <main class="yn-content">
+    <main class="yn-content">   <!-- tela de formulário ou de leitura: class="yn-content yn-content--narrow" -->
       <!-- conteúdo da tela -->
     </main>
 
@@ -330,7 +360,7 @@ No computador os dois são iguais: menu lateral fixo, que recolhe para só ícon
    </div>
    ```
 3. **A escolha fica guardada** no `localStorage` (chave `tema`). Com login, guarde também no perfil para valer em outro aparelho.
-4. **Não pisca ao abrir:** o script de uma linha do `<head>` aplica a escolha antes de a tela aparecer. Em React, ele fica no `index.html`, nunca num componente.
+4. **Não pisca ao abrir:** o script de uma linha do `<head>` aplica a escolha antes de a tela aparecer. Em React, a linha do `try` fica no arquivo `public/tema.js`, chamado no `<head>` do `index.html` com `<script src="/tema.js"></script>` (sem `defer`). Nunca num componente, e fora do HTML para a CSP não precisar liberar script na página (seção 10).
 5. **Só tokens.** O escuro vem dos tokens: proibido `.dark .bg-white {…}`, remapear a paleta do framework ou escrever cor fixa. Logo e gráfico em imagem têm versão para fundo escuro.
 6. **Toda tela é conferida nos dois temas** antes de entregar.
 
@@ -342,10 +372,26 @@ No computador os dois são iguais: menu lateral fixo, que recolhe para só ícon
 |---|---|---|
 | Celular | até 768px | Menu vira gaveta ou abas embaixo; uma coluna; 16px de margem lateral; título menor; ações da barra do topo descem para a linha de baixo |
 | Tablet e notebook pequeno | 769px a 960px | Menu lateral fixo (recolha se apertar); ficha 360 ainda empilhada; grades se ajustam sozinhas |
-| Computador | acima de 960px | Tudo lado a lado; o conteúdo para em 1280px |
+| Computador | acima de 960px | Tudo lado a lado; a tela de trabalho usa toda a largura do monitor |
 | Tela de toque | qualquer largura com dedo (`pointer: coarse`) | Tudo que se aperta tem 44px; campos com letra de 16px (abaixo disso o iPhone dá zoom sozinho) |
 
-Só existem os cortes de **768px** e **960px**; o resto se ajusta sozinho com grade `auto-fit`. Os componentes `yn-*` já fazem tudo isso.
+**Responsivo pelo espaço, não só pelo aparelho.** O menu muda pelo aparelho (768px). O resto muda pela largura **de onde está**:
+- a página, o `.yn-content` e o `.yn-container` são áreas que respondem ao espaço;
+- a ficha 360 empilha abaixo de 900px de área;
+- formulário longo e caixa de mensagens empilham abaixo de 720px;
+- a tabela `--stack` vira cards abaixo de 640px.
+
+A mesma ficha num painel lateral estreito empilha como no celular, mesmo num monitor grande. Os componentes `yn-*` já fazem tudo isso.
+
+**Use o espaço do monitor:**
+- **Tela de trabalho** (lista, quadro, tabela, painel, mensagens) usa toda a largura que sobra ao lado do menu. Nada de quadro rolando de lado com metade da tela vazia.
+- **Nunca trave a largura da tela de trabalho.** Nada de `max-width` fixo nela nem em nada em volta dela:
+  - nem `max-width: 1280px` (ou `var(--content-max)`, que saiu na v0.4.1);
+  - nem `container`, `mx-auto` e as classes `max-w-5xl`, `max-w-6xl`, `max-w-7xl` e `max-w-screen-xl` do Tailwind.
+
+  O quadro (`.yn-kanban`) abre as colunas que couberem (mínimo de 260px cada) e só rola de lado quando não cabem.
+- **Tela de formulário ou de leitura** usa `.yn-content--narrow`.
+- **Componente num espaço menor que a tela** (painel lateral, metade da tela) fica dentro de `<div class="yn-container">`.
 
 | Peça | Computador | Celular |
 |---|---|---|
@@ -364,7 +410,7 @@ Só existem os cortes de **768px** e **960px**; o resto se ajusta sozinho com gr
 
 Regras:
 
-1. **Nunca rolagem lateral na página.** Só rola de lado o que foi feito para isso: tabela larga, quadro, grade de tamanho e cor, filtros rápidos e abas.
+1. **Nunca rolagem lateral na página.** Só rola de lado o que foi feito para isso: tabela larga, quadro, grade de tamanho e cor, filtros rápidos e abas. E só quando não há espaço sobrando.
 2. **Grade sem corte fixo:** `grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr))`.
 3. **Altura de tela:** `100dvh`, não `100vh`.
 4. **Coisa presa embaixo** soma `env(safe-area-inset-bottom)` (os componentes já fazem; a página precisa de `viewport-fit=cover`).
@@ -372,7 +418,7 @@ Regras:
 6. **Imagem** com `max-width: 100%` e proporção fixa (`aspect-ratio`).
 7. **Texto longo** (nome, e-mail, endereço) quebra com `overflow-wrap: anywhere` ou corta com reticências e mostra tudo no detalhe.
 8. **A ação principal fica visível no celular:** no topo, no rodapé fixo do formulário ou no botão flutuante. Nunca escondida num menu.
-9. **Teste** em 375px, 390–430px, 768px, 1280px e 1440px, no claro e no escuro: sem rolagem lateral, menu abrindo e fechando, botões com 44px no celular.
+9. **Teste** em 375px, 390–430px, 768px, 1280px e 1920px, no claro e no escuro: sem rolagem lateral, menu abrindo e fechando, botões com 44px no celular, e a tela de trabalho usando o monitor todo. A aba Diagnóstico (seção 11) testa isso sozinha.
 
 ### Componentes
 
@@ -431,13 +477,17 @@ Regras:
 | Gráfico de barras | `<ul class="yn-bars"><li class="yn-bars__row" style="--value: 86"><span class="yn-bars__label">Carlos M.</span><span class="yn-bars__track"><span class="yn-bars__fill"></span></span><span class="yn-bars__value">R$ 82,4 mil</span></li></ul>`; em pé: `.yn-columns` > `.yn-columns__col` (`--value`) > `.yn-columns__bar`. Sempre com `<details class="yn-as-table"><summary>Ver como tabela</summary>...</details>` |
 | Ranking | `<ol class="yn-ranking"><li aria-current="true"><span class="yn-avatar">CM</span><span class="yn-ranking__name">Carlos M. (você)</span><span class="yn-ranking__value">R$ 82.400,00</span></li></ol>` |
 | Régua de meta | `<div class="yn-meter" data-state="behind" style="--value: 62; --expected: 70"><div class="yn-meter__head">...</div><div class="yn-meter__track"><span class="yn-meter__fill"></span><span class="yn-meter__mark"></span></div><div class="yn-meter__legend">...</div></div>` (`behind`, `ahead`, `done`) |
+| Área que responde ao espaço | `<div class="yn-container">...</div>`: o que estiver dentro se ajusta à largura dela (painel lateral, metade da tela) |
+| Diagnóstico | `<section id="diagnostico"></section>` + `YNDiagnostico.montar(...)` (seção 11); desenha o `.yn-audit` |
+| Aviso de cookies (página pública com rastreamento) | `<div class="yn-consent" role="region" aria-label="Aviso de cookies"><p>Usamos cookies para... <a href="/cookies">Saiba mais</a></p><div class="yn-consent__actions"><button class="yn-btn yn-btn--secondary">Recusar</button><button class="yn-btn yn-btn--secondary">Configurar</button><button class="yn-btn yn-btn--secondary">Aceitar</button></div></div>` |
+| Rodapé legal (página pública) | `<footer class="yn-legal"><nav class="yn-legal__links" aria-label="Informações legais"><a href="/privacidade">Política de privacidade</a><a href="/termos">Termos de uso</a></nav><p class="yn-legal__company">Razão social · CNPJ · endereço com CEP · e-mail · telefone</p></footer>`, antes do `.yn-credit` |
 | Formulário longo | `<section class="yn-form-section"><div class="yn-form-section__intro"><h2>Empresa</h2><p>...</p></div><div class="yn-form-grid">campos (`.yn-field--full` ocupa a linha)</div></section>` + `<div class="yn-form-footer"><span class="yn-form-footer__status" data-dirty>Alterações não salvas</span>Cancelar · Salvar</div>` |
 
 Os cards de indicador ficam em grade: `display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));`
 
 ### React + Tailwind 4 (Lovable, v0, Bolt, Claude Code)
 
-1. Coloque os links do `<head>` (acima) no `index.html`, **incluindo o script de uma linha do tema** (num componente ele pisca), e use as classes `yn-*` em `className` quando servirem.
+1. Coloque os links do `<head>` (acima) no `index.html`, com o `integrity`, e use as classes `yn-*` em `className` quando servirem. O script de uma linha do tema vai para `public/tema.js` e entra no `<head>` como `<script src="/tema.js"></script>` (num componente ele pisca; escrito dentro do HTML, a CSP bloqueia). Evento é `onClick`, nunca `onclick=""` no HTML. O Lucide vem do pacote `lucide-react`, não do CDN.
 2. No CSS principal (ex.: `src/index.css`), logo depois de `@import "tailwindcss";`, cole **exatamente** este bloco. Ele apaga a paleta do Tailwind (`bg-blue-500` e afins deixam de existir) e cria as cores do padrão:
 
 ```css
@@ -521,10 +571,49 @@ Use as tabelas da seção 3 e estas medidas:
 12. **Formulário longo:** seções, botões de ação fixos no rodapé, aviso ao sair sem salvar.
 13. **Estado na URL:** aba, filtro e página atuais ficam no endereço, para o link funcionar quando compartilhado.
 14. **Faixa no topo** para: modo demonstração, sem internet, versão nova disponível.
+15. **Tela de trabalho usa a largura toda do monitor.** Formulário e texto usam `.yn-content--narrow`.
+16. **Aba Diagnóstico em todo sistema** (seção 11), com só as regras que valem para o perfil dele.
+
+### Leis de UX
+
+Cada lei vira uma regra que dá para conferir na tela. Explicação e exemplo de cada uma: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/docs/08-leis-de-ux.md
+
+| Lei | O que o sistema faz |
+|---|---|
+| 1. Hick (mais opções, decisão mais lenta) | Um botão principal por tela; menu com até 8 itens por grupo; mais de 5 filtros vão para trás de "Filtros"; escolha entre muitos itens vira `.yn-combobox` |
+| 2. Fitts, tamanho | 44px de toque; o rótulo também é clicável; a ação principal é o maior botão |
+| 3. Jakob (funcionar como os outros sites) | Logo leva ao início, busca no topo, carrinho no canto, menu à esquerda no computador; checkout na ordem do Mercado Livre e da Shopee; nenhum gesto escondido |
+| 4. Proximidade | Rótulo colado no campo; grupos separados por 24px ou mais; ações de um item dentro do item |
+| 5. Miller (7 itens na memória) | Máscaras (CPF, telefone, R$), formulário em seções, número formatado; contexto (cliente, pedido) sempre à vista |
+| 6. Doherty (resposta em até 0,4 s) | O botão reage na hora (`aria-busy`); resultado antes da confirmação quando é seguro; esqueleto; lista paginada no banco; tela principal em até 2 s no 4G |
+| 7. Von Restorff (o diferente é lembrado) | Só uma coisa se destaca por tela; cor de status só quando pede atenção; nada piscando |
+| 8. Fitts, distância | Ações em sequência juntas; no celular, a ação principal no alcance do polegar (rodapé fixo, abas, botão flutuante); Excluir longe da ação principal |
+| 9. Posição serial | O mais usado primeiro no menu e o segundo mais importante por último; o que pede ação no topo da lista |
+| 10. Pico-fim | Sucesso caprichado, com confirmação clara e o próximo passo; o fim de um fluxo nunca é tela vazia nem erro genérico |
+| 11. Zeigarnik (o incompleto gruda) | Rascunho salvo, "Alterações não salvas", progresso ("3 de 5"), carrinho lembrado, pendências com contador |
+| 12. Navalha de Occam | Campo, tela ou etapa sem motivo sai |
+| 13. Tesler (a complexidade muda de lado) | O sistema faz o trabalho chato: CEP preenche, frete e total calculados, valor padrão, importar em vez de digitar |
+| 14. Postel (aceite qualquer formato) | CPF com ou sem ponto, telefone com ou sem 55, valor com vírgula ou ponto; grava padronizado; o erro mostra o formato certo e não apaga o que foi digitado |
+| 15. Murphy (vai dar errado) | Fila sem internet, botão que trava enquanto grava, "A cadastrar", faixa de integração parada, confirmação com o nome do item e "Desfazer" |
+| 16. Semelhança | Mesma ação, mesmo visual (`yn-*`), em todo o sistema |
+| 17. Conectividade uniforme | O que é do mesmo assunto fica no mesmo card ou ligado por linha (`.yn-steps`, `.yn-timeline`) |
+| 18. Parkinson (a tarefa ocupa todo o tempo) | Prazo visível e verdadeiro (`.yn-deadline`); nada de urgência falsa |
+| 19. Carga cognitiva | Um assunto por tela, texto curto com verbo, palavras do negócio, valor padrão, avançado escondido |
+| 20. Gradiente de meta | Mostrar quanto falta: `.yn-meter`, etapas, "Faltam R$ 40,00 para o frete grátis" |
+
+**Antes de mandar uma tela para aprovação, responda:**
+1. Qual é a uma ação principal, e ela é o botão mais forte, no alcance do dedo?
+2. Funciona como os sites que a pessoa já usa?
+3. Dá para entender os grupos sem ler tudo?
+4. Tem algo que dá para tirar?
+5. O sistema fez o trabalho chato e aceitou o que a pessoa digitou?
+6. Como fica quando demora, quando dá errado e quando dá certo?
+7. A pessoa sabe o que falta e até quando?
+8. O mais importante está no começo do menu e no topo da lista?
 
 ---
 
-## 8. Textos
+## 8. Textos e comunicação
 
 - Português do Brasil, tratando por "você". Frase curta, **verbo no começo** ("Salvar pedido", "Ver clientes").
 - Fale da **operação** do usuário, não da tecnologia.
@@ -536,6 +625,51 @@ Use as tabelas da seção 3 e estas medidas:
 | Erro | "Erro inesperado." | "Não deu para salvar: o CNPJ está incompleto." |
 | Vazio | "Nenhum registro encontrado." | "Nenhum cliente ainda. Cadastre o primeiro em Novo cliente." |
 | Confirmação | "Tem certeza?" | "Excluir o pedido #4821? Isso não pode ser desfeito." |
+
+### Avisos e notificações do sistema
+
+| Situação | Onde avisa |
+|---|---|
+| Resultado do que a pessoa acabou de fazer | Na tela: `.yn-toast` (deu certo) ou erro no próprio campo (`.yn-error`, `.yn-alert`) |
+| Algo que vale para a tela inteira | `.yn-banner` no topo |
+| Algo que pede ação depois | Contador no menu (`.yn-count`) e lista de pendências |
+| Algo urgente para quem está fora do sistema | E-mail ou WhatsApp, com link direto para a ação |
+
+- **Só avisa o que pede ação ou o que a pessoa espera.** O resto vai para o histórico.
+- **Do mais leve ao mais forte:** primeiro na tela, depois e-mail. WhatsApp só para o urgente ou para o que a pessoa pediu.
+- **Comprador:** o aviso do pedido (confirmação, nota, envio) vai sempre. Promoção só com `marketing_opt_in`.
+- **Horário comercial** (fuso de São Paulo) para o que não é urgente. Muitos avisos viram um resumo por dia.
+- **Todo aviso** diz o que aconteceu, o que fazer e traz o link para fazer.
+- **Nada sensível no texto do aviso** (CPF, endereço, saúde, senha): ele aparece na tela bloqueada.
+- **Cada pessoa escolhe** o que recebe e por qual canal, em Configurações → Avisos.
+- **WhatsApp oficial:** modelo aprovado e janela de atendimento. Confira as regras atuais na documentação oficial da Meta.
+- **Quando algo para:**
+  - faixa no topo dizendo o que parou, o que continua funcionando e o que fazer;
+  - o sistema segura o trabalho na fila;
+  - quando volta, aparece "Tudo funcionando de novo desde [hora]".
+
+### Comunicação com o cliente durante o projeto
+
+- **Canal:**
+  - recado rápido no WhatsApp do projeto;
+  - decisão, escopo, aprovação e entrega por escrito e guardados;
+  - assunto delicado por ligação ou áudio, e depois por escrito.
+- **Resumo toda semana**, no mesmo dia. Mostre a prévia em vez de descrever.
+- **Prazo:** com folga, dizendo o que depende de quem. Má notícia primeiro e cedo.
+- **Pedido fora do combinado:** reconheça e dê opções, sem aceitar calado.
+- **Nunca** senha nem dado sensível por WhatsApp ou e-mail. Nada de jargão técnico.
+
+Modelos (troque o que está entre colchetes; preço e valor ficam fora):
+
+1. **Entendimento (fase 1):** "Oi, [nome]! Resumo do que entendi, para você confirmar. Problema: [uma frase]. Quem usa: [papéis]. Vamos medir: [número, hoje e meta]. A primeira versão faz: [tarefas]. Fica para depois: [lista]. Está certo? Se estiver, responde "ok" que eu sigo para as telas."
+2. **Prévia para testar:** "[nome], a prévia de [tela] está pronta: [link]. Abre no celular e tenta [tarefa]. Os dados são de exemplo. Me conta onde travou. Preciso do retorno até [dia] para manter o prazo."
+3. **Resumo da semana:** "Feito: [itens]. Próxima semana: [itens]. Preciso de você: [decisão ou acesso] até [dia]. Entrega: [mantida / nova data e por quê]."
+4. **Pedido fora do combinado:** "[pedido] não estava no combinado da primeira versão. Dá para fazer depois da entrega, ou agora tirando [item] ou passando a entrega para [data]. Qual você prefere?"
+5. **Entrega:** "O [sistema] está no ar: [link]. Seu acesso de administrador chegou por e-mail; troque a senha no primeiro acesso. Treinamento: [vídeo] e [guia]. Suporte: [canal e horário]. Me confirma que recebeu tudo?"
+6. **Resultado:** "[2 ou 4] semanas de [sistema]: [número] antes [x], agora [y]. Ajustes pedidos: [lista]. Sigo com [próximo] se você concordar."
+7. **Problema no sistema:** "Aviso: [o que parou] desde [hora]. O que já fizemos: [ação]. Enquanto isso: [o que fazer]. Próxima atualização até [hora]." Depois, por escrito: o que aconteceu, por quê e o que mudou para não repetir.
+
+Detalhes: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/docs/09-comunicacao.md
 
 ---
 
@@ -577,6 +711,16 @@ Use as tabelas da seção 3 e estas medidas:
 - Webhook com segredo no **cabeçalho** ou HMAC, nunca na URL. CORS restrito. `vercel.json` com cabeçalhos de segurança.
 - IA recebe o **mínimo** de dado pessoal; ela sugere, nunca responde sozinha ao cliente.
 - Senhas, tokens e chaves **só em variável de ambiente**. Nunca no código, no README ou colados no chat. O `.env` nunca vai para o Git.
+- **Variável `VITE_` vai para o navegador** e qualquer pessoa lê: só a URL do Supabase e a chave `anon`/`publishable`. Chave `service_role`/`sb_secret_`, da IA, do gateway, do Mercado Livre e da Meta só em Edge Function ou API.
+- **O que vem de fora é texto, nunca código** (nome de cliente, mensagem do WhatsApp, pergunta do Mercado Livre): proibido `dangerouslySetInnerHTML` ou `innerHTML` com isso (precisou de HTML, passe pelo DOMPurify). Validação no servidor com Zod. Filtro do Supabase nunca montado juntando texto (`` .or(`name.ilike.%${busca}%`) ``): use `.ilike("name", ...)` ou RPC com parâmetro.
+- **Link público** (acompanhar pedido, proposta, segunda via) usa token aleatório, nunca o número do pedido: com `/pedido/4817`, quem troca para `4818` vê o pedido de outro cliente.
+- **Pagamento:** cartão só no checkout do gateway, nunca passa pelo sistema. "Pago" só depois de o servidor consultar o pagamento no gateway; nunca pelo `?status=approved` da URL de volta nem só pelo corpo do webhook.
+- **CSP** no `vercel.json` (modelo em `templates/vercel.json`): sem script escrito dentro do HTML e sem `onclick=""`; domínio novo (Sentry, SDK do gateway) entra na lista no mesmo PR, nunca com `*`.
+- **Dependências:** lockfile no Git; `npm audit` e gitleaks no CI (`templates/ci.yml`); Dependabot ligado (`templates/dependabot.yml`). Script ou CSS de CDN com versão fixa, `integrity` e `crossorigin`. Pixel, Analytics e chat de terceiros nunca em tela logada com dado de cliente.
+- **Arquivo enviado:** tipo conferido pelo conteúdo, tamanho máximo e nome gerado pelo sistema; SVG ou HTML de fora nunca abre direto na página. **Planilha exportada:** célula de texto que começa com `=`, `+`, `-` ou `@` ganha um `'` na frente.
+- **Exportar ou apagar em massa:** só gestor, registrado na linha do tempo (quem, quando, quantas linhas).
+- **IA:** texto de cliente é dado, não ordem (*prompt injection*). A IA não tem ferramenta que grava, envia, estorna ou dá desconto sem uma pessoa aprovar. Chave da IA só no servidor, com limite de gasto no painel.
+- **Incidente** (vazou dado ou entrou quem não devia): conter na hora (revogar chaves, derrubar sessões) → guardar a prova → medir o que vazou → avisar o cliente no mesmo dia (modelo 7 da seção 8) → corrigir e registrar. Havendo risco relevante às pessoas, o cliente (controlador) avisa a ANPD e os titulares; a Resolução CD/ANPD nº 15/2024 dá 3 dias úteis (confira o prazo atual). Roteiro completo: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/docs/06-seguranca-lgpd.md
 - Nunca registrar em log token, CPF ou telefone completo.
 - Marketing só para quem autorizou (`marketing_opt_in = true`), conforme a LGPD.
 - Webhook responde na hora e processa depois. Tudo pode ser repetido sem duplicar dados (atualiza se existe, cria se não existe).
@@ -597,19 +741,84 @@ Use as tabelas da seção 3 e estas medidas:
 
 ---
 
-## 11. Antes de entregar, confira
+## 11. Diagnóstico e conformidade (aba obrigatória)
 
+Todo sistema tem a aba **Diagnóstico**:
+- fica no endereço `/diagnostico`, no grupo **Sistema** do menu, com o ícone `stethoscope`;
+- só o administrador vê;
+- testa 18 regras de lei, acessibilidade, responsivo e segurança nas páginas do próprio sistema.
+
+**Cada sistema segue só o que faz sentido para ele.** As 4 perguntas do perfil (seção 0) decidem. A regra que não vale aparece como "Não se aplica", com o motivo. Não crie página, aviso ou campo para regra que não vale.
+
+| # | Regra | Vale quando | O certo |
+|---|---|---|---|
+| 1 | Política de privacidade | Página pública | `/privacidade` com dados coletados, finalidade, compartilhamento, prazo de guarda, encarregado e como pedir acesso ou exclusão; link no rodapé e perto de todo formulário |
+| 2 | Termos de serviço | Página pública ou vende | `/termos` com quem pode usar, proibições, responsabilidades, cancelamento, foro e data |
+| 3 | Aviso de cookies | Página pública com rastreamento | `.yn-consent` com Recusar e Aceitar do mesmo peso; rastreamento só depois do aceite; escolha em `localStorage` `consentimento` = `{"analytics": false, "marketing": false, "em": "..."}`; página `/cookies` |
+| 4 | Política de reembolso | Vende | `/reembolso`: arrependimento em 7 dias na compra online, troca por defeito, como pedir, estorno; link no rodapé e no checkout |
+| 5 | Formulários na LGPD | Página pública com dado pessoal | Diz para que serve, link para a política, caixa de ofertas **desmarcada** e separada do envio |
+| 6 | Só dados necessários | Dado pessoal | Todo campo pessoal tem motivo; dado sensível (saúde, religião, biometria...) só com base legal específica |
+| 7 | Scripts de tracking | Sempre | Cada rastreador listado e carregado só depois do aceite. **Sistema interno não rastreia** |
+| 8 | Acessibilidade | Sempre | `lang="pt-BR"`, um `h1`, todo botão e campo com nome, texto de 12px ou mais, zoom liberado |
+| 9 | Alt nas imagens | Sempre | `alt` que descreve, ou `alt=""` se for enfeite; nunca o nome do arquivo |
+| 10 | Contraste corrigido | Sempre | 4,5:1 (texto grande 3:1), no claro e no escuro |
+| 11 | Navegação por teclado | Sempre | Clicável é `<button>` ou `<a href>`; Tab na ordem, foco visível, Esc fecha |
+| 12 | Sem promessas falsas | Página pública | Nada de "garantido", "100%", "cura", "o melhor do Brasil", urgência falsa |
+| 13 | Copyright das imagens | Página pública | Origem registrada em cada `<img>`: `data-origem="propria"`, `"cliente"`, `"banco:Nome"` ou `"licenca:CC-BY Autor"` |
+| 14 | Dados da empresa | Página pública | Rodapé `.yn-legal` com razão social, CNPJ, endereço com CEP, e-mail e telefone |
+| 15 | Conformidade LGPD | Dado pessoal | Encarregado publicado, canal do titular, base legal e prazo de guarda por dado, operadores, plano de incidente |
+| 16 | Riscos jurídicos | Sempre | Resumo do que falhou, com a lei de cada item |
+| 17 | Responsivo ao espaço disponível | Sempre | Sem rolagem lateral; tela de trabalho usa a largura toda e nunca tem `max-width` travando; componente se ajusta à área onde está |
+| 18 | Segurança no navegador | Sempre | Nenhuma chave secreta no HTML nem no código que vai para o navegador; nenhuma senha no `localStorage`; só HTTPS; cabeçalhos do `templates/vercel.json` (CSP, nosniff, HSTS, frame-ancestors); script e CSS de CDN com versão fixa, `integrity` e `crossorigin` |
+
+Um CRM interno fica com 10 regras (6, 7, 8, 9, 10, 11, 15, 16, 17 e 18); uma loja virtual, com as 18. Regra por regra, com a base legal: https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/docs/07-diagnostico-e-conformidade.md
+
+**Como montar a aba** (o script lê as páginas com a sessão do administrador, não grava nada e não envia nada para fora):
+
+```html
+<section id="diagnostico" aria-label="Diagnóstico"></section>
+<script src="https://cdn.jsdelivr.net/gh/Yanunesxz/SystemDesing@v0.5.2/ui/diagnostico.js" integrity="sha384-z+sydA1gYihbIkr4I14pajgHr8ravx9fN/kbAZRciw+aA7zd6Z39y3Z8XzTgXI9M" crossorigin="anonymous"></script>
+<script>
+  YNDiagnostico.montar(document.getElementById("diagnostico"), {
+    perfil: { publico: false, vende: false, rastreamento: false, dadosPessoais: true },
+    paginas: ["/", "/clientes", "/pedidos"],   // as telas principais e todas as públicas
+    larguras: [375, 1280, 1920]
+  });
+</script>
+```
+
+- O `integrity` da linha acima é o desta versão. Copie a linha inteira; não escreva o hash de cabeça.
+- Em React, chame `window.YNDiagnostico.montar(ref.current, {...})` num `useEffect`.
+- A regra 18 lê o HTML e os arquivos de script do próprio site procurando chave secreta. Ela não lê nada de fora e mostra só o começo da chave achada. HTTPS e cabeçalhos só são testados no endereço publicado: rode lá também, não só em `localhost`.
+- O servidor precisa deixar o sistema abrir as próprias páginas: `X-Frame-Options: SAMEORIGIN` e `Content-Security-Policy: frame-ancestors 'self'`. Nunca `DENY`.
+- Não liste página que grava alguma coisa só de abrir.
+- Modelos das páginas legais: https://github.com/Yanunesxz/SystemDesing/tree/v0.5.2/templates/legal (esqueletos; um advogado revisa antes de publicar).
+- O resultado é alerta técnico, não parecer jurídico.
+
+---
+
+## 12. Antes de entregar, confira
+
+- [ ] Processo: portões das fases 1 a 5 fechados (seção 0), com o resumo aprovado pelo dono.
+- [ ] Telas conferidas com as 8 perguntas das leis de UX (seção 7).
+- [ ] Avisos e notificações seguindo a seção 8: canal certo, horário, sem dado sensível, link para a ação.
 - [ ] Manrope carregada, sem itálico, pesos certos (Bold títulos, Medium botões e menus, Regular texto).
 - [ ] Ícones só do Lucide, traço 1,75; botão só com ícone tem `aria-label`.
 - [ ] Nenhuma cor fora da seção 3; nenhuma cor ou tamanho fixo no código; nenhum componente inventado quando existe um `yn-*` que resolve.
 - [ ] Um botão principal por tela, na cor principal.
 - [ ] Tema claro e escuro: segue o aparelho, tem botão de trocar, a escolha fica guardada e a tela não pisca ao abrir.
-- [ ] Responsivo: conferido em 375px, 768px e 1280px, sem rolagem lateral; menu do celular no modelo certo (gaveta ou abas); 44px de toque.
+- [ ] Responsivo: conferido em 375px, 768px, 1280px e 1920px, sem rolagem lateral; tela de trabalho usando a largura toda; menu do celular no modelo certo (gaveta ou abas); 44px de toque.
+- [ ] Aba Diagnóstico no sistema, com o perfil certo, rodada sem nenhum "Falhou"; itens "Conferir" registrados no `ESTADO.md` com data.
 - [ ] Valores alinhados à direita com números de largura fixa.
 - [ ] Textos no tom da seção 8.
 - [ ] Sistema de cliente: cor do cliente só nos lugares permitidos e rodapé "Criado por Yan Nunes" (uma linha pequena, cinza).
 - [ ] Dinheiro em centavos, datas com fuso de São Paulo explícito, segredos em variável de ambiente.
 - [ ] RLS testada: logado com cada papel, tentei ler e alterar pela API o que não devia, e foi negado.
+- [ ] Nenhuma chave secreta no navegador (só URL e chave `anon` com `VITE_`); regra 18 do Diagnóstico sem "Falhou", rodada no endereço publicado.
+- [ ] Link público com token aleatório, nunca com o número do pedido; "pago" confirmado no gateway pelo servidor.
+- [ ] CI verde com `npm audit` e gitleaks; Dependabot ligado; script e CSS de CDN com `integrity`.
+- [ ] `vercel.json` com a CSP do modelo, ajustada só com os domínios que o sistema usa.
+- [ ] Roteiro de incidente combinado com o dono: quem avisa quem, e em quanto tempo.
 - [ ] Falha, vazio e sem dados têm telas diferentes.
 - [ ] Modo demonstração funciona sem banco.
 - [ ] `ESTADO.md` atualizado.
@@ -618,13 +827,13 @@ Use as tabelas da seção 3 e estas medidas:
 
 ## Anexo — CSS do padrão
 
-Use só se os links do jsDelivr (seção 5) não carregarem. É o mesmo conteúdo, versão 0.2.0.
+Use só se os links do jsDelivr (seção 5) não carregarem. É o mesmo conteúdo, versão 0.5.2. O script da aba Diagnóstico não entra aqui: se o jsDelivr cair, copie de https://raw.githubusercontent.com/Yanunesxz/SystemDesing/v0.5.2/ui/diagnostico.js
 
 ### ui/tokens.css
 
 ```css
 /*
- * SystemDesing — design tokens v0.2.0
+ * SystemDesing — design tokens v0.5.2
  * Yan Nunes · Sistemas & Consultoria
  * https://github.com/Yanunesxz/SystemDesing
  *
@@ -744,7 +953,8 @@ Use só se os links do jsDelivr (seção 5) não carregarem. É o mesmo conteúd
   --sidebar-collapsed-width: 64px; /* menu recolhido: só ícones */
   --topbar-height: 56px;
   --tabbar-height: 64px;           /* abas embaixo, no celular */
-  --content-max: 1280px;
+  --content-narrow: 960px;         /* tela de formulário ou de leitura (.yn-content--narrow) */
+  /* --content-max (1280px) saiu na v0.4.1: tela de trabalho não tem limite de largura */
 
   /* Área mínima de toque no celular (botão, campo, item de lista) */
   --touch-min: 44px;
@@ -825,7 +1035,7 @@ Use só se os links do jsDelivr (seção 5) não carregarem. É o mesmo conteúd
 
 ```css
 /*
- * SystemDesing — componentes de painel v0.2.0
+ * SystemDesing — componentes de painel v0.5.2
  * Yan Nunes · Sistemas & Consultoria
  *
  * Requer ui/tokens.css carregado ANTES.
@@ -845,6 +1055,9 @@ body {
   font-size: var(--text-base);
   line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
+  /* A página inteira é uma área que responde ao espaço: os componentes se ajustam à largura
+     de onde estão (página, .yn-content ou .yn-container), não só ao tamanho do aparelho. */
+  container-type: inline-size;
 }
 
 h1, h2, h3, h4 {
@@ -1088,9 +1301,10 @@ svg.lucide.yn-icon-24 { width: 24px; height: 24px; }
 .yn-table tbody tr:hover { background: var(--color-surface); }
 .yn-table .yn-num { text-align: right; }
 
-/* Tabela que vira cards no celular: .yn-table--stack + data-label em cada célula.
-   <td data-label="Cliente">Mercado São Jorge</td>. A primeira célula vira o título do card. */
-@media (max-width: 768px) {
+/* Tabela que vira cards quando o espaço fica estreito (celular ou painel apertado):
+   .yn-table--stack + data-label em cada célula. <td data-label="Cliente">Mercado São Jorge</td>.
+   A primeira célula vira o título do card. */
+@container (max-width: 640px) {
   .yn-table--stack thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
   .yn-table--stack tbody tr { display: grid; padding: var(--space-3) 0; border-bottom: 1px solid var(--color-border); }
   .yn-table--stack tbody tr:last-child { border-bottom: 0; }
@@ -1485,6 +1699,7 @@ button.yn-chip:hover { border-color: var(--color-border-strong); }
    <div class="yn-segmented" role="group" aria-label="Tema"><button type="button" aria-pressed="true">Claro</button>...</div> */
 .yn-segmented {
   display: inline-flex;
+  justify-self: start;
   gap: 2px;
   max-width: 100%;
   padding: 2px;
@@ -2470,7 +2685,8 @@ button.yn-chip:hover { border-color: var(--color-border-strong); }
   resize: none;
 }
 
-@media (max-width: 768px) {
+/* Pouco espaço (celular ou painel estreito): uma coisa por vez */
+@container (max-width: 720px) {
   .yn-inbox { grid-template-columns: minmax(0, 1fr); }
   .yn-inbox__list { border-right: 0; }
   .yn-inbox:not([data-view="thread"]) .yn-thread { display: none; }
@@ -3044,7 +3260,7 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
   min-width: 0;
 }
 
-@media (max-width: 960px) {
+@container (max-width: 900px) {
   .yn-split { grid-template-columns: minmax(0, 1fr); }
   .yn-split__aside { position: static; }
 }
@@ -3114,7 +3330,7 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
 
 .yn-form-grid > .yn-field--full { grid-column: 1 / -1; }
 
-@media (max-width: 768px) {
+@container (max-width: 720px) {
   .yn-form-section { grid-template-columns: minmax(0, 1fr); }
 }
 
@@ -3146,8 +3362,240 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
 
 @media (max-width: 768px) {
   .yn-form-footer { padding-inline: var(--space-4); }
+}
+
+@container (max-width: 560px) {
   .yn-form-footer .yn-btn { flex: 1; }
   .yn-form-footer__status { flex-basis: 100%; }
+}
+
+/* ---------- Diagnóstico ---------- */
+/* A aba Diagnóstico: desenhada por ui/diagnostico.js (YNDiagnostico.montar). Também dá para montar à mão.
+   Cada item: <details class="yn-audit__item" data-status="ok|warn|fail|manual|na">. */
+.yn-audit {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.yn-audit [data-status="ok"] { --yn-audit-tone: var(--color-success); }
+.yn-audit [data-status="warn"] { --yn-audit-tone: var(--color-warning); }
+.yn-audit [data-status="fail"] { --yn-audit-tone: var(--color-danger); }
+.yn-audit [data-status="manual"] { --yn-audit-tone: var(--color-info); }
+.yn-audit [data-status="na"] { --yn-audit-tone: var(--color-border-strong); }
+
+.yn-audit__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-4);
+}
+
+.yn-audit__head p { margin: 0; }
+
+.yn-audit__when {
+  margin-top: var(--space-1);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.yn-audit__profile {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.yn-audit__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.yn-audit__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.yn-audit__progress[hidden],
+.yn-audit__summary[hidden] { display: none; }
+
+.yn-audit__summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 120px), 1fr));
+  gap: var(--space-3);
+}
+
+.yn-audit__count {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--yn-audit-tone);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+}
+
+.yn-audit__count strong {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: var(--tracking-tight);
+  color: var(--color-text);
+}
+
+.yn-audit__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.yn-audit__list:empty { display: none; }
+.yn-audit__list > li + li { border-top: 1px solid var(--color-border); }
+.yn-audit__list > li > .yn-alert { margin: var(--space-3); }
+
+.yn-audit__item > summary {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto 12px;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  list-style: none;
+  cursor: pointer;
+}
+
+.yn-audit__item > summary::-webkit-details-marker { display: none; }
+.yn-audit__item > summary:hover { background: var(--color-surface); }
+
+.yn-audit__item > summary::after {
+  content: "+";
+  font-size: var(--text-lg);
+  line-height: 1;
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.yn-audit__item[open] > summary::after { content: "−"; }
+
+.yn-audit__icon { display: grid; place-items: center; color: var(--yn-audit-tone); }
+.yn-audit__icon svg.lucide { width: 20px; height: 20px; }
+.yn-audit__name { display: grid; min-width: 0; }
+.yn-audit__title { font-size: var(--text-sm); font-weight: var(--weight-semibold); }
+.yn-audit__meta { font-size: var(--text-xs); color: var(--color-text-muted); }
+.yn-audit__item[data-status="na"] .yn-audit__title { font-weight: var(--weight-medium); color: var(--color-text-muted); }
+
+.yn-audit__body {
+  display: grid;
+  gap: var(--space-2);
+  padding: 0 var(--space-4) var(--space-4) calc(var(--space-4) + 20px + var(--space-3));
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.yn-audit__body p { margin: 0; }
+.yn-audit__body > * { max-width: 100ch; }
+
+.yn-audit__findings {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: 18px;
+  overflow-wrap: anywhere;
+  color: var(--color-text);
+}
+
+.yn-audit__fix strong { font-weight: var(--weight-semibold); color: var(--color-text); }
+.yn-audit__ref { font-size: var(--text-xs); }
+
+@container (max-width: 560px) {
+  .yn-audit__body { padding-left: var(--space-4); }
+}
+
+/* ---------- Aviso de cookies e rodapé legal ---------- */
+/* Aviso de cookies: só em página pública com rastreamento. Recusar e Aceitar com o mesmo peso.
+   <div class="yn-consent" role="region" aria-label="Aviso de cookies"><p>...</p><div class="yn-consent__actions">
+   <button class="yn-btn yn-btn--secondary">Recusar</button><button class="yn-btn yn-btn--secondary">Configurar</button>
+   <button class="yn-btn yn-btn--secondary">Aceitar</button></div></div>
+   A escolha fica em localStorage "consentimento": {"analytics": false, "marketing": false, "em": "2026-10-21T14:00:00Z"} */
+.yn-consent {
+  position: fixed;
+  right: var(--space-4);
+  bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
+  left: var(--space-4);
+  z-index: 45;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+  box-sizing: border-box;
+  max-width: 760px;
+  margin-inline: auto;
+  padding: var(--space-4) var(--space-5);
+  background: var(--color-surface-raised);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-sm);
+}
+
+.yn-consent p { flex: 1 1 280px; margin: 0; }
+.yn-consent a { font-weight: var(--weight-medium); }
+
+.yn-consent__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* Rodapé legal de página pública: links e dados da empresa, antes do crédito.
+   <footer class="yn-legal"><nav class="yn-legal__links" aria-label="Informações legais"><a href="/privacidade">Política de privacidade</a>...</nav>
+   <p class="yn-legal__company">Razão social · CNPJ · endereço com CEP · e-mail · telefone</p></footer> */
+.yn-legal {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4) var(--space-2);
+  border-top: 1px solid var(--color-border);
+  font-size: var(--text-xs);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+.yn-legal__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: var(--space-1) var(--space-4);
+}
+
+.yn-legal__links a {
+  font-weight: var(--weight-medium);
+  text-decoration: none;
+  color: inherit;
+}
+
+.yn-legal__links a:hover { color: var(--color-text); text-decoration: underline; }
+
+.yn-legal__company {
+  max-width: 72ch;
+  margin: 0 auto;
+}
+
+@media (max-width: 768px) {
+  .yn-consent__actions { width: 100%; }
+  .yn-consent__actions .yn-btn { flex: 1; }
 }
 
 /* ---------- Animações ---------- */
@@ -3374,6 +3822,9 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
    Sem espaço para os três, as ações descem para a linha de baixo. */
 .yn-topbar > .yn-nav-toggle + * { flex: 1 1 160px; min-width: 0; }
 
+/* Conteúdo da tela: usa todo o espaço que sobra ao lado do menu, em qualquer monitor.
+   Tela de trabalho (lista, quadro, tabela, painel, mensagens) fica assim.
+   Tela de formulário ou de leitura usa .yn-content--narrow. */
 .yn-content {
   box-sizing: border-box;
   display: grid;
@@ -3381,8 +3832,17 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
   gap: var(--space-6);
   flex: 1;
   width: 100%;
-  max-width: var(--content-max);
   padding: var(--space-6);
+  container-type: inline-size;
+}
+
+.yn-content--narrow { max-width: var(--content-narrow); }
+
+/* Área que responde ao próprio espaço: painel lateral, metade da tela, card largo.
+   Os componentes dentro dela se ajustam à largura dela, não à da página. */
+.yn-container {
+  min-width: 0;
+  container-type: inline-size;
 }
 
 /* Botão do menu (gaveta) e fundo escuro atrás dela: só aparecem no celular */
@@ -3540,7 +4000,7 @@ body:has(> .yn-fab) .yn-content { padding-bottom: calc(56px + var(--space-8)); }
   }
 
   /* O que fica preso embaixo sobe acima das abas */
-  body:has(.yn-shell--tabs) :is(.yn-toast-region, .yn-fab) {
+  body:has(.yn-shell--tabs) :is(.yn-toast-region, .yn-fab, .yn-consent) {
     bottom: calc(var(--tabbar-height) + var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
 

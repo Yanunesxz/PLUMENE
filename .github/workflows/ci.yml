@@ -1,0 +1,71 @@
+# CI a partir do templates/ci.yml do padrão SystemDesing v0.5.2, adaptado para pnpm.
+# Roda em todo PR e na main: tipos, lint, testes, build, segurança e checagens do projeto.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # o gitleaks lê o histórico inteiro
+
+      - uses: pnpm/action-setup@v4   # versão do pnpm vem do "packageManager" do package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Tipos
+        run: pnpm typecheck
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Testes
+        run: pnpm test
+
+      - name: Build
+        run: pnpm build
+
+      # Pacote com falha de segurança alta ou crítica no que vai para produção.
+      # Falhou: atualize o pacote. Nunca desligue este passo para passar.
+      - name: Dependências com falha de segurança
+        run: pnpm audit --prod --audit-level high
+
+      # Segredo (token, chave, senha) no código ou no histórico.
+      # Achou um de verdade: revogue no painel da plataforma ANTES de apagar do código.
+      # Falso positivo: coloque a impressão digital que ele mostra no arquivo .gitleaksignore.
+      - name: Segredos no código (gitleaks)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.28.0/gitleaks_8.28.0_linux_x64.tar.gz | tar -xz gitleaks
+          ./gitleaks git --redact --no-banner --verbose .
+
+      # O apps/web/.env.production vai no build: entra na trava junto com o .env.example.
+      - name: Nenhuma chave secreta com prefixo VITE_
+        run: |
+          if grep -rnE 'VITE_[A-Z0-9_]*(SERVICE_ROLE|SECRET|PRIVATE|ANTHROPIC|OPENAI)' --include='*.ts' --include='*.tsx' --include='*.js' --include='.env.example' --include='.env.production' --exclude-dir=node_modules --exclude-dir=dist .; then
+            echo "Variável VITE_ vai para o navegador. Chave secreta fica só no servidor (docs/06 do SystemDesing)."
+            exit 1
+          fi
+
+      # As migrações deste projeto são numeradas à mão (NNN_nome.sql) e rodadas no SQL Editor.
+      # Duas sessões já criaram o mesmo número ao mesmo tempo: o CI barra a repetição.
+      - name: Migrações com número único
+        run: |
+          dir=apps/api/src/config/migrations
+          if [ -d "$dir" ]; then
+            dup=$(ls "$dir" | grep -oE '^[0-9]+' | sort | uniq -d)
+            if [ -n "$dup" ]; then echo "Migrações com o mesmo número: $dup"; exit 1; fi
+          fi

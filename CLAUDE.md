@@ -5,7 +5,7 @@ o que o sistema faz em [SOBRE-O-PROJETO.md](SOBRE-O-PROJETO.md).
 
 ---
 
-## 🎨 Visual: Padrão Yan Nunes (SystemDesing v0.2.0)
+## 🎨 Visual: Padrão Yan Nunes (SystemDesing v0.5.2)
 
 Menu no celular: abas
 
@@ -19,7 +19,8 @@ senão a tela quebra no tema escuro.
 
 ## 🚨 `main` é produção
 
-Não existe CI, não existe staging. Todo push no `main` sobe **na hora** para os
+Não existe staging. O CI (`.github/workflows/ci.yml`) roda no PR e no `main`, mas
+**não segura o deploy**: todo push no `main` sobe **na hora** para os
 representantes que estão usando o app em campo:
 
 - `apps/web` → Vercel
